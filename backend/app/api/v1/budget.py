@@ -414,3 +414,96 @@ def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)
                 "planned_amount": float(new_plan.planned_amount)
             }
         }
+
+
+@router.get("/overview/{year}/{month}")
+def get_budget_overview(year: int, month: int, db: Session = Depends(get_db)):
+    """Get budget overview (plan vs actual) for specific month"""
+    # Get all active categories
+    categories = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True
+    ).order_by(BudgetCategory.name).all()
+
+    # Get plans for the month
+    plans = db.query(BudgetPlan).filter(
+        BudgetPlan.year == year,
+        BudgetPlan.month == month
+    ).all()
+
+    plan_lookup = {p.category_id: float(p.planned_amount) for p in plans}
+
+    # Get actual expenses for the month
+    actual_query = db.query(
+        Expense.category_id,
+        func.sum(Expense.amount).label("actual")
+    ).filter(
+        func.extract('year', Expense.request_date) == year,
+        func.extract('month', Expense.request_date) == month
+    ).group_by(Expense.category_id)
+
+    actual_lookup = {item.category_id: float(item.actual) for item in actual_query.all()}
+
+    # Build result
+    result = []
+    for category in categories:
+        planned = plan_lookup.get(category.id, 0.0)
+        actual = actual_lookup.get(category.id, 0.0)
+        remaining = planned - actual
+        execution_percent = round((actual / planned * 100) if planned > 0 else 0, 2)
+        is_overspent = actual > planned
+
+        result.append({
+            "category_id": category.id,
+            "category_name": category.name,
+            "category_type": category.type,
+            "parent_id": category.parent_id,
+            "planned": planned,
+            "actual": actual,
+            "remaining": remaining,
+            "execution_percent": execution_percent,
+            "is_overspent": is_overspent
+        })
+
+    # Calculate totals
+    total_planned = sum(item["planned"] for item in result)
+    total_actual = sum(item["actual"] for item in result)
+    total_remaining = total_planned - total_actual
+    total_execution = round((total_actual / total_planned * 100) if total_planned > 0 else 0, 2)
+
+    # Calculate OPEX totals
+    opex_items = [item for item in result if item["category_type"] == ExpenseTypeEnum.OPEX]
+    opex_planned = sum(item["planned"] for item in opex_items)
+    opex_actual = sum(item["actual"] for item in opex_items)
+    opex_remaining = opex_planned - opex_actual
+    opex_execution = round((opex_actual / opex_planned * 100) if opex_planned > 0 else 0, 2)
+
+    # Calculate CAPEX totals
+    capex_items = [item for item in result if item["category_type"] == ExpenseTypeEnum.CAPEX]
+    capex_planned = sum(item["planned"] for item in capex_items)
+    capex_actual = sum(item["actual"] for item in capex_items)
+    capex_remaining = capex_planned - capex_actual
+    capex_execution = round((capex_actual / capex_planned * 100) if capex_planned > 0 else 0, 2)
+
+    return {
+        "year": year,
+        "month": month,
+        "categories": result,
+        "totals": {
+            "planned": total_planned,
+            "actual": total_actual,
+            "remaining": total_remaining,
+            "execution_percent": total_execution
+        },
+        "opex_totals": {
+            "planned": opex_planned,
+            "actual": opex_actual,
+            "remaining": opex_remaining,
+            "execution_percent": opex_execution
+        },
+        "capex_totals": {
+            "planned": capex_planned,
+            "actual": capex_actual,
+            "remaining": capex_remaining,
+            "execution_percent": capex_execution
+        }
+    }

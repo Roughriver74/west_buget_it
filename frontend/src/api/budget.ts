@@ -28,6 +28,42 @@ export interface CopyPlanRequest {
   coefficient: number
 }
 
+export interface BudgetOverviewCategory {
+  category_id: number
+  category_name: string
+  category_type: string
+  parent_id: number | null
+  planned: number
+  actual: number
+  remaining: number
+  execution_percent: number
+  is_overspent: boolean
+}
+
+export interface BudgetOverview {
+  year: number
+  month: number
+  categories: BudgetOverviewCategory[]
+  totals: {
+    planned: number
+    actual: number
+    remaining: number
+    execution_percent: number
+  }
+  opex_totals: {
+    planned: number
+    actual: number
+    remaining: number
+    execution_percent: number
+  }
+  capex_totals: {
+    planned: number
+    actual: number
+    remaining: number
+    execution_percent: number
+  }
+}
+
 export const budgetApi = {
   // Получить план на год в pivot формате
   getPlanForYear: async (year: number): Promise<BudgetPlanYear> => {
@@ -64,6 +100,12 @@ export const budgetApi = {
     const params: any = { year }
     if (month) params.month = month
     const { data } = await apiClient.get('/budget/summary', { params })
+    return data
+  },
+
+  // Получить обзор бюджета за месяц (План-Факт-Остаток)
+  getOverview: async (year: number, month: number): Promise<BudgetOverview> => {
+    const { data } = await apiClient.get(`/budget/overview/${year}/${month}`)
     return data
   },
 }

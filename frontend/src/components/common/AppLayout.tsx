@@ -29,6 +29,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/dashboard">Дашборд</Link>,
     },
     {
+      key: '/budget',
+      icon: <DollarOutlined />,
+      label: <Link to="/budget">Бюджет</Link>,
+    },
+    {
       key: '/expenses',
       icon: <FileTextOutlined />,
       label: <Link to="/expenses">Заявки</Link>,
