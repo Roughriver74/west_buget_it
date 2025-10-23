@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from datetime import datetime
@@ -8,8 +9,115 @@ import math
 from app.db import get_db
 from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum
 from app.schemas import ExpenseCreate, ExpenseUpdate, ExpenseInDB, ExpenseList, ExpenseStatusUpdate
+from app.utils.excel_export import ExcelExporter
 
 router = APIRouter()
+
+
+@router.get("/export")
+def export_expenses_to_excel(
+    status: Optional[ExpenseStatusEnum] = None,
+    category_id: Optional[int] = None,
+    contractor_id: Optional[int] = None,
+    organization_id: Optional[int] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    search: Optional[str] = None,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Export expenses to Excel file"""
+    # Get expenses with same filters as get_expenses endpoint
+    query = db.query(Expense)
+
+    if status:
+        query = query.filter(Expense.status == status)
+
+    if category_id:
+        query = query.filter(Expense.category_id == category_id)
+
+    if contractor_id:
+        query = query.filter(Expense.contractor_id == contractor_id)
+
+    if organization_id:
+        query = query.filter(Expense.organization_id == organization_id)
+
+    if date_from:
+        query = query.filter(Expense.request_date >= date_from)
+
+    if date_to:
+        query = query.filter(Expense.request_date <= date_to)
+
+    if year:
+        query = query.filter(func.extract('year', Expense.request_date) == year)
+
+    if month:
+        query = query.filter(func.extract('month', Expense.request_date) == month)
+
+    if search:
+        search_filter = or_(
+            Expense.number.ilike(f"%{search}%"),
+            Expense.comment.ilike(f"%{search}%")
+        )
+        query = query.filter(search_filter)
+
+    # Get all matching expenses
+    expenses = query.order_by(Expense.request_date.desc()).all()
+
+    # Convert to dict for export
+    expenses_data = []
+    for expense in expenses:
+        expense_dict = {
+            "number": expense.number,
+            "request_date": expense.request_date.isoformat() if expense.request_date else None,
+            "category": {
+                "name": expense.category.name if expense.category else "",
+                "type": expense.category.type if expense.category else ""
+            },
+            "contractor": {
+                "name": expense.contractor.name if expense.contractor else ""
+            } if expense.contractor else None,
+            "organization": {
+                "name": expense.organization.name if expense.organization else ""
+            },
+            "amount": expense.amount,
+            "status": expense.status,
+            "payment_date": expense.payment_date.isoformat() if expense.payment_date else None,
+            "comment": expense.comment or ""
+        }
+        expenses_data.append(expense_dict)
+
+    # Prepare filters for header
+    filters = {}
+    if year:
+        filters['year'] = year
+    if month:
+        filters['month'] = month
+    if category_id:
+        category = db.query(BudgetCategory).filter(BudgetCategory.id == category_id).first()
+        filters['category'] = category.name if category else f"ID {category_id}"
+
+    # Generate Excel file
+    excel_file = ExcelExporter.export_expenses(expenses_data, filters)
+
+    # Generate filename
+    filename_parts = ["expenses"]
+    if year:
+        filename_parts.append(str(year))
+    if month:
+        filename_parts.append(f"{month:02d}")
+    if category_id:
+        filename_parts.append(f"cat{category_id}")
+
+    filename = "_".join(filename_parts) + ".xlsx"
+
+    # Return as download
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.get("/", response_model=ExpenseList)
