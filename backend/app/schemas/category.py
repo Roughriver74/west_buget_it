@@ -10,6 +10,7 @@ class BudgetCategoryBase(BaseModel):
     type: ExpenseTypeEnum
     description: Optional[str] = None
     is_active: bool = True
+    parent_id: Optional[int] = None
 
 
 class BudgetCategoryCreate(BudgetCategoryBase):
@@ -23,6 +24,7 @@ class BudgetCategoryUpdate(BaseModel):
     type: Optional[ExpenseTypeEnum] = None
     description: Optional[str] = None
     is_active: Optional[bool] = None
+    parent_id: Optional[int] = None
 
 
 class BudgetCategoryInDB(BudgetCategoryBase):

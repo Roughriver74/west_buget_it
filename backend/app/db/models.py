@@ -11,11 +11,54 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    TypeDecorator,
 )
 from sqlalchemy.orm import relationship
 import enum
 
 from .session import Base
+
+
+class RussianEnumType(TypeDecorator):
+    """
+    TypeDecorator для работы с PostgreSQL enum, где значения на русском языке.
+    Конвертирует enum name (DRAFT) в enum value (Черновик) и обратно.
+    """
+    impl = String
+    cache_ok = True
+
+    def __init__(self, enum_class, *args, **kwargs):
+        self.enum_class = enum_class
+        # Создаем маппинг value -> name для чтения из БД
+        self.value_to_name = {e.value: e.name for e in enum_class}
+        # Создаем маппинг name -> value для записи в БД
+        self.name_to_value = {e.name: e.value for e in enum_class}
+        super().__init__(*args, **kwargs)
+
+    def process_bind_param(self, value, dialect):
+        """Преобразование Python enum в значение для БД"""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            # Если передана строка, проверяем что это валидный name
+            if value in self.name_to_value:
+                return self.name_to_value[value]
+            # Или уже value
+            if value in self.value_to_name:
+                return value
+            raise ValueError(f"Invalid value: {value}")
+        # Если передан enum, берем его value
+        return value.value
+
+    def process_result_value(self, value, dialect):
+        """Преобразование значения из БД в Python enum"""
+        if value is None:
+            return None
+        # Ищем enum по значению из БД
+        if value in self.value_to_name:
+            enum_name = self.value_to_name[value]
+            return self.enum_class[enum_name]
+        raise ValueError(f"Unknown enum value: {value}")
 
 
 class ExpenseTypeEnum(str, enum.Enum):
@@ -122,7 +165,7 @@ class Expense(Base):
     payment_date = Column(DateTime, nullable=True)
 
     # Status
-    status = Column(Enum(ExpenseStatusEnum), nullable=False, default=ExpenseStatusEnum.DRAFT, index=True)
+    status = Column(RussianEnumType(ExpenseStatusEnum), nullable=False, default=ExpenseStatusEnum.DRAFT, index=True)
     is_paid = Column(Boolean, default=False, nullable=False)
     is_closed = Column(Boolean, default=False, nullable=False)
 

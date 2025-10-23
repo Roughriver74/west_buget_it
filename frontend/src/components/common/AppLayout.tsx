@@ -46,7 +46,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     {
       key: '/analytics',
       icon: <BarChartOutlined />,
-      label: <Link to="/analytics">Аналитика</Link>,
+      label: 'Аналитика',
+      children: [
+        {
+          key: '/analytics',
+          label: <Link to="/analytics">Дашборд</Link>,
+        },
+        {
+          key: '/analytics/balance',
+          label: <Link to="/analytics/balance">План-Факт-Остаток</Link>,
+        },
+      ],
     },
     {
       key: '/categories',

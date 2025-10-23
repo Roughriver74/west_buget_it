@@ -46,11 +46,57 @@ const CategoryTable: React.FC = () => {
     deleteMutation.mutate(id)
   }
 
-  // Фильтрация по типу на клиенте
-  const filteredCategories = categories?.filter((cat) => {
-    if (typeFilter === 'ALL') return true
-    return cat.type === typeFilter
-  })
+  // Построение древовидной структуры
+  const buildTreeData = (categories: BudgetCategory[]) => {
+    if (!categories) return []
+
+    // Фильтрация по типу
+    const filtered = categories.filter((cat) => {
+      if (typeFilter === 'ALL') return true
+      return cat.type === typeFilter
+    })
+
+    // Создаём map для быстрого поиска
+    const categoryMap = new Map(filtered.map(cat => [cat.id, { ...cat, children: [] }]))
+
+    // Массив для корневых элементов
+    const rootCategories: any[] = []
+
+    // Строим дерево
+    filtered.forEach(cat => {
+      const node = categoryMap.get(cat.id)
+      if (!node) return
+
+      if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+        // Это подкатегория, добавляем к родителю
+        const parent = categoryMap.get(cat.parent_id)
+        if (parent) {
+          parent.children.push(node)
+        }
+      } else {
+        // Это корневая категория
+        rootCategories.push(node)
+      }
+    })
+
+    // Удаляем пустые массивы children
+    const cleanTree = (nodes: any[]) => {
+      return nodes.map(node => {
+        if (node.children.length === 0) {
+          const { children, ...rest } = node
+          return rest
+        }
+        return {
+          ...node,
+          children: cleanTree(node.children)
+        }
+      })
+    }
+
+    return cleanTree(rootCategories)
+  }
+
+  const treeData = buildTreeData(categories || [])
 
   const columns = [
     {
@@ -162,13 +208,16 @@ const CategoryTable: React.FC = () => {
 
       <Table
         columns={columns}
-        dataSource={filteredCategories}
+        dataSource={treeData}
         loading={isLoading}
         rowKey="id"
         pagination={{
           pageSize: 20,
           showSizeChanger: true,
           showTotal: (total) => `Всего: ${total} статей`,
+        }}
+        expandable={{
+          defaultExpandAllRows: false,
         }}
       />
 

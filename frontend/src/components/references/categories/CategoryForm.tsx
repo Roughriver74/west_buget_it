@@ -1,22 +1,36 @@
 import React from 'react'
-import { Form, Input, Radio, Checkbox, FormInstance } from 'antd'
+import { Form, Input, Radio, Checkbox, Select, FormInstance } from 'antd'
+import { useQuery } from '@tanstack/react-query'
+import { categoriesApi } from '@/api'
 import type { BudgetCategory, ExpenseType } from '@/types'
 
 const { TextArea } = Input
+const { Option } = Select
 
 interface CategoryFormProps {
   form?: FormInstance
   initialValues?: Partial<BudgetCategory>
   onFinish: (values: any) => void
+  currentCategoryId?: number
 }
 
-const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFinish }) => {
+const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFinish, currentCategoryId }) => {
+  // Загружаем все активные категории для выбора родителя
+  const { data: categories } = useQuery({
+    queryKey: ['categories', { is_active: true }],
+    queryFn: () => categoriesApi.getAll({ is_active: true }),
+  })
+
+  // Фильтруем категории: исключаем текущую категорию (чтобы не создать циклическую ссылку)
+  const availableParents = categories?.filter(cat => cat.id !== currentCategoryId) || []
+
   return (
     <Form
       form={form}
       layout="vertical"
       initialValues={{
         is_active: true,
+        parent_id: null,
         ...initialValues,
       }}
       onFinish={onFinish}
@@ -41,6 +55,25 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFini
           <Radio value="OPEX">OPEX (Операционные расходы)</Radio>
           <Radio value="CAPEX">CAPEX (Капитальные расходы)</Radio>
         </Radio.Group>
+      </Form.Item>
+
+      <Form.Item
+        name="parent_id"
+        label="Родительская категория"
+        tooltip="Выберите, если это подкатегория другой статьи расходов"
+      >
+        <Select
+          placeholder="Корневая категория (не выбрано)"
+          allowClear
+          showSearch
+          optionFilterProp="children"
+        >
+          {availableParents.map((cat) => (
+            <Option key={cat.id} value={cat.id}>
+              {cat.name} ({cat.type})
+            </Option>
+          ))}
+        </Select>
       </Form.Item>
 
       <Form.Item

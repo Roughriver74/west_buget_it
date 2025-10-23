@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, Field
+from app.db.models import BudgetStatusEnum
 
 
 class BudgetPlanBase(BaseModel):
@@ -32,8 +33,10 @@ class BudgetPlanUpdate(BaseModel):
 class BudgetPlanInDB(BudgetPlanBase):
     """Schema for budget plan from database"""
     id: int
+    status: BudgetStatusEnum
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+        use_enum_values = True

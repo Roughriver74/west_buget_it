@@ -22,6 +22,7 @@ const CategoryEditModal: React.FC<CategoryEditModalProps> = ({ open, category, o
         type: category.type,
         description: category.description,
         is_active: category.is_active,
+        parent_id: category.parent_id,
       })
     }
   }, [category, open, form])
@@ -63,7 +64,12 @@ const CategoryEditModal: React.FC<CategoryEditModalProps> = ({ open, category, o
       okText="Сохранить"
       cancelText="Отмена"
     >
-      <CategoryForm form={form} initialValues={category || undefined} onFinish={handleFinish} />
+      <CategoryForm
+        form={form}
+        initialValues={category || undefined}
+        onFinish={handleFinish}
+        currentCategoryId={category?.id}
+      />
     </Modal>
   )
 }

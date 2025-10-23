@@ -17,8 +17,10 @@ export interface BudgetCategory {
   type: ExpenseType
   description?: string
   is_active: boolean
+  parent_id?: number | null
   created_at: string
   updated_at: string
+  children?: BudgetCategory[]
 }
 
 export interface Contractor {
