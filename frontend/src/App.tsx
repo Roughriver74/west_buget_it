@@ -4,7 +4,7 @@ import AppLayout from './components/common/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import ExpensesPage from './pages/ExpensesPage'
 import BudgetPage from './pages/BudgetPage'
-import ReferencesPage from './pages/ReferencesPage'
+import CategoriesPage from './pages/CategoriesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 
 function App() {
@@ -16,7 +16,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/budget" element={<BudgetPage />} />
-          <Route path="/references" element={<ReferencesPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
         </Routes>
       </AppLayout>

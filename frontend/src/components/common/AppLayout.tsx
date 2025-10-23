@@ -44,9 +44,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/analytics">Аналитика</Link>,
     },
     {
-      key: '/references',
+      key: '/categories',
       icon: <DatabaseOutlined />,
-      label: <Link to="/references">Справочники</Link>,
+      label: <Link to="/categories">Статьи расходов</Link>,
     },
   ]
 
