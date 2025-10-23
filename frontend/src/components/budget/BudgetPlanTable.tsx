@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Table, Tag, Spin, message, Button, Space } from 'antd'
-import { CopyOutlined, PlusOutlined } from '@ant-design/icons'
+import { CopyOutlined, PlusOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import EditableCell from './EditableCell'
@@ -73,6 +73,13 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
 
   const isCellUpdating = (categoryId: number, month: number): boolean => {
     return updatingCells.has(`${categoryId}-${month}`)
+  }
+
+  const handleExport = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const url = `${apiUrl}/api/v1/budget/plans/year/${year}/export`
+    window.open(url, '_blank')
+    message.success('Экспорт начат. Файл скоро будет загружен.')
   }
 
   const formatNumber = (num: number) => {
@@ -243,6 +250,13 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
             onClick={() => setCopyModalOpen(true)}
           >
             Скопировать из другого года
+          </Button>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+            type="default"
+          >
+            Экспорт в Excel
           </Button>
         </Space>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Table, Tag, Button, Spin } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { Table, Tag, Button, Spin, Space, message } from 'antd'
+import { PlusOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import type { BudgetOverviewCategory } from '@/api/budget'
@@ -19,6 +19,13 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     queryKey: ['budget-overview', year, month],
     queryFn: () => budgetApi.getOverview(year, month),
   })
+
+  const handleExport = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const url = `${apiUrl}/api/v1/budget/overview/${year}/${month}/export`
+    window.open(url, '_blank')
+    message.success('Экспорт начат. Файл скоро будет загружен.')
+  }
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('ru-RU').format(num)
@@ -159,13 +166,21 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
             Бюджет за месяц: {new Date(year, month - 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
           </h3>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setExpenseModalOpen(true)}
-        >
-          Добавить расход
-        </Button>
+        <Space>
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+          >
+            Экспорт в Excel
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setExpenseModalOpen(true)}
+          >
+            Добавить расход
+          </Button>
+        </Space>
       </div>
 
       <Table
