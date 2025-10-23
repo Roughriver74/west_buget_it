@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Table, Button, Space, Tag, Input, Select, DatePicker } from 'antd'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
-import type { Expense, ExpenseStatus } from '@/types'
+import type { ExpenseStatus } from '@/types'
 import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
@@ -107,7 +107,7 @@ const ExpensesPage = () => {
       key: 'actions',
       width: 100,
       fixed: 'right' as const,
-      render: (_: any, record: Expense) => (
+      render: () => (
         <Space size="small">
           <Button type="link" size="small">
             Изменить

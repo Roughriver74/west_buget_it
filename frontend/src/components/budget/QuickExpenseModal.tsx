@@ -111,9 +111,6 @@ const QuickExpenseModal: React.FC<QuickExpenseModalProps> = ({
             placeholder="Выберите статью"
             showSearch
             optionFilterProp="children"
-            filterOption={(input, option) =>
-              (option?.children as string).toLowerCase().includes(input.toLowerCase())
-            }
           >
             {categories?.map((cat) => (
               <Option key={cat.id} value={cat.id}>
@@ -137,7 +134,7 @@ const QuickExpenseModal: React.FC<QuickExpenseModalProps> = ({
             step={1000}
             placeholder="Введите сумму"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number(value!.replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>

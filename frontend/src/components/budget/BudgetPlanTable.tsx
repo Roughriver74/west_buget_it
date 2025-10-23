@@ -3,7 +3,6 @@ import { Table, Tag, Spin, message, Button, Space } from 'antd'
 import { CopyOutlined, PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
-import type { ExpenseType } from '@/types'
 import EditableCell from './EditableCell'
 import CopyPlanModal from './CopyPlanModal'
 
@@ -27,9 +26,9 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
   // Инициализация плана
   const initMutation = useMutation({
     mutationFn: () => budgetApi.initializePlan(year),
-    onSuccess: (data) => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['budget-plan', year] })
-      message.success(`План инициализирован! Создано записей: ${data.created_entries}`)
+      message.success(`План инициализирован! Создано записей: ${response.created_entries}`)
     },
     onError: (error: any) => {
       message.error(`Ошибка инициализации: ${error.response?.data?.detail || error.message}`)
@@ -43,7 +42,7 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
       const cellKey = `${variables.category_id}-${variables.month}`
       setUpdatingCells((prev) => new Set(prev).add(cellKey))
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['budget-plan', year] })
       const cellKey = `${variables.category_id}-${variables.month}`
       setUpdatingCells((prev) => {
@@ -90,13 +89,6 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
     return categories.reduce((sum, cat) => {
       const monthData = cat.months[month.toString()]
       return sum + (monthData?.planned_amount || 0)
-    }, 0)
-  }
-
-  // Расчёт общего итога
-  const calculateGrandTotal = (categories: any[]) => {
-    return categories.reduce((sum, cat) => {
-      return sum + calculateRowTotal(cat.months)
     }, 0)
   }
 

@@ -2,7 +2,7 @@ import React from 'react'
 import { Form, Input, Radio, Checkbox, Select, FormInstance } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { categoriesApi } from '@/api'
-import type { BudgetCategory, ExpenseType } from '@/types'
+import type { BudgetCategory } from '@/types'
 
 const { TextArea } = Input
 const { Option } = Select
