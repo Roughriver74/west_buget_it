@@ -2,12 +2,27 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
+from decimal import Decimal
 
 from app.db import get_db
 from app.db.models import BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
 
 router = APIRouter()
+
+
+class CellUpdateRequest(BaseModel):
+    """Request to update a single budget cell"""
+    year: int
+    month: int
+    category_id: int
+    planned_amount: Decimal
+
+
+class CopyPlanRequest(BaseModel):
+    """Request to copy budget plan from another year"""
+    coefficient: float = 1.0  # Коэффициент корректировки (1.0 = без изменений, 1.1 = +10%)
 
 
 @router.get("/plans", response_model=List[BudgetPlanInDB])
@@ -184,3 +199,218 @@ def get_budget_summary(
             "execution_percent": round((total_actual / total_planned * 100) if total_planned > 0 else 0, 2)
         }
     }
+
+
+@router.get("/plans/year/{year}")
+def get_budget_plan_for_year(year: int, db: Session = Depends(get_db)):
+    """Get budget plan for entire year in pivot format (categories x months)"""
+    # Get all active categories
+    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).order_by(BudgetCategory.name).all()
+
+    # Get all plans for the year
+    plans = db.query(BudgetPlan).filter(BudgetPlan.year == year).all()
+
+    # Create a lookup dictionary for plans
+    plan_lookup = {}
+    for plan in plans:
+        key = (plan.category_id, plan.month)
+        plan_lookup[key] = {
+            "id": plan.id,
+            "planned_amount": float(plan.planned_amount),
+            "capex_planned": float(plan.capex_planned),
+            "opex_planned": float(plan.opex_planned)
+        }
+
+    # Build result
+    result = []
+    for category in categories:
+        row = {
+            "category_id": category.id,
+            "category_name": category.name,
+            "category_type": category.type,
+            "months": {}
+        }
+
+        # Add data for each month
+        for month in range(1, 13):
+            key = (category.id, month)
+            if key in plan_lookup:
+                row["months"][str(month)] = plan_lookup[key]
+            else:
+                row["months"][str(month)] = {
+                    "id": None,
+                    "planned_amount": 0,
+                    "capex_planned": 0,
+                    "opex_planned": 0
+                }
+
+        result.append(row)
+
+    return {
+        "year": year,
+        "categories": result
+    }
+
+
+@router.post("/plans/year/{year}/init")
+def initialize_budget_plan(year: int, db: Session = Depends(get_db)):
+    """Initialize budget plan for the year (create empty entries for all categories and months)"""
+    # Get all active categories
+    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).all()
+
+    created_count = 0
+    for category in categories:
+        for month in range(1, 13):
+            # Check if plan already exists
+            existing = db.query(BudgetPlan).filter(
+                BudgetPlan.year == year,
+                BudgetPlan.month == month,
+                BudgetPlan.category_id == category.id
+            ).first()
+
+            if not existing:
+                new_plan = BudgetPlan(
+                    year=year,
+                    month=month,
+                    category_id=category.id,
+                    planned_amount=0,
+                    capex_planned=0 if category.type == ExpenseTypeEnum.OPEX else 0,
+                    opex_planned=0 if category.type == ExpenseTypeEnum.CAPEX else 0
+                )
+                db.add(new_plan)
+                created_count += 1
+
+    db.commit()
+
+    return {
+        "message": f"Initialized budget plan for {year}",
+        "created_entries": created_count
+    }
+
+
+@router.post("/plans/year/{year}/copy-from/{source_year}")
+def copy_budget_plan(
+    year: int,
+    source_year: int,
+    request: CopyPlanRequest,
+    db: Session = Depends(get_db)
+):
+    """Copy budget plan from source year to target year with optional coefficient"""
+    # Get source plans
+    source_plans = db.query(BudgetPlan).filter(BudgetPlan.year == source_year).all()
+
+    if not source_plans:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No budget plans found for year {source_year}"
+        )
+
+    created_count = 0
+    updated_count = 0
+
+    for source_plan in source_plans:
+        # Check if target plan already exists
+        existing = db.query(BudgetPlan).filter(
+            BudgetPlan.year == year,
+            BudgetPlan.month == source_plan.month,
+            BudgetPlan.category_id == source_plan.category_id
+        ).first()
+
+        new_amount = float(source_plan.planned_amount) * request.coefficient
+        new_capex = float(source_plan.capex_planned) * request.coefficient
+        new_opex = float(source_plan.opex_planned) * request.coefficient
+
+        if existing:
+            # Update existing plan
+            existing.planned_amount = Decimal(str(round(new_amount, 2)))
+            existing.capex_planned = Decimal(str(round(new_capex, 2)))
+            existing.opex_planned = Decimal(str(round(new_opex, 2)))
+            updated_count += 1
+        else:
+            # Create new plan
+            new_plan = BudgetPlan(
+                year=year,
+                month=source_plan.month,
+                category_id=source_plan.category_id,
+                planned_amount=Decimal(str(round(new_amount, 2))),
+                capex_planned=Decimal(str(round(new_capex, 2))),
+                opex_planned=Decimal(str(round(new_opex, 2)))
+            )
+            db.add(new_plan)
+            created_count += 1
+
+    db.commit()
+
+    return {
+        "message": f"Copied budget plan from {source_year} to {year} with coefficient {request.coefficient}",
+        "created_entries": created_count,
+        "updated_entries": updated_count
+    }
+
+
+@router.patch("/plans/cell")
+def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)):
+    """Update a single budget plan cell (upsert)"""
+    # Check if category exists
+    category = db.query(BudgetCategory).filter(BudgetCategory.id == request.category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Category with id {request.category_id} not found"
+        )
+
+    # Try to find existing plan
+    existing = db.query(BudgetPlan).filter(
+        BudgetPlan.year == request.year,
+        BudgetPlan.month == request.month,
+        BudgetPlan.category_id == request.category_id
+    ).first()
+
+    # Calculate capex/opex based on category type
+    if category.type == ExpenseTypeEnum.CAPEX:
+        capex_amount = request.planned_amount
+        opex_amount = Decimal(0)
+    else:
+        capex_amount = Decimal(0)
+        opex_amount = request.planned_amount
+
+    if existing:
+        # Update existing plan
+        existing.planned_amount = request.planned_amount
+        existing.capex_planned = capex_amount
+        existing.opex_planned = opex_amount
+        db.commit()
+        db.refresh(existing)
+        return {
+            "message": "Budget cell updated",
+            "plan": {
+                "id": existing.id,
+                "year": existing.year,
+                "month": existing.month,
+                "category_id": existing.category_id,
+                "planned_amount": float(existing.planned_amount)
+            }
+        }
+    else:
+        # Create new plan
+        new_plan = BudgetPlan(
+            year=request.year,
+            month=request.month,
+            category_id=request.category_id,
+            planned_amount=request.planned_amount,
+            capex_planned=capex_amount,
+            opex_planned=opex_amount
+        )
+        db.add(new_plan)
+        db.commit()
+        db.refresh(new_plan)
+        return {
+            "message": "Budget cell created",
+            "plan": {
+                "id": new_plan.id,
+                "year": new_plan.year,
+                "month": new_plan.month,
+                "category_id": new_plan.category_id,
+                "planned_amount": float(new_plan.planned_amount)
+            }
+        }

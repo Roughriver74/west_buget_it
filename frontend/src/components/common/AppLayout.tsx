@@ -34,9 +34,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/expenses">Заявки</Link>,
     },
     {
-      key: '/budget',
+      key: '/budget/plan',
       icon: <DollarOutlined />,
-      label: <Link to="/budget">Бюджет</Link>,
+      label: <Link to="/budget/plan">План бюджета</Link>,
     },
     {
       key: '/analytics',
@@ -70,6 +70,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           selectedKeys={[location.pathname]}
           mode="inline"
           items={menuItems}
+          defaultSelectedKeys={[location.pathname]}
         />
       </Sider>
       <Layout>
