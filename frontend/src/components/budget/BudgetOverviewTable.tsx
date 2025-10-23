@@ -121,8 +121,9 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
   // Строки итогов
   const opexRow = {
     key: 'opex-total',
+    category_id: -1,
     category_name: 'ИТОГО OPEX',
-    category_type: 'OPEX',
+    category_type: 'OPEX' as const,
     parent_id: null,
     ...overview.opex_totals,
     is_overspent: overview.opex_totals.remaining < 0,
@@ -130,8 +131,9 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
 
   const capexRow = {
     key: 'capex-total',
+    category_id: -2,
     category_name: 'ИТОГО CAPEX',
-    category_type: 'CAPEX',
+    category_type: 'CAPEX' as const,
     parent_id: null,
     ...overview.capex_totals,
     is_overspent: overview.capex_totals.remaining < 0,
@@ -139,14 +141,15 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
 
   const totalRow = {
     key: 'grand-total',
+    category_id: -3,
     category_name: 'ВСЕГО',
-    category_type: '',
+    category_type: '' as any,
     parent_id: null,
     ...overview.totals,
     is_overspent: overview.totals.remaining < 0,
   }
 
-  const dataWithTotals = [...dataSource, opexRow, capexRow, totalRow]
+  const dataWithTotals = [...dataSource, opexRow, capexRow, totalRow] as any[]
 
   return (
     <div>
@@ -171,7 +174,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         pagination={false}
         bordered
         size="middle"
-        rowClassName={(record) => {
+        rowClassName={(record: any) => {
           if (record.key === 'grand-total') return 'grand-total-row'
           if (record.key === 'opex-total' || record.key === 'capex-total') return 'subtotal-row'
           return ''

@@ -70,17 +70,17 @@ const CategoryTable: React.FC = () => {
       if (cat.parent_id && categoryMap.has(cat.parent_id)) {
         // Это подкатегория, добавляем к родителю
         const parent = categoryMap.get(cat.parent_id)
-        if (parent) {
-          parent.children.push(node)
+        if (parent && node) {
+          (parent.children as any[]).push(node)
         }
       } else {
         // Это корневая категория
-        rootCategories.push(node)
+        if (node) rootCategories.push(node)
       }
     })
 
     // Удаляем пустые массивы children
-    const cleanTree = (nodes: any[]) => {
+    const cleanTree = (nodes: any[]): any[] => {
       return nodes.map(node => {
         if (node.children.length === 0) {
           const { children, ...rest } = node

@@ -137,7 +137,6 @@ const BalanceAnalyticsPage: React.FC = () => {
       key: 'remaining',
       align: 'right',
       render: (value: number, record: CategoryBalance) => {
-        const status = getBalanceStatus(value, record.planned)
         return (
           <span style={{
             color: value < 0 ? '#ff4d4f' : value < record.planned * 0.2 ? '#faad14' : '#52c41a',

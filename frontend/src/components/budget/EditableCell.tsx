@@ -67,7 +67,7 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onChange, loading = 
         step={1000}
         style={{ width: '100%' }}
         formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-        parser={(value) => value!.replace(/\s?/g, '')}
+        parser={(value) => Number(value!.replace(/\s?/g, '')) as any}
         disabled={loading}
       />
     )
