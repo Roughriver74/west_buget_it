@@ -1,0 +1,50 @@
+import apiClient from './client'
+import type { Expense, ExpenseList, ExpenseStatus } from '@/types'
+
+export interface ExpenseFilters {
+  skip?: number
+  limit?: number
+  status?: ExpenseStatus
+  category_id?: number
+  contractor_id?: number
+  organization_id?: number
+  date_from?: string
+  date_to?: string
+  search?: string
+}
+
+export const expensesApi = {
+  getAll: async (filters?: ExpenseFilters): Promise<ExpenseList> => {
+    const { data } = await apiClient.get('/expenses', { params: filters })
+    return data
+  },
+
+  getById: async (id: number): Promise<Expense> => {
+    const { data } = await apiClient.get(`/expenses/${id}`)
+    return data
+  },
+
+  create: async (expense: Partial<Expense>): Promise<Expense> => {
+    const { data } = await apiClient.post('/expenses', expense)
+    return data
+  },
+
+  update: async (id: number, expense: Partial<Expense>): Promise<Expense> => {
+    const { data } = await apiClient.put(`/expenses/${id}`, expense)
+    return data
+  },
+
+  updateStatus: async (id: number, status: ExpenseStatus): Promise<Expense> => {
+    const { data } = await apiClient.patch(`/expenses/${id}/status`, { status })
+    return data
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/expenses/${id}`)
+  },
+
+  getTotals: async (filters?: { year?: number; month?: number; category_id?: number }) => {
+    const { data } = await apiClient.get('/expenses/stats/totals', { params: filters })
+    return data
+  },
+}
