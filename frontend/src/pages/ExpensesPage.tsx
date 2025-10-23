@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker } from 'antd'
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { Table, Button, Space, Tag, Input, Select, DatePicker, message } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
 import type { ExpenseStatus } from '@/types'
 import dayjs from 'dayjs'
@@ -41,6 +41,21 @@ const ExpensesPage = () => {
     'Оплачена': 'success',
     'Отклонена': 'error',
     'Закрыта': 'default',
+  }
+
+  const handleExport = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const params = new URLSearchParams()
+
+    if (status) params.append('status', status)
+    if (categoryId) params.append('category_id', categoryId.toString())
+    if (search) params.append('search', search)
+    if (dateRange?.[0]) params.append('date_from', dateRange[0].toISOString())
+    if (dateRange?.[1]) params.append('date_to', dateRange[1].toISOString())
+
+    const url = `${apiUrl}/api/v1/expenses/export?${params.toString()}`
+    window.open(url, '_blank')
+    message.success('Экспорт начат. Файл скоро будет загружен.')
   }
 
   const columns = [
@@ -155,6 +170,9 @@ const ExpensesPage = () => {
           value={dateRange}
           onChange={setDateRange as any}
         />
+        <Button icon={<DownloadOutlined />} onClick={handleExport}>
+          Экспорт в Excel
+        </Button>
         <Button type="primary" icon={<PlusOutlined />}>
           Создать заявку
         </Button>

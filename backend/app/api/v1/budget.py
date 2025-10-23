@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from decimal import Decimal
 from app.db import get_db
 from app.db.models import BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
+from app.utils.excel_export import ExcelExporter
 
 router = APIRouter()
 
@@ -507,3 +509,80 @@ def get_budget_overview(year: int, month: int, db: Session = Depends(get_db)):
             "execution_percent": capex_execution
         }
     }
+
+
+@router.get("/plans/year/{year}/export")
+def export_budget_plan_to_excel(year: int, db: Session = Depends(get_db)):
+    """Export budget plan for year to Excel file"""
+    # Get budget plan data
+    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).order_by(BudgetCategory.name).all()
+    plans = db.query(BudgetPlan).filter(BudgetPlan.year == year).all()
+
+    # Create a lookup dictionary for plans
+    plan_lookup = {}
+    for plan in plans:
+        key = (plan.category_id, plan.month)
+        plan_lookup[key] = {
+            "id": plan.id,
+            "planned_amount": float(plan.planned_amount),
+            "capex_planned": float(plan.capex_planned),
+            "opex_planned": float(plan.opex_planned)
+        }
+
+    # Build result
+    categories_data = []
+    for category in categories:
+        row = {
+            "category_id": category.id,
+            "category_name": category.name,
+            "category_type": category.type,
+            "months": {}
+        }
+
+        # Add data for each month
+        for month in range(1, 13):
+            key = (category.id, month)
+            if key in plan_lookup:
+                row["months"][str(month)] = plan_lookup[key]
+            else:
+                row["months"][str(month)] = {
+                    "id": None,
+                    "planned_amount": 0,
+                    "capex_planned": 0,
+                    "opex_planned": 0
+                }
+
+        categories_data.append(row)
+
+    # Generate Excel file
+    excel_file = ExcelExporter.export_budget_plan(year, categories_data)
+
+    # Return as download
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=budget_plan_{year}.xlsx"}
+    )
+
+
+@router.get("/overview/{year}/{month}/export")
+def export_budget_overview_to_excel(year: int, month: int, db: Session = Depends(get_db)):
+    """Export budget overview for specific month to Excel file"""
+    # Get budget overview data (reuse the logic from get_budget_overview)
+    overview_data = get_budget_overview(year, month, db)
+
+    # Generate Excel file
+    excel_file = ExcelExporter.export_budget_overview(year, month, overview_data)
+
+    # Return as download
+    month_names = {
+        1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June',
+        7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'
+    }
+    filename = f"budget_overview_{year}_{month:02d}_{month_names.get(month, month)}.xlsx"
+
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
