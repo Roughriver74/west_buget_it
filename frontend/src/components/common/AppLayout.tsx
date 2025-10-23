@@ -29,14 +29,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/dashboard">Дашборд</Link>,
     },
     {
+      key: '/budget',
+      icon: <DollarOutlined />,
+      label: <Link to="/budget">Бюджет</Link>,
+    },
+    {
       key: '/expenses',
       icon: <FileTextOutlined />,
       label: <Link to="/expenses">Заявки</Link>,
     },
     {
-      key: '/budget',
+      key: '/budget/plan',
       icon: <DollarOutlined />,
-      label: <Link to="/budget">Бюджет</Link>,
+      label: <Link to="/budget/plan">План бюджета</Link>,
     },
     {
       key: '/analytics',
@@ -44,9 +49,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/analytics">Аналитика</Link>,
     },
     {
-      key: '/references',
+      key: '/categories',
       icon: <DatabaseOutlined />,
-      label: <Link to="/references">Справочники</Link>,
+      label: <Link to="/categories">Статьи расходов</Link>,
     },
   ]
 
@@ -70,6 +75,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           selectedKeys={[location.pathname]}
           mode="inline"
           items={menuItems}
+          defaultSelectedKeys={[location.pathname]}
         />
       </Sider>
       <Layout>

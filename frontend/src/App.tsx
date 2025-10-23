@@ -3,8 +3,9 @@ import { Layout } from 'antd'
 import AppLayout from './components/common/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import ExpensesPage from './pages/ExpensesPage'
-import BudgetPage from './pages/BudgetPage'
-import ReferencesPage from './pages/ReferencesPage'
+import BudgetOverviewPage from './pages/BudgetOverviewPage'
+import BudgetPlanPage from './pages/BudgetPlanPage'
+import CategoriesPage from './pages/CategoriesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 
 function App() {
@@ -14,9 +15,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/budget" element={<BudgetOverviewPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
-          <Route path="/budget" element={<BudgetPage />} />
-          <Route path="/references" element={<ReferencesPage />} />
+          <Route path="/budget/plan" element={<BudgetPlanPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
         </Routes>
       </AppLayout>

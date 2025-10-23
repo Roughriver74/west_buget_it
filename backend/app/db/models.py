@@ -33,6 +33,12 @@ class ExpenseStatusEnum(str, enum.Enum):
     CLOSED = "Закрыта"
 
 
+class BudgetStatusEnum(str, enum.Enum):
+    """Enum for budget plan statuses"""
+    DRAFT = "Черновик"
+    APPROVED = "Утвержден"
+
+
 class BudgetCategory(Base):
     """Budget categories (статьи расходов)"""
     __tablename__ = "budget_categories"
@@ -42,12 +48,19 @@ class BudgetCategory(Base):
     type = Column(Enum(ExpenseTypeEnum), nullable=False)  # OPEX or CAPEX
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Подкатегории (hierarchical structure)
+    parent_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     expenses = relationship("Expense", back_populates="category")
     budget_plans = relationship("BudgetPlan", back_populates="category")
+
+    # Self-referential relationship for subcategories
+    parent = relationship("BudgetCategory", remote_side=[id], backref="subcategories")
 
     def __repr__(self):
         return f"<BudgetCategory {self.name} ({self.type})>"
@@ -145,6 +158,9 @@ class BudgetPlan(Base):
     planned_amount = Column(Numeric(15, 2), nullable=False)
     capex_planned = Column(Numeric(15, 2), default=0, nullable=False)
     opex_planned = Column(Numeric(15, 2), default=0, nullable=False)
+
+    # Status (для всего года - все записи одного года имеют одинаковый статус)
+    status = Column(Enum(BudgetStatusEnum), default=BudgetStatusEnum.DRAFT, nullable=False, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
