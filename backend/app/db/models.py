@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -143,6 +144,7 @@ class Expense(Base):
     category = relationship("BudgetCategory", back_populates="expenses")
     contractor = relationship("Contractor", back_populates="expenses")
     organization = relationship("Organization", back_populates="expenses")
+    attachments = relationship("Attachment", back_populates="expense", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Expense {self.number} - {self.amount}>"
@@ -212,3 +214,60 @@ class BudgetPlan(Base):
 
     def __repr__(self):
         return f"<BudgetPlan {self.year}-{self.month:02d} - {self.planned_amount}>"
+
+
+class Attachment(Base):
+    """Attachments (приложения к заявкам: счета, договора, акты)"""
+    __tablename__ = "attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign key
+    expense_id = Column(Integer, ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # File information
+    filename = Column(String(500), nullable=False)  # Оригинальное имя файла
+    file_path = Column(String(1000), nullable=False)  # Путь к файлу в хранилище
+    file_size = Column(Integer, nullable=False)  # Размер файла в байтах
+    mime_type = Column(String(100), nullable=True)  # MIME тип файла
+    file_type = Column(String(50), nullable=True)  # Тип документа: invoice, contract, act, other
+
+    # Upload information
+    uploaded_by = Column(String(255), nullable=True)  # Кто загрузил
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    expense = relationship("Expense", back_populates="attachments")
+
+    def __repr__(self):
+        return f"<Attachment {self.filename} for Expense {self.expense_id}>"
+
+
+class DashboardConfig(Base):
+    """Dashboard configurations (конфигурации пользовательских дашбордов)"""
+    __tablename__ = "dashboard_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # Название дашборда
+    description = Column(Text, nullable=True)  # Описание дашборда
+
+    # User association (для будущей многопользовательской системы)
+    user_id = Column(String(255), nullable=True, index=True)  # ID пользователя
+
+    # Configuration
+    is_default = Column(Boolean, default=False, nullable=False)  # Дефолтный дашборд
+    is_public = Column(Boolean, default=False, nullable=False)  # Публичный (доступен всем)
+
+    # Layout configuration stored as JSON
+    # Structure: { "widgets": [{"id": "...", "type": "...", "config": {...}, "layout": {"x": 0, "y": 0, "w": 4, "h": 2}}] }
+    config = Column(JSON, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<DashboardConfig {self.name}>"

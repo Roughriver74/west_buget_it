@@ -9,7 +9,15 @@ import CategoryEditModal from './CategoryEditModal'
 
 const { Option } = Select
 
-const CategoryTable: React.FC = () => {
+interface CategoryTableProps {
+  selectedRowKeys?: React.Key[]
+  onSelectionChange?: (keys: React.Key[]) => void
+}
+
+const CategoryTable: React.FC<CategoryTableProps> = ({
+  selectedRowKeys = [],
+  onSelectionChange,
+}) => {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null)
@@ -221,6 +229,15 @@ const CategoryTable: React.FC = () => {
         expandable={{
           defaultExpandAllRows: false,
         }}
+        rowSelection={
+          onSelectionChange
+            ? {
+                selectedRowKeys,
+                onChange: onSelectionChange,
+                preserveSelectedRowKeys: true,
+              }
+            : undefined
+        }
       />
 
       <CategoryCreateModal
