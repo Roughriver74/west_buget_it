@@ -48,6 +48,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/budget/plan">План бюджета</Link>,
     },
     {
+      key: '/budget/scenarios',
+      icon: <BarChartOutlined />,
+      label: <Link to="/budget/scenarios">Сценарии бюджета</Link>,
+    },
+    {
       key: '/payment-calendar',
       icon: <CalendarOutlined />,
       label: <Link to="/payment-calendar">Календарь оплат</Link>,

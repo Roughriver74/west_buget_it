@@ -13,6 +13,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import BalanceAnalyticsPage from './pages/BalanceAnalyticsPage'
 import PaymentCalendarPage from './pages/PaymentCalendarPage'
 import ForecastPage from './pages/ForecastPage'
+import BudgetScenariosPage from './pages/BudgetScenariosPage'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
           <Route path="/analytics/balance" element={<BalanceAnalyticsPage />} />
           <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
           <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/budget/scenarios" element={<BudgetScenariosPage />} />
         </Routes>
       </AppLayout>
     </Router>
