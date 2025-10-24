@@ -1,15 +1,18 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from datetime import datetime
 import math
+import os
+from pydantic import BaseModel
 
 from app.db import get_db
 from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum
 from app.schemas import ExpenseCreate, ExpenseUpdate, ExpenseInDB, ExpenseList, ExpenseStatusUpdate
 from app.utils.excel_export import ExcelExporter
+from app.services.ftp_import_service import import_from_ftp
 
 router = APIRouter()
 
@@ -131,6 +134,8 @@ def get_expenses(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     search: Optional[str] = None,
+    needs_review: Optional[bool] = None,
+    imported_from_ftp: Optional[bool] = None,
     db: Session = Depends(get_db)
 ):
     """Get all expenses with filters and pagination"""
@@ -163,6 +168,12 @@ def get_expenses(
                 Expense.requester.ilike(f"%{search}%")
             )
         )
+
+    if needs_review is not None:
+        query = query.filter(Expense.needs_review == needs_review)
+
+    if imported_from_ftp is not None:
+        query = query.filter(Expense.imported_from_ftp == imported_from_ftp)
 
     # Get total count
     total = query.count()
@@ -291,6 +302,25 @@ def update_expense_status(
     return db_expense
 
 
+@router.patch("/{expense_id}/mark-reviewed", response_model=ExpenseInDB)
+def mark_expense_reviewed(
+    expense_id: int,
+    db: Session = Depends(get_db)
+):
+    """Mark expense as reviewed (снимает пометку 'needs_review')"""
+    db_expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not db_expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Expense with id {expense_id} not found"
+        )
+
+    db_expense.needs_review = False
+    db.commit()
+    db.refresh(db_expense)
+    return db_expense
+
+
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     """Delete expense"""
@@ -329,3 +359,55 @@ def get_expense_totals(
     total = float(result.total) if result.total else 0.0
 
     return {"total": total}
+
+
+class FTPImportRequest(BaseModel):
+    """Request schema for FTP import"""
+    remote_path: str
+    delete_from_year: Optional[int] = None
+    delete_from_month: Optional[int] = None
+    skip_duplicates: bool = True
+
+
+@router.post("/import/ftp")
+async def import_expenses_from_ftp(
+    request: FTPImportRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Import expenses from FTP server
+
+    This endpoint will:
+    1. Download Excel file from FTP
+    2. Delete expenses from specified month onwards (default: July 2025)
+    3. Import new expenses from the file
+    4. Skip duplicates based on expense number
+    """
+    # Get FTP credentials from environment variables
+    ftp_host = os.getenv("FTP_HOST", "floppisw.beget.tech")
+    ftp_user = os.getenv("FTP_USER", "floppisw_zrds")
+    ftp_pass = os.getenv("FTP_PASS", "4yZUaloOBmU!")
+
+    try:
+        result = await import_from_ftp(
+            db=db,
+            host=ftp_host,
+            username=ftp_user,
+            password=ftp_pass,
+            remote_path=request.remote_path,
+            delete_from_year=request.delete_from_year,
+            delete_from_month=request.delete_from_month,
+            skip_duplicates=request.skip_duplicates
+        )
+
+        return {
+            "success": True,
+            "message": "Import completed successfully",
+            "statistics": result
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Import failed: {str(e)}"
+        )

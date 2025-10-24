@@ -10,11 +10,14 @@ interface CategoryBalance {
   category_id: number
   category_name: string
   category_type: 'OPEX' | 'CAPEX'
+  parent_id: number | null
   planned: number
   actual: number
   remaining: number
   execution_percent: number
   expense_count: number
+  isParent?: boolean
+  isChild?: boolean
 }
 
 interface BalanceData {
@@ -107,15 +110,51 @@ const BalanceAnalyticsPage: React.FC = () => {
       key: 'category_name',
       width: '25%',
       fixed: 'left',
+      render: (text: string, record: CategoryBalance) => {
+        const isParent = record.isParent === true
+        const isChild = record.isChild === true
+
+        return (
+          <div style={{
+            paddingLeft: isChild ? 24 : 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
+          }}>
+            {isChild && <span style={{ color: '#999', fontSize: 12 }}>└─</span>}
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontWeight: isParent ? 600 : 'normal',
+                fontSize: isParent ? 14 : 13,
+                color: isParent ? '#1890ff' : 'inherit'
+              }}>
+                {text}
+              </div>
+              {isParent && (
+                <Tag
+                  color={record.category_type === 'OPEX' ? 'blue' : 'green'}
+                  style={{ marginTop: 4, fontSize: 11 }}
+                >
+                  {record.category_type}
+                </Tag>
+              )}
+            </div>
+          </div>
+        )
+      },
     },
     {
       title: 'Тип',
       dataIndex: 'category_type',
       key: 'category_type',
       width: 100,
-      render: (type: string) => (
-        <Tag color={type === 'OPEX' ? 'blue' : 'green'}>{type}</Tag>
-      ),
+      render: (type: string, record: CategoryBalance) => {
+        // Показываем тег только для дочерних категорий
+        if (record.isChild) {
+          return <Tag color={type === 'OPEX' ? 'blue' : 'green'}>{type}</Tag>
+        }
+        return null
+      },
     },
     {
       title: 'План',
@@ -177,6 +216,63 @@ const BalanceAnalyticsPage: React.FC = () => {
       align: 'center',
     },
   ]
+
+  // Group categories by parent
+  const groupedCategories = React.useMemo(() => {
+    if (!data?.categories) return []
+
+    const parents = data.categories.filter(cat => cat.parent_id === null)
+    const childrenMap = new Map<number, CategoryBalance[]>()
+
+    data.categories.forEach(cat => {
+      if (cat.parent_id !== null) {
+        if (!childrenMap.has(cat.parent_id)) {
+          childrenMap.set(cat.parent_id, [])
+        }
+        childrenMap.get(cat.parent_id)!.push(cat)
+      }
+    })
+
+    const result: CategoryBalance[] = []
+
+    parents.forEach(parent => {
+      const children = childrenMap.get(parent.category_id) || []
+
+      // Calculate parent totals from children
+      const parentTotals = children.reduce(
+        (acc, child) => ({
+          planned: acc.planned + child.planned,
+          actual: acc.actual + child.actual,
+          remaining: acc.remaining + child.remaining,
+          expense_count: acc.expense_count + child.expense_count,
+        }),
+        { planned: 0, actual: 0, remaining: 0, expense_count: 0 }
+      )
+
+      // Add parent with aggregated data
+      result.push({
+        ...parent,
+        planned: parentTotals.planned,
+        actual: parentTotals.actual,
+        remaining: parentTotals.remaining,
+        execution_percent: parentTotals.planned > 0 ? Math.round((parentTotals.actual / parentTotals.planned) * 100) : 0,
+        expense_count: parentTotals.expense_count,
+        isParent: true,
+        isChild: false,
+      })
+
+      // Add children
+      children.forEach(child => {
+        result.push({
+          ...child,
+          isParent: false,
+          isChild: true,
+        })
+      })
+    })
+
+    return result
+  }, [data])
 
   // Calculate totals
   const totals = data?.categories.reduce(
@@ -296,10 +392,15 @@ const BalanceAnalyticsPage: React.FC = () => {
         <Spin spinning={loading}>
           <Table<CategoryBalance>
             columns={columns}
-            dataSource={data?.categories || []}
+            dataSource={groupedCategories}
             rowKey="category_id"
             pagination={false}
             scroll={{ x: 1200 }}
+            rowClassName={(record) => {
+              if (record.isParent === true) return 'parent-row'
+              if (record.isChild === true) return 'child-row'
+              return ''
+            }}
             summary={() => (
               <Table.Summary fixed>
                 {summaryData.map((row) => (
@@ -350,6 +451,22 @@ const BalanceAnalyticsPage: React.FC = () => {
           <li>⚫ <strong>Перерасход</strong> — Факт превышает план</li>
         </ul>
       </div>
+
+      <style>{`
+        .parent-row {
+          background-color: #fafafa !important;
+          font-weight: 500;
+        }
+        .parent-row:hover {
+          background-color: #f0f0f0 !important;
+        }
+        .child-row {
+          background-color: #ffffff !important;
+        }
+        .child-row:hover {
+          background-color: #f5f5f5 !important;
+        }
+      `}</style>
     </div>
   )
 }

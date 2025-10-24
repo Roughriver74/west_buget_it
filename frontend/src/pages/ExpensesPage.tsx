@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker, message } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons'
+import { Link } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, WarningOutlined, CloudDownloadOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
-import type { ExpenseStatus } from '@/types'
+import { ExpenseStatus, type Expense } from '@/types'
+import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
+import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
+import FTPImportModal from '@/components/expenses/FTPImportModal'
 import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
@@ -15,6 +19,12 @@ const ExpensesPage = () => {
   const [status, setStatus] = useState<ExpenseStatus | undefined>()
   const [categoryId, setCategoryId] = useState<number | undefined>()
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [importModalVisible, setImportModalVisible] = useState(false)
+
+  const queryClient = useQueryClient()
 
   const { data: expenses, isLoading } = useQuery({
     queryKey: ['expenses', page, pageSize, search, status, categoryId, dateRange],
@@ -35,13 +45,6 @@ const ExpensesPage = () => {
     queryFn: () => categoriesApi.getAll({ is_active: true }),
   })
 
-  const statusColors: Record<string, string> = {
-    'Черновик': 'default',
-    'К оплате': 'processing',
-    'Оплачена': 'success',
-    'Отклонена': 'error',
-    'Закрыта': 'default',
-  }
 
   const handleExport = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -58,12 +61,44 @@ const ExpensesPage = () => {
     message.success('Экспорт начат. Файл скоро будет загружен.')
   }
 
+  const handleCreate = () => {
+    setModalMode('create')
+    setSelectedExpense(null)
+    setModalVisible(true)
+  }
+
+  const handleEdit = (expense: Expense) => {
+    setModalMode('edit')
+    setSelectedExpense(expense)
+    setModalVisible(true)
+  }
+
+  const handleModalCancel = () => {
+    setModalVisible(false)
+    setSelectedExpense(null)
+  }
+
   const columns = [
     {
       title: 'Номер',
       dataIndex: 'number',
       key: 'number',
-      width: 150,
+      width: 180,
+      render: (number: string, record: Expense) => (
+        <Space>
+          {record.imported_from_ftp && (
+            <Tooltip title="Загружена из FTP">
+              <CloudDownloadOutlined style={{ color: '#1890ff' }} />
+            </Tooltip>
+          )}
+          {record.needs_review && (
+            <Tooltip title="Требует проверки категории">
+              <Badge status="warning" />
+            </Tooltip>
+          )}
+          <span>{number}</span>
+        </Space>
+      ),
     },
     {
       title: 'Дата заявки',
@@ -96,7 +131,11 @@ const ExpensesPage = () => {
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      render: (status: string) => <Tag color={statusColors[status]}>{status}</Tag>,
+      render: (status: ExpenseStatus) => (
+        <Tag color={getExpenseStatusColor(status)}>
+          {getExpenseStatusLabel(status)}
+        </Tag>
+      ),
     },
     {
       title: 'Контрагент',
@@ -104,12 +143,34 @@ const ExpensesPage = () => {
       key: 'contractor',
       width: 200,
       ellipsis: true,
+      render: (_: string, record: Expense) =>
+        record.contractor ? (
+          <Link
+            to={`/contractors/${record.contractor.id}`}
+            style={{ color: '#1890ff' }}
+          >
+            {record.contractor.name}
+          </Link>
+        ) : (
+          '-'
+        ),
     },
     {
       title: 'Организация',
       dataIndex: ['organization', 'name'],
       key: 'organization',
       width: 150,
+      render: (_: string, record: Expense) =>
+        record.organization ? (
+          <Link
+            to={`/organizations/${record.organization.id}`}
+            style={{ color: '#1890ff' }}
+          >
+            {record.organization.name}
+          </Link>
+        ) : (
+          '-'
+        ),
     },
     {
       title: 'Заявитель',
@@ -120,13 +181,38 @@ const ExpensesPage = () => {
     {
       title: 'Действия',
       key: 'actions',
-      width: 100,
+      width: 200,
       fixed: 'right' as const,
-      render: () => (
+      render: (_: any, record: Expense) => (
         <Space size="small">
-          <Button type="link" size="small">
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
             Изменить
           </Button>
+          {record.needs_review && (
+            <Tooltip title="Отметить категорию как проверенную">
+              <Button
+                type="link"
+                size="small"
+                onClick={async () => {
+                  try {
+                    await expensesApi.markReviewed(record.id)
+                    message.success('Заявка отмечена как проверенная')
+                    queryClient.invalidateQueries({ queryKey: ['expenses'] })
+                  } catch (error) {
+                    message.error('Ошибка при обновлении')
+                  }
+                }}
+                style={{ color: '#52c41a' }}
+              >
+                ✓ Проверено
+              </Button>
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -150,11 +236,11 @@ const ExpensesPage = () => {
           onChange={setStatus}
           allowClear
           options={[
-            { value: 'Черновик', label: 'Черновик' },
-            { value: 'К оплате', label: 'К оплате' },
-            { value: 'Оплачена', label: 'Оплачена' },
-            { value: 'Отклонена', label: 'Отклонена' },
-            { value: 'Закрыта', label: 'Закрыта' },
+            { value: ExpenseStatus.DRAFT, label: getExpenseStatusLabel(ExpenseStatus.DRAFT) },
+            { value: ExpenseStatus.PENDING, label: getExpenseStatusLabel(ExpenseStatus.PENDING) },
+            { value: ExpenseStatus.PAID, label: getExpenseStatusLabel(ExpenseStatus.PAID) },
+            { value: ExpenseStatus.REJECTED, label: getExpenseStatusLabel(ExpenseStatus.REJECTED) },
+            { value: ExpenseStatus.CLOSED, label: getExpenseStatusLabel(ExpenseStatus.CLOSED) },
           ]}
         />
         <Select
@@ -170,10 +256,13 @@ const ExpensesPage = () => {
           value={dateRange}
           onChange={setDateRange as any}
         />
+        <Button icon={<CloudUploadOutlined />} onClick={() => setImportModalVisible(true)}>
+          Импорт из FTP
+        </Button>
         <Button icon={<DownloadOutlined />} onClick={handleExport}>
           Экспорт в Excel
         </Button>
-        <Button type="primary" icon={<PlusOutlined />}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           Создать заявку
         </Button>
       </div>
@@ -195,6 +284,18 @@ const ExpensesPage = () => {
             setPageSize(newPageSize)
           },
         }}
+      />
+
+      <ExpenseFormModal
+        visible={modalVisible}
+        onCancel={handleModalCancel}
+        expense={selectedExpense}
+        mode={modalMode}
+      />
+
+      <FTPImportModal
+        visible={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
       />
     </div>
   )

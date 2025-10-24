@@ -39,8 +39,10 @@ const BudgetPlanPage: React.FC = () => {
         </Space>
       </div>
 
-      <Card>
-        <BudgetPlanTable year={selectedYear} />
+      <Card styles={{ body: { padding: 0, overflow: 'auto' } }}>
+        <div style={{ padding: 24 }}>
+          <BudgetPlanTable year={selectedYear} />
+        </div>
       </Card>
 
       <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f0f5ff', borderRadius: 8 }}>

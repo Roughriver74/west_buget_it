@@ -6,10 +6,13 @@ export interface BudgetPlanYear {
     category_id: number
     category_name: string
     category_type: string
+    parent_id: number | null
     months: {
       [month: string]: {
         id: number | null
         planned_amount: number
+        actual_amount: number
+        remaining: number
         capex_planned: number
         opex_planned: number
       }

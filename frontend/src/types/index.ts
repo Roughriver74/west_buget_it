@@ -4,11 +4,11 @@ export enum ExpenseType {
 }
 
 export enum ExpenseStatus {
-  DRAFT = 'Черновик',
-  PENDING = 'К оплате',
-  PAID = 'Оплачена',
-  REJECTED = 'Отклонена',
-  CLOSED = 'Закрыта',
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  PAID = 'PAID',
+  REJECTED = 'REJECTED',
+  CLOSED = 'CLOSED',
 }
 
 export interface BudgetCategory {
@@ -38,6 +38,8 @@ export interface Organization {
   id: number
   name: string
   legal_name?: string
+  inn?: string
+  kpp?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -57,6 +59,8 @@ export interface Expense {
   is_closed: boolean
   comment?: string
   requester?: string
+  imported_from_ftp: boolean
+  needs_review: boolean
   created_at: string
   updated_at: string
   category?: BudgetCategory
@@ -82,6 +86,23 @@ export interface BudgetPlan {
   opex_planned: number
   created_at: string
   updated_at: string
+}
+
+export interface ForecastExpense {
+  id: number
+  category_id: number
+  contractor_id?: number
+  organization_id: number
+  forecast_date: string
+  amount: number
+  comment?: string
+  is_regular: boolean
+  based_on_expense_id?: number
+  created_at: string
+  updated_at: string
+  category?: BudgetCategory
+  contractor?: Contractor
+  organization?: Organization
 }
 
 export interface DashboardData {
@@ -152,4 +173,85 @@ export interface BudgetExecution {
     remaining: number
     execution_percent: number
   }>
+}
+
+export interface PaymentCalendarDay {
+  date: string
+  total_amount: number
+  payment_count: number
+}
+
+export interface PaymentCalendar {
+  year: number
+  month: number
+  days: PaymentCalendarDay[]
+}
+
+export interface PaymentDetail {
+  id: number
+  number: string
+  amount: number
+  payment_date: string | null
+  category_id: number
+  category_name: string | null
+  contractor_id: number | null
+  contractor_name: string | null
+  organization_id: number
+  organization_name: string | null
+  status: string
+  comment: string | null
+}
+
+export interface PaymentsByDay {
+  date: string
+  total_count: number
+  total_amount: number
+  payments: PaymentDetail[]
+}
+
+export type ForecastMethod = 'simple_average' | 'moving_average' | 'seasonal'
+
+export type ForecastConfidence = 'low' | 'medium' | 'high'
+
+export interface ForecastDataPoint {
+  date: string
+  predicted_amount: number
+  confidence: ForecastConfidence
+  method: string
+}
+
+export interface PaymentForecast {
+  period: {
+    start_date: string
+    end_date: string
+    days: number
+  }
+  method: ForecastMethod
+  lookback_days: number
+  summary: {
+    total_predicted: number
+    average_daily: number
+  }
+  forecast: ForecastDataPoint[]
+}
+
+export interface ForecastSummary {
+  period: {
+    start_date: string
+    end_date: string
+  }
+  forecasts: {
+    simple_average: {
+      total: number
+      daily_avg: number
+    }
+    moving_average: {
+      total: number
+      daily_avg: number
+    }
+    seasonal: {
+      total: number
+      daily_avg: number
+    }
+  }
 }

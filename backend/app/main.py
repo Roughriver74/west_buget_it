@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast
 
 # Create FastAPI application
 app = FastAPI(
@@ -28,6 +28,7 @@ app.include_router(contractors.router, prefix=f"{settings.API_PREFIX}/contractor
 app.include_router(organizations.router, prefix=f"{settings.API_PREFIX}/organizations", tags=["Organizations"])
 app.include_router(budget.router, prefix=f"{settings.API_PREFIX}/budget", tags=["Budget"])
 app.include_router(analytics.router, prefix=f"{settings.API_PREFIX}/analytics", tags=["Analytics"])
+app.include_router(forecast.router, prefix=f"{settings.API_PREFIX}/forecast", tags=["Forecast"])
 
 
 @app.get("/")

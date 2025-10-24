@@ -100,22 +100,18 @@ const CategoryTable: React.FC = () => {
 
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 80,
-    },
-    {
       title: 'Название',
       dataIndex: 'name',
       key: 'name',
+      width: 300,
       ellipsis: true,
     },
     {
       title: 'Тип',
       dataIndex: 'type',
       key: 'type',
-      width: 120,
+      width: 100,
+      align: 'center' as const,
       render: (type: ExpenseType) => (
         <Tag color={type === 'OPEX' ? 'blue' : 'green'}>{type}</Tag>
       ),
@@ -124,14 +120,16 @@ const CategoryTable: React.FC = () => {
       title: 'Описание',
       dataIndex: 'description',
       key: 'description',
+      width: 300,
       ellipsis: true,
       render: (text: string) => text || '—',
     },
     {
-      title: 'Активна',
+      title: 'Статус',
       dataIndex: 'is_active',
       key: 'is_active',
-      width: 100,
+      width: 90,
+      align: 'center' as const,
       render: (isActive: boolean) => (
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Да' : 'Нет'}
@@ -141,7 +139,8 @@ const CategoryTable: React.FC = () => {
     {
       title: 'Действия',
       key: 'actions',
-      width: 120,
+      width: 180,
+      fixed: 'right' as const,
       render: (_: any, record: BudgetCategory) => (
         <Space size="small">
           <Button
@@ -211,10 +210,13 @@ const CategoryTable: React.FC = () => {
         dataSource={treeData}
         loading={isLoading}
         rowKey="id"
+        size="middle"
+        scroll={{ x: 900 }}
         pagination={{
           pageSize: 20,
           showSizeChanger: true,
           showTotal: (total) => `Всего: ${total} статей`,
+          pageSizeOptions: ['10', '20', '50', '100'],
         }}
         expandable={{
           defaultExpandAllRows: false,

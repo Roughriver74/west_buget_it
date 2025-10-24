@@ -53,6 +53,67 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     return <Tag color="green">{percent}%</Tag>
   }
 
+  // Группировка категорий по родителям (должно быть до early returns!)
+  const groupedCategories = React.useMemo(() => {
+    if (!overview?.categories) return []
+
+    const parents = overview.categories.filter(cat => cat.parent_id === null)
+    const childrenMap = new Map<number, BudgetOverviewCategory[]>()
+
+    overview.categories.forEach(cat => {
+      if (cat.parent_id !== null) {
+        if (!childrenMap.has(cat.parent_id)) {
+          childrenMap.set(cat.parent_id, [])
+        }
+        childrenMap.get(cat.parent_id)!.push(cat)
+      }
+    })
+
+    const result: any[] = []
+
+    parents.forEach(parent => {
+      const children = childrenMap.get(parent.category_id) || []
+
+      // Calculate parent totals from children
+      const parentTotals = children.reduce(
+        (acc, child) => ({
+          planned: acc.planned + child.planned,
+          actual: acc.actual + child.actual,
+          remaining: acc.remaining + child.remaining,
+        }),
+        { planned: 0, actual: 0, remaining: 0 }
+      )
+
+      // Add parent with aggregated data
+      result.push({
+        key: `parent-${parent.category_id}`,
+        category_id: parent.category_id,
+        category_name: parent.category_name,
+        category_type: parent.category_type,
+        parent_id: null,
+        planned: parentTotals.planned,
+        actual: parentTotals.actual,
+        remaining: parentTotals.remaining,
+        execution_percent: parentTotals.planned > 0 ? Math.round((parentTotals.actual / parentTotals.planned) * 100) : 0,
+        is_overspent: parentTotals.remaining < 0,
+        isParent: true,
+        isChild: false,
+      })
+
+      // Add children
+      children.forEach(child => {
+        result.push({
+          key: `child-${child.category_id}`,
+          ...child,
+          isParent: false,
+          isChild: true,
+        })
+      })
+    })
+
+    return result
+  }, [overview])
+
   if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px' }}>
@@ -70,15 +131,40 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
       title: 'Статья расходов',
       dataIndex: 'category_name',
       key: 'category_name',
-      width: 250,
-      render: (text: string, record: BudgetOverviewCategory) => (
-        <div>
-          <div>{text}</div>
-          <Tag color={record.category_type === 'OPEX' ? 'blue' : 'green'} style={{ marginTop: 4 }}>
-            {record.category_type}
-          </Tag>
-        </div>
-      ),
+      width: 300,
+      render: (text: string, record: any) => {
+        const isParent = record.isParent === true
+        const isChild = record.isChild === true
+        const isTotal = record.key && (record.key.includes('total') || record.key === 'grand-total')
+
+        return (
+          <div style={{
+            paddingLeft: isChild ? 24 : 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
+          }}>
+            {isChild && <span style={{ color: '#999', fontSize: 12 }}>└─</span>}
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontWeight: isParent || isTotal ? 600 : 'normal',
+                fontSize: isParent ? 14 : 13,
+                color: isParent ? '#1890ff' : 'inherit'
+              }}>
+                {text}
+              </div>
+              {isParent && (
+                <Tag
+                  color={record.category_type === 'OPEX' ? 'blue' : 'green'}
+                  style={{ marginTop: 4, fontSize: 11 }}
+                >
+                  {record.category_type}
+                </Tag>
+              )}
+            </div>
+          </div>
+        )
+      },
     },
     {
       title: 'План',
@@ -119,11 +205,8 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     },
   ]
 
-  // Данные для таблицы
-  const dataSource = overview.categories.map((cat) => ({
-    key: cat.category_id,
-    ...cat,
-  }))
+  // Данные для таблицы используют groupedCategories, который уже определен выше
+  const dataSource = groupedCategories
 
   // Строки итогов
   const opexRow = {
@@ -192,6 +275,8 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         rowClassName={(record: any) => {
           if (record.key === 'grand-total') return 'grand-total-row'
           if (record.key === 'opex-total' || record.key === 'capex-total') return 'subtotal-row'
+          if (record.isParent === true) return 'parent-row'
+          if (record.isChild === true) return 'child-row'
           return ''
         }}
       />
@@ -204,6 +289,19 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
       />
 
       <style>{`
+        .parent-row {
+          background-color: #fafafa !important;
+          font-weight: 500;
+        }
+        .parent-row:hover {
+          background-color: #f0f0f0 !important;
+        }
+        .child-row {
+          background-color: #ffffff !important;
+        }
+        .child-row:hover {
+          background-color: #f5f5f5 !important;
+        }
         .subtotal-row {
           background-color: #f0f5ff !important;
           font-weight: 600;

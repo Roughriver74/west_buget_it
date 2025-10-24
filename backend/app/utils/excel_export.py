@@ -440,3 +440,208 @@ class ExcelExporter:
         output.seek(0)
 
         return output
+
+    @staticmethod
+    def export_forecast_calendar(year: int, month: int, forecasts: List[Dict[str, Any]]) -> BytesIO:
+        """
+        Export forecast data as calendar (dates in columns)
+
+        Args:
+            year: Year
+            month: Month (1-12)
+            forecasts: List of forecast items with amounts grouped by day
+
+        Returns:
+            BytesIO: Excel file in memory
+        """
+        from calendar import monthrange, day_name
+        from datetime import date
+
+        wb = Workbook()
+        ws = wb.active
+
+        # Month names in Russian
+        month_names = [
+            '', 'ЯНВАРЬ', 'ФЕВРАЛЬ', 'МАРТ', 'АПРЕЛЬ', 'МАЙ', 'ИЮНЬ',
+            'ИЮЛЬ', 'АВГУСТ', 'СЕНТЯБРЬ', 'ОКТЯБРЬ', 'НОЯБРЬ', 'ДЕКАБРЬ'
+        ]
+
+        # Day names in Russian (Monday=0)
+        day_names_ru = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+        ws.title = f"{month_names[month]} {year}"
+
+        # Row 2: "суммы с НДС"
+        ws['A2'] = 'суммы с НДС'
+        ws['A2'].font = Font(italic=True, size=10)
+
+        # Row 3: Title
+        ws['A3'] = f"{month_names[month]}_ПЛАН ПЛАТЕЖЕЙ"
+        ws['A3'].font = Font(bold=True, size=12)
+        ws.merge_cells('A3:F3')
+
+        # Get all days in month
+        _, num_days = monthrange(year, month)
+        dates = []
+        for day in range(1, num_days + 1):
+            d = date(year, month, day)
+            dates.append(d)
+
+        # Row 4: Day names (пн, вт, ср...)
+        for i, d in enumerate(dates):
+            col = 7 + i  # Start from column G
+            day_name_short = day_names_ru[d.weekday()]
+            cell = ws.cell(row=4, column=col, value=day_name_short)
+            cell.font = Font(size=9)
+            cell.alignment = Alignment(horizontal='center')
+
+            # Highlight weekends
+            if d.weekday() >= 5:  # Saturday or Sunday
+                cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+
+        # Row 5: Headers
+        headers = ['N п/п', 'Статья ДДС', 'ЮЛ', 'Контрагент', 'Договор', 'Комментарии']
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=5, column=col_num, value=header)
+            cell.font = ExcelExporter.HEADER_FONT
+            cell.fill = ExcelExporter.HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = ExcelExporter.BORDER
+
+        # Date headers
+        for i, d in enumerate(dates):
+            col = 7 + i
+            cell = ws.cell(row=5, column=col, value=d.day)
+            cell.font = ExcelExporter.HEADER_FONT
+            cell.fill = ExcelExporter.HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = ExcelExporter.BORDER
+
+            # Highlight weekends
+            if d.weekday() >= 5:
+                cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+
+        # Group forecasts by unique combination
+        grouped_forecasts = {}
+        for forecast in forecasts:
+            category = forecast.get('category') or {}
+            contractor = forecast.get('contractor') or {}
+            organization = forecast.get('organization') or {}
+
+            category_name = category.get('name', 'Без категории')
+            contractor_name = contractor.get('name', '')
+            org_name = organization.get('name', '')
+
+            key = (category_name, org_name, contractor_name)
+
+            if key not in grouped_forecasts:
+                grouped_forecasts[key] = {
+                    'category': category_name,
+                    'organization': org_name,
+                    'contractor': contractor_name,
+                    'amounts_by_date': {}
+                }
+
+            # Add amount to the specific date
+            forecast_date = forecast.get('date')
+            if forecast_date:
+                if isinstance(forecast_date, str):
+                    forecast_date = datetime.fromisoformat(forecast_date.replace('Z', '+00:00')).date()
+                amount = float(forecast.get('amount', 0))
+
+                if forecast_date not in grouped_forecasts[key]['amounts_by_date']:
+                    grouped_forecasts[key]['amounts_by_date'][forecast_date] = 0
+                grouped_forecasts[key]['amounts_by_date'][forecast_date] += amount
+
+        # Data rows
+        current_row = 6
+        row_number = 1
+
+        for key, data in sorted(grouped_forecasts.items()):
+            # Row number
+            ws.cell(row=current_row, column=1, value=row_number)
+            ws.cell(row=current_row, column=1).alignment = Alignment(horizontal='center')
+
+            # Category
+            ws.cell(row=current_row, column=2, value=data['category'])
+
+            # Organization
+            ws.cell(row=current_row, column=3, value=data['organization'])
+
+            # Contractor
+            ws.cell(row=current_row, column=4, value=data['contractor'])
+
+            # Contract (empty for now)
+            ws.cell(row=current_row, column=5, value='')
+
+            # Comment (empty for now)
+            ws.cell(row=current_row, column=6, value='')
+
+            # Fill amounts by date
+            row_total = 0
+            for i, d in enumerate(dates):
+                col = 7 + i
+                amount = data['amounts_by_date'].get(d, 0)
+
+                if amount > 0:
+                    ws.cell(row=current_row, column=col, value=amount)
+                    ws.cell(row=current_row, column=col).number_format = '#,##0.00'
+                    row_total += amount
+                else:
+                    ws.cell(row=current_row, column=col, value=None)
+
+                ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+                ws.cell(row=current_row, column=col).alignment = Alignment(horizontal='right')
+
+                # Highlight weekends
+                if d.weekday() >= 5:
+                    ws.cell(row=current_row, column=col).fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+
+            # Apply borders to all cells in row
+            for col in range(1, 7):
+                ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+            current_row += 1
+            row_number += 1
+
+        # Totals row
+        ws.cell(row=current_row, column=1, value='')
+        ws.cell(row=current_row, column=2, value='ИТОГО')
+        ws.cell(row=current_row, column=2).font = ExcelExporter.TOTAL_FONT
+
+        for i in range(len(dates)):
+            col = 7 + i
+            col_letter = get_column_letter(col)
+            formula = f"=SUM({col_letter}6:{col_letter}{current_row-1})"
+            ws.cell(row=current_row, column=col, value=formula)
+            ws.cell(row=current_row, column=col).number_format = '#,##0.00'
+            ws.cell(row=current_row, column=col).font = ExcelExporter.TOTAL_FONT
+            ws.cell(row=current_row, column=col).fill = ExcelExporter.TOTAL_FILL
+            ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+        for col in range(1, 7):
+            ws.cell(row=current_row, column=col).fill = ExcelExporter.TOTAL_FILL
+            ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 8   # N п/п
+        ws.column_dimensions['B'].width = 30  # Статья ДДС
+        ws.column_dimensions['C'].width = 20  # ЮЛ
+        ws.column_dimensions['D'].width = 25  # Контрагент
+        ws.column_dimensions['E'].width = 15  # Договор
+        ws.column_dimensions['F'].width = 20  # Комментарии
+
+        # Date columns
+        for i in range(len(dates)):
+            col_letter = get_column_letter(7 + i)
+            ws.column_dimensions[col_letter].width = 10
+
+        # Freeze panes at column G (after Комментарии)
+        ws.freeze_panes = 'G6'
+
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return output

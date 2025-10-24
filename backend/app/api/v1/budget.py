@@ -223,6 +223,20 @@ def get_budget_plan_for_year(year: int, db: Session = Depends(get_db)):
             "opex_planned": float(plan.opex_planned)
         }
 
+    # Get actual expenses for the year
+    actual_query = db.query(
+        Expense.category_id,
+        func.extract('month', Expense.request_date).label('month'),
+        func.sum(Expense.amount).label("actual")
+    ).filter(
+        func.extract('year', Expense.request_date) == year
+    ).group_by(Expense.category_id, func.extract('month', Expense.request_date))
+
+    actual_lookup = {}
+    for item in actual_query.all():
+        key = (item.category_id, int(item.month))
+        actual_lookup[key] = float(item.actual)
+
     # Build result
     result = []
     for category in categories:
@@ -230,21 +244,24 @@ def get_budget_plan_for_year(year: int, db: Session = Depends(get_db)):
             "category_id": category.id,
             "category_name": category.name,
             "category_type": category.type,
+            "parent_id": category.parent_id,
             "months": {}
         }
 
         # Add data for each month
         for month in range(1, 13):
             key = (category.id, month)
-            if key in plan_lookup:
-                row["months"][str(month)] = plan_lookup[key]
-            else:
-                row["months"][str(month)] = {
-                    "id": None,
-                    "planned_amount": 0,
-                    "capex_planned": 0,
-                    "opex_planned": 0
-                }
+            planned_amount = plan_lookup[key]["planned_amount"] if key in plan_lookup else 0
+            actual_amount = actual_lookup.get(key, 0)
+
+            row["months"][str(month)] = {
+                "id": plan_lookup[key]["id"] if key in plan_lookup else None,
+                "planned_amount": planned_amount,
+                "actual_amount": actual_amount,
+                "remaining": planned_amount - actual_amount,
+                "capex_planned": plan_lookup[key]["capex_planned"] if key in plan_lookup else 0,
+                "opex_planned": plan_lookup[key]["opex_planned"] if key in plan_lookup else 0
+            }
 
         result.append(row)
 

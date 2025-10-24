@@ -47,4 +47,19 @@ export const expensesApi = {
     const { data } = await apiClient.get('/expenses/stats/totals', { params: filters })
     return data
   },
+
+  importFromFTP: async (params: {
+    remote_path: string
+    delete_from_year?: number
+    delete_from_month?: number
+    skip_duplicates?: boolean
+  }) => {
+    const { data } = await apiClient.post('/expenses/import/ftp', params)
+    return data
+  },
+
+  markReviewed: async (id: number): Promise<Expense> => {
+    const { data } = await apiClient.patch(`/expenses/${id}/mark-reviewed`)
+    return data
+  },
 }

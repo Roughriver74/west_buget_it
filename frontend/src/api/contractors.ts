@@ -12,6 +12,11 @@ export const contractorsApi = {
     return data
   },
 
+  getOne: async (id: number): Promise<Contractor> => {
+    const { data } = await apiClient.get(`/contractors/${id}`)
+    return data
+  },
+
   create: async (contractor: Partial<Contractor>): Promise<Contractor> => {
     const { data } = await apiClient.post('/contractors', contractor)
     return data

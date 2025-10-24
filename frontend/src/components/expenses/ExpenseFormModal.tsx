@@ -1,0 +1,260 @@
+import { useEffect } from 'react'
+import { Modal, Form, Input, Select, DatePicker, InputNumber, message } from 'antd'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import dayjs from 'dayjs'
+import { expensesApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
+import type { Expense, ExpenseStatus } from '@/types'
+
+const { TextArea } = Input
+const { Option } = Select
+
+interface ExpenseFormModalProps {
+  visible: boolean
+  onCancel: () => void
+  expense?: Expense | null
+  mode: 'create' | 'edit'
+}
+
+const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
+  visible,
+  onCancel,
+  expense,
+  mode,
+}) => {
+  const [form] = Form.useForm()
+  const queryClient = useQueryClient()
+
+  // Fetch categories
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.getAll({ is_active: true }),
+  })
+
+  // Fetch contractors
+  const { data: contractors } = useQuery({
+    queryKey: ['contractors'],
+    queryFn: () => contractorsApi.getAll({ is_active: true }),
+  })
+
+  // Fetch organizations
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: () => organizationsApi.getAll({ is_active: true }),
+  })
+
+  // Status options
+  const statusOptions: { value: ExpenseStatus; label: string }[] = [
+    { value: 'DRAFT', label: 'Черновик' },
+    { value: 'PENDING', label: 'К оплате' },
+    { value: 'PAID', label: 'Оплачена' },
+    { value: 'REJECTED', label: 'Отклонена' },
+    { value: 'CLOSED', label: 'Закрыта' },
+  ]
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: (values: any) => expensesApi.create(values),
+    onSuccess: () => {
+      message.success('Заявка успешно создана')
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      form.resetFields()
+      onCancel()
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка при создании заявки: ${error.message}`)
+    },
+  })
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: number; values: any }) =>
+      expensesApi.update(id, values),
+    onSuccess: () => {
+      message.success('Заявка успешно обновлена')
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      form.resetFields()
+      onCancel()
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка при обновлении заявки: ${error.message}`)
+    },
+  })
+
+  // Initialize form with expense data when editing
+  useEffect(() => {
+    if (visible && mode === 'edit' && expense) {
+      form.setFieldsValue({
+        number: expense.number,
+        category_id: expense.category_id,
+        contractor_id: expense.contractor_id,
+        organization_id: expense.organization_id,
+        amount: expense.amount,
+        request_date: expense.request_date ? dayjs(expense.request_date) : null,
+        payment_date: expense.payment_date ? dayjs(expense.payment_date) : null,
+        status: expense.status,
+        requester: expense.requester,
+        comment: expense.comment,
+      })
+    } else if (visible && mode === 'create') {
+      form.setFieldsValue({
+        status: 'DRAFT',
+        request_date: dayjs(),
+      })
+    }
+  }, [visible, mode, expense, form])
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+
+      // Format dates to ISO string
+      const formattedValues = {
+        ...values,
+        request_date: values.request_date
+          ? dayjs(values.request_date).toISOString()
+          : undefined,
+        payment_date: values.payment_date
+          ? dayjs(values.payment_date).toISOString()
+          : undefined,
+        is_paid: values.status === 'PAID',
+        is_closed: values.status === 'CLOSED',
+      }
+
+      if (mode === 'create') {
+        createMutation.mutate(formattedValues)
+      } else if (mode === 'edit' && expense) {
+        updateMutation.mutate({ id: expense.id, values: formattedValues })
+      }
+    } catch (error) {
+      console.error('Form validation failed:', error)
+    }
+  }
+
+  const handleCancel = () => {
+    form.resetFields()
+    onCancel()
+  }
+
+  return (
+    <Modal
+      title={mode === 'create' ? 'Создание заявки' : 'Редактирование заявки'}
+      open={visible}
+      onOk={handleSubmit}
+      onCancel={handleCancel}
+      okText={mode === 'create' ? 'Создать' : 'Сохранить'}
+      cancelText="Отмена"
+      width={700}
+      confirmLoading={createMutation.isPending || updateMutation.isPending}
+    >
+      <Form form={form} layout="vertical" style={{ marginTop: 20 }}>
+        <Form.Item
+          name="number"
+          label="Номер заявки"
+          rules={[{ required: true, message: 'Введите номер заявки' }]}
+        >
+          <Input placeholder="Например: 0В0В-001627" />
+        </Form.Item>
+
+        <Form.Item
+          name="organization_id"
+          label="Организация"
+          rules={[{ required: true, message: 'Выберите организацию' }]}
+        >
+          <Select placeholder="Выберите организацию">
+            {organizations?.map((org) => (
+              <Option key={org.id} value={org.id}>
+                {org.name}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="category_id"
+          label="Категория расходов"
+          rules={[{ required: true, message: 'Выберите категорию' }]}
+        >
+          <Select
+            placeholder="Выберите категорию"
+            showSearch
+            optionFilterProp="children"
+          >
+            {categories?.map((cat) => (
+              <Option key={cat.id} value={cat.id}>
+                {cat.name} ({cat.type})
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="contractor_id" label="Контрагент">
+          <Select
+            placeholder="Выберите контрагента (опционально)"
+            showSearch
+            optionFilterProp="children"
+            allowClear
+          >
+            {contractors?.map((contractor) => (
+              <Option key={contractor.id} value={contractor.id}>
+                {contractor.name}
+                {contractor.inn && ` (ИНН: ${contractor.inn})`}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="amount"
+          label="Сумма"
+          rules={[{ required: true, message: 'Введите сумму' }]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            min={0}
+            placeholder="Введите сумму"
+            formatter={(value) =>
+              `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+            }
+            parser={(value) => value!.replace(/\s?/g, '')}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="request_date"
+          label="Дата заявки"
+          rules={[{ required: true, message: 'Выберите дату заявки' }]}
+        >
+          <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+        </Form.Item>
+
+        <Form.Item name="payment_date" label="Дата оплаты">
+          <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+        </Form.Item>
+
+        <Form.Item
+          name="status"
+          label="Статус"
+          rules={[{ required: true, message: 'Выберите статус' }]}
+        >
+          <Select placeholder="Выберите статус">
+            {statusOptions.map((option) => (
+              <Option key={option.value} value={option.value}>
+                {option.label}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        <Form.Item name="requester" label="Заявитель">
+          <Input placeholder="ФИО заявителя" />
+        </Form.Item>
+
+        <Form.Item name="comment" label="Комментарий">
+          <TextArea rows={4} placeholder="Дополнительная информация" />
+        </Form.Item>
+      </Form>
+    </Modal>
+  )
+}
+
+export default ExpenseFormModal

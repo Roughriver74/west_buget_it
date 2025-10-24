@@ -1,11 +1,12 @@
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
 from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum
+from app.services.forecast_service import PaymentForecastService, ForecastMethod
 
 router = APIRouter()
 
@@ -181,8 +182,10 @@ def get_analytics_by_category(
     db: Session = Depends(get_db)
 ):
     """Get detailed analytics by category"""
-    # Get all categories
-    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).all()
+    # Get all categories ordered by parent_id and name for proper hierarchy display
+    categories = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True
+    ).order_by(BudgetCategory.parent_id.nullsfirst(), BudgetCategory.name).all()
 
     result = []
     for category in categories:
@@ -217,15 +220,13 @@ def get_analytics_by_category(
             "category_id": category.id,
             "category_name": category.name,
             "category_type": category.type.value,
+            "parent_id": category.parent_id,
             "planned": float(planned),
             "actual": float(actual),
             "remaining": float(planned) - float(actual),
             "execution_percent": round((float(actual) / float(planned) * 100) if planned > 0 else 0, 2),
             "expense_count": expense_count
         })
-
-    # Sort by actual amount descending
-    result.sort(key=lambda x: x["actual"], reverse=True)
 
     return {
         "year": year,
@@ -267,3 +268,167 @@ def get_trends(
         "category_id": category_id,
         "trends": trends
     }
+
+
+@router.get("/payment-calendar")
+def get_payment_calendar(
+    year: int = Query(default=None, description="Year for calendar"),
+    month: int = Query(default=None, ge=1, le=12, description="Month (1-12)"),
+    category_id: Optional[int] = Query(default=None, description="Filter by category"),
+    organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get payment calendar view for a specific month
+    Returns daily aggregated payment data
+    """
+    # Use current year/month if not provided
+    if not year:
+        year = datetime.now().year
+    if not month:
+        month = datetime.now().month
+
+    forecast_service = PaymentForecastService(db)
+    calendar_data = forecast_service.get_payment_calendar(
+        year=year,
+        month=month,
+        category_id=category_id,
+        organization_id=organization_id,
+    )
+
+    return {
+        "year": year,
+        "month": month,
+        "days": calendar_data
+    }
+
+
+@router.get("/payment-calendar/{date}")
+def get_payments_by_day(
+    date: str = Path(description="Date in ISO format (YYYY-MM-DD)"),
+    category_id: Optional[int] = Query(default=None, description="Filter by category"),
+    organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all payments for a specific day
+    Returns detailed list of expenses
+    """
+    try:
+        payment_date = datetime.fromisoformat(date)
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+
+    forecast_service = PaymentForecastService(db)
+    payments = forecast_service.get_payments_by_day(
+        date=payment_date,
+        category_id=category_id,
+        organization_id=organization_id,
+    )
+
+    # Convert to dict format
+    payments_data = [
+        {
+            "id": payment.id,
+            "number": payment.number,
+            "amount": float(payment.amount),
+            "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+            "category_id": payment.category_id,
+            "category_name": payment.category.name if payment.category else None,
+            "contractor_id": payment.contractor_id,
+            "contractor_name": payment.contractor.name if payment.contractor else None,
+            "organization_id": payment.organization_id,
+            "organization_name": payment.organization.name if payment.organization else None,
+            "status": payment.status.value,
+            "comment": payment.comment,
+        }
+        for payment in payments
+    ]
+
+    return {
+        "date": date,
+        "total_count": len(payments_data),
+        "total_amount": sum(p["amount"] for p in payments_data),
+        "payments": payments_data
+    }
+
+
+@router.get("/payment-forecast")
+def get_payment_forecast(
+    start_date: str = Query(description="Start date in ISO format (YYYY-MM-DD)"),
+    end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
+    method: ForecastMethod = Query(default="simple_average", description="Forecast method"),
+    lookback_days: int = Query(default=90, ge=30, le=365, description="Days to look back for historical data"),
+    category_id: Optional[int] = Query(default=None, description="Filter by category"),
+    organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate payment forecast for future period
+    Methods: simple_average, moving_average, seasonal
+    """
+    try:
+        start = datetime.fromisoformat(start_date)
+        end = datetime.fromisoformat(end_date)
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+
+    if end <= start:
+        return {"error": "End date must be after start date"}
+
+    forecast_service = PaymentForecastService(db)
+    forecast_data = forecast_service.generate_forecast(
+        start_date=start,
+        end_date=end,
+        method=method,
+        lookback_days=lookback_days,
+        category_id=category_id,
+        organization_id=organization_id,
+    )
+
+    # Calculate summary statistics
+    total_predicted = sum(item['predicted_amount'] for item in forecast_data)
+    avg_daily = total_predicted / len(forecast_data) if forecast_data else 0
+
+    return {
+        "period": {
+            "start_date": start_date,
+            "end_date": end_date,
+            "days": len(forecast_data),
+        },
+        "method": method,
+        "lookback_days": lookback_days,
+        "summary": {
+            "total_predicted": round(total_predicted, 2),
+            "average_daily": round(avg_daily, 2),
+        },
+        "forecast": forecast_data
+    }
+
+
+@router.get("/payment-forecast/summary")
+def get_payment_forecast_summary(
+    start_date: str = Query(description="Start date in ISO format (YYYY-MM-DD)"),
+    end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
+    category_id: Optional[int] = Query(default=None, description="Filter by category"),
+    organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get forecast summary comparing different methods
+    """
+    try:
+        start = datetime.fromisoformat(start_date)
+        end = datetime.fromisoformat(end_date)
+    except ValueError:
+        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+
+    forecast_service = PaymentForecastService(db)
+    summary = forecast_service.get_forecast_summary(
+        start_date=start,
+        end_date=end,
+        category_id=category_id,
+        organization_id=organization_id,
+    )
+
+    return summary

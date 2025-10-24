@@ -7,6 +7,10 @@ import {
   DollarOutlined,
   DatabaseOutlined,
   BarChartOutlined,
+  CalendarOutlined,
+  TeamOutlined,
+  BankOutlined,
+  FundOutlined,
 } from '@ant-design/icons'
 
 const { Header, Content, Sider } = Layout
@@ -44,7 +48,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/budget/plan">План бюджета</Link>,
     },
     {
-      key: '/analytics',
+      key: '/payment-calendar',
+      icon: <CalendarOutlined />,
+      label: <Link to="/payment-calendar">Календарь оплат</Link>,
+    },
+    {
+      key: '/forecast',
+      icon: <FundOutlined />,
+      label: <Link to="/forecast">Прогноз расходов</Link>,
+    },
+    {
+      key: 'analytics-submenu',
       icon: <BarChartOutlined />,
       label: 'Аналитика',
       children: [
@@ -62,6 +76,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       key: '/categories',
       icon: <DatabaseOutlined />,
       label: <Link to="/categories">Статьи расходов</Link>,
+    },
+    {
+      key: '/contractors',
+      icon: <TeamOutlined />,
+      label: <Link to="/contractors">Контрагенты</Link>,
+    },
+    {
+      key: '/organizations',
+      icon: <BankOutlined />,
+      label: <Link to="/organizations">Организации</Link>,
     },
   ]
 
