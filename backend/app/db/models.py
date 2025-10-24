@@ -40,6 +40,23 @@ class BudgetStatusEnum(str, enum.Enum):
     APPROVED = "APPROVED"
 
 
+class EmployeeStatusEnum(str, enum.Enum):
+    """Enum for employee statuses"""
+    ACTIVE = "ACTIVE"
+    VACATION = "VACATION"
+    SICK_LEAVE = "SICK_LEAVE"
+    DISMISSED = "DISMISSED"
+
+
+class PositionLevelEnum(str, enum.Enum):
+    """Enum for employee position levels"""
+    JUNIOR = "JUNIOR"
+    MIDDLE = "MIDDLE"
+    SENIOR = "SENIOR"
+    LEAD = "LEAD"
+    MANAGER = "MANAGER"
+
+
 class BudgetCategory(Base):
     """Budget categories (статьи расходов)"""
     __tablename__ = "budget_categories"
@@ -244,3 +261,84 @@ class BudgetPlan(Base):
 
     def __repr__(self):
         return f"<BudgetPlan {self.year}-{self.month:02d} - {self.planned_amount}>"
+
+
+class Employee(Base):
+    """IT Department employees (сотрудники IT-отдела)"""
+    __tablename__ = "employees"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Personal info
+    full_name = Column(String(500), nullable=False, index=True)
+    position = Column(String(255), nullable=False)  # Должность
+    position_level = Column(Enum(PositionLevelEnum), nullable=True)  # Уровень позиции
+
+    # Employment info
+    hire_date = Column(Date, nullable=False)  # Дата приема на работу
+    termination_date = Column(Date, nullable=True)  # Дата увольнения
+    status = Column(Enum(EmployeeStatusEnum), default=EmployeeStatusEnum.ACTIVE, nullable=False, index=True)
+
+    # Salary info
+    base_salary = Column(Numeric(12, 2), nullable=False)  # Оклад (в месяц)
+    tax_rate = Column(Numeric(5, 2), default=30.0, nullable=False)  # Ставка налогов (%)
+
+    # Organization
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+
+    # Additional info
+    email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    organization = relationship("Organization")
+    payrolls = relationship("Payroll", back_populates="employee", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Employee {self.full_name} - {self.position}>"
+
+
+class Payroll(Base):
+    """Payroll records (записи о начислениях зарплаты)"""
+    __tablename__ = "payrolls"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Period
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)  # 1-12
+
+    # Amounts
+    base_salary = Column(Numeric(12, 2), nullable=False)  # Оклад
+    bonus = Column(Numeric(12, 2), default=0, nullable=False)  # Премия
+    other_payments = Column(Numeric(12, 2), default=0, nullable=False)  # Прочие выплаты
+
+    # Calculated fields
+    gross_salary = Column(Numeric(12, 2), nullable=False)  # Начислено (до налогов)
+    taxes = Column(Numeric(12, 2), nullable=False)  # Налоги
+    net_salary = Column(Numeric(12, 2), nullable=False)  # К выплате (на руки)
+
+    # Total cost for employer
+    employer_taxes = Column(Numeric(12, 2), nullable=False)  # Налоги работодателя (ЕСН и др.)
+    total_cost = Column(Numeric(12, 2), nullable=False)  # Полная стоимость для работодателя
+
+    # Additional info
+    worked_days = Column(Integer, nullable=True)  # Отработано дней
+    payment_date = Column(Date, nullable=True)  # Дата выплаты
+    notes = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee", back_populates="payrolls")
+
+    def __repr__(self):
+        return f"<Payroll {self.employee_id} - {self.year}-{self.month:02d} - {self.total_cost}>"
