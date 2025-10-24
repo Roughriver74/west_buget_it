@@ -645,3 +645,180 @@ class ExcelExporter:
         output.seek(0)
 
         return output
+
+    @staticmethod
+    def export_categories(categories: List[Dict[str, Any]]) -> BytesIO:
+        """
+        Export budget categories to Excel
+
+        Args:
+            categories: List of category records
+
+        Returns:
+            BytesIO: Excel file in memory
+        """
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Категории"
+
+        # Header
+        ws['A1'] = "Справочник категорий"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:E1')
+
+        # Column headers
+        headers = ['ID', 'Название', 'Тип', 'Описание', 'Активна']
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_num, value=header)
+            cell.font = ExcelExporter.HEADER_FONT
+            cell.fill = ExcelExporter.HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = ExcelExporter.BORDER
+
+        # Data rows
+        current_row = 4
+        for cat in categories:
+            ws.cell(row=current_row, column=1, value=cat.get('id', ''))
+            ws.cell(row=current_row, column=2, value=cat.get('name', ''))
+            ws.cell(row=current_row, column=3, value=cat.get('type', ''))
+            ws.cell(row=current_row, column=4, value=cat.get('description', ''))
+            ws.cell(row=current_row, column=5, value='Да' if cat.get('is_active', True) else 'Нет')
+
+            # Apply borders
+            for col in range(1, 6):
+                ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+            current_row += 1
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 10
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 50
+        ws.column_dimensions['E'].width = 10
+
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return output
+
+    @staticmethod
+    def export_contractors(contractors: List[Dict[str, Any]]) -> BytesIO:
+        """
+        Export contractors to Excel
+
+        Args:
+            contractors: List of contractor records
+
+        Returns:
+            BytesIO: Excel file in memory
+        """
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Контрагенты"
+
+        # Header
+        ws['A1'] = "Справочник контрагентов"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:F1')
+
+        # Column headers
+        headers = ['ID', 'Название', 'Краткое название', 'ИНН', 'Контактная информация', 'Активен']
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_num, value=header)
+            cell.font = ExcelExporter.HEADER_FONT
+            cell.fill = ExcelExporter.HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = ExcelExporter.BORDER
+
+        # Data rows
+        current_row = 4
+        for contractor in contractors:
+            ws.cell(row=current_row, column=1, value=contractor.get('id', ''))
+            ws.cell(row=current_row, column=2, value=contractor.get('name', ''))
+            ws.cell(row=current_row, column=3, value=contractor.get('short_name', ''))
+            ws.cell(row=current_row, column=4, value=contractor.get('inn', ''))
+            ws.cell(row=current_row, column=5, value=contractor.get('contact_info', ''))
+            ws.cell(row=current_row, column=6, value='Да' if contractor.get('is_active', True) else 'Нет')
+
+            # Apply borders
+            for col in range(1, 7):
+                ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+            current_row += 1
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 10
+        ws.column_dimensions['B'].width = 50
+        ws.column_dimensions['C'].width = 30
+        ws.column_dimensions['D'].width = 15
+        ws.column_dimensions['E'].width = 40
+        ws.column_dimensions['F'].width = 10
+
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return output
+
+    @staticmethod
+    def export_organizations(organizations: List[Dict[str, Any]]) -> BytesIO:
+        """
+        Export organizations to Excel
+
+        Args:
+            organizations: List of organization records
+
+        Returns:
+            BytesIO: Excel file in memory
+        """
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Организации"
+
+        # Header
+        ws['A1'] = "Справочник организаций"
+        ws['A1'].font = Font(bold=True, size=14)
+        ws.merge_cells('A1:D1')
+
+        # Column headers
+        headers = ['ID', 'Название', 'Юридическое название', 'Активна']
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_num, value=header)
+            cell.font = ExcelExporter.HEADER_FONT
+            cell.fill = ExcelExporter.HEADER_FILL
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = ExcelExporter.BORDER
+
+        # Data rows
+        current_row = 4
+        for org in organizations:
+            ws.cell(row=current_row, column=1, value=org.get('id', ''))
+            ws.cell(row=current_row, column=2, value=org.get('name', ''))
+            ws.cell(row=current_row, column=3, value=org.get('legal_name', ''))
+            ws.cell(row=current_row, column=4, value='Да' if org.get('is_active', True) else 'Нет')
+
+            # Apply borders
+            for col in range(1, 5):
+                ws.cell(row=current_row, column=col).border = ExcelExporter.BORDER
+
+            current_row += 1
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 10
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 50
+        ws.column_dimensions['D'].width = 10
+
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return output

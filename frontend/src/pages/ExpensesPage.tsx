@@ -8,6 +8,7 @@ import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
 import FTPImportModal from '@/components/expenses/FTPImportModal'
+import AttachmentBadge from '@/components/expenses/AttachmentBadge'
 import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
@@ -96,6 +97,7 @@ const ExpensesPage = () => {
               <Badge status="warning" />
             </Tooltip>
           )}
+          <AttachmentBadge expenseId={record.id} />
           <span>{number}</span>
         </Space>
       ),

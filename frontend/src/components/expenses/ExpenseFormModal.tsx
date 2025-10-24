@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { Modal, Form, Input, Select, DatePicker, InputNumber, message } from 'antd'
+import { Modal, Form, Input, Select, DatePicker, InputNumber, message, Divider } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { expensesApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
 import type { Expense, ExpenseStatus } from '@/types'
+import AttachmentManager from './AttachmentManager'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -252,6 +253,13 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         <Form.Item name="comment" label="Комментарий">
           <TextArea rows={4} placeholder="Дополнительная информация" />
         </Form.Item>
+
+        {mode === 'edit' && expense && (
+          <>
+            <Divider />
+            <AttachmentManager expenseId={expense.id} />
+          </>
+        )}
       </Form>
     </Modal>
   )
