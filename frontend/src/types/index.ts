@@ -234,6 +234,49 @@ export interface ForecastDataPoint {
   method: string
 }
 
+export type WidgetType =
+  | 'total_amount'
+  | 'category_chart'
+  | 'status_chart'
+  | 'monthly_trend'
+  | 'recent_expenses'
+  | 'budget_execution'
+  | 'top_contractors'
+  | 'capex_opex_ratio'
+
+export interface WidgetLayout {
+  x: number
+  y: number
+  w: number
+  h: number
+  minW?: number
+  minH?: number
+  maxW?: number
+  maxH?: number
+}
+
+export interface Widget {
+  id: string
+  type: WidgetType
+  title: string
+  config: Record<string, any>
+  layout: WidgetLayout
+}
+
+export interface DashboardConfig {
+  id: number
+  name: string
+  description?: string
+  user_id?: string
+  is_default: boolean
+  is_public: boolean
+  config: {
+    widgets: Widget[]
+  }
+  created_at: string
+  updated_at: string
+}
+
 export interface PaymentForecast {
   period: {
     start_date: string

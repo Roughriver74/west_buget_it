@@ -15,6 +15,12 @@ from .attachment import (
     AttachmentInDB,
     AttachmentList,
 )
+from .dashboard import (
+    DashboardConfigCreate,
+    DashboardConfigUpdate,
+    DashboardConfigInDB,
+    DashboardConfigList,
+)
 
 __all__ = [
     # Expense
@@ -44,4 +50,9 @@ __all__ = [
     "AttachmentUpdate",
     "AttachmentInDB",
     "AttachmentList",
+    # Dashboard Config
+    "DashboardConfigCreate",
+    "DashboardConfigUpdate",
+    "DashboardConfigInDB",
+    "DashboardConfigList",
 ]

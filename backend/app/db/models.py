@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -243,3 +244,30 @@ class Attachment(Base):
 
     def __repr__(self):
         return f"<Attachment {self.filename} for Expense {self.expense_id}>"
+
+
+class DashboardConfig(Base):
+    """Dashboard configurations (конфигурации пользовательских дашбордов)"""
+    __tablename__ = "dashboard_configs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # Название дашборда
+    description = Column(Text, nullable=True)  # Описание дашборда
+
+    # User association (для будущей многопользовательской системы)
+    user_id = Column(String(255), nullable=True, index=True)  # ID пользователя
+
+    # Configuration
+    is_default = Column(Boolean, default=False, nullable=False)  # Дефолтный дашборд
+    is_public = Column(Boolean, default=False, nullable=False)  # Публичный (доступен всем)
+
+    # Layout configuration stored as JSON
+    # Structure: { "widgets": [{"id": "...", "type": "...", "config": {...}, "layout": {"x": 0, "y": 0, "w": 4, "h": 2}}] }
+    config = Column(JSON, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<DashboardConfig {self.name}>"
