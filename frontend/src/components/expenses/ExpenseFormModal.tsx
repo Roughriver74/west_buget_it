@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
-import { Modal, Form, Input, Select, DatePicker, InputNumber, message } from 'antd'
+import { useEffect, useState } from 'react'
+import { Modal, Form, Input, Select, DatePicker, InputNumber, message, Divider, Tabs } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { expensesApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
-import type { Expense, ExpenseStatus } from '@/types'
+import type { Expense, ExpenseStatus, Attachment } from '@/types'
+import AttachmentManager from './AttachmentManager'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -23,6 +24,7 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 }) => {
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
+  const [attachments, setAttachments] = useState<Attachment[]>(expense?.attachments || [])
 
   // Fetch categories
   const { data: categories } = useQuery({
@@ -95,11 +97,13 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
         requester: expense.requester,
         comment: expense.comment,
       })
+      setAttachments(expense.attachments || [])
     } else if (visible && mode === 'create') {
       form.setFieldsValue({
         status: 'DRAFT',
         request_date: dayjs(),
       })
+      setAttachments([])
     }
   }, [visible, mode, expense, form])
 
@@ -143,17 +147,24 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
       onCancel={handleCancel}
       okText={mode === 'create' ? 'Создать' : 'Сохранить'}
       cancelText="Отмена"
-      width={700}
+      width={800}
       confirmLoading={createMutation.isPending || updateMutation.isPending}
     >
-      <Form form={form} layout="vertical" style={{ marginTop: 20 }}>
-        <Form.Item
-          name="number"
-          label="Номер заявки"
-          rules={[{ required: true, message: 'Введите номер заявки' }]}
-        >
-          <Input placeholder="Например: 0В0В-001627" />
-        </Form.Item>
+      <Tabs
+        defaultActiveKey="1"
+        items={[
+          {
+            key: '1',
+            label: 'Основная информация',
+            children: (
+              <Form form={form} layout="vertical" style={{ marginTop: 20 }}>
+                <Form.Item
+                  name="number"
+                  label="Номер заявки"
+                  rules={[{ required: true, message: 'Введите номер заявки' }]}
+                >
+                  <Input placeholder="Например: 0В0В-001627" />
+                </Form.Item>
 
         <Form.Item
           name="organization_id"
@@ -249,10 +260,27 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           <Input placeholder="ФИО заявителя" />
         </Form.Item>
 
-        <Form.Item name="comment" label="Комментарий">
-          <TextArea rows={4} placeholder="Дополнительная информация" />
-        </Form.Item>
-      </Form>
+                <Form.Item name="comment" label="Комментарий">
+                  <TextArea rows={4} placeholder="Дополнительная информация" />
+                </Form.Item>
+              </Form>
+            ),
+          },
+          {
+            key: '2',
+            label: `Файлы ${attachments.length > 0 ? `(${attachments.length})` : ''}`,
+            children: (
+              <div style={{ marginTop: 20 }}>
+                <AttachmentManager
+                  expenseId={mode === 'edit' && expense ? expense.id : undefined}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
     </Modal>
   )
 }

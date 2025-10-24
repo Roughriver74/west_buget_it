@@ -1,11 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 from pydantic import BaseModel, Field
 from app.db.models import ExpenseStatusEnum
 from .category import BudgetCategoryInDB
 from .contractor import ContractorInDB
 from .organization import OrganizationInDB
+
+if TYPE_CHECKING:
+    from .attachment import AttachmentInDB
 
 
 class ExpenseBase(BaseModel):
@@ -58,6 +61,7 @@ class ExpenseInDB(ExpenseBase):
     category: Optional[BudgetCategoryInDB] = None
     contractor: Optional[ContractorInDB] = None
     organization: Optional[OrganizationInDB] = None
+    attachments: List["AttachmentInDB"] = []
 
     class Config:
         from_attributes = True

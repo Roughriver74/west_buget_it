@@ -9,6 +9,12 @@ from .category import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCategory
 from .contractor import ContractorCreate, ContractorUpdate, ContractorInDB
 from .organization import OrganizationCreate, OrganizationUpdate, OrganizationInDB
 from .budget import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
+from .attachment import (
+    AttachmentCreate,
+    AttachmentUpdate,
+    AttachmentInDB,
+    AttachmentList,
+)
 
 __all__ = [
     # Expense
@@ -33,4 +39,9 @@ __all__ = [
     "BudgetPlanCreate",
     "BudgetPlanUpdate",
     "BudgetPlanInDB",
+    # Attachment
+    "AttachmentCreate",
+    "AttachmentUpdate",
+    "AttachmentInDB",
+    "AttachmentList",
 ]

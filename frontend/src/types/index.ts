@@ -45,6 +45,19 @@ export interface Organization {
   updated_at: string
 }
 
+export interface Attachment {
+  id: number
+  expense_id: number
+  filename: string
+  file_path: string
+  file_size: number
+  mime_type?: string
+  file_type?: string
+  uploaded_by?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Expense {
   id: number
   number: string
@@ -66,6 +79,7 @@ export interface Expense {
   category?: BudgetCategory
   contractor?: Contractor
   organization?: Organization
+  attachments?: Attachment[]
 }
 
 export interface ExpenseList {
