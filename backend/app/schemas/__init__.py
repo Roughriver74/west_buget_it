@@ -20,6 +20,20 @@ from .employee import (
     PayrollList,
     PayrollSummary,
 )
+from .budget_scenario import (
+    BudgetScenarioCreate,
+    BudgetScenarioUpdate,
+    BudgetScenario,
+    BudgetScenarioWithItems,
+    BudgetScenarioItemCreate,
+    BudgetScenarioItemUpdate,
+    BudgetScenarioItem,
+    BudgetScenarioSummary,
+    BudgetScenarioComparison,
+    BudgetCategoryComparison,
+    BudgetCategoryType,
+    BudgetPriority,
+)
 
 __all__ = [
     # Expense
@@ -54,4 +68,17 @@ __all__ = [
     "PayrollInDB",
     "PayrollList",
     "PayrollSummary",
+    # Budget Scenarios
+    "BudgetScenarioCreate",
+    "BudgetScenarioUpdate",
+    "BudgetScenario",
+    "BudgetScenarioWithItems",
+    "BudgetScenarioItemCreate",
+    "BudgetScenarioItemUpdate",
+    "BudgetScenarioItem",
+    "BudgetScenarioSummary",
+    "BudgetScenarioComparison",
+    "BudgetCategoryComparison",
+    "BudgetCategoryType",
+    "BudgetPriority",
 ]

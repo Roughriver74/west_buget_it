@@ -342,3 +342,66 @@ class Payroll(Base):
 
     def __repr__(self):
         return f"<Payroll {self.employee_id} - {self.year}-{self.month:02d} - {self.total_cost}>"
+
+
+class BudgetCategoryTypeEnum(str, Enum):
+    """Budget category type (тип категории бюджета)"""
+    OPEX = "OPEX"  # Операционные расходы
+    CAPEX = "CAPEX"  # Капитальные расходы
+
+
+class BudgetPriorityEnum(str, Enum):
+    """Budget priority levels (уровни приоритета бюджета)"""
+    CRITICAL = "CRITICAL"  # Критический
+    HIGH = "HIGH"  # Высокий
+    MEDIUM = "MEDIUM"  # Средний
+    LOW = "LOW"  # Низкий
+
+
+class BudgetScenario(Base):
+    """Budget planning scenarios (сценарии планирования бюджета)"""
+    __tablename__ = "budget_scenarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)  # Название сценария
+    description = Column(Text, nullable=True)  # Описание
+    year = Column(Integer, nullable=False, index=True)  # Год планирования
+    total_budget = Column(Numeric(15, 2), nullable=False)  # Общий бюджет
+    budget_change_percent = Column(Numeric(5, 2), nullable=True)  # Изменение к предыдущему году (%)
+    is_active = Column(Boolean, default=True, nullable=False)  # Активен ли сценарий
+    notes = Column(Text, nullable=True)  # Заметки
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    items = relationship("BudgetScenarioItem", back_populates="scenario", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<BudgetScenario {self.name} - {self.year} - {self.total_budget}>"
+
+
+class BudgetScenarioItem(Base):
+    """Budget scenario category items (статьи бюджета в сценарии)"""
+    __tablename__ = "budget_scenario_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scenario_id = Column(Integer, ForeignKey("budget_scenarios.id", ondelete="CASCADE"), nullable=False, index=True)
+    category_type = Column(Enum(BudgetCategoryTypeEnum), nullable=False, index=True)  # OPEX или CAPEX
+    category_name = Column(String(255), nullable=False)  # Название категории
+    percentage = Column(Numeric(5, 2), nullable=False)  # Процент от общего бюджета
+    amount = Column(Numeric(15, 2), nullable=False)  # Сумма (рассчитывается автоматически)
+    priority = Column(Enum(BudgetPriorityEnum), default=BudgetPriorityEnum.MEDIUM, nullable=False)  # Приоритет
+    change_from_previous = Column(Numeric(5, 2), nullable=True)  # Изменение к предыдущему году (%)
+    notes = Column(Text, nullable=True)  # Заметки
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    scenario = relationship("BudgetScenario", back_populates="items")
+
+    def __repr__(self):
+        return f"<BudgetScenarioItem {self.category_name} - {self.category_type} - {self.amount}>"
