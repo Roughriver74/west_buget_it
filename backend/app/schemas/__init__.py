@@ -9,6 +9,17 @@ from .category import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCategory
 from .contractor import ContractorCreate, ContractorUpdate, ContractorInDB
 from .organization import OrganizationCreate, OrganizationUpdate, OrganizationInDB
 from .budget import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
+from .employee import (
+    EmployeeCreate,
+    EmployeeUpdate,
+    EmployeeInDB,
+    EmployeeList,
+    PayrollCreate,
+    PayrollUpdate,
+    PayrollInDB,
+    PayrollList,
+    PayrollSummary,
+)
 
 __all__ = [
     # Expense
@@ -33,4 +44,14 @@ __all__ = [
     "BudgetPlanCreate",
     "BudgetPlanUpdate",
     "BudgetPlanInDB",
+    # Employee & Payroll
+    "EmployeeCreate",
+    "EmployeeUpdate",
+    "EmployeeInDB",
+    "EmployeeList",
+    "PayrollCreate",
+    "PayrollUpdate",
+    "PayrollInDB",
+    "PayrollList",
+    "PayrollSummary",
 ]
