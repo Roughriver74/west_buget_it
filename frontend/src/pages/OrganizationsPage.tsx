@@ -1,14 +1,18 @@
 import { useState } from 'react'
-import { Typography, Card, Table, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { Typography, Card, Table, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { organizationsApi } from '@/api'
 import type { Organization } from '@/types'
+import type { UploadProps } from 'antd'
+import axios from 'axios'
 import OrganizationFormModal from '@/components/organizations/OrganizationFormModal'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 const OrganizationsPage = () => {
   const [page, setPage] = useState(1)
@@ -18,6 +22,8 @@ const OrganizationsPage = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -57,6 +63,114 @@ const OrganizationsPage = () => {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id)
+  }
+
+  const handleExport = () => {
+    const url = `${API_BASE}/organizations/export`
+    window.open(url, '_blank')
+    message.success('Экспорт начат. Файл скоро будет загружен.')
+  }
+
+  const uploadProps: UploadProps = {
+    name: 'file',
+    action: `${API_BASE}/organizations/import`,
+    accept: '.xlsx,.xls',
+    showUploadList: false,
+    onChange(info) {
+      if (info.file.status === 'done') {
+        const response = info.file.response
+        message.success(
+          `Импорт завершен! Создано: ${response.created_count}, Обновлено: ${response.updated_count}`
+        )
+        if (response.errors && response.errors.length > 0) {
+          Modal.warning({
+            title: 'Предупреждения при импорте',
+            content: (
+              <div>
+                {response.errors.map((error: string, index: number) => (
+                  <div key={index}>{error}</div>
+                ))}
+              </div>
+            ),
+            width: 600,
+          })
+        }
+        queryClient.invalidateQueries({ queryKey: ['organizations'] })
+      } else if (info.file.status === 'error') {
+        message.error(`${info.file.name} загрузка не удалась`)
+      }
+    },
+  }
+
+  const handleBulkActivate = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите организации для активации')
+      return
+    }
+
+    setBulkLoading(true)
+    try {
+      await axios.post(`${API_BASE}/organizations/bulk/update`, {
+        ids: selectedRowKeys,
+        is_active: true,
+      })
+      message.success(`Активировано ${selectedRowKeys.length} организаций`)
+      setSelectedRowKeys([])
+      queryClient.invalidateQueries({ queryKey: ['organizations'] })
+    } catch (error) {
+      message.error('Ошибка при активации организаций')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkDeactivate = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите организации для деактивации')
+      return
+    }
+
+    setBulkLoading(true)
+    try {
+      await axios.post(`${API_BASE}/organizations/bulk/update`, {
+        ids: selectedRowKeys,
+        is_active: false,
+      })
+      message.success(`Деактивировано ${selectedRowKeys.length} организаций`)
+      setSelectedRowKeys([])
+      queryClient.invalidateQueries({ queryKey: ['organizations'] })
+    } catch (error) {
+      message.error('Ошибка при деактивации организаций')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите организации для удаления')
+      return
+    }
+
+    Modal.confirm({
+      title: 'Удалить выбранные организации?',
+      content: `Будет удалено ${selectedRowKeys.length} организаций`,
+      onOk: async () => {
+        setBulkLoading(true)
+        try {
+          await axios.post(`${API_BASE}/organizations/bulk/delete`, {
+            ids: selectedRowKeys,
+          })
+          message.success(`Удалено ${selectedRowKeys.length} организаций`)
+          setSelectedRowKeys([])
+          queryClient.invalidateQueries({ queryKey: ['organizations'] })
+        } catch (error) {
+          message.error('Ошибка при удалении организаций')
+        } finally {
+          setBulkLoading(false)
+        }
+      },
+    })
   }
 
   const columns = [
@@ -187,6 +301,42 @@ const OrganizationsPage = () => {
       </Row>
 
       <Card>
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            Экспорт в Excel
+          </Button>
+          <Upload {...uploadProps}>
+            <Button icon={<UploadOutlined />}>Импорт из Excel</Button>
+          </Upload>
+
+          {selectedRowKeys.length > 0 && (
+            <>
+              <Button
+                icon={<CheckOutlined />}
+                onClick={handleBulkActivate}
+                loading={bulkLoading}
+              >
+                Активировать ({selectedRowKeys.length})
+              </Button>
+              <Button
+                icon={<CloseOutlined />}
+                onClick={handleBulkDeactivate}
+                loading={bulkLoading}
+              >
+                Деактивировать ({selectedRowKeys.length})
+              </Button>
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                onClick={handleBulkDelete}
+                loading={bulkLoading}
+              >
+                Удалить ({selectedRowKeys.length})
+              </Button>
+            </>
+          )}
+        </Space>
+
         <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
           <Space>
             <Input
@@ -237,6 +387,11 @@ const OrganizationsPage = () => {
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total} организаций`,
             pageSizeOptions: ['10', '20', '50', '100'],
+          }}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            preserveSelectedRowKeys: true,
           }}
         />
 
