@@ -20,12 +20,14 @@ import {
   PlusOutlined,
   DownOutlined,
   DownloadOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
 import PayrollActualFormModal from '../components/payroll/PayrollActualFormModal';
+import PayrollImportModal from '../components/payroll/PayrollImportModal';
 
 const { Option } = Select;
 
@@ -40,6 +42,7 @@ export default function PayrollPlanPage() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [planModalVisible, setPlanModalVisible] = useState(false);
   const [actualModalVisible, setActualModalVisible] = useState(false);
+  const [importModalVisible, setImportModalVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
 
   // Fetch payroll plans
@@ -127,12 +130,23 @@ export default function PayrollPlanPage() {
     {
       key: 'plan',
       label: 'Добавить план',
+      icon: <PlusOutlined />,
       onClick: () => handleAddPlan(),
     },
     {
       key: 'actual',
       label: 'Добавить факт',
+      icon: <PlusOutlined />,
       onClick: () => handleAddActual(),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'import',
+      label: 'Импорт из Excel',
+      icon: <UploadOutlined />,
+      onClick: () => setImportModalVisible(true),
     },
   ];
 
@@ -357,6 +371,11 @@ export default function PayrollPlanPage() {
           setActualModalVisible(false);
           setSelectedMonth(undefined);
         }}
+      />
+
+      <PayrollImportModal
+        visible={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
       />
     </div>
   );

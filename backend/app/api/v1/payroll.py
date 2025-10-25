@@ -3,7 +3,7 @@ Payroll planning and actual API endpoints
 Handles payroll plans and actual payments
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -846,3 +846,206 @@ async def get_payroll_dynamics(
             ))
 
     return dynamics
+
+
+# ==================== Import Endpoints ====================
+
+@router.post("/plans/import", status_code=status.HTTP_200_OK)
+async def import_payroll_plans(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Import payroll plans from Excel file
+
+    Expected columns:
+    - Год (Year)
+    - Месяц (Month)
+    - Сотрудник (Employee full name)
+    - Оклад (Base salary)
+    - Премия (Bonus) - optional
+    - Прочие выплаты (Other payments) - optional
+    - Примечания (Notes) - optional
+
+    Only ADMIN and MANAGER can import payroll plans
+    """
+    # Only ADMIN and MANAGER can import
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can import payroll plans"
+        )
+
+    # Get user's department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    else:
+        # For ADMIN/MANAGER, use their department or allow specifying in file
+        department_id = current_user.department_id
+
+    # Validate file extension
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an Excel file (.xlsx or .xls)"
+        )
+
+    try:
+        # Read file content
+        content = await file.read()
+
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File too large. Maximum size is 10MB"
+            )
+
+        # Parse Excel file
+        try:
+            df = pd.read_excel(io.BytesIO(content))
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid Excel file format: {str(e)}"
+            )
+
+        # Check if dataframe is empty
+        if df.empty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file is empty"
+            )
+
+        # Validate required columns
+        required_columns = ['Год', 'Месяц', 'Сотрудник', 'Оклад']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required columns: {', '.join(missing_columns)}. Found columns: {', '.join(df.columns)}"
+            )
+
+        created_count = 0
+        updated_count = 0
+        skipped_count = 0
+        errors = []
+        total_rows = len(df)
+
+        for index, row in df.iterrows():
+            try:
+                # Extract and validate data
+                year = int(row['Год']) if pd.notna(row['Год']) else None
+                month = int(row['Месяц']) if pd.notna(row['Месяц']) else None
+                employee_name = str(row['Сотрудник']).strip() if pd.notna(row['Сотрудник']) else None
+                base_salary = float(row['Оклад']) if pd.notna(row['Оклад']) else None
+                bonus = float(row.get('Премия', 0)) if pd.notna(row.get('Премия', 0)) else 0
+                other_payments = float(row.get('Прочие выплаты', 0)) if pd.notna(row.get('Прочие выплаты', 0)) else 0
+                notes = str(row.get('Примечания', '')).strip() if pd.notna(row.get('Примечания')) else None
+
+                # Validate required fields
+                if not year or not month or not employee_name or base_salary is None:
+                    errors.append(f"Row {index + 2}: Missing required fields")
+                    skipped_count += 1
+                    continue
+
+                if year < 2000 or year > 2100:
+                    errors.append(f"Row {index + 2}: Invalid year {year}")
+                    skipped_count += 1
+                    continue
+
+                if month < 1 or month > 12:
+                    errors.append(f"Row {index + 2}: Invalid month {month}")
+                    skipped_count += 1
+                    continue
+
+                if base_salary < 0:
+                    errors.append(f"Row {index + 2}: Base salary cannot be negative")
+                    skipped_count += 1
+                    continue
+
+                # Find employee by name
+                employee = db.query(Employee).filter(
+                    Employee.full_name == employee_name
+                ).first()
+
+                if not employee:
+                    errors.append(f"Row {index + 2}: Employee '{employee_name}' not found")
+                    skipped_count += 1
+                    continue
+
+                # Check department access
+                if current_user.role == UserRoleEnum.USER:
+                    if employee.department_id != current_user.department_id:
+                        errors.append(f"Row {index + 2}: No access to employee from another department")
+                        skipped_count += 1
+                        continue
+
+                # Check if plan already exists
+                existing_plan = db.query(PayrollPlan).filter(
+                    and_(
+                        PayrollPlan.employee_id == employee.id,
+                        PayrollPlan.year == year,
+                        PayrollPlan.month == month
+                    )
+                ).first()
+
+                total_planned = Decimal(str(base_salary)) + Decimal(str(bonus)) + Decimal(str(other_payments))
+
+                if existing_plan:
+                    # Update existing plan
+                    existing_plan.base_salary = Decimal(str(base_salary))
+                    existing_plan.bonus = Decimal(str(bonus))
+                    existing_plan.other_payments = Decimal(str(other_payments))
+                    existing_plan.total_planned = total_planned
+                    if notes:
+                        existing_plan.notes = notes
+                    updated_count += 1
+                else:
+                    # Create new plan
+                    new_plan = PayrollPlan(
+                        employee_id=employee.id,
+                        year=year,
+                        month=month,
+                        base_salary=Decimal(str(base_salary)),
+                        bonus=Decimal(str(bonus)),
+                        other_payments=Decimal(str(other_payments)),
+                        total_planned=total_planned,
+                        department_id=employee.department_id,
+                        notes=notes
+                    )
+                    db.add(new_plan)
+                    created_count += 1
+
+            except Exception as e:
+                errors.append(f"Row {index + 2}: {str(e)}")
+                skipped_count += 1
+                continue
+
+        # Commit all changes
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"Import completed",
+            "total_rows": total_rows,
+            "created": created_count,
+            "updated": updated_count,
+            "skipped": skipped_count,
+            "errors": errors[:10] if errors else []  # Return first 10 errors
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Import failed: {str(e)}"
+        )
