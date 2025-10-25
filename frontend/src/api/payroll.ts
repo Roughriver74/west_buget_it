@@ -121,6 +121,18 @@ export interface PayrollDynamics {
   employee_count: number;
 }
 
+export interface PayrollForecast {
+  year: number;
+  month: number;
+  forecasted_total: number;
+  forecasted_base_salary: number;
+  forecasted_bonus: number;
+  forecasted_other: number;
+  employee_count: number;
+  confidence: string;
+  based_on_months: number;
+}
+
 export interface EmployeePayrollStats {
   employee_id: number;
   employee_name: string;
@@ -397,6 +409,13 @@ export const payrollAnalyticsAPI = {
   getDynamics: async (year: number, department_id?: number) => {
     const response = await apiClient.get<PayrollDynamics[]>('/payroll/analytics/dynamics', {
       params: { year, department_id },
+    });
+    return response.data;
+  },
+
+  getForecast: async (params?: { months_ahead?: number; historical_months?: number; department_id?: number }) => {
+    const response = await apiClient.get<PayrollForecast[]>('/payroll/analytics/forecast', {
+      params,
     });
     return response.data;
   },

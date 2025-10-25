@@ -31,6 +31,7 @@ from app.schemas.payroll import (
     SalaryStatistics,
     PayrollStructureMonth,
     PayrollDynamics,
+    PayrollForecast,
 )
 from app.utils.auth import get_current_active_user
 
@@ -846,6 +847,131 @@ async def get_payroll_dynamics(
             ))
 
     return dynamics
+
+
+@router.get("/analytics/forecast", response_model=List[PayrollForecast])
+async def get_payroll_forecast(
+    months_ahead: int = Query(3, ge=1, le=12, description="Number of months to forecast"),
+    historical_months: int = Query(6, ge=3, le=12, description="Number of historical months to use"),
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get payroll forecast for future months based on historical data
+
+    Uses simple moving average with trend adjustment for forecasting
+    """
+    from datetime import datetime as dt
+    from dateutil.relativedelta import relativedelta
+
+    # Filter by department based on user role
+    dept_filter = None
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        dept_filter = current_user.department_id
+    elif department_id:
+        dept_filter = department_id
+
+    # Get current date
+    now = dt.now()
+    current_year = now.year
+    current_month = now.month
+
+    # Get historical data for the last N months
+    historical_data = []
+    for i in range(historical_months, 0, -1):
+        date = now - relativedelta(months=i)
+        year = date.year
+        month = date.month
+
+        # Query plans for this month
+        plan_query = db.query(
+            func.sum(PayrollPlan.base_salary).label('base_salary'),
+            func.sum(PayrollPlan.bonus).label('bonus'),
+            func.sum(PayrollPlan.other_payments).label('other_payments'),
+            func.sum(PayrollPlan.total_planned).label('total'),
+            func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
+        ).filter(
+            and_(
+                PayrollPlan.year == year,
+                PayrollPlan.month == month
+            )
+        )
+
+        if dept_filter:
+            plan_query = plan_query.filter(PayrollPlan.department_id == dept_filter)
+
+        result = plan_query.first()
+
+        if result and result.total:
+            historical_data.append({
+                'year': year,
+                'month': month,
+                'base_salary': float(result.base_salary or 0),
+                'bonus': float(result.bonus or 0),
+                'other_payments': float(result.other_payments or 0),
+                'total': float(result.total or 0),
+                'employee_count': result.employee_count
+            })
+
+    if not historical_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No historical data available for forecasting"
+        )
+
+    # Calculate averages from historical data
+    avg_base_salary = sum(d['base_salary'] for d in historical_data) / len(historical_data)
+    avg_bonus = sum(d['bonus'] for d in historical_data) / len(historical_data)
+    avg_other = sum(d['other_payments'] for d in historical_data) / len(historical_data)
+    avg_total = sum(d['total'] for d in historical_data) / len(historical_data)
+    avg_employee_count = int(sum(d['employee_count'] for d in historical_data) / len(historical_data))
+
+    # Calculate trend (simple linear trend based on first and last months)
+    if len(historical_data) >= 3:
+        first_half_avg = sum(d['total'] for d in historical_data[:len(historical_data)//2]) / (len(historical_data)//2)
+        second_half_avg = sum(d['total'] for d in historical_data[len(historical_data)//2:]) / (len(historical_data) - len(historical_data)//2)
+        trend_factor = (second_half_avg - first_half_avg) / first_half_avg if first_half_avg > 0 else 0
+    else:
+        trend_factor = 0
+
+    # Determine confidence level
+    if len(historical_data) >= 6:
+        confidence = "high"
+    elif len(historical_data) >= 4:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    # Generate forecasts
+    forecasts = []
+    for i in range(1, months_ahead + 1):
+        forecast_date = now + relativedelta(months=i)
+        forecast_year = forecast_date.year
+        forecast_month = forecast_date.month
+
+        # Apply trend to forecast (compound monthly)
+        monthly_trend = trend_factor / len(historical_data)
+        trend_multiplier = 1 + (monthly_trend * i)
+
+        forecasts.append(PayrollForecast(
+            year=forecast_year,
+            month=forecast_month,
+            forecasted_total=Decimal(str(avg_total * trend_multiplier)),
+            forecasted_base_salary=Decimal(str(avg_base_salary * trend_multiplier)),
+            forecasted_bonus=Decimal(str(avg_bonus * trend_multiplier)),
+            forecasted_other=Decimal(str(avg_other * trend_multiplier)),
+            employee_count=avg_employee_count,
+            confidence=confidence,
+            based_on_months=len(historical_data)
+        ))
+
+    return forecasts
 
 
 # ==================== Import Endpoints ====================

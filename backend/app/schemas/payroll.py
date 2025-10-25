@@ -271,3 +271,16 @@ class PayrollDynamics(BaseModel):
     actual_other: Decimal
     actual_total: Decimal
     employee_count: int
+
+
+class PayrollForecast(BaseModel):
+    """Payroll forecast for future months"""
+    year: int
+    month: int
+    forecasted_total: Decimal
+    forecasted_base_salary: Decimal
+    forecasted_bonus: Decimal
+    forecasted_other: Decimal
+    employee_count: int
+    confidence: str  # "high", "medium", "low"
+    based_on_months: int  # How many historical months used for forecast

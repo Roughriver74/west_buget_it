@@ -11,6 +11,7 @@ import {
   Typography,
   Space,
   Divider,
+  Tag,
 } from 'antd';
 import {
   LineChart,
@@ -36,11 +37,11 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
-import { payrollAnalyticsAPI } from '../api/payroll';
+import { payrollAnalyticsAPI, PayrollForecast } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import dayjs from 'dayjs';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 const COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
@@ -72,7 +73,17 @@ export default function PayrollAnalyticsPage() {
     queryFn: () => payrollAnalyticsAPI.getDynamics(selectedYear, selectedDepartment || undefined),
   });
 
-  const isLoading = statsLoading || structureLoading || dynamicsLoading;
+  // Fetch payroll forecast
+  const { data: forecast, isLoading: forecastLoading } = useQuery({
+    queryKey: ['payroll-forecast', selectedDepartment],
+    queryFn: () => payrollAnalyticsAPI.getForecast({
+      months_ahead: 6,
+      historical_months: 6,
+      department_id: selectedDepartment || undefined,
+    }),
+  });
+
+  const isLoading = statsLoading || structureLoading || dynamicsLoading || forecastLoading;
 
   if (isLoading) {
     return (
@@ -352,6 +363,72 @@ export default function PayrollAnalyticsPage() {
           </Card>
         </Col>
       </Row>
+
+      {/* Payroll Forecast */}
+      {forecast && forecast.length > 0 && (
+        <Card
+          title={
+            <Space>
+              <span>Прогноз ФОТ на ближайшие месяцы</span>
+              <Tag color={
+                forecast[0].confidence === 'high' ? 'green' :
+                forecast[0].confidence === 'medium' ? 'orange' : 'red'
+              }>
+                {forecast[0].confidence === 'high' ? 'Высокая точность' :
+                 forecast[0].confidence === 'medium' ? 'Средняя точность' : 'Низкая точность'}
+              </Tag>
+              <Text type="secondary">
+                (на основе {forecast[0].based_on_months} месяцев)
+              </Text>
+            </Space>
+          }
+          style={{ marginTop: '24px' }}
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={forecast.map(item => ({
+              month: `${MONTH_NAMES[item.month - 1]} ${item.year}`,
+              'Прогноз': Number(item.forecasted_total),
+            }))}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="month" />
+              <YAxis />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="Прогноз"
+                stroke="#722ed1"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+
+          <Divider />
+
+          <Row gutter={[16, 16]}>
+            {forecast.map((item, index) => (
+              <Col span={8} key={index}>
+                <Card size="small">
+                  <Statistic
+                    title={`${MONTH_NAMES[item.month - 1]} ${item.year}`}
+                    value={Number(item.forecasted_total)}
+                    precision={0}
+                    formatter={(value) => formatCurrency(Number(value))}
+                  />
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+                    <div>Оклад: {formatCurrency(Number(item.forecasted_base_salary))}</div>
+                    <div>Премия: {formatCurrency(Number(item.forecasted_bonus))}</div>
+                    <div>Прочее: {formatCurrency(Number(item.forecasted_other))}</div>
+                    <div>Сотрудников: {item.employee_count}</div>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
     </div>
   );
 }
