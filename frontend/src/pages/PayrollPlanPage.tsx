@@ -12,12 +12,14 @@ import {
   Button,
   Dropdown,
   MenuProps,
+  message,
 } from 'antd';
 import {
   DollarOutlined,
   TeamOutlined,
   PlusOutlined,
   DownOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
@@ -97,6 +99,30 @@ export default function PayrollPlanPage() {
     setActualModalVisible(true);
   };
 
+  const handleExportPlans = async () => {
+    try {
+      await payrollPlanAPI.exportToExcel({
+        year: selectedYear,
+        department_id: selectedDepartment || undefined,
+      });
+      message.success('Экспорт планов выполнен успешно');
+    } catch (error) {
+      message.error('Ошибка при экспорте планов');
+    }
+  };
+
+  const handleExportActuals = async () => {
+    try {
+      await payrollActualAPI.exportToExcel({
+        year: selectedYear,
+        department_id: selectedDepartment || undefined,
+      });
+      message.success('Экспорт фактов выполнен успешно');
+    } catch (error) {
+      message.error('Ошибка при экспорте фактов');
+    }
+  };
+
   const addMenuItems: MenuProps['items'] = [
     {
       key: 'plan',
@@ -107,6 +133,19 @@ export default function PayrollPlanPage() {
       key: 'actual',
       label: 'Добавить факт',
       onClick: () => handleAddActual(),
+    },
+  ];
+
+  const exportMenuItems: MenuProps['items'] = [
+    {
+      key: 'export-plans',
+      label: 'Экспорт планов',
+      onClick: handleExportPlans,
+    },
+    {
+      key: 'export-actuals',
+      label: 'Экспорт фактов',
+      onClick: handleExportActuals,
     },
   ];
 
@@ -183,6 +222,11 @@ export default function PayrollPlanPage() {
               </Option>
             ))}
           </Select>
+          <Dropdown menu={{ items: exportMenuItems }} placement="bottomRight">
+            <Button icon={<DownloadOutlined />}>
+              Экспорт <DownOutlined />
+            </Button>
+          </Dropdown>
           <Dropdown menu={{ items: addMenuItems }} placement="bottomRight">
             <Button type="primary" icon={<PlusOutlined />}>
               Добавить <DownOutlined />

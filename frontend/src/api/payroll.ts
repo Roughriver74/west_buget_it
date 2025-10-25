@@ -223,6 +223,21 @@ export const employeeAPI = {
     const response = await apiClient.post<SalaryHistory>(`/employees/${id}/salary-history`, data);
     return response.data;
   },
+
+  exportToExcel: async (params?: { department_id?: number; status?: string }) => {
+    const response = await apiClient.get('/employees/export', {
+      params,
+      responseType: 'blob',
+    });
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'employees_export.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
 };
 
 // ==================== Payroll Plan API ====================
@@ -258,6 +273,20 @@ export const payrollPlanAPI = {
   delete: async (id: number) => {
     await apiClient.delete(`/payroll/plans/${id}`);
   },
+
+  exportToExcel: async (params?: { year?: number; month?: number; department_id?: number }) => {
+    const response = await apiClient.get('/payroll/plans/export', {
+      params,
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'payroll_plans_export.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
 };
 
 // ==================== Payroll Actual API ====================
@@ -287,6 +316,20 @@ export const payrollActualAPI = {
 
   delete: async (id: number) => {
     await apiClient.delete(`/payroll/actuals/${id}`);
+  },
+
+  exportToExcel: async (params?: { year?: number; month?: number; department_id?: number }) => {
+    const response = await apiClient.get('/payroll/actuals/export', {
+      params,
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'payroll_actuals_export.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   },
 };
 

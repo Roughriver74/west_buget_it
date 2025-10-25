@@ -4,10 +4,13 @@ Handles payroll plans and actual payments
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime
 from decimal import Decimal
+import pandas as pd
+import io
 
 from app.db.session import get_db
 from app.db.models import (
@@ -502,3 +505,136 @@ async def get_payroll_summary(
     summaries.sort(key=lambda x: x.month)
 
     return summaries
+
+
+# ==================== Export Endpoints ====================
+
+@router.get("/plans/export", response_class=StreamingResponse)
+async def export_payroll_plans(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export payroll plans to Excel
+    """
+    query = db.query(PayrollPlan).join(Employee)
+
+    # Apply department filter based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(PayrollPlan.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(PayrollPlan.department_id == department_id)
+
+    # Apply filters
+    if year:
+        query = query.filter(PayrollPlan.year == year)
+    if month:
+        query = query.filter(PayrollPlan.month == month)
+
+    plans = query.all()
+
+    # Convert to DataFrame
+    data = []
+    for plan in plans:
+        data.append({
+            "ID": plan.id,
+            "Год": plan.year,
+            "Месяц": plan.month,
+            "Сотрудник": plan.employee_rel.full_name,
+            "Должность": plan.employee_rel.position,
+            "Оклад": float(plan.base_salary),
+            "Премия": float(plan.bonus),
+            "Прочие выплаты": float(plan.other_payments),
+            "Итого запланировано": float(plan.total_planned),
+            "Примечания": plan.notes or "",
+            "Дата создания": plan.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    df = pd.DataFrame(data)
+
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='План ФОТ')
+
+    output.seek(0)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=payroll_plans_export.xlsx"}
+    )
+
+
+@router.get("/actuals/export", response_class=StreamingResponse)
+async def export_payroll_actuals(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export payroll actuals to Excel
+    """
+    query = db.query(PayrollActual).join(Employee)
+
+    # Apply department filter based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(PayrollActual.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(PayrollActual.department_id == department_id)
+
+    # Apply filters
+    if year:
+        query = query.filter(PayrollActual.year == year)
+    if month:
+        query = query.filter(PayrollActual.month == month)
+
+    actuals = query.all()
+
+    # Convert to DataFrame
+    data = []
+    for actual in actuals:
+        data.append({
+            "ID": actual.id,
+            "Год": actual.year,
+            "Месяц": actual.month,
+            "Сотрудник": actual.employee_rel.full_name,
+            "Должность": actual.employee_rel.position,
+            "Оклад выплачено": float(actual.base_salary_paid),
+            "Премия выплачено": float(actual.bonus_paid),
+            "Прочие выплаты": float(actual.other_payments_paid),
+            "Итого выплачено": float(actual.total_paid),
+            "Дата выплаты": actual.payment_date.strftime("%Y-%m-%d") if actual.payment_date else "",
+            "Примечания": actual.notes or "",
+            "Дата создания": actual.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    df = pd.DataFrame(data)
+
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Факт ФОТ')
+
+    output.seek(0)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=payroll_actuals_export.xlsx"}
+    )

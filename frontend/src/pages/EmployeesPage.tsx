@@ -21,6 +21,7 @@ import {
   DeleteOutlined,
   SearchOutlined,
   UserOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { employeeAPI, Employee } from '../api/payroll';
@@ -93,6 +94,18 @@ export default function EmployeesPage() {
   const handleCloseModal = () => {
     setModalVisible(false);
     setSelectedEmployee(undefined);
+  };
+
+  const handleExport = async () => {
+    try {
+      await employeeAPI.exportToExcel({
+        department_id: selectedDepartment || undefined,
+        status: statusFilter,
+      });
+      message.success('Экспорт выполнен успешно');
+    } catch (error) {
+      message.error('Ошибка при экспорте');
+    }
   };
 
   // Calculate statistics
@@ -261,13 +274,21 @@ export default function EmployeesPage() {
               ))}
             </Select>
           </Space>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            Добавить сотрудника
-          </Button>
+          <Space>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+            >
+              Экспорт в Excel
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
+              Добавить сотрудника
+            </Button>
+          </Space>
         </Space>
 
         {/* Employees Table */}
