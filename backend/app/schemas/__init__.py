@@ -21,6 +21,17 @@ from .dashboard import (
     DashboardConfigInDB,
     DashboardConfigList,
 )
+from .user import (
+    User,
+    UserCreate,
+    UserUpdate,
+    UserPasswordChange,
+    UserListItem,
+    Token,
+    TokenData,
+    UserLogin,
+    UserLoginResponse,
+)
 
 __all__ = [
     # Expense
@@ -55,4 +66,14 @@ __all__ = [
     "DashboardConfigUpdate",
     "DashboardConfigInDB",
     "DashboardConfigList",
+    # User
+    "User",
+    "UserCreate",
+    "UserUpdate",
+    "UserPasswordChange",
+    "UserListItem",
+    "Token",
+    "TokenData",
+    "UserLogin",
+    "UserLoginResponse",
 ]

@@ -41,6 +41,13 @@ class BudgetStatusEnum(str, enum.Enum):
     APPROVED = "APPROVED"
 
 
+class UserRoleEnum(str, enum.Enum):
+    """Enum for user roles"""
+    ADMIN = "ADMIN"  # Администратор - полный доступ
+    ACCOUNTANT = "ACCOUNTANT"  # Бухгалтер - управление заявками и бюджетом
+    REQUESTER = "REQUESTER"  # Заявитель - создание и просмотр заявок
+
+
 class BudgetCategory(Base):
     """Budget categories (статьи расходов)"""
     __tablename__ = "budget_categories"
@@ -254,8 +261,8 @@ class DashboardConfig(Base):
     name = Column(String(255), nullable=False)  # Название дашборда
     description = Column(Text, nullable=True)  # Описание дашборда
 
-    # User association (для будущей многопользовательской системы)
-    user_id = Column(String(255), nullable=True, index=True)  # ID пользователя
+    # User association
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # Configuration
     is_default = Column(Boolean, default=False, nullable=False)  # Дефолтный дашборд
@@ -269,5 +276,46 @@ class DashboardConfig(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Relationships
+    user = relationship("User", back_populates="dashboards")
+
     def __repr__(self):
         return f"<DashboardConfig {self.name}>"
+
+
+class User(Base):
+    """Users (пользователи системы)"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)  # Логин
+    email = Column(String(255), unique=True, nullable=False, index=True)  # Email
+    full_name = Column(String(255), nullable=True)  # Полное имя
+
+    # Authentication
+    hashed_password = Column(String(255), nullable=False)  # Хеш пароля
+
+    # Role and permissions
+    role = Column(Enum(UserRoleEnum), nullable=False, default=UserRoleEnum.REQUESTER)
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)  # Активен ли пользователь
+    is_verified = Column(Boolean, default=False, nullable=False)  # Подтвержден ли email
+
+    # Additional info
+    department = Column(String(255), nullable=True)  # Отдел
+    position = Column(String(255), nullable=True)  # Должность
+    phone = Column(String(50), nullable=True)  # Телефон
+
+    # Last login tracking
+    last_login = Column(DateTime, nullable=True)  # Последний вход
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    dashboards = relationship("DashboardConfig", back_populates="user")
+
+    def __repr__(self):
+        return f"<User {self.username} ({self.role})>"
