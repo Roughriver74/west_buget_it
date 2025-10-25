@@ -33,6 +33,11 @@ export const departmentsApi = {
     return data
   },
 
+  list: async (params?: { skip?: number; limit?: number; is_active?: boolean }): Promise<Department[]> => {
+    const { data } = await apiClient.get('/departments/', { params })
+    return data
+  },
+
   getById: async (id: number): Promise<Department> => {
     const { data } = await apiClient.get(`/departments/${id}`)
     return data
@@ -62,3 +67,6 @@ export const departmentsApi = {
     return data
   },
 }
+
+// Alias for consistency
+export const departmentsAPI = departmentsApi

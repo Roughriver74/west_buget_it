@@ -9,7 +9,6 @@ import {
   Input,
   Select,
   message,
-  Modal,
   Popconfirm,
   Statistic,
   Row,
@@ -25,6 +24,7 @@ import {
 import { useDepartment } from '../contexts/DepartmentContext';
 import { employeeAPI, Employee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
+import EmployeeFormModal from '../components/employees/EmployeeFormModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -48,6 +48,8 @@ export default function EmployeesPage() {
   const { selectedDepartment } = useDepartment();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>();
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -74,6 +76,21 @@ export default function EmployeesPage() {
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(id);
+  };
+
+  const handleCreate = () => {
+    setSelectedEmployee(undefined);
+    setModalVisible(true);
+  };
+
+  const handleEdit = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setModalVisible(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedEmployee(undefined);
   };
 
   // Calculate statistics
@@ -144,7 +161,7 @@ export default function EmployeesPage() {
           <Button
             type="link"
             icon={<EditOutlined />}
-            onClick={() => message.info('Редактирование будет добавлено в следующей версии')}
+            onClick={() => handleEdit(record)}
           />
           <Popconfirm
             title="Вы уверены, что хотите удалить этого сотрудника?"
@@ -236,7 +253,7 @@ export default function EmployeesPage() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => message.info('Создание сотрудника будет добавлено в следующей версии')}
+            onClick={handleCreate}
           >
             Добавить сотрудника
           </Button>
@@ -256,6 +273,12 @@ export default function EmployeesPage() {
           scroll={{ x: 1200 }}
         />
       </Card>
+
+      <EmployeeFormModal
+        visible={modalVisible}
+        employee={selectedEmployee}
+        onCancel={handleCloseModal}
+      />
     </div>
   );
 }

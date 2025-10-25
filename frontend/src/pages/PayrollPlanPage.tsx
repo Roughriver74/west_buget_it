@@ -9,14 +9,21 @@ import {
   Row,
   Col,
   Tag,
+  Button,
+  Dropdown,
+  MenuProps,
 } from 'antd';
 import {
   DollarOutlined,
   TeamOutlined,
+  PlusOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
+import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
+import PayrollActualFormModal from '../components/payroll/PayrollActualFormModal';
 
 const { Option } = Select;
 
@@ -29,6 +36,9 @@ export default function PayrollPlanPage() {
   const { selectedDepartment } = useDepartment();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [actualModalVisible, setActualModalVisible] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
 
   // Fetch payroll plans
   const { data: plans = [], isLoading: plansLoading } = useQuery<PayrollPlanWithEmployee[]>({
@@ -76,6 +86,29 @@ export default function PayrollPlanPage() {
   const yearTotalPlanned = monthlyData.reduce((sum, m) => sum + m.totalPlanned, 0);
   const yearTotalPaid = monthlyData.reduce((sum, m) => sum + m.totalPaid, 0);
   const yearVariance = yearTotalPaid - yearTotalPlanned;
+
+  const handleAddPlan = (month?: number) => {
+    setSelectedMonth(month);
+    setPlanModalVisible(true);
+  };
+
+  const handleAddActual = (month?: number) => {
+    setSelectedMonth(month);
+    setActualModalVisible(true);
+  };
+
+  const addMenuItems: MenuProps['items'] = [
+    {
+      key: 'plan',
+      label: 'Добавить план',
+      onClick: () => handleAddPlan(),
+    },
+    {
+      key: 'actual',
+      label: 'Добавить факт',
+      onClick: () => handleAddActual(),
+    },
+  ];
 
   const columns = [
     {
@@ -138,17 +171,24 @@ export default function PayrollPlanPage() {
         <h1>
           <DollarOutlined /> Планирование ФОТ
         </h1>
-        <Select
-          value={selectedYear}
-          onChange={setSelectedYear}
-          style={{ width: 150 }}
-        >
-          {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
-            <Option key={year} value={year}>
-              {year} год
-            </Option>
-          ))}
-        </Select>
+        <Space>
+          <Select
+            value={selectedYear}
+            onChange={setSelectedYear}
+            style={{ width: 150 }}
+          >
+            {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
+              <Option key={year} value={year}>
+                {year} год
+              </Option>
+            ))}
+          </Select>
+          <Dropdown menu={{ items: addMenuItems }} placement="bottomRight">
+            <Button type="primary" icon={<PlusOutlined />}>
+              Добавить <DownOutlined />
+            </Button>
+          </Dropdown>
+        </Space>
       </div>
 
       {/* Year Statistics */}
@@ -250,6 +290,30 @@ export default function PayrollPlanPage() {
           )}
         />
       </Card>
+
+      <PayrollPlanFormModal
+        visible={planModalVisible}
+        defaultValues={{
+          year: selectedYear,
+          month: selectedMonth,
+        }}
+        onCancel={() => {
+          setPlanModalVisible(false);
+          setSelectedMonth(undefined);
+        }}
+      />
+
+      <PayrollActualFormModal
+        visible={actualModalVisible}
+        defaultValues={{
+          year: selectedYear,
+          month: selectedMonth,
+        }}
+        onCancel={() => {
+          setActualModalVisible(false);
+          setSelectedMonth(undefined);
+        }}
+      />
     </div>
   );
 }
