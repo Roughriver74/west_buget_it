@@ -6,6 +6,7 @@ import ruRU from 'antd/locale/ru_RU'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
 
 dayjs.locale('ru')
@@ -21,10 +22,12 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ConfigProvider locale={ruRU}>
-        <App />
-      </ConfigProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ConfigProvider locale={ruRU}>
+          <App />
+        </ConfigProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 )

@@ -8,6 +8,7 @@ import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
 import FTPImportModal from '@/components/expenses/FTPImportModal'
+import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
@@ -25,9 +26,10 @@ const ExpensesPage = () => {
   const [importModalVisible, setImportModalVisible] = useState(false)
 
   const queryClient = useQueryClient()
+  const { selectedDepartment } = useDepartment()
 
   const { data: expenses, isLoading } = useQuery({
-    queryKey: ['expenses', page, pageSize, search, status, categoryId, dateRange],
+    queryKey: ['expenses', page, pageSize, search, status, categoryId, dateRange, selectedDepartment?.id],
     queryFn: () =>
       expensesApi.getAll({
         skip: (page - 1) * pageSize,
@@ -35,6 +37,7 @@ const ExpensesPage = () => {
         search: search || undefined,
         status,
         category_id: categoryId,
+        department_id: selectedDepartment?.id,
         date_from: dateRange?.[0]?.toISOString(),
         date_to: dateRange?.[1]?.toISOString(),
       }),
@@ -52,6 +55,7 @@ const ExpensesPage = () => {
 
     if (status) params.append('status', status)
     if (categoryId) params.append('category_id', categoryId.toString())
+    if (selectedDepartment?.id) params.append('department_id', selectedDepartment.id.toString())
     if (search) params.append('search', search)
     if (dateRange?.[0]) params.append('date_from', dateRange[0].toISOString())
     if (dateRange?.[1]) params.append('date_to', dateRange[1].toISOString())

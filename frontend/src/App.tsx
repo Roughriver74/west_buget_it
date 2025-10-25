@@ -20,6 +20,8 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import BalanceAnalyticsPage from './pages/BalanceAnalyticsPage'
 import PaymentCalendarPage from './pages/PaymentCalendarPage'
 import ForecastPage from './pages/ForecastPage'
+import DepartmentsPage from './pages/DepartmentsPage'
+import UsersPage from './pages/UsersPage'
 
 function App() {
   return (
@@ -93,6 +95,26 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
                           <OrganizationDetailPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Departments - Admin only */}
+                    <Route
+                      path="/departments"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN']}>
+                          <DepartmentsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Users - Admin only */}
+                    <Route
+                      path="/users"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN']}>
+                          <UsersPage />
                         </ProtectedRoute>
                       }
                     />

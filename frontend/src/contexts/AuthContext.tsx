@@ -64,15 +64,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userData = await response.json();
             setUser(userData);
             setToken(savedToken);
+            console.log('[Auth] User loaded successfully:', userData.username);
           } else {
             // Token is invalid, clear it
+            console.warn('[Auth] Token validation failed, clearing');
             localStorage.removeItem('token');
             setToken(null);
+            setUser(null);
           }
         } catch (error) {
-          console.error('Failed to load user:', error);
+          console.error('[Auth] Failed to load user:', error);
           localStorage.removeItem('token');
           setToken(null);
+          setUser(null);
         }
       }
 
@@ -80,6 +84,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     loadUser();
+  }, []);
+
+  // Listen for unauthorized events from API interceptor
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      console.log('[Auth] Received unauthorized event, logging out');
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      // Don't show message here as it's handled by the interceptor
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {

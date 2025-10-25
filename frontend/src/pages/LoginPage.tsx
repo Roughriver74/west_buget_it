@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, Typography, Alert, Row, Col } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const { Title, Text } = Typography;
@@ -11,6 +11,10 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the page they were trying to access before being redirected to login
+  const from = (location.state as any)?.from?.pathname || '/';
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -18,7 +22,8 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(values.username, values.password);
-      navigate('/');
+      // Navigate to the page they were trying to access, or home
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

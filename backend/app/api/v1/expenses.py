@@ -9,10 +9,11 @@ import os
 from pydantic import BaseModel
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum
+from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum, User, UserRoleEnum
 from app.schemas import ExpenseCreate, ExpenseUpdate, ExpenseInDB, ExpenseList, ExpenseStatusUpdate
 from app.utils.excel_export import ExcelExporter
 from app.services.ftp_import_service import import_from_ftp
+from app.utils.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -23,16 +24,38 @@ def export_expenses_to_excel(
     category_id: Optional[int] = None,
     contractor_id: Optional[int] = None,
     organization_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     search: Optional[str] = None,
     year: Optional[int] = None,
     month: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Export expenses to Excel file"""
+    """
+    Export expenses to Excel file
+
+    - **USER**: Can only export expenses from their own department
+    - **MANAGER**: Can export expenses from all departments
+    - **ADMIN**: Can export expenses from all departments
+    """
     # Get expenses with same filters as get_expenses endpoint
     query = db.query(Expense)
+
+    # Department filtering based on user role (Row Level Security)
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only export their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Expense.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(Expense.department_id == department_id)
 
     if status:
         query = query.filter(Expense.status == status)
@@ -131,17 +154,39 @@ def get_expenses(
     category_id: Optional[int] = None,
     contractor_id: Optional[int] = None,
     organization_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     search: Optional[str] = None,
     needs_review: Optional[bool] = None,
     imported_from_ftp: Optional[bool] = None,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all expenses with filters and pagination"""
+    """
+    Get all expenses with filters and pagination
+
+    - **USER**: Can only see expenses from their own department
+    - **MANAGER**: Can see expenses from all departments
+    - **ADMIN**: Can see expenses from all departments
+    """
     query = db.query(Expense)
 
-    # Apply filters
+    # Department filtering based on user role (Row Level Security)
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Expense.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(Expense.department_id == department_id)
+
+    # Apply other filters
     if status:
         query = query.filter(Expense.status == status)
 
@@ -207,14 +252,52 @@ def get_expense(expense_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=ExpenseInDB, status_code=status.HTTP_201_CREATED)
-def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
-    """Create new expense"""
-    # Check if expense with same number exists
-    existing = db.query(Expense).filter(Expense.number == expense.number).first()
+def create_expense(
+    expense: ExpenseCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create new expense
+
+    Auto-assigns to user's department (or can be specified by ADMIN/MANAGER)
+    """
+    # USER can only create expenses in their own department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
+    # Determine the department_id we'll be using
+    expense_data = expense.model_dump()
+    target_department_id = None
+
+    if current_user.role == UserRoleEnum.USER:
+        # USER always creates in their own department
+        target_department_id = current_user.department_id
+        expense_data['department_id'] = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = expense_data.get('department_id') or current_user.department_id
+        if not target_department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required"
+            )
+        expense_data['department_id'] = target_department_id
+
+    # Check if expense with same number exists in the same department
+    # (number uniqueness is now scoped to department)
+    existing = db.query(Expense).filter(
+        Expense.number == expense.number,
+        Expense.department_id == target_department_id
+    ).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Expense with number '{expense.number}' already exists"
+            detail=f"Expense with number '{expense.number}' already exists in this department"
         )
 
     # Validate category exists
@@ -242,7 +325,7 @@ def create_expense(expense: ExpenseCreate, db: Session = Depends(get_db)):
                 detail=f"Contractor with id {expense.contractor_id} not found"
             )
 
-    db_expense = Expense(**expense.model_dump())
+    db_expense = Expense(**expense_data)
     db.add(db_expense)
     db.commit()
     db.refresh(db_expense)

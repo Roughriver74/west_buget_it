@@ -3,7 +3,7 @@ Authentication and user management API endpoints
 """
 from datetime import timedelta
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -27,6 +27,7 @@ from app.utils.auth import (
     verify_password,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+from app.utils.audit import audit_login, audit_create
 
 router = APIRouter()
 
@@ -81,7 +82,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=UserLoginResponse)
-async def login(login_data: UserLogin, db: Session = Depends(get_db)):
+async def login(login_data: UserLogin, request: Request, db: Session = Depends(get_db)):
     """
     Login with username/email and password
 
@@ -108,6 +109,9 @@ async def login(login_data: UserLogin, db: Session = Depends(get_db)):
         data={"sub": user.id, "username": user.username},
         expires_delta=access_token_expires
     )
+
+    # Audit log for successful login
+    audit_login(db=db, user=user, request=request)
 
     return {
         "access_token": access_token,

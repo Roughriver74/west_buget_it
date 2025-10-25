@@ -8,6 +8,7 @@ export interface ExpenseFilters {
   category_id?: number
   contractor_id?: number
   organization_id?: number
+  department_id?: number
   date_from?: string
   date_to?: string
   search?: string

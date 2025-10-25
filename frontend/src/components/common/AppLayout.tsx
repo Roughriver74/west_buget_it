@@ -60,7 +60,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     },
   ]
 
-  const menuItems = [
+  // Build menu items based on user role
+  const baseMenuItems = [
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
@@ -122,6 +123,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       label: <Link to="/organizations">Организации</Link>,
     },
   ]
+
+  // Add admin-only menu items
+  const menuItems = user?.role === 'ADMIN'
+    ? [
+        ...baseMenuItems,
+        {
+          key: '/departments',
+          icon: <BankOutlined />,
+          label: <Link to="/departments">Отделы</Link>,
+        },
+        {
+          key: '/users',
+          icon: <UserOutlined />,
+          label: <Link to="/users">Пользователи</Link>,
+        },
+      ]
+    : baseMenuItems
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
