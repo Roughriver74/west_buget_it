@@ -15,7 +15,7 @@ class BudgetCategoryBase(BaseModel):
 
 class BudgetCategoryCreate(BudgetCategoryBase):
     """Schema for creating budget category"""
-    pass
+    department_id: Optional[int] = None  # Optional - auto-assigned if not provided
 
 
 class BudgetCategoryUpdate(BaseModel):
@@ -30,6 +30,7 @@ class BudgetCategoryUpdate(BaseModel):
 class BudgetCategoryInDB(BudgetCategoryBase):
     """Schema for budget category from database"""
     id: int
+    department_id: int
     created_at: datetime
     updated_at: datetime
 

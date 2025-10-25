@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -7,8 +7,9 @@ import pandas as pd
 import io
 
 from app.db import get_db
-from app.db.models import Organization
+from app.db.models import Organization, User, UserRoleEnum
 from app.schemas import OrganizationCreate, OrganizationUpdate, OrganizationInDB
+from app.utils.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -24,13 +25,35 @@ class BulkDeleteRequest(BaseModel):
 
 @router.get("/", response_model=List[OrganizationInDB])
 def get_organizations(
-    skip: int = 0,
-    limit: int = 100,
-    is_active: bool = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    is_active: Optional[bool] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all organizations"""
+    """
+    Get all organizations
+
+    - **USER**: Can only see organizations from their own department
+    - **MANAGER**: Can see organizations from all departments
+    - **ADMIN**: Can see organizations from all departments
+    """
     query = db.query(Organization)
+
+    # Department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Organization.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(Organization.department_id == department_id)
 
     if is_active is not None:
         query = query.filter(Organization.is_active == is_active)
@@ -40,7 +63,11 @@ def get_organizations(
 
 
 @router.get("/{organization_id}", response_model=OrganizationInDB)
-def get_organization(organization_id: int, db: Session = Depends(get_db)):
+def get_organization(
+    organization_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Get organization by ID"""
     organization = db.query(Organization).filter(Organization.id == organization_id).first()
     if not organization:
@@ -48,21 +75,69 @@ def get_organization(organization_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with id {organization_id} not found"
         )
+
+    # USER can only view organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if organization.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to view this organization"
+            )
+
     return organization
 
 
 @router.post("/", response_model=OrganizationInDB, status_code=status.HTTP_201_CREATED)
-def create_organization(organization: OrganizationCreate, db: Session = Depends(get_db)):
-    """Create new organization"""
-    # Check if organization with same name exists
-    existing = db.query(Organization).filter(Organization.name == organization.name).first()
+def create_organization(
+    organization: OrganizationCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create new organization
+
+    Auto-assigns to user's department (or can be specified by ADMIN)
+    """
+    # USER can only create organizations in their own department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
+    # Check if organization with same name exists in the same department
+    # (name uniqueness is now scoped to department)
+    query = db.query(Organization).filter(Organization.name == organization.name)
+
+    # For USER, only check within their department
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(Organization.department_id == current_user.department_id)
+
+    existing = query.first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Organization with name '{organization.name}' already exists"
+            detail=f"Organization with name '{organization.name}' already exists in this department"
         )
 
-    db_organization = Organization(**organization.model_dump())
+    # Create organization with department_id
+    organization_data = organization.model_dump()
+
+    # Auto-assign department_id based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER always creates in their own department
+        organization_data['department_id'] = current_user.department_id
+    elif 'department_id' not in organization_data or organization_data['department_id'] is None:
+        # MANAGER/ADMIN must specify department or use their own
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required"
+            )
+        organization_data['department_id'] = current_user.department_id
+
+    db_organization = Organization(**organization_data)
     db.add(db_organization)
     db.commit()
     db.refresh(db_organization)
@@ -73,6 +148,7 @@ def create_organization(organization: OrganizationCreate, db: Session = Depends(
 def update_organization(
     organization_id: int,
     organization: OrganizationUpdate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update organization"""
@@ -82,6 +158,14 @@ def update_organization(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with id {organization_id} not found"
         )
+
+    # USER can only update organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_organization.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to update this organization"
+            )
 
     # Update fields
     update_data = organization.model_dump(exclude_unset=True)
@@ -94,7 +178,11 @@ def update_organization(
 
 
 @router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_organization(organization_id: int, db: Session = Depends(get_db)):
+def delete_organization(
+    organization_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Delete organization (soft delete - mark as inactive)"""
     db_organization = db.query(Organization).filter(Organization.id == organization_id).first()
     if not db_organization:
@@ -102,6 +190,14 @@ def delete_organization(organization_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with id {organization_id} not found"
         )
+
+    # USER can only delete organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_organization.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to delete this organization"
+            )
 
     # Soft delete - mark as inactive
     db_organization.is_active = False
@@ -112,10 +208,22 @@ def delete_organization(organization_id: int, db: Session = Depends(get_db)):
 @router.post("/bulk/update", status_code=status.HTTP_200_OK)
 def bulk_update_organizations(
     request: BulkUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Bulk activate/deactivate organizations"""
-    organizations = db.query(Organization).filter(Organization.id.in_(request.ids)).all()
+    query = db.query(Organization).filter(Organization.id.in_(request.ids))
+
+    # USER can only update organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Organization.department_id == current_user.department_id)
+
+    organizations = query.all()
 
     for organization in organizations:
         organization.is_active = request.is_active
@@ -132,10 +240,22 @@ def bulk_update_organizations(
 @router.post("/bulk/delete", status_code=status.HTTP_200_OK)
 def bulk_delete_organizations(
     request: BulkDeleteRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Bulk soft delete organizations"""
-    organizations = db.query(Organization).filter(Organization.id.in_(request.ids)).all()
+    query = db.query(Organization).filter(Organization.id.in_(request.ids))
+
+    # USER can only delete organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Organization.department_id == current_user.department_id)
+
+    organizations = query.all()
 
     for organization in organizations:
         organization.is_active = False
@@ -149,9 +269,23 @@ def bulk_delete_organizations(
 
 
 @router.get("/export", response_class=StreamingResponse)
-def export_organizations(db: Session = Depends(get_db)):
+def export_organizations(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Export organizations to Excel"""
-    organizations = db.query(Organization).all()
+    query = db.query(Organization)
+
+    # USER can only export organizations from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Organization.department_id == current_user.department_id)
+
+    organizations = query.all()
 
     data = []
     for organization in organizations:
@@ -180,9 +314,21 @@ def export_organizations(db: Session = Depends(get_db)):
 @router.post("/import", status_code=status.HTTP_200_OK)
 async def import_organizations(
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Import organizations from Excel"""
+    """
+    Import organizations from Excel
+
+    All imported organizations are assigned to the user's department
+    """
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -217,20 +363,27 @@ async def import_organizations(
                 is_active_str = str(row.get("Активна", "Да")).strip() if pd.notna(row.get("Активна")) else "Да"
                 is_active = is_active_str.lower() in ["да", "yes", "true", "1"]
 
-                # Try to find existing organization by name
-                existing_organization = db.query(Organization).filter(Organization.name == name).first()
+                # Determine department_id for import
+                import_department_id = current_user.department_id
+
+                # Try to find existing organization by name within the same department
+                existing_organization = db.query(Organization).filter(
+                    Organization.name == name,
+                    Organization.department_id == import_department_id
+                ).first()
 
                 if existing_organization:
-                    # Update existing
+                    # Update existing (only if belongs to user's department)
                     existing_organization.legal_name = legal_name
                     existing_organization.is_active = is_active
                     updated_count += 1
                 else:
-                    # Create new
+                    # Create new with department_id
                     new_organization = Organization(
                         name=name,
                         legal_name=legal_name,
-                        is_active=is_active
+                        is_active=is_active,
+                        department_id=import_department_id
                     )
                     db.add(new_organization)
                     created_count += 1

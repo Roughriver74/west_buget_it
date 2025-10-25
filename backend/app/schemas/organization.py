@@ -12,7 +12,7 @@ class OrganizationBase(BaseModel):
 
 class OrganizationCreate(OrganizationBase):
     """Schema for creating organization"""
-    pass
+    department_id: Optional[int] = None  # Optional - auto-assigned if not provided
 
 
 class OrganizationUpdate(BaseModel):
@@ -25,6 +25,7 @@ class OrganizationUpdate(BaseModel):
 class OrganizationInDB(OrganizationBase):
     """Schema for organization from database"""
     id: int
+    department_id: int
     created_at: datetime
     updated_at: datetime
 

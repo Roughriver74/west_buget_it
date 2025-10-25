@@ -41,15 +41,57 @@ class BudgetStatusEnum(str, enum.Enum):
     APPROVED = "APPROVED"
 
 
+class UserRoleEnum(str, enum.Enum):
+    """Enum for user roles in BDR (Budget Department Reporting)"""
+    ADMIN = "ADMIN"  # Администратор - управление системой и пользователями
+    MANAGER = "MANAGER"  # Руководитель - доступ ко всем отделам, сводная аналитика
+    USER = "USER"  # Пользователь отдела - доступ только к своему отделу
+
+
+class Department(Base):
+    """Departments (отделы компании) - основа multi-tenancy"""
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), unique=True, nullable=False, index=True)  # Название отдела
+    code = Column(String(50), unique=True, nullable=False, index=True)  # Код отдела
+    description = Column(Text, nullable=True)  # Описание
+    is_active = Column(Boolean, default=True, nullable=False)  # Активен ли отдел
+
+    # Contact info
+    manager_name = Column(String(255), nullable=True)  # Имя руководителя
+    contact_email = Column(String(255), nullable=True)  # Email отдела
+    contact_phone = Column(String(50), nullable=True)  # Телефон
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    users = relationship("User", back_populates="department_rel")
+    budget_categories = relationship("BudgetCategory", back_populates="department_rel")
+    contractors = relationship("Contractor", back_populates="department_rel")
+    organizations = relationship("Organization", back_populates="department_rel")
+    expenses = relationship("Expense", back_populates="department_rel")
+    budget_plans = relationship("BudgetPlan", back_populates="department_rel")
+    forecast_expenses = relationship("ForecastExpense", back_populates="department_rel")
+
+    def __repr__(self):
+        return f"<Department {self.code}: {self.name}>"
+
+
 class BudgetCategory(Base):
     """Budget categories (статьи расходов)"""
     __tablename__ = "budget_categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)
     type = Column(Enum(ExpenseTypeEnum), nullable=False)  # OPEX or CAPEX
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Подкатегории (hierarchical structure)
     parent_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
@@ -58,6 +100,7 @@ class BudgetCategory(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="budget_categories")
     expenses = relationship("Expense", back_populates="category")
     budget_plans = relationship("BudgetPlan", back_populates="category")
 
@@ -75,13 +118,18 @@ class Contractor(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(500), nullable=False, index=True)
     short_name = Column(String(255), nullable=True)
-    inn = Column(String(20), unique=True, nullable=True, index=True)
+    inn = Column(String(20), nullable=True, index=True)  # Removed unique constraint for multi-tenancy
     contact_info = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="contractors")
     expenses = relationship("Expense", back_populates="contractor")
 
     def __repr__(self):
@@ -93,13 +141,18 @@ class Organization(Base):
     __tablename__ = "organizations"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False, index=True)  # Removed unique constraint for multi-tenancy
     legal_name = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="organizations")
     expenses = relationship("Expense", back_populates="organization")
 
     def __repr__(self):
@@ -111,7 +164,10 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id = Column(Integer, primary_key=True, index=True)
-    number = Column(String(50), unique=True, nullable=False, index=True)  # 0В0В-001627
+    number = Column(String(50), nullable=False, index=True)  # Removed unique constraint for multi-tenancy
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign keys
     category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
@@ -141,6 +197,7 @@ class Expense(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="expenses")
     category = relationship("BudgetCategory", back_populates="expenses")
     contractor = relationship("Contractor", back_populates="expenses")
     organization = relationship("Organization", back_populates="expenses")
@@ -155,6 +212,9 @@ class ForecastExpense(Base):
     __tablename__ = "forecast_expenses"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign keys
     category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
@@ -177,6 +237,7 @@ class ForecastExpense(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="forecast_expenses")
     category = relationship("BudgetCategory")
     contractor = relationship("Contractor")
     organization = relationship("Organization")
@@ -194,6 +255,9 @@ class BudgetPlan(Base):
     year = Column(Integer, nullable=False, index=True)
     month = Column(Integer, nullable=False, index=True)  # 1-12
 
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
     # Foreign key
     category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
 
@@ -210,6 +274,7 @@ class BudgetPlan(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    department_rel = relationship("Department", back_populates="budget_plans")
     category = relationship("BudgetCategory", back_populates="budget_plans")
 
     def __repr__(self):
@@ -254,8 +319,8 @@ class DashboardConfig(Base):
     name = Column(String(255), nullable=False)  # Название дашборда
     description = Column(Text, nullable=True)  # Описание дашборда
 
-    # User association (для будущей многопользовательской системы)
-    user_id = Column(String(255), nullable=True, index=True)  # ID пользователя
+    # User association
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # Configuration
     is_default = Column(Boolean, default=False, nullable=False)  # Дефолтный дашборд
@@ -269,5 +334,49 @@ class DashboardConfig(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Relationships
+    user = relationship("User", back_populates="dashboards")
+
     def __repr__(self):
         return f"<DashboardConfig {self.name}>"
+
+
+class User(Base):
+    """Users (пользователи BDR системы)"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)  # Логин
+    email = Column(String(255), unique=True, nullable=False, index=True)  # Email
+    full_name = Column(String(255), nullable=True)  # Полное имя
+
+    # Authentication
+    hashed_password = Column(String(255), nullable=False)  # Хеш пароля
+
+    # Role and permissions in BDR
+    role = Column(Enum(UserRoleEnum), nullable=False, default=UserRoleEnum.USER)
+
+    # Department association (USER and MANAGER belong to department, ADMIN can be without)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)  # Активен ли пользователь
+    is_verified = Column(Boolean, default=False, nullable=False)  # Подтвержден ли email
+
+    # Additional info
+    position = Column(String(255), nullable=True)  # Должность
+    phone = Column(String(50), nullable=True)  # Телефон
+
+    # Last login tracking
+    last_login = Column(DateTime, nullable=True)  # Последний вход
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    department_rel = relationship("Department", back_populates="users")
+    dashboards = relationship("DashboardConfig", back_populates="user")
+
+    def __repr__(self):
+        return f"<User {self.username} ({self.role})>"
