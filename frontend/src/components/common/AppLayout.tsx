@@ -133,6 +133,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           icon: <BankOutlined />,
           label: <Link to="/departments">Отделы</Link>,
         },
+        {
+          key: '/users',
+          icon: <UserOutlined />,
+          label: <Link to="/users">Пользователи</Link>,
+        },
       ]
     : baseMenuItems
 
