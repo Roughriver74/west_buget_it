@@ -171,6 +171,14 @@ npm run lint
 - `GET /api/v1/contractors` - Контрагенты
 - `GET /api/v1/organizations` - Организации
 
+## Документация
+
+- [ROADMAP.md](./ROADMAP.md) - план развития проекта и история изменений
+- [AUTH_SETUP.md](./AUTH_SETUP.md) - настройка системы аутентификации
+- [SETUP.md](./SETUP.md) - детальная инструкция по установке
+- [PAYROLL_KPI_SUMMARY.md](./PAYROLL_KPI_SUMMARY.md) - краткое описание модулей ФОТ и KPI
+- [PAYROLL_KPI_PLAN.md](./PAYROLL_KPI_PLAN.md) - детальный технический план модулей ФОТ и KPI
+
 ## Лицензия
 
 MIT

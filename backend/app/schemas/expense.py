@@ -1,14 +1,12 @@
+from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 from pydantic import BaseModel, Field
 from app.db.models import ExpenseStatusEnum
 from .category import BudgetCategoryInDB
 from .contractor import ContractorInDB
 from .organization import OrganizationInDB
-
-if TYPE_CHECKING:
-    from .attachment import AttachmentInDB
 
 
 class ExpenseBase(BaseModel):

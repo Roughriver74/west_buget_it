@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { DepartmentProvider } from './contexts/DepartmentContext'
 import AppLayout from './components/common/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -35,8 +36,9 @@ function App() {
             path="/*"
             element={
               <ProtectedRoute>
-                <AppLayout>
-                  <Routes>
+                <DepartmentProvider>
+                  <AppLayout>
+                    <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
@@ -100,8 +102,9 @@ function App() {
                     <Route path="/analytics/balance" element={<BalanceAnalyticsPage />} />
                     <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                     <Route path="/forecast" element={<ForecastPage />} />
-                  </Routes>
-                </AppLayout>
+                    </Routes>
+                  </AppLayout>
+                </DepartmentProvider>
               </ProtectedRoute>
             }
           />

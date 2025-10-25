@@ -40,6 +40,10 @@ from .department import (
     DepartmentWithStats,
 )
 
+# Rebuild models to resolve forward references
+ExpenseInDB.model_rebuild()
+ExpenseList.model_rebuild()
+
 __all__ = [
     # Expense
     "ExpenseCreate",

@@ -32,11 +32,11 @@ def create_admin_user():
             username="admin",
             email="admin@example.com",
             full_name="System Administrator",
-            hashed_password=get_password_hash("admin123"),  # Change this password after first login!
+            hashed_password=get_password_hash("admin"),  # Change this password after first login!
             role=UserRoleEnum.ADMIN,
             is_active=True,
             is_verified=True,
-            department="IT",
+            department_id=1,  # IT Department
             position="Administrator"
         )
 
@@ -47,7 +47,7 @@ def create_admin_user():
         print("✓ Admin user created successfully!")
         print(f"Username: {admin_user.username}")
         print(f"Email: {admin_user.email}")
-        print(f"Password: admin123")
+        print(f"Password: admin")
         print("\nIMPORTANT: Please change the password after first login!")
 
     except Exception as e:

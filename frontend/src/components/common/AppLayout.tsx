@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Layout, Menu, theme } from 'antd'
-import { Link, useLocation } from 'react-router-dom'
+import { Layout, Menu, theme, Space, Dropdown, Avatar, Button } from 'antd'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -11,7 +11,12 @@ import {
   TeamOutlined,
   BankOutlined,
   FundOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
+import { useAuth } from '../../contexts/AuthContext'
+import DepartmentSelector from './DepartmentSelector'
 
 const { Header, Content, Sider } = Layout
 
@@ -22,9 +27,38 @@ interface AppLayoutProps {
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
+
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Профиль',
+      onClick: () => navigate('/profile'),
+    },
+    {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: 'Настройки',
+      onClick: () => navigate('/settings'),
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Выйти',
+      onClick: () => {
+        logout()
+        navigate('/login')
+      },
+    },
+  ]
 
   const menuItems = [
     {
@@ -102,7 +136,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             textAlign: 'center',
           }}
         >
-          {collapsed ? 'ITB' : 'IT Budget'}
+          {collapsed ? 'ITB' : 'BDR'}
         </div>
         <Menu
           theme="dark"
@@ -113,10 +147,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         />
       </Sider>
       <Layout>
-        <Header style={{ padding: 0, background: colorBgContainer }}>
-          <div style={{ padding: '0 24px', fontSize: 20, fontWeight: 500 }}>
+        <Header
+          style={{
+            padding: '0 24px',
+            background: colorBgContainer,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ fontSize: 20, fontWeight: 500 }}>
             IT Budget Manager
           </div>
+          <Space size="large">
+            <DepartmentSelector />
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <Button type="text" style={{ height: 'auto', padding: '4px 8px' }}>
+                <Space>
+                  <Avatar size="small" icon={<UserOutlined />} />
+                  <span>{user?.full_name || user?.username}</span>
+                </Space>
+              </Button>
+            </Dropdown>
+          </Space>
         </Header>
         <Content style={{ margin: '24px 16px 0' }}>
           <div

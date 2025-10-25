@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { message } from 'antd';
+import { API_BASE_URL } from '../config/api';
 
 export interface User {
   id: number;
@@ -9,7 +10,7 @@ export interface User {
   role: 'ADMIN' | 'ACCOUNTANT' | 'REQUESTER';
   is_active: boolean;
   is_verified: boolean;
-  department: string | null;
+  department_id: number | null;
   position: string | null;
   phone: string | null;
   last_login: string | null;
@@ -33,15 +34,13 @@ interface RegisterData {
   email: string;
   password: string;
   full_name?: string;
-  department?: string;
+  department_id?: number;
   position?: string;
   phone?: string;
   role?: 'ADMIN' | 'ACCOUNTANT' | 'REQUESTER';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -100,9 +99,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const data = await response.json();
 
+      // Save token to localStorage FIRST, before updating state
+      localStorage.setItem('token', data.access_token);
+      console.log('[Auth] Token saved to localStorage:', data.access_token.substring(0, 20) + '...');
+
       setToken(data.access_token);
       setUser(data.user);
-      localStorage.setItem('token', data.access_token);
 
       message.success('Successfully logged in!');
     } catch (error) {
@@ -157,6 +159,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return user.role === role;
   };
 
+  const isAuthenticated = !!user && !!token;
+
+  console.log('[AuthContext] State:', { hasUser: !!user, hasToken: !!token, isAuthenticated, loading });
+
   const value: AuthContextType = {
     user,
     token,
@@ -164,7 +170,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     register,
     logout,
-    isAuthenticated: !!user && !!token,
+    isAuthenticated,
     hasRole,
   };
 

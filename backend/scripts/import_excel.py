@@ -49,7 +49,7 @@ def import_categories(db: Session):
     for cat_data in categories_data:
         existing = db.query(BudgetCategory).filter(BudgetCategory.name == cat_data["name"]).first()
         if not existing:
-            category = BudgetCategory(**cat_data)
+            category = BudgetCategory(**cat_data, department_id=1)
             db.add(category)
             print(f"  Added category: {cat_data['name']}")
 
@@ -69,7 +69,7 @@ def import_organizations(db: Session):
     for org_data in orgs_data:
         existing = db.query(Organization).filter(Organization.name == org_data["name"]).first()
         if not existing:
-            organization = Organization(**org_data)
+            organization = Organization(**org_data, department_id=1)
             db.add(organization)
             print(f"  Added organization: {org_data['name']}")
 
@@ -124,7 +124,8 @@ def import_expenses_from_excel(db: Session, file_path: str):
                     new_cat = BudgetCategory(
                         name=category_name,
                         type=ExpenseTypeEnum.OPEX,
-                        description=f"Auto-imported: {category_name}"
+                        description=f"Auto-imported: {category_name}",
+                        department_id=1
                     )
                     db.add(new_cat)
                     db.flush()
@@ -144,7 +145,7 @@ def import_expenses_from_excel(db: Session, file_path: str):
                 if contractor_name and contractor_name != "nan":
                     contractor = db.query(Contractor).filter(Contractor.name == contractor_name).first()
                     if not contractor:
-                        contractor = Contractor(name=contractor_name)
+                        contractor = Contractor(name=contractor_name, department_id=1)
                         db.add(contractor)
                         db.flush()
 
@@ -186,6 +187,7 @@ def import_expenses_from_excel(db: Session, file_path: str):
                     is_closed=(str(row.get("Оплачена / Закрыта", "")) == "Да"),
                     comment=str(row.get("Комментарий", "")) if not pd.isna(row.get("Комментарий")) else None,
                     requester=str(row.get("Заявитель", "")) if not pd.isna(row.get("Заявитель")) else None,
+                    department_id=1
                 )
 
                 db.add(expense)

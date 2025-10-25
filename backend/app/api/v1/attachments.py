@@ -13,7 +13,7 @@ from app.schemas.attachment import AttachmentCreate, AttachmentUpdate, Attachmen
 router = APIRouter()
 
 # Directory to store uploaded files
-UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR = Path(__file__).parent.parent.parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Allowed file extensions

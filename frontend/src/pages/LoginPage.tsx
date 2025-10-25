@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
       <Col xs={22} sm={18} md={12} lg={8} xl={6}>
         <Card>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <Title level={2}>IT Budget Manager</Title>
+            <Title level={2}>BDR Manager</Title>
             <Text type="secondary">Sign in to your account</Text>
           </div>
 
@@ -98,7 +98,7 @@ const LoginPage: React.FC = () => {
             <Text type="secondary" style={{ fontSize: 12 }}>
               <strong>Default Admin Credentials:</strong><br />
               Username: <code>admin</code><br />
-              Password: <code>admin123</code>
+              Password: <code>admin</code>
             </Text>
           </div>
         </Card>

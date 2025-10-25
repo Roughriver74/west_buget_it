@@ -97,9 +97,9 @@ def upgrade() -> None:
     op.alter_column('budget_categories', 'department_id', nullable=False)
 
     # ### Update contractors table ###
-    # Remove unique constraint from inn
-    op.drop_index('contractors_inn_key', table_name='contractors')
-    op.create_index(op.f('ix_contractors_inn'), 'contractors', ['inn'], unique=False)
+    # Remove unique constraint from inn (if exists)
+    op.execute("DROP INDEX IF EXISTS contractors_inn_key")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_contractors_inn ON contractors (inn)")
 
     # Add department_id
     op.add_column('contractors', sa.Column('department_id', sa.Integer(), nullable=True))
@@ -113,9 +113,9 @@ def upgrade() -> None:
     op.alter_column('contractors', 'department_id', nullable=False)
 
     # ### Update organizations table ###
-    # Remove unique constraint from name
-    op.drop_index('organizations_name_key', table_name='organizations')
-    op.create_index(op.f('ix_organizations_name'), 'organizations', ['name'], unique=False)
+    # Remove unique constraint from name (if exists)
+    op.execute("DROP INDEX IF EXISTS organizations_name_key")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_organizations_name ON organizations (name)")
 
     # Add department_id
     op.add_column('organizations', sa.Column('department_id', sa.Integer(), nullable=True))
@@ -129,9 +129,9 @@ def upgrade() -> None:
     op.alter_column('organizations', 'department_id', nullable=False)
 
     # ### Update expenses table ###
-    # Remove unique constraint from number
-    op.drop_index('expenses_number_key', table_name='expenses')
-    op.create_index(op.f('ix_expenses_number'), 'expenses', ['number'], unique=False)
+    # Remove unique constraint from number (if exists)
+    op.execute("DROP INDEX IF EXISTS expenses_number_key")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_expenses_number ON expenses (number)")
 
     # Add department_id
     op.add_column('expenses', sa.Column('department_id', sa.Integer(), nullable=True))

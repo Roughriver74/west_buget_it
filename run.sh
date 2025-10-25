@@ -135,11 +135,13 @@ fi
 
 # Check if migrations are applied
 echo -e "${BLUE}🔄 Checking database migrations...${NC}"
+unset DEBUG
 MIGRATION_CHECK=$(alembic current 2>&1)
 if echo "$MIGRATION_CHECK" | grep -q "21c6cd6d2f8b"; then
     echo -e "${GREEN}✅ Migrations already applied${NC}"
 else
     echo -e "${BLUE}🔄 Applying migrations...${NC}"
+    unset DEBUG
     alembic upgrade head
     echo -e "${GREEN}✅ Migrations applied${NC}"
 fi
@@ -150,12 +152,24 @@ if [ "$DATA_COUNT" -gt 0 ] 2>/dev/null; then
     echo -e "${GREEN}✅ Data already imported (${DATA_COUNT} categories)${NC}"
 else
     echo -e "${BLUE}📊 Importing data from Excel...${NC}"
+    unset DEBUG
     python scripts/import_excel.py 2>&1 | grep -E "(completed|Imported|Added)" | tail -3
     echo -e "${GREEN}✅ Data imported${NC}"
 fi
 
+# Create admin user if not exists
+echo -e "${BLUE}👤 Checking admin user...${NC}"
+unset DEBUG
+ADMIN_CHECK=$(python create_admin.py 2>&1 | grep -E "(already exists|created successfully)")
+if echo "$ADMIN_CHECK" | grep -q "already exists"; then
+    echo -e "${GREEN}✅ Admin user already exists${NC}"
+elif echo "$ADMIN_CHECK" | grep -q "created successfully"; then
+    echo -e "${GREEN}✅ Admin user created (username: admin, password: admin)${NC}"
+fi
+
 # Start backend
 echo -e "${BLUE}🚀 Starting Backend API server...${NC}"
+unset DEBUG
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > ../backend.log 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > ../backend.pid
