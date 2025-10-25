@@ -18,3 +18,5 @@ aioftp==0.22.3
 # JWT Authentication
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+# Redis for caching and distributed rate limiting
+redis==5.0.1

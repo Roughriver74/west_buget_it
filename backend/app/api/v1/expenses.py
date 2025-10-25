@@ -1,9 +1,9 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, or_
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 import os
 from pydantic import BaseModel
@@ -88,7 +88,13 @@ def export_expenses_to_excel(
         )
         query = query.filter(search_filter)
 
-    # Get all matching expenses
+    # Get all matching expenses with eager loading (fix N+1 queries)
+    query = query.options(
+        joinedload(Expense.category),
+        joinedload(Expense.contractor),
+        joinedload(Expense.organization),
+        joinedload(Expense.department_rel)
+    )
     expenses = query.order_by(Expense.request_date.desc()).all()
 
     # Convert to dict for export
@@ -223,7 +229,13 @@ def get_expenses(
     # Get total count
     total = query.count()
 
-    # Get items with pagination
+    # Get items with pagination and eager loading (fix N+1 queries)
+    query = query.options(
+        joinedload(Expense.category),
+        joinedload(Expense.contractor),
+        joinedload(Expense.organization),
+        joinedload(Expense.department_rel)
+    )
     expenses = query.order_by(Expense.request_date.desc()).offset(skip).limit(limit).all()
 
     # Calculate pagination
@@ -376,7 +388,7 @@ def update_expense_status(
     if status_update.status == ExpenseStatusEnum.PAID:
         db_expense.is_paid = True
         if not db_expense.payment_date:
-            db_expense.payment_date = datetime.utcnow()
+            db_expense.payment_date = datetime.now(timezone.utc)
     elif status_update.status == ExpenseStatusEnum.CLOSED:
         db_expense.is_closed = True
 
