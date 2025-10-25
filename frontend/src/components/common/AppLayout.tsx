@@ -14,6 +14,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import DepartmentSelector from './DepartmentSelector'
@@ -111,6 +112,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       key: '/categories',
       icon: <DatabaseOutlined />,
       label: <Link to="/categories">Статьи расходов</Link>,
+    },
+    {
+      key: 'payroll-submenu',
+      icon: <IdcardOutlined />,
+      label: 'ФОТ (Зарплаты)',
+      children: [
+        {
+          key: '/employees',
+          label: <Link to="/employees">Сотрудники</Link>,
+        },
+        {
+          key: '/payroll/plan',
+          label: <Link to="/payroll/plan">Планирование ФОТ</Link>,
+        },
+      ],
     },
     {
       key: '/contractors',

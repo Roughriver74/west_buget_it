@@ -44,6 +44,25 @@ from .audit import (
     AuditLogInDB,
     AuditLogWithUser,
 )
+from .payroll import (
+    EmployeeCreate,
+    EmployeeUpdate,
+    EmployeeInDB,
+    EmployeeWithSalaryHistory,
+    SalaryHistoryCreate,
+    SalaryHistoryInDB,
+    PayrollPlanCreate,
+    PayrollPlanUpdate,
+    PayrollPlanInDB,
+    PayrollPlanWithEmployee,
+    PayrollActualCreate,
+    PayrollActualUpdate,
+    PayrollActualInDB,
+    PayrollActualWithEmployee,
+    PayrollSummary,
+    EmployeePayrollStats,
+    DepartmentPayrollStats,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -102,4 +121,25 @@ __all__ = [
     "AuditLogCreate",
     "AuditLogInDB",
     "AuditLogWithUser",
+    # Payroll (Employee)
+    "EmployeeCreate",
+    "EmployeeUpdate",
+    "EmployeeInDB",
+    "EmployeeWithSalaryHistory",
+    "SalaryHistoryCreate",
+    "SalaryHistoryInDB",
+    # Payroll Plan
+    "PayrollPlanCreate",
+    "PayrollPlanUpdate",
+    "PayrollPlanInDB",
+    "PayrollPlanWithEmployee",
+    # Payroll Actual
+    "PayrollActualCreate",
+    "PayrollActualUpdate",
+    "PayrollActualInDB",
+    "PayrollActualWithEmployee",
+    # Payroll Analytics
+    "PayrollSummary",
+    "EmployeePayrollStats",
+    "DepartmentPayrollStats",
 ]

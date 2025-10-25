@@ -1,0 +1,255 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Table,
+  Card,
+  Select,
+  Space,
+  Statistic,
+  Row,
+  Col,
+  Tag,
+} from 'antd';
+import {
+  DollarOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+import { useDepartment } from '../contexts/DepartmentContext';
+import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
+import { formatCurrency } from '../utils/formatters';
+
+const { Option } = Select;
+
+const MONTHS = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+];
+
+export default function PayrollPlanPage() {
+  const { selectedDepartment } = useDepartment();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  // Fetch payroll plans
+  const { data: plans = [], isLoading: plansLoading } = useQuery<PayrollPlanWithEmployee[]>({
+    queryKey: ['payroll-plans', selectedDepartment, selectedYear],
+    queryFn: () =>
+      payrollPlanAPI.list({
+        department_id: selectedDepartment || undefined,
+        year: selectedYear,
+      }),
+  });
+
+  // Fetch payroll actuals
+  const { data: actuals = [], isLoading: actualsLoading } = useQuery<PayrollActualWithEmployee[]>({
+    queryKey: ['payroll-actuals', selectedDepartment, selectedYear],
+    queryFn: () =>
+      payrollActualAPI.list({
+        department_id: selectedDepartment || undefined,
+        year: selectedYear,
+      }),
+  });
+
+  // Group data by month
+  const monthlyData = MONTHS.map((monthName, index) => {
+    const month = index + 1;
+    const monthPlans = plans.filter((p) => p.month === month);
+    const monthActuals = actuals.filter((a) => a.month === month);
+
+    const totalPlanned = monthPlans.reduce((sum, p) => sum + Number(p.total_planned), 0);
+    const totalPaid = monthActuals.reduce((sum, a) => sum + Number(a.total_paid), 0);
+    const variance = totalPaid - totalPlanned;
+    const variancePercent = totalPlanned > 0 ? (variance / totalPlanned) * 100 : 0;
+
+    return {
+      month,
+      monthName,
+      employeeCount: monthPlans.length,
+      totalPlanned,
+      totalPaid,
+      variance,
+      variancePercent,
+    };
+  });
+
+  // Calculate year totals
+  const yearTotalPlanned = monthlyData.reduce((sum, m) => sum + m.totalPlanned, 0);
+  const yearTotalPaid = monthlyData.reduce((sum, m) => sum + m.totalPaid, 0);
+  const yearVariance = yearTotalPaid - yearTotalPlanned;
+
+  const columns = [
+    {
+      title: 'Месяц',
+      dataIndex: 'monthName',
+      key: 'monthName',
+    },
+    {
+      title: 'Сотрудников',
+      dataIndex: 'employeeCount',
+      key: 'employeeCount',
+    },
+    {
+      title: 'План (₽)',
+      dataIndex: 'totalPlanned',
+      key: 'totalPlanned',
+      render: (value: number) => formatCurrency(value),
+    },
+    {
+      title: 'Факт (₽)',
+      dataIndex: 'totalPaid',
+      key: 'totalPaid',
+      render: (value: number) => (
+        <span style={{ color: value > 0 ? '#3f8600' : undefined }}>
+          {formatCurrency(value)}
+        </span>
+      ),
+    },
+    {
+      title: 'Отклонение (₽)',
+      dataIndex: 'variance',
+      key: 'variance',
+      render: (value: number) => {
+        const color = value > 0 ? '#cf1322' : value < 0 ? '#3f8600' : undefined;
+        return (
+          <span style={{ color }}>
+            {value > 0 ? '+' : ''}{formatCurrency(value)}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Отклонение (%)',
+      dataIndex: 'variancePercent',
+      key: 'variancePercent',
+      render: (value: number) => {
+        const color = value > 0 ? '#cf1322' : value < 0 ? '#3f8600' : undefined;
+        return (
+          <Tag color={color === '#cf1322' ? 'red' : color === '#3f8600' ? 'green' : 'default'}>
+            {value > 0 ? '+' : ''}{value.toFixed(2)}%
+          </Tag>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1>
+          <DollarOutlined /> Планирование ФОТ
+        </h1>
+        <Select
+          value={selectedYear}
+          onChange={setSelectedYear}
+          style={{ width: 150 }}
+        >
+          {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
+            <Option key={year} value={year}>
+              {year} год
+            </Option>
+          ))}
+        </Select>
+      </div>
+
+      {/* Year Statistics */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Всего запланировано"
+              value={yearTotalPlanned}
+              precision={2}
+              prefix={<DollarOutlined />}
+              suffix="₽"
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Всего выплачено"
+              value={yearTotalPaid}
+              precision={2}
+              prefix={<TeamOutlined />}
+              suffix="₽"
+              valueStyle={{ color: yearTotalPaid > 0 ? '#3f8600' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Отклонение"
+              value={yearVariance}
+              precision={2}
+              suffix="₽"
+              valueStyle={{ color: yearVariance > 0 ? '#cf1322' : yearVariance < 0 ? '#3f8600' : undefined }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Отклонение (%)"
+              value={yearTotalPlanned > 0 ? (yearVariance / yearTotalPlanned) * 100 : 0}
+              precision={2}
+              suffix="%"
+              valueStyle={{
+                color:
+                  yearVariance > 0
+                    ? '#cf1322'
+                    : yearVariance < 0
+                    ? '#3f8600'
+                    : undefined,
+              }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Monthly Table */}
+      <Card>
+        <Table
+          columns={columns}
+          dataSource={monthlyData}
+          rowKey="month"
+          loading={plansLoading || actualsLoading}
+          pagination={false}
+          summary={() => (
+            <Table.Summary fixed>
+              <Table.Summary.Row style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
+                <Table.Summary.Cell index={0}>ИТОГО:</Table.Summary.Cell>
+                <Table.Summary.Cell index={1}>
+                  {plans.length}
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={2}>
+                  {formatCurrency(yearTotalPlanned)}
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={3}>
+                  <span style={{ color: yearTotalPaid > 0 ? '#3f8600' : undefined }}>
+                    {formatCurrency(yearTotalPaid)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={4}>
+                  <span style={{
+                    color: yearVariance > 0 ? '#cf1322' : yearVariance < 0 ? '#3f8600' : undefined
+                  }}>
+                    {yearVariance > 0 ? '+' : ''}{formatCurrency(yearVariance)}
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={5}>
+                  <Tag color={
+                    yearVariance > 0 ? 'red' : yearVariance < 0 ? 'green' : 'default'
+                  }>
+                    {yearVariance > 0 ? '+' : ''}
+                    {yearTotalPlanned > 0 ? ((yearVariance / yearTotalPlanned) * 100).toFixed(2) : '0.00'}%
+                  </Tag>
+                </Table.Summary.Cell>
+              </Table.Summary.Row>
+            </Table.Summary>
+          )}
+        />
+      </Card>
+    </div>
+  );
+}
