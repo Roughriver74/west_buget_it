@@ -76,6 +76,9 @@ class Department(Base):
     expenses = relationship("Expense", back_populates="department_rel")
     budget_plans = relationship("BudgetPlan", back_populates="department_rel")
     forecast_expenses = relationship("ForecastExpense", back_populates="department_rel")
+    employees = relationship("Employee", back_populates="department_rel")
+    payroll_plans = relationship("PayrollPlan", back_populates="department_rel")
+    payroll_actuals = relationship("PayrollActual", back_populates="department_rel")
 
     def __repr__(self):
         return f"<Department {self.code}: {self.name}>"
@@ -400,6 +403,14 @@ class User(Base):
         return f"<User {self.username} ({self.role})>"
 
 
+class EmployeeStatusEnum(str, enum.Enum):
+    """Enum for employee statuses"""
+    ACTIVE = "ACTIVE"  # Активный сотрудник
+    ON_VACATION = "ON_VACATION"  # В отпуске
+    ON_LEAVE = "ON_LEAVE"  # В отпуске по уходу за ребенком / больничный
+    FIRED = "FIRED"  # Уволен
+
+
 class AuditActionEnum(str, enum.Enum):
     """Enum for audit log actions"""
     CREATE = "CREATE"
@@ -454,3 +465,165 @@ class AuditLog(Base):
 
     def __repr__(self):
         return f"<AuditLog {self.action} on {self.entity_type}#{self.entity_id} by User#{self.user_id}>"
+
+
+class Employee(Base):
+    """Employees (сотрудники) - для управления ФОТ"""
+    __tablename__ = "employees"
+    __table_args__ = (
+        Index('idx_employee_dept_status', 'department_id', 'status'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Personal information
+    full_name = Column(String(255), nullable=False, index=True)  # ФИО
+    position = Column(String(255), nullable=False)  # Должность
+    employee_number = Column(String(50), nullable=True, index=True)  # Табельный номер
+
+    # Employment details
+    hire_date = Column(Date, nullable=True)  # Дата приема на работу
+    fire_date = Column(Date, nullable=True)  # Дата увольнения
+    status = Column(Enum(EmployeeStatusEnum), nullable=False, default=EmployeeStatusEnum.ACTIVE, index=True)
+
+    # Salary information
+    base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Contact information
+    email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    department_rel = relationship("Department")
+    payroll_plans = relationship("PayrollPlan", back_populates="employee")
+    payroll_actuals = relationship("PayrollActual", back_populates="employee")
+    salary_history = relationship("SalaryHistory", back_populates="employee", order_by="SalaryHistory.effective_date.desc()")
+
+    def __repr__(self):
+        return f"<Employee {self.full_name} ({self.position})>"
+
+
+class SalaryHistory(Base):
+    """Salary history (история изменений оклада)"""
+    __tablename__ = "salary_history"
+    __table_args__ = (
+        Index('idx_salary_history_employee_date', 'employee_id', 'effective_date'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign key
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+
+    # Salary change information
+    old_salary = Column(Numeric(15, 2), nullable=True)  # Старый оклад (None для первой записи)
+    new_salary = Column(Numeric(15, 2), nullable=False)  # Новый оклад
+    effective_date = Column(Date, nullable=False)  # Дата вступления в силу
+
+    # Additional information
+    reason = Column(Text, nullable=True)  # Причина изменения (повышение, индексация, и т.д.)
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee", back_populates="salary_history")
+
+    def __repr__(self):
+        return f"<SalaryHistory Employee#{self.employee_id}: {self.old_salary} → {self.new_salary}>"
+
+
+class PayrollPlan(Base):
+    """Payroll planning (планирование ФОТ по месяцам)"""
+    __tablename__ = "payroll_plans"
+    __table_args__ = (
+        Index('idx_payroll_plan_dept_year_month', 'department_id', 'year', 'month'),
+        Index('idx_payroll_plan_employee_year_month', 'employee_id', 'year', 'month'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Time period
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)  # 1-12
+
+    # Foreign keys
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Planned amounts
+    base_salary = Column(Numeric(15, 2), nullable=False)  # Плановый оклад
+    bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Плановая премия
+    other_payments = Column(Numeric(15, 2), default=0, nullable=False)  # Прочие выплаты
+    total_planned = Column(Numeric(15, 2), nullable=False)  # Итого план (вычисляется)
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee", back_populates="payroll_plans")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<PayrollPlan {self.year}-{self.month:02d} Employee#{self.employee_id}: {self.total_planned}>"
+
+
+class PayrollActual(Base):
+    """Payroll actual (фактические выплаты ФОТ)"""
+    __tablename__ = "payroll_actuals"
+    __table_args__ = (
+        Index('idx_payroll_actual_dept_year_month', 'department_id', 'year', 'month'),
+        Index('idx_payroll_actual_employee_year_month', 'employee_id', 'year', 'month'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Time period
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)  # 1-12
+
+    # Foreign keys
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Actual amounts paid
+    base_salary_paid = Column(Numeric(15, 2), nullable=False)  # Фактически выплаченный оклад
+    bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Фактически выплаченная премия
+    other_payments_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Прочие фактические выплаты
+    total_paid = Column(Numeric(15, 2), nullable=False)  # Итого факт (вычисляется)
+
+    # Payment details
+    payment_date = Column(Date, nullable=True)  # Дата выплаты
+
+    # Link to expense (if payroll is tracked as expense)
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True, index=True)
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee", back_populates="payroll_actuals")
+    department_rel = relationship("Department")
+    expense = relationship("Expense")
+
+    def __repr__(self):
+        return f"<PayrollActual {self.year}-{self.month:02d} Employee#{self.employee_id}: {self.total_paid}>"

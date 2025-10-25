@@ -22,6 +22,10 @@ import PaymentCalendarPage from './pages/PaymentCalendarPage'
 import ForecastPage from './pages/ForecastPage'
 import DepartmentsPage from './pages/DepartmentsPage'
 import UsersPage from './pages/UsersPage'
+import EmployeesPage from './pages/EmployeesPage'
+import EmployeeDetailPage from './pages/EmployeeDetailPage'
+import PayrollPlanPage from './pages/PayrollPlanPage'
+import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
 
 function App() {
   return (
@@ -115,6 +119,40 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN']}>
                           <UsersPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Payroll (FOT) - Admin and Manager only */}
+                    <Route
+                      path="/employees/:id"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <EmployeeDetailPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/employees"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <EmployeesPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/payroll/plan"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <PayrollPlanPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/payroll/analytics"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <PayrollAnalyticsPage />
                         </ProtectedRoute>
                       }
                     />
