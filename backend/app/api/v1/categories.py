@@ -10,6 +10,7 @@ from app.db import get_db
 from app.db.models import BudgetCategory, User, UserRoleEnum
 from app.schemas import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCategoryInDB
 from app.utils.auth import get_current_active_user
+from app.utils.logger import logger, log_error, log_info
 
 router = APIRouter()
 
@@ -366,8 +367,33 @@ async def import_categories(
 
     try:
         # Read Excel file
+        log_info(f"Starting categories import from {file.filename}", "Import")
         content = await file.read()
-        df = pd.read_excel(io.BytesIO(content))
+
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File too large. Maximum size is 10MB"
+            )
+
+        # Try to read Excel file with error handling
+        try:
+            df = pd.read_excel(io.BytesIO(content))
+        except Exception as e:
+            log_error(e, "Failed to parse Excel file")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid Excel file format: {str(e)}"
+            )
+
+        # Check if dataframe is empty
+        if df.empty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file is empty"
+            )
 
         # Validate required columns
         required_columns = ['Название', 'Тип']
@@ -375,12 +401,13 @@ async def import_categories(
         if missing_columns:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Missing required columns: {', '.join(missing_columns)}"
+                detail=f"Missing required columns: {', '.join(missing_columns)}. Found columns: {', '.join(df.columns)}"
             )
 
         created_count = 0
         updated_count = 0
         errors = []
+        total_rows = len(df)
 
         for index, row in df.iterrows():
             try:

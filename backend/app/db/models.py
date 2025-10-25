@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -83,12 +84,15 @@ class Department(Base):
 class BudgetCategory(Base):
     """Budget categories (статьи расходов)"""
     __tablename__ = "budget_categories"
+    __table_args__ = (
+        Index('idx_budget_category_dept_active', 'department_id', 'is_active'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)
     type = Column(Enum(ExpenseTypeEnum), nullable=False)  # OPEX or CAPEX
     description = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
 
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
@@ -114,13 +118,16 @@ class BudgetCategory(Base):
 class Contractor(Base):
     """Contractors (контрагенты/получатели)"""
     __tablename__ = "contractors"
+    __table_args__ = (
+        Index('idx_contractor_dept_active', 'department_id', 'is_active'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(500), nullable=False, index=True)
     short_name = Column(String(255), nullable=True)
     inn = Column(String(20), nullable=True, index=True)  # Removed unique constraint for multi-tenancy
     contact_info = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
 
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
@@ -139,11 +146,14 @@ class Contractor(Base):
 class Organization(Base):
     """Organizations (ВЕСТ ООО, ВЕСТ ГРУПП ООО)"""
     __tablename__ = "organizations"
+    __table_args__ = (
+        Index('idx_organization_dept_active', 'department_id', 'is_active'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False, index=True)  # Removed unique constraint for multi-tenancy
     legal_name = Column(String(500), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
 
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
@@ -162,6 +172,10 @@ class Organization(Base):
 class Expense(Base):
     """Expenses (заявки на расходы)"""
     __tablename__ = "expenses"
+    __table_args__ = (
+        Index('idx_expense_dept_status', 'department_id', 'status'),
+        Index('idx_expense_dept_date', 'department_id', 'request_date'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     number = Column(String(50), nullable=False, index=True)  # Removed unique constraint for multi-tenancy
@@ -170,9 +184,9 @@ class Expense(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign keys
-    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
-    contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+    contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
 
     # Amount and dates
     amount = Column(Numeric(15, 2), nullable=False)
@@ -181,8 +195,8 @@ class Expense(Base):
 
     # Status
     status = Column(Enum(ExpenseStatusEnum), nullable=False, default=ExpenseStatusEnum.DRAFT, index=True)
-    is_paid = Column(Boolean, default=False, nullable=False)
-    is_closed = Column(Boolean, default=False, nullable=False)
+    is_paid = Column(Boolean, default=False, nullable=False, index=True)
+    is_closed = Column(Boolean, default=False, nullable=False, index=True)
 
     # Additional info
     comment = Column(Text, nullable=True)
@@ -217,9 +231,9 @@ class ForecastExpense(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign keys
-    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
-    contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+    contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
 
     # Date and amount
     forecast_date = Column(Date, nullable=False, index=True)  # Прогнозная дата платежа
@@ -250,6 +264,9 @@ class ForecastExpense(Base):
 class BudgetPlan(Base):
     """Budget plans (планы бюджета)"""
     __tablename__ = "budget_plans"
+    __table_args__ = (
+        Index('idx_budget_plan_dept_year_month', 'department_id', 'year', 'month'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     year = Column(Integer, nullable=False, index=True)
@@ -259,7 +276,7 @@ class BudgetPlan(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign key
-    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
 
     # Planned amounts
     planned_amount = Column(Numeric(15, 2), nullable=False)
