@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { message } from 'antd';
 import { API_BASE_URL } from '../config/api';
+import { logger } from '../utils/logger';
 
 export interface User {
   id: number;
@@ -64,16 +65,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userData = await response.json();
             setUser(userData);
             setToken(savedToken);
-            console.log('[Auth] User loaded successfully:', userData.username);
+            logger.auth('User loaded successfully', { username: userData.username });
           } else {
             // Token is invalid, clear it
-            console.warn('[Auth] Token validation failed, clearing');
+            logger.warn('[Auth] Token validation failed, clearing');
             localStorage.removeItem('token');
             setToken(null);
             setUser(null);
           }
         } catch (error) {
-          console.error('[Auth] Failed to load user:', error);
+          logger.error('[Auth] Failed to load user:', error);
           localStorage.removeItem('token');
           setToken(null);
           setUser(null);
@@ -89,7 +90,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Listen for unauthorized events from API interceptor
   useEffect(() => {
     const handleUnauthorized = () => {
-      console.log('[Auth] Received unauthorized event, logging out');
+      logger.auth('Received unauthorized event, logging out');
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
@@ -122,7 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Save token to localStorage FIRST, before updating state
       localStorage.setItem('token', data.access_token);
-      console.log('[Auth] Token saved to localStorage:', data.access_token.substring(0, 20) + '...');
+      logger.auth('Token saved to localStorage');
 
       setToken(data.access_token);
       setUser(data.user);
@@ -182,7 +183,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isAuthenticated = !!user && !!token;
 
-  console.log('[AuthContext] State:', { hasUser: !!user, hasToken: !!token, isAuthenticated, loading });
+  logger.debug('[AuthContext] State:', { hasUser: !!user, hasToken: !!token, isAuthenticated, loading });
 
   const value: AuthContextType = {
     user,

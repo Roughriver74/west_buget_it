@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
@@ -84,10 +84,15 @@ def get_dashboard_data(
         for item in category_query.all()
     ]
 
-    # Get recent expenses
-    recent_expenses = db.query(Expense).filter(
+    # Get recent expenses with eager loading (fix N+1)
+    recent_expenses_query = db.query(Expense).filter(
         extract('year', Expense.request_date) == year
-    ).order_by(Expense.request_date.desc()).limit(10).all()
+    ).options(
+        joinedload(Expense.category),
+        joinedload(Expense.contractor),
+        joinedload(Expense.organization)
+    )
+    recent_expenses = recent_expenses_query.order_by(Expense.request_date.desc()).limit(10).all()
 
     recent_expenses_data = [
         {

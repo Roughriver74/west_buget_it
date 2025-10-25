@@ -1,9 +1,11 @@
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, ValidationError
+import secrets
 
 
 class Settings(BaseSettings):
-    """Application settings"""
+    """Application settings with validation"""
 
     # Application
     APP_NAME: str = "IT Budget Manager"
@@ -27,6 +29,13 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Redis (optional - for distributed rate limiting and caching)
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str = ""
+    USE_REDIS: bool = False  # Set to True to enable Redis
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -34,5 +43,92 @@ class Settings(BaseSettings):
         extra="allow"
     )
 
+    @field_validator('SECRET_KEY')
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """
+        Validate SECRET_KEY to ensure it's secure
 
-settings = Settings()
+        - Must not be the default value in production
+        - Must be at least 32 characters for security
+        """
+        # Get DEBUG from environment (can't access self here)
+        import os
+        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+        if not debug and v == "your-secret-key-here-change-in-production":
+            raise ValueError(
+                "❌ SECURITY ERROR: SECRET_KEY must be changed from default value in production!\n"
+                f"Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+
+        if len(v) < 32:
+            raise ValueError(
+                f"❌ SECURITY ERROR: SECRET_KEY must be at least 32 characters (current: {len(v)})\n"
+                f"Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
+
+        return v
+
+    @field_validator('DATABASE_URL')
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """
+        Validate DATABASE_URL to warn about weak passwords
+
+        This is a warning, not an error, as it might be intentional in dev
+        """
+        import os
+        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+        weak_passwords = ['password', 'admin', '123456', 'budget_pass', 'postgres']
+
+        if not debug:
+            for weak_pass in weak_passwords:
+                if weak_pass in v:
+                    print(f"⚠️  WARNING: Database URL contains common password '{weak_pass}' - change in production!")
+                    break
+
+        return v
+
+    @field_validator('CORS_ORIGINS')
+    @classmethod
+    def validate_cors_origins(cls, v: List[str]) -> List[str]:
+        """
+        Validate CORS origins to warn about wildcards in production
+        """
+        import os
+        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+        if not debug:
+            if '*' in v or 'http://localhost' in str(v):
+                print("⚠️  WARNING: CORS origins contains wildcards or localhost in production mode!")
+
+        return v
+
+
+def get_settings() -> Settings:
+    """
+    Get validated settings instance
+
+    This function can be used as a dependency in FastAPI routes
+    """
+    try:
+        return Settings()
+    except ValidationError as e:
+        print("\n" + "=" * 80)
+        print("❌ CONFIGURATION ERROR: Invalid settings detected!")
+        print("=" * 80)
+        for error in e.errors():
+            field = error['loc'][0]
+            message = error['msg']
+            print(f"\nField: {field}")
+            print(f"Error: {message}")
+        print("\n" + "=" * 80)
+        print("Please fix the configuration in your .env file and restart the application.")
+        print("=" * 80 + "\n")
+        raise
+
+
+# Create and validate settings on module import
+settings = get_settings()
