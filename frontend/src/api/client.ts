@@ -37,10 +37,23 @@ apiClient.interceptors.response.use(
 
     // If we get a 401 Unauthorized, the token is invalid - clear it
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      // Redirect to login page if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      const currentPath = window.location.pathname
+
+      // Only clear token and redirect if we're not already on login/register pages
+      // AND if it's not the initial /auth/me request (which happens on page load)
+      const isAuthMeRequest = error.config?.url?.includes('/auth/me')
+      const isAuthPage = currentPath === '/login' || currentPath === '/register'
+
+      if (!isAuthPage) {
+        // Clear token only if it's not the initial auth check
+        if (!isAuthMeRequest) {
+          localStorage.removeItem('token')
+          console.warn('[API] 401 error: Token invalid, cleared from storage')
+        }
+
+        // Dispatch custom event instead of hard redirect
+        // This allows AuthContext to handle the logout gracefully
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'))
       }
     }
 
