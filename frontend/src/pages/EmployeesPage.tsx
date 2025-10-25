@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -44,6 +45,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function EmployeesPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedDepartment } = useDepartment();
   const [searchText, setSearchText] = useState('');
@@ -104,6 +106,15 @@ export default function EmployeesPage() {
       dataIndex: 'full_name',
       key: 'full_name',
       sorter: (a: Employee, b: Employee) => a.full_name.localeCompare(b.full_name),
+      render: (name: string, record: Employee) => (
+        <Button
+          type="link"
+          onClick={() => navigate(`/employees/${record.id}`)}
+          style={{ padding: 0 }}
+        >
+          {name}
+        </Button>
+      ),
     },
     {
       title: 'Должность',

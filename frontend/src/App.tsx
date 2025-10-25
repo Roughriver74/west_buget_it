@@ -23,6 +23,7 @@ import ForecastPage from './pages/ForecastPage'
 import DepartmentsPage from './pages/DepartmentsPage'
 import UsersPage from './pages/UsersPage'
 import EmployeesPage from './pages/EmployeesPage'
+import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import PayrollPlanPage from './pages/PayrollPlanPage'
 
 function App() {
@@ -122,6 +123,14 @@ function App() {
                     />
 
                     {/* Payroll (FOT) - Admin and Manager only */}
+                    <Route
+                      path="/employees/:id"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <EmployeeDetailPage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route
                       path="/employees"
                       element={
