@@ -126,6 +126,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           key: '/payroll/plan',
           label: <Link to="/payroll/plan">Планирование ФОТ</Link>,
         },
+        {
+          key: '/payroll/analytics',
+          label: <Link to="/payroll/analytics">Аналитика ФОТ</Link>,
+        },
       ],
     },
     {

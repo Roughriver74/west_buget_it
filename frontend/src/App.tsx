@@ -25,6 +25,7 @@ import UsersPage from './pages/UsersPage'
 import EmployeesPage from './pages/EmployeesPage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import PayrollPlanPage from './pages/PayrollPlanPage'
+import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
 
 function App() {
   return (
@@ -144,6 +145,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
                           <PayrollPlanPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/payroll/analytics"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <PayrollAnalyticsPage />
                         </ProtectedRoute>
                       }
                     />

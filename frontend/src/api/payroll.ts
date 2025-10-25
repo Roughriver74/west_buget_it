@@ -84,6 +84,43 @@ export interface PayrollSummary {
   variance_percent: number;
 }
 
+export interface SalaryStatistics {
+  total_employees: number;
+  active_employees: number;
+  min_salary: number;
+  max_salary: number;
+  average_salary: number;
+  median_salary: number;
+  percentile_25: number;
+  percentile_75: number;
+  percentile_90: number;
+  total_payroll: number;
+}
+
+export interface PayrollStructureMonth {
+  year: number;
+  month: number;
+  total_base_salary: number;
+  total_bonus: number;
+  total_other_payments: number;
+  total_amount: number;
+  employee_count: number;
+}
+
+export interface PayrollDynamics {
+  year: number;
+  month: number;
+  planned_base_salary: number;
+  planned_bonus: number;
+  planned_other: number;
+  planned_total: number;
+  actual_base_salary: number;
+  actual_bonus: number;
+  actual_other: number;
+  actual_total: number;
+  employee_count: number;
+}
+
 export interface EmployeePayrollStats {
   employee_id: number;
   employee_name: string;
@@ -338,6 +375,27 @@ export const payrollActualAPI = {
 export const payrollAnalyticsAPI = {
   getSummary: async (year: number, department_id?: number) => {
     const response = await apiClient.get<PayrollSummary[]>('/payroll/analytics/summary', {
+      params: { year, department_id },
+    });
+    return response.data;
+  },
+
+  getSalaryStats: async (department_id?: number) => {
+    const response = await apiClient.get<SalaryStatistics>('/payroll/analytics/salary-stats', {
+      params: { department_id },
+    });
+    return response.data;
+  },
+
+  getStructure: async (year: number, department_id?: number) => {
+    const response = await apiClient.get<PayrollStructureMonth[]>('/payroll/analytics/structure', {
+      params: { year, department_id },
+    });
+    return response.data;
+  },
+
+  getDynamics: async (year: number, department_id?: number) => {
+    const response = await apiClient.get<PayrollDynamics[]>('/payroll/analytics/dynamics', {
       params: { year, department_id },
     });
     return response.data;

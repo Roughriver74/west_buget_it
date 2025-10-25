@@ -28,6 +28,9 @@ from app.schemas.payroll import (
     PayrollSummary,
     EmployeePayrollStats,
     DepartmentPayrollStats,
+    SalaryStatistics,
+    PayrollStructureMonth,
+    PayrollDynamics,
 )
 from app.utils.auth import get_current_active_user
 
@@ -638,3 +641,208 @@ async def export_payroll_actuals(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=payroll_actuals_export.xlsx"}
     )
+
+
+# ==================== Advanced Analytics Endpoints ====================
+
+@router.get("/analytics/salary-stats", response_model=SalaryStatistics)
+async def get_salary_statistics(
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get salary distribution statistics including median and percentiles
+    """
+    query = db.query(Employee)
+
+    # Filter by department based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Employee.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(Employee.department_id == department_id)
+
+    # Get all employees and active employees
+    all_employees = query.all()
+    active_employees = [e for e in all_employees if e.status == 'ACTIVE']
+
+    if not active_employees:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active employees found"
+        )
+
+    # Get salary values sorted
+    salaries = sorted([float(e.base_salary) for e in active_employees])
+    n = len(salaries)
+
+    # Calculate statistics
+    def percentile(data, p):
+        """Calculate percentile"""
+        if not data:
+            return 0
+        k = (len(data) - 1) * p / 100
+        f = int(k)
+        c = k - f
+        if f + 1 < len(data):
+            return data[f] + (data[f + 1] - data[f]) * c
+        return data[f]
+
+    median = percentile(salaries, 50)
+    p25 = percentile(salaries, 25)
+    p75 = percentile(salaries, 75)
+    p90 = percentile(salaries, 90)
+
+    total_payroll = sum(salaries)
+    avg_salary = total_payroll / n if n > 0 else 0
+
+    return SalaryStatistics(
+        total_employees=len(all_employees),
+        active_employees=n,
+        min_salary=Decimal(str(min(salaries))),
+        max_salary=Decimal(str(max(salaries))),
+        average_salary=Decimal(str(avg_salary)),
+        median_salary=Decimal(str(median)),
+        percentile_25=Decimal(str(p25)),
+        percentile_75=Decimal(str(p75)),
+        percentile_90=Decimal(str(p90)),
+        total_payroll=Decimal(str(total_payroll))
+    )
+
+
+@router.get("/analytics/structure", response_model=List[PayrollStructureMonth])
+async def get_payroll_structure(
+    year: int = Query(..., ge=2000, le=2100),
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get payroll structure breakdown by month (base salary vs bonus vs other payments)
+    """
+    # Filter by department based on user role
+    dept_filter = None
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        dept_filter = current_user.department_id
+    elif department_id:
+        dept_filter = department_id
+
+    # Get plan data grouped by month
+    query = db.query(
+        PayrollPlan.month,
+        func.sum(PayrollPlan.base_salary).label('total_base_salary'),
+        func.sum(PayrollPlan.bonus).label('total_bonus'),
+        func.sum(PayrollPlan.other_payments).label('total_other_payments'),
+        func.sum(PayrollPlan.total_planned).label('total_amount'),
+        func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
+    ).filter(PayrollPlan.year == year)
+
+    if dept_filter:
+        query = query.filter(PayrollPlan.department_id == dept_filter)
+
+    results = query.group_by(PayrollPlan.month).order_by(PayrollPlan.month).all()
+
+    structure = []
+    for row in results:
+        structure.append(PayrollStructureMonth(
+            year=year,
+            month=row.month,
+            total_base_salary=row.total_base_salary or Decimal(0),
+            total_bonus=row.total_bonus or Decimal(0),
+            total_other_payments=row.total_other_payments or Decimal(0),
+            total_amount=row.total_amount or Decimal(0),
+            employee_count=row.employee_count
+        ))
+
+    return structure
+
+
+@router.get("/analytics/dynamics", response_model=List[PayrollDynamics])
+async def get_payroll_dynamics(
+    year: int = Query(..., ge=2000, le=2100),
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get payroll dynamics over time including plan vs actual breakdown
+    """
+    # Filter by department based on user role
+    dept_filter = None
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        dept_filter = current_user.department_id
+    elif department_id:
+        dept_filter = department_id
+
+    # Get plan data
+    plan_query = db.query(
+        PayrollPlan.month,
+        func.sum(PayrollPlan.base_salary).label('planned_base_salary'),
+        func.sum(PayrollPlan.bonus).label('planned_bonus'),
+        func.sum(PayrollPlan.other_payments).label('planned_other'),
+        func.sum(PayrollPlan.total_planned).label('planned_total'),
+        func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
+    ).filter(PayrollPlan.year == year)
+
+    if dept_filter:
+        plan_query = plan_query.filter(PayrollPlan.department_id == dept_filter)
+
+    plan_data = {
+        row.month: row for row in
+        plan_query.group_by(PayrollPlan.month).all()
+    }
+
+    # Get actual data
+    actual_query = db.query(
+        PayrollActual.month,
+        func.sum(PayrollActual.base_salary_paid).label('actual_base_salary'),
+        func.sum(PayrollActual.bonus_paid).label('actual_bonus'),
+        func.sum(PayrollActual.other_payments_paid).label('actual_other'),
+        func.sum(PayrollActual.total_paid).label('actual_total')
+    ).filter(PayrollActual.year == year)
+
+    if dept_filter:
+        actual_query = actual_query.filter(PayrollActual.department_id == dept_filter)
+
+    actual_data = {
+        row.month: row for row in
+        actual_query.group_by(PayrollActual.month).all()
+    }
+
+    # Combine plan and actual data
+    dynamics = []
+    for month in range(1, 13):
+        plan = plan_data.get(month)
+        actual = actual_data.get(month)
+
+        if plan or actual:
+            dynamics.append(PayrollDynamics(
+                year=year,
+                month=month,
+                planned_base_salary=plan.planned_base_salary if plan else Decimal(0),
+                planned_bonus=plan.planned_bonus if plan else Decimal(0),
+                planned_other=plan.planned_other if plan else Decimal(0),
+                planned_total=plan.planned_total if plan else Decimal(0),
+                actual_base_salary=actual.actual_base_salary if actual else Decimal(0),
+                actual_bonus=actual.actual_bonus if actual else Decimal(0),
+                actual_other=actual.actual_other if actual else Decimal(0),
+                actual_total=actual.actual_total if actual else Decimal(0),
+                employee_count=plan.employee_count if plan else 0
+            ))
+
+    return dynamics

@@ -231,3 +231,43 @@ class DepartmentPayrollStats(BaseModel):
     total_paid: Decimal
     variance: Decimal
     average_salary: Decimal
+
+
+class SalaryStatistics(BaseModel):
+    """Salary distribution statistics"""
+    total_employees: int
+    active_employees: int
+    min_salary: Decimal
+    max_salary: Decimal
+    average_salary: Decimal
+    median_salary: Decimal
+    percentile_25: Decimal
+    percentile_75: Decimal
+    percentile_90: Decimal
+    total_payroll: Decimal
+
+
+class PayrollStructureMonth(BaseModel):
+    """Payroll structure breakdown for a single month"""
+    year: int
+    month: int
+    total_base_salary: Decimal
+    total_bonus: Decimal
+    total_other_payments: Decimal
+    total_amount: Decimal
+    employee_count: int
+
+
+class PayrollDynamics(BaseModel):
+    """Payroll dynamics over time"""
+    year: int
+    month: int
+    planned_base_salary: Decimal
+    planned_bonus: Decimal
+    planned_other: Decimal
+    planned_total: Decimal
+    actual_base_salary: Decimal
+    actual_bonus: Decimal
+    actual_other: Decimal
+    actual_total: Decimal
+    employee_count: int
