@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -7,8 +7,9 @@ import pandas as pd
 import io
 
 from app.db import get_db
-from app.db.models import BudgetCategory
+from app.db.models import BudgetCategory, User, UserRoleEnum
 from app.schemas import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCategoryInDB
+from app.utils.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -26,13 +27,35 @@ class BulkDeleteRequest(BaseModel):
 
 @router.get("/", response_model=List[BudgetCategoryInDB])
 def get_categories(
-    skip: int = 0,
-    limit: int = 100,
-    is_active: bool = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    is_active: Optional[bool] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all budget categories"""
+    """
+    Get all budget categories
+
+    - **USER**: Can only see categories from their own department
+    - **MANAGER**: Can see categories from all departments
+    - **ADMIN**: Can see categories from all departments
+    """
     query = db.query(BudgetCategory)
+
+    # Department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(BudgetCategory.department_id == department_id)
 
     if is_active is not None:
         query = query.filter(BudgetCategory.is_active == is_active)
@@ -42,7 +65,11 @@ def get_categories(
 
 
 @router.get("/{category_id}", response_model=BudgetCategoryInDB)
-def get_category(category_id: int, db: Session = Depends(get_db)):
+def get_category(
+    category_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Get category by ID"""
     category = db.query(BudgetCategory).filter(BudgetCategory.id == category_id).first()
     if not category:
@@ -50,21 +77,69 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Category with id {category_id} not found"
         )
+
+    # USER can only view categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if category.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to view this category"
+            )
+
     return category
 
 
 @router.post("/", response_model=BudgetCategoryInDB, status_code=status.HTTP_201_CREATED)
-def create_category(category: BudgetCategoryCreate, db: Session = Depends(get_db)):
-    """Create new budget category"""
-    # Check if category with same name exists
-    existing = db.query(BudgetCategory).filter(BudgetCategory.name == category.name).first()
+def create_category(
+    category: BudgetCategoryCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create new budget category
+
+    Auto-assigns to user's department (or can be specified by ADMIN)
+    """
+    # USER can only create categories in their own department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
+    # Check if category with same name exists in the same department
+    # (name uniqueness is now scoped to department)
+    query = db.query(BudgetCategory).filter(BudgetCategory.name == category.name)
+
+    # For USER, only check within their department
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+
+    existing = query.first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Category with name '{category.name}' already exists"
+            detail=f"Category with name '{category.name}' already exists in this department"
         )
 
-    db_category = BudgetCategory(**category.model_dump())
+    # Create category with department_id
+    category_data = category.model_dump()
+
+    # Auto-assign department_id based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER always creates in their own department
+        category_data['department_id'] = current_user.department_id
+    elif 'department_id' not in category_data or category_data['department_id'] is None:
+        # MANAGER/ADMIN must specify department or use their own
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required"
+            )
+        category_data['department_id'] = current_user.department_id
+
+    db_category = BudgetCategory(**category_data)
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
@@ -75,6 +150,7 @@ def create_category(category: BudgetCategoryCreate, db: Session = Depends(get_db
 def update_category(
     category_id: int,
     category: BudgetCategoryUpdate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update budget category"""
@@ -84,6 +160,14 @@ def update_category(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Category with id {category_id} not found"
         )
+
+    # USER can only update categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_category.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to update this category"
+            )
 
     # Update fields
     update_data = category.model_dump(exclude_unset=True)
@@ -96,7 +180,11 @@ def update_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Delete budget category (soft delete - mark as inactive)"""
     db_category = db.query(BudgetCategory).filter(BudgetCategory.id == category_id).first()
     if not db_category:
@@ -105,6 +193,14 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
             detail=f"Category with id {category_id} not found"
         )
 
+    # USER can only delete categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_category.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to delete this category"
+            )
+
     # Soft delete - mark as inactive
     db_category.is_active = False
     db.commit()
@@ -112,7 +208,11 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk/update", status_code=status.HTTP_200_OK)
-def bulk_update_categories(request: BulkUpdateRequest, db: Session = Depends(get_db)):
+def bulk_update_categories(
+    request: BulkUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Bulk update categories (activate/deactivate)"""
     if not request.ids:
         raise HTTPException(
@@ -120,12 +220,23 @@ def bulk_update_categories(request: BulkUpdateRequest, db: Session = Depends(get
             detail="No category IDs provided"
         )
 
-    categories = db.query(BudgetCategory).filter(BudgetCategory.id.in_(request.ids)).all()
+    query = db.query(BudgetCategory).filter(BudgetCategory.id.in_(request.ids))
+
+    # USER can only update categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+
+    categories = query.all()
 
     if len(categories) != len(request.ids):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Some categories not found"
+            detail="Some categories not found or not accessible"
         )
 
     updated_count = 0
@@ -143,7 +254,11 @@ def bulk_update_categories(request: BulkUpdateRequest, db: Session = Depends(get
 
 
 @router.post("/bulk/delete", status_code=status.HTTP_200_OK)
-def bulk_delete_categories(request: BulkDeleteRequest, db: Session = Depends(get_db)):
+def bulk_delete_categories(
+    request: BulkDeleteRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Bulk delete categories (soft delete - mark as inactive)"""
     if not request.ids:
         raise HTTPException(
@@ -151,7 +266,18 @@ def bulk_delete_categories(request: BulkDeleteRequest, db: Session = Depends(get
             detail="No category IDs provided"
         )
 
-    categories = db.query(BudgetCategory).filter(BudgetCategory.id.in_(request.ids)).all()
+    query = db.query(BudgetCategory).filter(BudgetCategory.id.in_(request.ids))
+
+    # USER can only delete categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+
+    categories = query.all()
 
     deleted_count = 0
     for category in categories:
@@ -167,9 +293,23 @@ def bulk_delete_categories(request: BulkDeleteRequest, db: Session = Depends(get
 
 
 @router.get("/export", response_class=StreamingResponse)
-def export_categories(db: Session = Depends(get_db)):
+def export_categories(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Export all categories to Excel"""
-    categories = db.query(BudgetCategory).all()
+    query = db.query(BudgetCategory)
+
+    # USER can only export categories from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+
+    categories = query.all()
 
     # Convert to DataFrame
     data = []
@@ -201,8 +341,23 @@ def export_categories(db: Session = Depends(get_db)):
 
 
 @router.post("/import", status_code=status.HTTP_200_OK)
-async def import_categories(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Import categories from Excel file"""
+async def import_categories(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Import categories from Excel file
+
+    All imported categories are assigned to the user's department
+    """
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -240,8 +395,14 @@ async def import_categories(file: UploadFile = File(...), db: Session = Depends(
                     errors.append(f"Row {index + 2}: Type must be OPEX or CAPEX")
                     continue
 
-                # Check if category exists
-                existing = db.query(BudgetCategory).filter(BudgetCategory.name == name).first()
+                # Determine department_id for import
+                import_department_id = current_user.department_id
+
+                # Check if category exists within the same department
+                existing = db.query(BudgetCategory).filter(
+                    BudgetCategory.name == name,
+                    BudgetCategory.department_id == import_department_id
+                ).first()
 
                 if existing:
                     # Update existing
@@ -250,12 +411,13 @@ async def import_categories(file: UploadFile = File(...), db: Session = Depends(
                     existing.is_active = str(row.get('Активна', 'Да')).strip().lower() in ['да', 'yes', '1', 'true']
                     updated_count += 1
                 else:
-                    # Create new
+                    # Create new with department_id
                     new_category = BudgetCategory(
                         name=name,
                         type=type_val,
                         description=str(row.get('Описание', '')) if pd.notna(row.get('Описание')) else None,
-                        is_active=str(row.get('Активна', 'Да')).strip().lower() in ['да', 'yes', '1', 'true']
+                        is_active=str(row.get('Активна', 'Да')).strip().lower() in ['да', 'yes', '1', 'true'],
+                        department_id=import_department_id
                     )
                     db.add(new_category)
                     created_count += 1
