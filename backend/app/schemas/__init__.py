@@ -32,6 +32,13 @@ from .user import (
     UserLogin,
     UserLoginResponse,
 )
+from .department import (
+    Department,
+    DepartmentCreate,
+    DepartmentUpdate,
+    DepartmentListItem,
+    DepartmentWithStats,
+)
 
 __all__ = [
     # Expense

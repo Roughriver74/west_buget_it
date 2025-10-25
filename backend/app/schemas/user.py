@@ -14,7 +14,7 @@ class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     full_name: Optional[str] = None
-    department: Optional[str] = None
+    department_id: Optional[int] = None
     position: Optional[str] = None
     phone: Optional[str] = None
 
@@ -23,7 +23,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for user registration"""
     password: str = Field(..., min_length=6, max_length=100)
-    role: UserRoleEnum = UserRoleEnum.REQUESTER
+    role: UserRoleEnum = UserRoleEnum.USER
 
     @validator('password')
     def validate_password(cls, v):
@@ -42,7 +42,7 @@ class UserUpdate(BaseModel):
     """Schema for updating user information"""
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
-    department: Optional[str] = None
+    department_id: Optional[int] = None
     position: Optional[str] = None
     phone: Optional[str] = None
     is_active: Optional[bool] = None
@@ -74,6 +74,7 @@ class User(UserBase):
     role: UserRoleEnum
     is_active: bool
     is_verified: bool
+    department_id: Optional[int] = None
     last_login: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -91,7 +92,7 @@ class UserListItem(BaseModel):
     full_name: Optional[str] = None
     role: UserRoleEnum
     is_active: bool
-    department: Optional[str] = None
+    department_id: Optional[int] = None
     position: Optional[str] = None
     last_login: Optional[datetime] = None
 

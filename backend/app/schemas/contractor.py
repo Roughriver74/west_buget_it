@@ -14,7 +14,7 @@ class ContractorBase(BaseModel):
 
 class ContractorCreate(ContractorBase):
     """Schema for creating contractor"""
-    pass
+    department_id: Optional[int] = None  # Optional - auto-assigned if not provided
 
 
 class ContractorUpdate(BaseModel):
@@ -29,6 +29,7 @@ class ContractorUpdate(BaseModel):
 class ContractorInDB(ContractorBase):
     """Schema for contractor from database"""
     id: int
+    department_id: int
     created_at: datetime
     updated_at: datetime
 

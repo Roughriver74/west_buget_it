@@ -39,7 +39,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     - **username**: Unique username (3-100 characters)
     - **email**: Valid email address
     - **password**: Password (min 6 characters, must contain letter and digit)
-    - **role**: User role (ADMIN, ACCOUNTANT, REQUESTER)
+    - **role**: User role (ADMIN, MANAGER, USER)
     """
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == user_data.username).first()
@@ -66,7 +66,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         full_name=user_data.full_name,
         hashed_password=hashed_password,
         role=user_data.role,
-        department=user_data.department,
+        department_id=user_data.department_id,
         position=user_data.position,
         phone=user_data.phone,
         is_active=True,
@@ -150,8 +150,8 @@ async def update_current_user(
     # Update fields
     if user_update.full_name is not None:
         current_user.full_name = user_update.full_name
-    if user_update.department is not None:
-        current_user.department = user_update.department
+    if user_update.department_id is not None:
+        current_user.department_id = user_update.department_id
     if user_update.position is not None:
         current_user.position = user_update.position
     if user_update.phone is not None:

@@ -1,5 +1,5 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -7,8 +7,9 @@ import pandas as pd
 import io
 
 from app.db import get_db
-from app.db.models import Contractor
+from app.db.models import Contractor, User, UserRoleEnum
 from app.schemas import ContractorCreate, ContractorUpdate, ContractorInDB
+from app.utils.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -24,14 +25,36 @@ class BulkDeleteRequest(BaseModel):
 
 @router.get("/", response_model=List[ContractorInDB])
 def get_contractors(
-    skip: int = 0,
-    limit: int = 100,
-    is_active: bool = None,
-    search: str = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    is_active: Optional[bool] = None,
+    search: Optional[str] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get all contractors"""
+    """
+    Get all contractors
+
+    - **USER**: Can only see contractors from their own department
+    - **MANAGER**: Can see contractors from all departments
+    - **ADMIN**: Can see contractors from all departments
+    """
     query = db.query(Contractor)
+
+    # Department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Contractor.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(Contractor.department_id == department_id)
 
     if is_active is not None:
         query = query.filter(Contractor.is_active == is_active)
@@ -48,7 +71,11 @@ def get_contractors(
 
 
 @router.get("/{contractor_id}", response_model=ContractorInDB)
-def get_contractor(contractor_id: int, db: Session = Depends(get_db)):
+def get_contractor(
+    contractor_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Get contractor by ID"""
     contractor = db.query(Contractor).filter(Contractor.id == contractor_id).first()
     if not contractor:
@@ -56,22 +83,70 @@ def get_contractor(contractor_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Contractor with id {contractor_id} not found"
         )
+
+    # USER can only view contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if contractor.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to view this contractor"
+            )
+
     return contractor
 
 
 @router.post("/", response_model=ContractorInDB, status_code=status.HTTP_201_CREATED)
-def create_contractor(contractor: ContractorCreate, db: Session = Depends(get_db)):
-    """Create new contractor"""
-    # Check if contractor with same INN exists
+def create_contractor(
+    contractor: ContractorCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create new contractor
+
+    Auto-assigns to user's department (or can be specified by ADMIN)
+    """
+    # USER can only create contractors in their own department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+
+    # Check if contractor with same INN exists in the same department
+    # (INN uniqueness is now scoped to department)
     if contractor.inn:
-        existing = db.query(Contractor).filter(Contractor.inn == contractor.inn).first()
+        query = db.query(Contractor).filter(Contractor.inn == contractor.inn)
+
+        # For USER, only check within their department
+        if current_user.role == UserRoleEnum.USER:
+            query = query.filter(Contractor.department_id == current_user.department_id)
+
+        existing = query.first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Contractor with INN '{contractor.inn}' already exists"
+                detail=f"Contractor with INN '{contractor.inn}' already exists in this department"
             )
 
-    db_contractor = Contractor(**contractor.model_dump())
+    # Create contractor with department_id
+    contractor_data = contractor.model_dump()
+
+    # Auto-assign department_id based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER always creates in their own department
+        contractor_data['department_id'] = current_user.department_id
+    elif 'department_id' not in contractor_data or contractor_data['department_id'] is None:
+        # MANAGER/ADMIN must specify department or use their own
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required"
+            )
+        contractor_data['department_id'] = current_user.department_id
+
+    db_contractor = Contractor(**contractor_data)
     db.add(db_contractor)
     db.commit()
     db.refresh(db_contractor)
@@ -82,6 +157,7 @@ def create_contractor(contractor: ContractorCreate, db: Session = Depends(get_db
 def update_contractor(
     contractor_id: int,
     contractor: ContractorUpdate,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update contractor"""
@@ -91,6 +167,14 @@ def update_contractor(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Contractor with id {contractor_id} not found"
         )
+
+    # USER can only update contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_contractor.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to update this contractor"
+            )
 
     # Update fields
     update_data = contractor.model_dump(exclude_unset=True)
@@ -103,7 +187,11 @@ def update_contractor(
 
 
 @router.delete("/{contractor_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_contractor(contractor_id: int, db: Session = Depends(get_db)):
+def delete_contractor(
+    contractor_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Delete contractor (soft delete - mark as inactive)"""
     db_contractor = db.query(Contractor).filter(Contractor.id == contractor_id).first()
     if not db_contractor:
@@ -111,6 +199,14 @@ def delete_contractor(contractor_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Contractor with id {contractor_id} not found"
         )
+
+    # USER can only delete contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if db_contractor.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions to delete this contractor"
+            )
 
     # Soft delete - mark as inactive
     db_contractor.is_active = False
@@ -121,10 +217,22 @@ def delete_contractor(contractor_id: int, db: Session = Depends(get_db)):
 @router.post("/bulk/update", status_code=status.HTTP_200_OK)
 def bulk_update_contractors(
     request: BulkUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Bulk activate/deactivate contractors"""
-    contractors = db.query(Contractor).filter(Contractor.id.in_(request.ids)).all()
+    query = db.query(Contractor).filter(Contractor.id.in_(request.ids))
+
+    # USER can only update contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Contractor.department_id == current_user.department_id)
+
+    contractors = query.all()
 
     for contractor in contractors:
         contractor.is_active = request.is_active
@@ -141,10 +249,22 @@ def bulk_update_contractors(
 @router.post("/bulk/delete", status_code=status.HTTP_200_OK)
 def bulk_delete_contractors(
     request: BulkDeleteRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Bulk soft delete contractors"""
-    contractors = db.query(Contractor).filter(Contractor.id.in_(request.ids)).all()
+    query = db.query(Contractor).filter(Contractor.id.in_(request.ids))
+
+    # USER can only delete contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Contractor.department_id == current_user.department_id)
+
+    contractors = query.all()
 
     for contractor in contractors:
         contractor.is_active = False
@@ -158,9 +278,23 @@ def bulk_delete_contractors(
 
 
 @router.get("/export", response_class=StreamingResponse)
-def export_contractors(db: Session = Depends(get_db)):
+def export_contractors(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
     """Export contractors to Excel"""
-    contractors = db.query(Contractor).all()
+    query = db.query(Contractor)
+
+    # USER can only export contractors from their department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Contractor.department_id == current_user.department_id)
+
+    contractors = query.all()
 
     data = []
     for contractor in contractors:
@@ -191,9 +325,20 @@ def export_contractors(db: Session = Depends(get_db)):
 @router.post("/import", status_code=status.HTTP_200_OK)
 async def import_contractors(
     file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Import contractors from Excel"""
+    """
+    Import contractors from Excel
+
+    All imported contractors are assigned to the user's department
+    """
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -230,15 +375,24 @@ async def import_contractors(
                 is_active_str = str(row.get("Активен", "Да")).strip() if pd.notna(row.get("Активен")) else "Да"
                 is_active = is_active_str.lower() in ["да", "yes", "true", "1"]
 
-                # Try to find existing contractor by INN or name
+                # Determine department_id for import
+                import_department_id = current_user.department_id
+
+                # Try to find existing contractor by INN or name within the same department
                 existing_contractor = None
                 if inn:
-                    existing_contractor = db.query(Contractor).filter(Contractor.inn == inn).first()
+                    existing_contractor = db.query(Contractor).filter(
+                        Contractor.inn == inn,
+                        Contractor.department_id == import_department_id
+                    ).first()
                 if not existing_contractor:
-                    existing_contractor = db.query(Contractor).filter(Contractor.name == name).first()
+                    existing_contractor = db.query(Contractor).filter(
+                        Contractor.name == name,
+                        Contractor.department_id == import_department_id
+                    ).first()
 
                 if existing_contractor:
-                    # Update existing
+                    # Update existing (only if belongs to user's department)
                     existing_contractor.name = name
                     existing_contractor.short_name = short_name
                     existing_contractor.inn = inn
@@ -246,13 +400,14 @@ async def import_contractors(
                     existing_contractor.is_active = is_active
                     updated_count += 1
                 else:
-                    # Create new
+                    # Create new with department_id
                     new_contractor = Contractor(
                         name=name,
                         short_name=short_name,
                         inn=inn,
                         contact_info=contact_info,
-                        is_active=is_active
+                        is_active=is_active,
+                        department_id=import_department_id
                     )
                     db.add(new_contractor)
                     created_count += 1
