@@ -394,6 +394,63 @@ class User(Base):
     # Relationships
     department_rel = relationship("Department", back_populates="users")
     dashboards = relationship("DashboardConfig", back_populates="user")
+    audit_logs = relationship("AuditLog", back_populates="user", foreign_keys="AuditLog.user_id")
 
     def __repr__(self):
         return f"<User {self.username} ({self.role})>"
+
+
+class AuditActionEnum(str, enum.Enum):
+    """Enum for audit log actions"""
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    LOGIN = "LOGIN"
+    LOGOUT = "LOGOUT"
+    EXPORT = "EXPORT"
+    IMPORT = "IMPORT"
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+
+
+class AuditLog(Base):
+    """Audit log for tracking critical operations"""
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index('idx_audit_log_user_action', 'user_id', 'action'),
+        Index('idx_audit_log_entity', 'entity_type', 'entity_id'),
+        Index('idx_audit_log_timestamp', 'timestamp'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # User who performed the action
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+
+    # Action performed
+    action = Column(Enum(AuditActionEnum), nullable=False, index=True)
+
+    # Entity affected
+    entity_type = Column(String(50), nullable=False, index=True)  # e.g., "Expense", "User", "Category"
+    entity_id = Column(Integer, nullable=True, index=True)  # ID of the affected entity
+
+    # Details
+    description = Column(Text, nullable=True)  # Human-readable description
+    changes = Column(JSON, nullable=True)  # Detailed changes in JSON format
+
+    # Request metadata
+    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
+    user_agent = Column(String(500), nullable=True)  # Browser/client info
+
+    # Department context
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+
+    # Timestamp
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    user = relationship("User", back_populates="audit_logs", foreign_keys=[user_id])
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<AuditLog {self.action} on {self.entity_type}#{self.entity_id} by User#{self.user_id}>"

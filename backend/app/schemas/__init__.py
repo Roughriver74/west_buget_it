@@ -39,6 +39,11 @@ from .department import (
     DepartmentListItem,
     DepartmentWithStats,
 )
+from .audit import (
+    AuditLogCreate,
+    AuditLogInDB,
+    AuditLogWithUser,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -87,4 +92,14 @@ __all__ = [
     "TokenData",
     "UserLogin",
     "UserLoginResponse",
+    # Department
+    "Department",
+    "DepartmentCreate",
+    "DepartmentUpdate",
+    "DepartmentListItem",
+    "DepartmentWithStats",
+    # Audit Log
+    "AuditLogCreate",
+    "AuditLogInDB",
+    "AuditLogWithUser",
 ]

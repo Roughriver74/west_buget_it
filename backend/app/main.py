@@ -5,8 +5,9 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import time
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit
 from app.utils.logger import logger, log_error, log_info
+from app.middleware import create_rate_limiter
 
 # Create FastAPI application
 app = FastAPI(
@@ -25,6 +26,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure rate limiting
+# 100 requests per minute, 1000 requests per hour per IP
+app.add_middleware(create_rate_limiter(requests_per_minute=100, requests_per_hour=1000))
+log_info("Rate limiting enabled: 100 req/min, 1000 req/hour per IP", "Startup")
 
 
 # Request logging middleware
@@ -102,6 +108,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.API_PREFIX}/auth", tags=["Authentication"])
 app.include_router(departments.router, prefix=f"{settings.API_PREFIX}/departments", tags=["Departments"])
+app.include_router(audit.router, prefix=f"{settings.API_PREFIX}/audit", tags=["Audit Logs"])
 app.include_router(expenses.router, prefix=f"{settings.API_PREFIX}/expenses", tags=["Expenses"])
 app.include_router(categories.router, prefix=f"{settings.API_PREFIX}/categories", tags=["Categories"])
 app.include_router(contractors.router, prefix=f"{settings.API_PREFIX}/contractors", tags=["Contractors"])
