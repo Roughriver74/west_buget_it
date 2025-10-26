@@ -8,6 +8,7 @@ export interface Department {
   name: string;
   code: string;
   description: string | null;
+  ftp_subdivision_name: string | null;
   manager_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -50,6 +51,14 @@ export const DepartmentProvider: React.FC<{ children: ReactNode }> = ({ children
       const depts = response.data;
       setDepartments(depts);
 
+      // Update selectedDepartment if it exists in the new data
+      if (selectedDepartment) {
+        const updatedDept = depts.find((d: Department) => d.id === selectedDepartment.id);
+        if (updatedDept) {
+          setSelectedDepartmentState(updatedDept);
+        }
+      }
+
       // Auto-select first department if none selected
       if (depts.length > 0 && !selectedDepartment) {
         const savedDeptId = localStorage.getItem('selectedDepartmentId');
@@ -76,15 +85,20 @@ export const DepartmentProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Load departments when user becomes authenticated
   useEffect(() => {
-    if (!authLoading && token && !hasLoadedOnce) {
+    // Check both state token and localStorage to handle race conditions
+    const hasToken = token || localStorage.getItem('token');
+
+    if (!authLoading && hasToken && !hasLoadedOnce) {
       console.log('[DepartmentContext] Auth complete, scheduling departments load...');
+      console.log('[DepartmentContext] Token in state:', !!token, 'Token in localStorage:', !!localStorage.getItem('token'));
+
       // Delay to ensure token is properly set in localStorage and available to interceptor
       const timer = setTimeout(() => {
         console.log('[DepartmentContext] Loading departments now...');
         refreshDepartments();
       }, 300);
       return () => clearTimeout(timer);
-    } else if (!token) {
+    } else if (!hasToken) {
       // Clear departments when logged out
       setDepartments([]);
       setSelectedDepartmentState(null);

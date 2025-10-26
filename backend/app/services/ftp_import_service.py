@@ -12,7 +12,7 @@ from sqlalchemy import extract, and_, or_
 from io import BytesIO
 import logging
 
-from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum
+from app.db.models import Expense, BudgetCategory, Contractor, Organization, Department, ExpenseStatusEnum
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,7 @@ class FTPImportService:
             'Статья ДДС': 'category_name',
             'Получатель': 'contractor_name',
             'Организация': 'organization_name',
+            'Подразделение': 'subdivision_name',  # FTP subdivision field
             'Сумма документа': 'amount',
             'Дата оплаты': 'payment_date',
             'Статус': 'status',
@@ -316,7 +317,8 @@ class FTPImportService:
     def find_or_create_contractor(
         self,
         db: Session,
-        contractor_name: str
+        contractor_name: str,
+        department_id: int
     ) -> Optional[Contractor]:
         """Find existing contractor or create new one"""
         if not contractor_name:
@@ -333,12 +335,13 @@ class FTPImportService:
         # Create new contractor
         new_contractor = Contractor(
             name=contractor_name,
+            department_id=department_id,
             is_active=True
         )
         db.add(new_contractor)
         db.flush()
 
-        logger.info(f"Created new contractor: {contractor_name}")
+        logger.info(f"Created new contractor: {contractor_name} (department_id: {department_id})")
         return new_contractor
 
     def find_organization(
@@ -355,6 +358,36 @@ class FTPImportService:
         ).first()
 
         return organization
+
+    def find_department_by_subdivision(
+        self,
+        db: Session,
+        subdivision_name: str
+    ) -> Optional[Department]:
+        """Find department by FTP subdivision name"""
+        if not subdivision_name:
+            return None
+
+        # Try to find by exact match first
+        department = db.query(Department).filter(
+            Department.ftp_subdivision_name == subdivision_name,
+            Department.is_active == True
+        ).first()
+
+        if department:
+            logger.info(f"Found department '{department.name}' for subdivision '{subdivision_name}'")
+            return department
+
+        # Try partial match
+        department = db.query(Department).filter(
+            Department.ftp_subdivision_name.ilike(f"%{subdivision_name}%"),
+            Department.is_active == True
+        ).first()
+
+        if department:
+            logger.info(f"Found department '{department.name}' for subdivision '{subdivision_name}' (partial match)")
+
+        return department
 
     def map_status(self, status_str: Optional[str]) -> ExpenseStatusEnum:
         """Map status string to ExpenseStatusEnum"""
@@ -403,10 +436,17 @@ class FTPImportService:
         self,
         db: Session,
         expenses_data: List[Dict],
-        skip_duplicates: bool = True
+        skip_duplicates: bool = True,
+        default_department_id: Optional[int] = None
     ) -> Tuple[int, int, int]:
         """
         Import expenses to database
+
+        Args:
+            db: Database session
+            expenses_data: List of expense dictionaries
+            skip_duplicates: Whether to skip duplicate expenses
+            default_department_id: Default department ID if no mapping found
 
         Returns:
             Tuple of (created, updated, skipped) counts
@@ -422,6 +462,18 @@ class FTPImportService:
                     Expense.number == expense_data.get('number')
                 ).first()
 
+                # Find department by subdivision name from FTP
+                department = self.find_department_by_subdivision(
+                    db,
+                    expense_data.get('subdivision_name')
+                )
+
+                # Skip if department not found (no fallback to default)
+                if not department:
+                    logger.warning(f"No department mapping found for subdivision '{expense_data.get('subdivision_name')}' in expense {expense_data.get('number')}, skipping")
+                    skipped += 1
+                    continue
+
                 # Find/create related entities
                 # Use smart keyword matching for category
                 category = self.find_category_by_keywords(
@@ -433,7 +485,8 @@ class FTPImportService:
 
                 contractor = self.find_or_create_contractor(
                     db,
-                    expense_data.get('contractor_name')
+                    expense_data.get('contractor_name'),
+                    department.id
                 )
 
                 organization = self.find_organization(
@@ -456,6 +509,7 @@ class FTPImportService:
                 # Prepare expense fields
                 expense_fields = {
                     'number': expense_data.get('number'),
+                    'department_id': department.id,  # Add department mapping
                     'category_id': category.id if category else None,
                     'contractor_id': contractor.id if contractor else None,
                     'organization_id': organization.id,
@@ -505,7 +559,8 @@ async def import_from_ftp(
     remote_path: str,
     delete_from_year: Optional[int] = None,
     delete_from_month: Optional[int] = None,
-    skip_duplicates: bool = True
+    skip_duplicates: bool = True,
+    default_department_id: Optional[int] = None
 ) -> Dict:
     """
     Main function to import expenses from FTP
@@ -519,6 +574,7 @@ async def import_from_ftp(
         delete_from_year: Year to start deleting from (None = skip deletion)
         delete_from_month: Month to start deleting from (None = skip deletion)
         skip_duplicates: Whether to skip duplicate expenses
+        default_department_id: Default department ID if no mapping found
 
     Returns:
         Dict with import statistics
@@ -540,7 +596,12 @@ async def import_from_ftp(
         deleted = service.delete_expenses_from_month(db, delete_from_year, delete_from_month)
 
     # Import expenses
-    created, updated, skipped = service.import_expenses(db, expenses_data, skip_duplicates)
+    created, updated, skipped = service.import_expenses(
+        db,
+        expenses_data,
+        skip_duplicates,
+        default_department_id
+    )
 
     return {
         'deleted': deleted,

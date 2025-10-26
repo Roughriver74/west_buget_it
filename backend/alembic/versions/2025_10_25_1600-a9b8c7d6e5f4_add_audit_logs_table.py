@@ -19,12 +19,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create AuditActionEnum
+    # Create AuditActionEnum if it doesn't exist
     op.execute("""
-        CREATE TYPE auditactionenum AS ENUM (
-            'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT',
-            'EXPORT', 'IMPORT', 'APPROVE', 'REJECT'
-        )
+        DO $$ BEGIN
+            CREATE TYPE auditactionenum AS ENUM (
+                'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT',
+                'EXPORT', 'IMPORT', 'APPROVE', 'REJECT'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
     """)
 
     # Create audit_logs table
@@ -35,7 +39,8 @@ def upgrade() -> None:
         sa.Column('action', postgresql.ENUM(
             'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT',
             'EXPORT', 'IMPORT', 'APPROVE', 'REJECT',
-            name='auditactionenum'
+            name='auditactionenum',
+            create_type=False
         ), nullable=False),
         sa.Column('entity_type', sa.String(length=50), nullable=False),
         sa.Column('entity_id', sa.Integer(), nullable=True),

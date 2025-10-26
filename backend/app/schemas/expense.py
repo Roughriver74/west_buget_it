@@ -12,7 +12,7 @@ from .organization import OrganizationInDB
 class ExpenseBase(BaseModel):
     """Base schema for expense"""
     number: str = Field(..., min_length=1, max_length=50)
-    category_id: int
+    category_id: Optional[int] = None  # Nullable for FTP imports that need manual categorization
     contractor_id: Optional[int] = None
     organization_id: int
     amount: Decimal = Field(..., ge=0)

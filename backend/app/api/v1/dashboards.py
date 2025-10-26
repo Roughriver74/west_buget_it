@@ -3,15 +3,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.db.models import DashboardConfig
+from app.db.models import User, DashboardConfig
 from app.schemas import (
     DashboardConfigCreate,
     DashboardConfigUpdate,
     DashboardConfigInDB,
     DashboardConfigList,
 )
+from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("", response_model=DashboardConfigList)
@@ -21,6 +22,7 @@ def get_dashboards(
     user_id: Optional[str] = None,
     is_public: Optional[bool] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get all dashboard configurations"""
     query = db.query(DashboardConfig)
@@ -69,7 +71,8 @@ def get_default_dashboard(db: Session = Depends(get_db)):
 
 @router.post("", response_model=DashboardConfigInDB, status_code=status.HTTP_201_CREATED)
 def create_dashboard(
-    dashboard_create: DashboardConfigCreate, db: Session = Depends(get_db)
+    dashboard_create: DashboardConfigCreate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Create a new dashboard configuration"""
 
@@ -79,7 +82,7 @@ def create_dashboard(
             {"is_default": False}
         )
 
-    dashboard = DashboardConfig(**dashboard_create.dict())
+    dashboard = DashboardConfig(**dashboard_create.model_dump())
     db.add(dashboard)
     db.commit()
     db.refresh(dashboard)
@@ -92,6 +95,7 @@ def update_dashboard(
     dashboard_id: int,
     dashboard_update: DashboardConfigUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Update dashboard configuration"""
     dashboard = db.query(DashboardConfig).filter(DashboardConfig.id == dashboard_id).first()
@@ -109,7 +113,7 @@ def update_dashboard(
         ).update({"is_default": False})
 
     # Update fields
-    update_data = dashboard_update.dict(exclude_unset=True)
+    update_data = dashboard_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(dashboard, field, value)
 

@@ -10,23 +10,23 @@ import type {
 } from '@/types'
 
 export const analyticsApi = {
-  getDashboard: async (params?: { year?: number; month?: number }): Promise<DashboardData> => {
-    const { data } = await apiClient.get('/analytics/dashboard', { params })
+  getDashboard: async (params?: { year?: number; month?: number; department_id?: number }): Promise<DashboardData> => {
+    const { data } = await apiClient.get('analytics/dashboard', { params })
     return data
   },
 
   getBudgetExecution: async (year: number): Promise<BudgetExecution> => {
-    const { data } = await apiClient.get('/analytics/budget-execution', { params: { year } })
+    const { data } = await apiClient.get('analytics/budget-execution', { params: { year } })
     return data
   },
 
-  getByCategory: async (params: { year: number; month?: number }) => {
-    const { data } = await apiClient.get('/analytics/by-category', { params })
+  getByCategory: async (params: { year: number; month?: number; department_id?: number }) => {
+    const { data } = await apiClient.get('analytics/by-category', { params })
     return data
   },
 
   getTrends: async (params: { year: number; category_id?: number }) => {
-    const { data } = await apiClient.get('/analytics/trends', { params })
+    const { data } = await apiClient.get('analytics/trends', { params })
     return data
   },
 
@@ -37,7 +37,7 @@ export const analyticsApi = {
     category_id?: number
     organization_id?: number
   }): Promise<PaymentCalendar> => {
-    const { data } = await apiClient.get('/analytics/payment-calendar', { params })
+    const { data } = await apiClient.get('analytics/payment-calendar', { params })
     return data
   },
 
@@ -47,7 +47,7 @@ export const analyticsApi = {
     organization_id?: number
   }): Promise<PaymentsByDay> => {
     const { date, ...otherParams } = params
-    const { data } = await apiClient.get(`/analytics/payment-calendar/${date}`, {
+    const { data } = await apiClient.get(`analytics/payment-calendar/${date}`, {
       params: otherParams,
     })
     return data
@@ -62,7 +62,7 @@ export const analyticsApi = {
     category_id?: number
     organization_id?: number
   }): Promise<PaymentForecast> => {
-    const { data } = await apiClient.get('/analytics/payment-forecast', { params })
+    const { data } = await apiClient.get('analytics/payment-forecast', { params })
     return data
   },
 
@@ -72,7 +72,7 @@ export const analyticsApi = {
     category_id?: number
     organization_id?: number
   }): Promise<ForecastSummary> => {
-    const { data } = await apiClient.get('/analytics/payment-forecast/summary', { params })
+    const { data } = await apiClient.get('analytics/payment-forecast/summary', { params })
     return data
   },
 }

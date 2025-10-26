@@ -240,41 +240,41 @@ export const employeeAPI = {
     status?: string;
     search?: string;
   }) => {
-    const response = await apiClient.get<Employee[]>('/employees', { params });
+    const response = await apiClient.get<Employee[]>('employees/', { params });
     return response.data;
   },
 
   get: async (id: number) => {
-    const response = await apiClient.get<EmployeeWithSalaryHistory>(`/employees/${id}`);
+    const response = await apiClient.get<EmployeeWithSalaryHistory>(`employees/${id}`);
     return response.data;
   },
 
   create: async (data: EmployeeCreate) => {
-    const response = await apiClient.post<Employee>('/employees', data);
+    const response = await apiClient.post<Employee>('employees/', data);
     return response.data;
   },
 
   update: async (id: number, data: EmployeeUpdate) => {
-    const response = await apiClient.put<Employee>(`/employees/${id}`, data);
+    const response = await apiClient.put<Employee>(`employees/${id}`, data);
     return response.data;
   },
 
   delete: async (id: number) => {
-    await apiClient.delete(`/employees/${id}`);
+    await apiClient.delete(`employees/${id}`);
   },
 
   getSalaryHistory: async (id: number) => {
-    const response = await apiClient.get<SalaryHistory[]>(`/employees/${id}/salary-history`);
+    const response = await apiClient.get<SalaryHistory[]>(`employees/${id}/salary-history`);
     return response.data;
   },
 
   addSalaryHistory: async (id: number, data: SalaryHistoryCreate) => {
-    const response = await apiClient.post<SalaryHistory>(`/employees/${id}/salary-history`, data);
+    const response = await apiClient.post<SalaryHistory>(`employees/${id}/salary-history`, data);
     return response.data;
   },
 
   exportToExcel: async (params?: { department_id?: number; status?: string }) => {
-    const response = await apiClient.get('/employees/export', {
+    const response = await apiClient.get('employees/export', {
       params,
       responseType: 'blob',
     });
@@ -300,31 +300,31 @@ export const payrollPlanAPI = {
     year?: number;
     month?: number;
   }) => {
-    const response = await apiClient.get<PayrollPlanWithEmployee[]>('/payroll/plans', { params });
+    const response = await apiClient.get<PayrollPlanWithEmployee[]>('payroll/plans', { params });
     return response.data;
   },
 
   get: async (id: number) => {
-    const response = await apiClient.get<PayrollPlanWithEmployee>(`/payroll/plans/${id}`);
+    const response = await apiClient.get<PayrollPlanWithEmployee>(`payroll/plans/${id}`);
     return response.data;
   },
 
   create: async (data: PayrollPlanCreate) => {
-    const response = await apiClient.post<PayrollPlan>('/payroll/plans', data);
+    const response = await apiClient.post<PayrollPlan>('payroll/plans', data);
     return response.data;
   },
 
   update: async (id: number, data: PayrollPlanUpdate) => {
-    const response = await apiClient.put<PayrollPlan>(`/payroll/plans/${id}`, data);
+    const response = await apiClient.put<PayrollPlan>(`payroll/plans/${id}`, data);
     return response.data;
   },
 
   delete: async (id: number) => {
-    await apiClient.delete(`/payroll/plans/${id}`);
+    await apiClient.delete(`payroll/plans/${id}`);
   },
 
   exportToExcel: async (params?: { year?: number; month?: number; department_id?: number }) => {
-    const response = await apiClient.get('/payroll/plans/export', {
+    const response = await apiClient.get('payroll/plans/export', {
       params,
       responseType: 'blob',
     });
@@ -349,26 +349,26 @@ export const payrollActualAPI = {
     year?: number;
     month?: number;
   }) => {
-    const response = await apiClient.get<PayrollActualWithEmployee[]>('/payroll/actuals', { params });
+    const response = await apiClient.get<PayrollActualWithEmployee[]>('payroll/actuals', { params });
     return response.data;
   },
 
   create: async (data: PayrollActualCreate) => {
-    const response = await apiClient.post<PayrollActual>('/payroll/actuals', data);
+    const response = await apiClient.post<PayrollActual>('payroll/actuals', data);
     return response.data;
   },
 
   update: async (id: number, data: PayrollActualUpdate) => {
-    const response = await apiClient.put<PayrollActual>(`/payroll/actuals/${id}`, data);
+    const response = await apiClient.put<PayrollActual>(`payroll/actuals/${id}`, data);
     return response.data;
   },
 
   delete: async (id: number) => {
-    await apiClient.delete(`/payroll/actuals/${id}`);
+    await apiClient.delete(`payroll/actuals/${id}`);
   },
 
   exportToExcel: async (params?: { year?: number; month?: number; department_id?: number }) => {
-    const response = await apiClient.get('/payroll/actuals/export', {
+    const response = await apiClient.get('payroll/actuals/export', {
       params,
       responseType: 'blob',
     });
@@ -386,35 +386,35 @@ export const payrollActualAPI = {
 
 export const payrollAnalyticsAPI = {
   getSummary: async (year: number, department_id?: number) => {
-    const response = await apiClient.get<PayrollSummary[]>('/payroll/analytics/summary', {
+    const response = await apiClient.get<PayrollSummary[]>('payroll/analytics/summary', {
       params: { year, department_id },
     });
     return response.data;
   },
 
   getSalaryStats: async (department_id?: number) => {
-    const response = await apiClient.get<SalaryStatistics>('/payroll/analytics/salary-stats', {
+    const response = await apiClient.get<SalaryStatistics>('payroll/analytics/salary-stats', {
       params: { department_id },
     });
     return response.data;
   },
 
   getStructure: async (year: number, department_id?: number) => {
-    const response = await apiClient.get<PayrollStructureMonth[]>('/payroll/analytics/structure', {
+    const response = await apiClient.get<PayrollStructureMonth[]>('payroll/analytics/structure', {
       params: { year, department_id },
     });
     return response.data;
   },
 
   getDynamics: async (year: number, department_id?: number) => {
-    const response = await apiClient.get<PayrollDynamics[]>('/payroll/analytics/dynamics', {
+    const response = await apiClient.get<PayrollDynamics[]>('payroll/analytics/dynamics', {
       params: { year, department_id },
     });
     return response.data;
   },
 
   getForecast: async (params?: { months_ahead?: number; historical_months?: number; department_id?: number }) => {
-    const response = await apiClient.get<PayrollForecast[]>('/payroll/analytics/forecast', {
+    const response = await apiClient.get<PayrollForecast[]>('payroll/analytics/forecast', {
       params,
     });
     return response.data;

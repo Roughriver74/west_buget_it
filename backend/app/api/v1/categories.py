@@ -12,7 +12,7 @@ from app.schemas import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCatego
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 class BulkUpdateRequest(BaseModel):
@@ -172,10 +172,18 @@ def update_category(
 
     # Update fields
     update_data = category.model_dump(exclude_unset=True)
+
+    # Log what we're updating
+    from app.utils.logger import log_info
+    log_info(f"Updating category {category_id} with data: {update_data}", "CategoryUpdate")
+
     for field, value in update_data.items():
+        old_value = getattr(db_category, field, None)
         setattr(db_category, field, value)
+        log_info(f"  {field}: {old_value} -> {value}", "CategoryUpdate")
 
     db.commit()
+    log_info(f"Category {category_id} committed successfully", "CategoryUpdate")
     db.refresh(db_category)
     return db_category
 
@@ -202,8 +210,8 @@ def delete_category(
                 detail="Not enough permissions to delete this category"
             )
 
-    # Soft delete - mark as inactive
-    db_category.is_active = False
+    # Hard delete - permanently remove from database
+    db.delete(db_category)
     db.commit()
     return None
 
@@ -282,7 +290,7 @@ def bulk_delete_categories(
 
     deleted_count = 0
     for category in categories:
-        category.is_active = False
+        db.delete(category)
         deleted_count += 1
 
     db.commit()

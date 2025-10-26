@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import EditableCell from './EditableCell'
 import CopyPlanModal from './CopyPlanModal'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 interface BudgetPlanTableProps {
   year: number
@@ -16,11 +17,12 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set())
   const queryClient = useQueryClient()
+  const { selectedDepartment } = useDepartment()
 
   // Загрузка плана на год
   const { data: planData, isLoading } = useQuery({
-    queryKey: ['budget-plan', year],
-    queryFn: () => budgetApi.getPlanForYear(year),
+    queryKey: ['budget-plan', year, selectedDepartment?.id],
+    queryFn: () => budgetApi.getPlanForYear(year, selectedDepartment?.id),
   })
 
   // Инициализация плана

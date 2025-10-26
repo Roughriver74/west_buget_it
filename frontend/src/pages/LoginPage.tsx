@@ -22,6 +22,11 @@ const LoginPage: React.FC = () => {
 
     try {
       await login(values.username, values.password);
+
+      // Small delay to ensure React state is fully updated before navigation
+      // This prevents race conditions where components render before auth context updates
+      await new Promise(resolve => setTimeout(resolve, 150));
+
       // Navigate to the page they were trying to access, or home
       navigate(from, { replace: true });
     } catch (err) {

@@ -19,11 +19,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create EmployeeStatusEnum
+    # Create EmployeeStatusEnum if it doesn't exist
     op.execute("""
-        CREATE TYPE employeestatusenum AS ENUM (
-            'ACTIVE', 'ON_VACATION', 'ON_LEAVE', 'FIRED'
-        )
+        DO $$ BEGIN
+            CREATE TYPE employeestatusenum AS ENUM (
+                'ACTIVE', 'ON_VACATION', 'ON_LEAVE', 'FIRED'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
     """)
 
     # Create employees table
@@ -37,7 +41,8 @@ def upgrade() -> None:
         sa.Column('fire_date', sa.Date(), nullable=True),
         sa.Column('status', postgresql.ENUM(
             'ACTIVE', 'ON_VACATION', 'ON_LEAVE', 'FIRED',
-            name='employeestatusenum'
+            name='employeestatusenum',
+            create_type=False
         ), nullable=False),
         sa.Column('base_salary', sa.Numeric(precision=15, scale=2), nullable=False),
         sa.Column('department_id', sa.Integer(), nullable=False),

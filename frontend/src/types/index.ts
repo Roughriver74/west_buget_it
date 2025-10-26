@@ -104,6 +104,7 @@ export interface BudgetPlan {
 
 export interface ForecastExpense {
   id: number
+  department_id: number
   category_id: number
   contractor_id?: number
   organization_id: number

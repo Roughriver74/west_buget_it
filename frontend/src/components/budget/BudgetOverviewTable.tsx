@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import type { BudgetOverviewCategory } from '@/api/budget'
 import QuickExpenseModal from './QuickExpenseModal'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 interface BudgetOverviewTableProps {
   year: number
@@ -13,16 +14,20 @@ interface BudgetOverviewTableProps {
 
 const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }) => {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
+  const { selectedDepartment } = useDepartment()
 
   // Загрузка данных обзора
   const { data: overview, isLoading } = useQuery({
-    queryKey: ['budget-overview', year, month],
-    queryFn: () => budgetApi.getOverview(year, month),
+    queryKey: ['budget-overview', year, month, selectedDepartment?.id],
+    queryFn: () => budgetApi.getOverview(year, month, selectedDepartment?.id),
   })
 
   const handleExport = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${apiUrl}/api/v1/budget/overview/${year}/${month}/export`
+    let url = `${apiUrl}/api/v1/budget/overview/${year}/${month}/export`
+    if (selectedDepartment?.id) {
+      url += `?department_id=${selectedDepartment.id}`
+    }
     window.open(url, '_blank')
     message.success('Экспорт начат. Файл скоро будет загружен.')
   }

@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api/v1"
 
     # Database
-    DATABASE_URL: str = "postgresql://budget_user:budget_pass@localhost:5432/it_budget_db"
+    DATABASE_URL: str = "postgresql://budget_user:budget_pass@localhost:54329/it_budget_db"
     DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
+    DB_PORT: int = 54329
     DB_NAME: str = "it_budget_db"
     DB_USER: str = "budget_user"
     DB_PASSWORD: str = "budget_pass"

@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 
 from app.db import get_db
-from app.db.models import Attachment, Expense
+from app.db.models import User,  Attachment, Expense
 from app.schemas.attachment import AttachmentCreate, AttachmentUpdate, AttachmentInDB, AttachmentList
+from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 # Directory to store uploaded files
 UPLOAD_DIR = Path(__file__).parent.parent.parent / "uploads"
@@ -43,7 +44,8 @@ async def upload_attachment(
     file: UploadFile = File(...),
     file_type: str = Form(None),
     uploaded_by: str = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Upload a file attachment for an expense"""
 
@@ -108,7 +110,8 @@ async def upload_attachment(
 @router.get("/{expense_id}/attachments", response_model=AttachmentList)
 def get_expense_attachments(
     expense_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get all attachments for an expense"""
 
@@ -131,7 +134,8 @@ def get_expense_attachments(
 @router.get("/attachments/{attachment_id}", response_model=AttachmentInDB)
 def get_attachment(
     attachment_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get attachment by ID"""
 
@@ -148,7 +152,8 @@ def get_attachment(
 @router.get("/attachments/{attachment_id}/download")
 def download_attachment(
     attachment_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Download an attachment file"""
 
@@ -177,7 +182,8 @@ def download_attachment(
 def update_attachment(
     attachment_id: int,
     attachment_update: AttachmentUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Update attachment metadata (filename or file_type)"""
 
@@ -189,7 +195,7 @@ def update_attachment(
         )
 
     # Update fields
-    update_data = attachment_update.dict(exclude_unset=True)
+    update_data = attachment_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(attachment, field, value)
 
@@ -202,7 +208,8 @@ def update_attachment(
 @router.delete("/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_attachment(
     attachment_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Delete an attachment"""
 

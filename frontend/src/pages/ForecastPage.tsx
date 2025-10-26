@@ -6,10 +6,11 @@ import {
 } from 'antd'
 import {
   PlusOutlined, DeleteOutlined, ReloadOutlined, EditOutlined,
-  CheckOutlined, CloseOutlined, ThunderboltOutlined
+  CheckOutlined, CloseOutlined, ThunderboltOutlined, DownloadOutlined
 } from '@ant-design/icons'
 import { forecastApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
 import type { ForecastExpense, BudgetCategory, Contractor, Organization } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 import dayjs, { Dayjs } from 'dayjs'
 
 const { Title, Paragraph } = Typography
@@ -18,11 +19,12 @@ const { Option } = Select
 const ForecastPage = () => {
   const currentDate = dayjs()
   const nextMonth = currentDate.add(1, 'month')
+  const { user } = useAuth()
 
   const [selectedYear, setSelectedYear] = useState(nextMonth.year())
   const [selectedMonth, setSelectedMonth] = useState(nextMonth.month() + 1)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm] = Form.useForm()
+  const [editingData, setEditingData] = useState<Partial<ForecastExpense> | null>(null)
   const [addModalVisible, setAddModalVisible] = useState(false)
   const [addForm] = Form.useForm()
 
@@ -30,8 +32,9 @@ const ForecastPage = () => {
 
   // Load data
   const { data: forecasts, isLoading } = useQuery({
-    queryKey: ['forecasts', selectedYear, selectedMonth],
-    queryFn: () => forecastApi.getAll(selectedYear, selectedMonth),
+    queryKey: ['forecasts', selectedYear, selectedMonth, user?.department_id],
+    queryFn: () => forecastApi.getAll(selectedYear, selectedMonth, user!.department_id),
+    enabled: !!user?.department_id,
   })
 
   const { data: categories } = useQuery({
@@ -54,6 +57,7 @@ const ForecastPage = () => {
     mutationFn: () => forecastApi.generate({
       target_year: selectedYear,
       target_month: selectedMonth,
+      department_id: user!.department_id,
       include_regular: true,
       include_average: true,
     }),
@@ -73,6 +77,7 @@ const ForecastPage = () => {
       message.success('Прогноз обновлен')
       queryClient.invalidateQueries({ queryKey: ['forecasts'] })
       setEditingId(null)
+      setEditingData(null)
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления: ${error.message}`)
@@ -104,7 +109,7 @@ const ForecastPage = () => {
   })
 
   const clearMutation = useMutation({
-    mutationFn: () => forecastApi.clear(selectedYear, selectedMonth),
+    mutationFn: () => forecastApi.clear(selectedYear, selectedMonth, user!.department_id),
     onSuccess: () => {
       message.success('Прогнозы очищены')
       queryClient.invalidateQueries({ queryKey: ['forecasts'] })
@@ -115,17 +120,48 @@ const ForecastPage = () => {
   })
 
   const handleSaveEdit = (id: number) => {
-    const values = editForm.getFieldsValue()
-    updateMutation.mutate({ id, data: values })
+    if (!editingData) return
+
+    console.log('=== handleSaveEdit DEBUG ===')
+    console.log('editingData:', editingData)
+
+    // Удаляем поля, которые не нужны для обновления (read-only)
+    const { category, contractor, organization, created_at, updated_at, ...dataToSend } = editingData as any
+
+    console.log('dataToSend (final):', dataToSend)
+
+    updateMutation.mutate({
+      id,
+      data: dataToSend
+    })
   }
 
   const handleAddForecast = () => {
     addForm.validateFields().then(values => {
       createMutation.mutate({
         ...values,
+        department_id: user!.department_id,
         forecast_date: values.forecast_date.format('YYYY-MM-DD'),
       })
     })
+  }
+
+  const handleExportToExcel = async () => {
+    try {
+      const blob = await forecastApi.exportToExcel(selectedYear, selectedMonth, user!.department_id)
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Планирование_${selectedMonth.toString().padStart(2, '0')}.${selectedYear}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      message.success('Файл Excel успешно скачан')
+    } catch (error) {
+      message.error('Ошибка при экспорте в Excel')
+      console.error('Export error:', error)
+    }
   }
 
   const formatCurrency = (value: number) => {
@@ -161,8 +197,8 @@ const ForecastPage = () => {
         if (editingId === record.id) {
           return (
             <Select
-              value={editForm.getFieldValue('category_id')}
-              onChange={(value) => editForm.setFieldValue('category_id', value)}
+              value={editingData?.category_id}
+              onChange={(value) => setEditingData({ ...editingData, category_id: value })}
               style={{ width: '100%' }}
               showSearch
               filterOption={(input, option) =>
@@ -195,8 +231,8 @@ const ForecastPage = () => {
         if (editingId === record.id) {
           return (
             <Select
-              value={editForm.getFieldValue('contractor_id')}
-              onChange={(value) => editForm.setFieldValue('contractor_id', value)}
+              value={editingData?.contractor_id}
+              onChange={(value) => setEditingData({ ...editingData, contractor_id: value })}
               style={{ width: '100%' }}
               showSearch
               allowClear
@@ -222,8 +258,8 @@ const ForecastPage = () => {
         if (editingId === record.id) {
           return (
             <DatePicker
-              value={dayjs(editForm.getFieldValue('forecast_date'))}
-              onChange={(date) => editForm.setFieldValue('forecast_date', date?.format('YYYY-MM-DD'))}
+              value={dayjs(editingData?.forecast_date)}
+              onChange={(date) => setEditingData({ ...editingData, forecast_date: date?.format('YYYY-MM-DD') })}
               format="DD.MM.YYYY"
             />
           )
@@ -241,8 +277,8 @@ const ForecastPage = () => {
         if (editingId === record.id) {
           return (
             <InputNumber
-              value={editForm.getFieldValue('amount')}
-              onChange={(value) => editForm.setFieldValue('amount', value)}
+              value={editingData?.amount}
+              onChange={(value) => setEditingData({ ...editingData, amount: value || 0 })}
               style={{ width: '100%' }}
               min={0}
               precision={2}
@@ -261,8 +297,8 @@ const ForecastPage = () => {
         if (editingId === record.id) {
           return (
             <Input
-              value={editForm.getFieldValue('comment')}
-              onChange={(e) => editForm.setFieldValue('comment', e.target.value)}
+              value={editingData?.comment}
+              onChange={(e) => setEditingData({ ...editingData, comment: e.target.value })}
               placeholder="Комментарий"
             />
           )
@@ -291,7 +327,10 @@ const ForecastPage = () => {
               <Button
                 size="small"
                 icon={<CloseOutlined />}
-                onClick={() => setEditingId(null)}
+                onClick={() => {
+                  setEditingId(null)
+                  setEditingData(null)
+                }}
               >
                 Отмена
               </Button>
@@ -307,13 +346,14 @@ const ForecastPage = () => {
               icon={<EditOutlined />}
               onClick={() => {
                 setEditingId(record.id)
-                editForm.setFieldsValue({
+                setEditingData({
                   category_id: record.category_id,
                   contractor_id: record.contractor_id,
                   organization_id: record.organization_id,
                   forecast_date: record.forecast_date,
                   amount: record.amount,
                   comment: record.comment,
+                  department_id: user!.department_id,
                 })
               }}
             >
@@ -400,6 +440,13 @@ const ForecastPage = () => {
             >
               Добавить
             </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExportToExcel}
+              type="default"
+            >
+              Экспорт в Excel
+            </Button>
             <Popconfirm
               title="Очистить все прогнозы на этот месяц?"
               onConfirm={() => clearMutation.mutate()}
@@ -429,17 +476,15 @@ const ForecastPage = () => {
               </div>
             }
           >
-            <Form form={editForm}>
-              <Table
-                columns={columns}
-                dataSource={forecasts}
-                rowKey="id"
-                pagination={false}
-                scroll={{ x: 1200 }}
-                size="small"
-                rowClassName={(record) => record.is_regular ? 'regular-row' : ''}
-              />
-            </Form>
+            <Table
+              columns={columns}
+              dataSource={forecasts}
+              rowKey="id"
+              pagination={false}
+              scroll={{ x: 1200 }}
+              size="small"
+              rowClassName={(record) => record.is_regular ? 'regular-row' : ''}
+            />
           </Card>
 
           <style>{`

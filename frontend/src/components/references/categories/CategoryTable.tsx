@@ -6,6 +6,7 @@ import { categoriesApi } from '@/api'
 import type { BudgetCategory, ExpenseType } from '@/types'
 import CategoryCreateModal from './CategoryCreateModal'
 import CategoryEditModal from './CategoryEditModal'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Option } = Select
 
@@ -23,13 +24,14 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null)
   const [typeFilter, setTypeFilter] = useState<ExpenseType | 'ALL'>('ALL')
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined)
+  const { selectedDepartment } = useDepartment()
 
   const queryClient = useQueryClient()
 
   // Загрузка категорий
   const { data: categories, isLoading } = useQuery({
-    queryKey: ['categories', { is_active: activeFilter }],
-    queryFn: () => categoriesApi.getAll({ is_active: activeFilter }),
+    queryKey: ['categories', { is_active: activeFilter, department_id: selectedDepartment?.id }],
+    queryFn: () => categoriesApi.getAll({ is_active: activeFilter, department_id: selectedDepartment?.id }),
   })
 
   // Удаление категории

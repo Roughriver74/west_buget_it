@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Script to add department filtering to all remaining pages
+# This script will be used as a reference for manual updates
+
+echo "📋 Pages requiring department filter updates:"
+echo ""
+echo "1. OrganizationsPage"
+echo "   - Add: import { useDepartment } from '@/contexts/DepartmentContext'"
+echo "   - Add: const { selectedDepartment } = useDepartment()"
+echo "   - Update queryKey: add selectedDepartment?.id"
+echo "   - Update API call: add department_id: selectedDepartment?.id"
+echo ""
+echo "2. DashboardPage"
+echo "   - Same steps as above"
+echo ""
+echo "3. BudgetPlanPage (годовой план)"
+echo "   - Same steps as above"
+echo ""
+echo "4. Dashboard analytics calls"
+echo "   - Update analytics API calls to include department_id"
+echo ""
+echo "✅ Backend APIs already support department_id:"
+echo "   - /categories"
+echo "   - /contractors"
+echo "   - /organizations"
+echo "   - /budget/overview"
+echo "   - /analytics/by-category"
+echo ""
+echo "Run this script to see what needs to be updated manually."

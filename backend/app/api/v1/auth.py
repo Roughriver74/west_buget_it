@@ -106,7 +106,7 @@ async def login(login_data: UserLogin, request: Request, db: Session = Depends(g
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.id, "username": user.username},
+        data={"sub": str(user.id), "username": user.username},
         expires_delta=access_token_expires
     )
 
@@ -277,7 +277,7 @@ async def update_user(
         user.email = user_update.email
 
     # Update fields
-    update_data = user_update.dict(exclude_unset=True)
+    update_data = user_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(user, field, value)
 

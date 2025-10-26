@@ -17,8 +17,9 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
       logger.api(config.method?.toUpperCase() || 'GET', config.url || '', config.data)
+      logger.debug(`[API] Token attached to request: ${config.url}`)
     } else {
-      logger.debug(`[API] Request to ${config.url} WITHOUT token`)
+      logger.warn(`[API] Request to ${config.url} WITHOUT token - localStorage is empty`)
     }
     return config
   },
@@ -45,14 +46,12 @@ apiClient.interceptors.response.use(
       const isAuthMeRequest = error.config?.url?.includes('/auth/me')
       const isAuthPage = currentPath === '/login' || currentPath === '/register'
 
-      if (!isAuthPage) {
-        // Clear token only if it's not the initial auth check
-        if (!isAuthMeRequest) {
-          localStorage.removeItem('token')
-          logger.warn('[API] 401 error: Token invalid, cleared from storage')
-        }
+      if (!isAuthPage && !isAuthMeRequest) {
+        // Clear token and dispatch logout event
+        localStorage.removeItem('token')
+        logger.warn('[API] 401 error: Token invalid, cleared from storage')
 
-        // Dispatch custom event instead of hard redirect
+        // Dispatch custom event to trigger logout
         // This allows AuthContext to handle the logout gracefully
         window.dispatchEvent(new CustomEvent('auth:unauthorized'))
       }

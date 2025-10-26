@@ -23,7 +23,7 @@ from app.schemas.payroll import (
 )
 from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 def check_department_access(user: User, department_id: int) -> bool:

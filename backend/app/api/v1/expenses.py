@@ -15,7 +15,7 @@ from app.utils.excel_export import ExcelExporter
 from app.services.ftp_import_service import import_from_ftp
 from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("/export")
@@ -429,6 +429,37 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     db.delete(db_expense)
     db.commit()
     return None
+
+
+@router.post("/bulk-delete", status_code=status.HTTP_200_OK)
+def bulk_delete_expenses(
+    expense_ids: List[int],
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk delete expenses by IDs (ADMIN only)
+
+    Returns the number of deleted expenses
+    """
+    # Only ADMIN can bulk delete
+    if current_user.role != UserRoleEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can bulk delete expenses"
+        )
+
+    if not expense_ids:
+        return {"deleted_count": 0}
+
+    # Delete expenses
+    deleted_count = db.query(Expense).filter(
+        Expense.id.in_(expense_ids)
+    ).delete(synchronize_session=False)
+
+    db.commit()
+
+    return {"deleted_count": deleted_count}
 
 
 @router.get("/stats/totals")

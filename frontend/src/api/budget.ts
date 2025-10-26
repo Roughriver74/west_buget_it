@@ -69,14 +69,16 @@ export interface BudgetOverview {
 
 export const budgetApi = {
   // Получить план на год в pivot формате
-  getPlanForYear: async (year: number): Promise<BudgetPlanYear> => {
-    const { data } = await apiClient.get(`/budget/plans/year/${year}`)
+  getPlanForYear: async (year: number, department_id?: number): Promise<BudgetPlanYear> => {
+    const params: any = {}
+    if (department_id) params.department_id = department_id
+    const { data } = await apiClient.get(`budget/plans/year/${year}`, { params })
     return data
   },
 
   // Инициализировать план на год (создать пустые записи)
   initializePlan: async (year: number): Promise<{ message: string; created_entries: number }> => {
-    const { data } = await apiClient.post(`/budget/plans/year/${year}/init`)
+    const { data } = await apiClient.post(`budget/plans/year/${year}/init`)
     return data
   },
 
@@ -86,7 +88,7 @@ export const budgetApi = {
     sourceYear: number,
     coefficient: number = 1.0
   ): Promise<{ message: string; created_entries: number; updated_entries: number }> => {
-    const { data } = await apiClient.post(`/budget/plans/year/${targetYear}/copy-from/${sourceYear}`, {
+    const { data } = await apiClient.post(`budget/plans/year/${targetYear}/copy-from/${sourceYear}`, {
       coefficient,
     })
     return data
@@ -94,7 +96,7 @@ export const budgetApi = {
 
   // Обновить одну ячейку (upsert)
   updateCell: async (request: CellUpdateRequest): Promise<any> => {
-    const { data } = await apiClient.patch('/budget/plans/cell', request)
+    const { data } = await apiClient.patch('budget/plans/cell', request)
     return data
   },
 
@@ -102,13 +104,15 @@ export const budgetApi = {
   getSummary: async (year: number, month?: number): Promise<any> => {
     const params: any = { year }
     if (month) params.month = month
-    const { data } = await apiClient.get('/budget/summary', { params })
+    const { data } = await apiClient.get('budget/summary', { params })
     return data
   },
 
   // Получить обзор бюджета за месяц (План-Факт-Остаток)
-  getOverview: async (year: number, month: number): Promise<BudgetOverview> => {
-    const { data } = await apiClient.get(`/budget/overview/${year}/${month}`)
+  getOverview: async (year: number, month: number, department_id?: number): Promise<BudgetOverview> => {
+    const params: any = {}
+    if (department_id) params.department_id = department_id
+    const { data } = await apiClient.get(`budget/overview/${year}/${month}`, { params })
     return data
   },
 }

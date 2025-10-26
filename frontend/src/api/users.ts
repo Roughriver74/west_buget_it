@@ -49,26 +49,26 @@ export interface UserListItem {
 
 export const usersApi = {
   getAll: async (params?: { skip?: number; limit?: number }): Promise<UserListItem[]> => {
-    const { data } = await apiClient.get('/auth/users', { params })
+    const { data } = await apiClient.get('auth/users', { params })
     return data
   },
 
   getById: async (id: number): Promise<User> => {
-    const { data } = await apiClient.get(`/auth/users/${id}`)
+    const { data } = await apiClient.get(`auth/users/${id}`)
     return data
   },
 
   create: async (user: UserCreate): Promise<User> => {
-    const { data } = await apiClient.post('/auth/register', user)
+    const { data } = await apiClient.post('auth/register', user)
     return data
   },
 
   update: async (id: number, user: UserUpdate): Promise<User> => {
-    const { data } = await apiClient.put(`/auth/users/${id}`, user)
+    const { data } = await apiClient.put(`auth/users/${id}`, user)
     return data
   },
 
   delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/auth/users/${id}`)
+    await apiClient.delete(`auth/users/${id}`)
   },
 }

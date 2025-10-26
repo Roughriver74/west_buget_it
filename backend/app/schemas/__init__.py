@@ -67,6 +67,7 @@ from .payroll import (
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
 ExpenseList.model_rebuild()
+EmployeeWithSalaryHistory.model_rebuild()
 
 __all__ = [
     # Expense

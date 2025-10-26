@@ -55,7 +55,7 @@ class EmployeeInDB(EmployeeBase):
 
 class EmployeeWithSalaryHistory(EmployeeInDB):
     """Employee with salary history"""
-    salary_history: List[SalaryHistoryInDB] = []
+    salary_history: List['SalaryHistoryInDB'] = []
 
     class Config:
         from_attributes = True

@@ -18,7 +18,7 @@ from app.db.models import (
 from app.utils.auth import get_current_active_user
 from app.utils.audit import audit_export
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("/expenses/by-department")

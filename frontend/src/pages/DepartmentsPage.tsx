@@ -43,7 +43,7 @@ const DepartmentsPage = () => {
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined)
   const [modalVisible, setModalVisible] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null)
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null)
 
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -84,13 +84,13 @@ const DepartmentsPage = () => {
 
   const handleCreate = () => {
     setModalMode('create')
-    setSelectedDepartment(null)
+    setSelectedDepartmentId(null)
     setModalVisible(true)
   }
 
   const handleEdit = (department: Department) => {
     setModalMode('edit')
-    setSelectedDepartment(department)
+    setSelectedDepartmentId(department.id)
     setModalVisible(true)
   }
 
@@ -117,6 +117,11 @@ const DepartmentsPage = () => {
   const totalCount = filteredDepartments?.length || 0
   const activeCount = filteredDepartments?.filter((d) => d.is_active).length || 0
   const inactiveCount = filteredDepartments?.filter((d) => !d.is_active).length || 0
+
+  // Get selected department from current data (always fresh)
+  const selectedDepartment = selectedDepartmentId
+    ? departments?.find((d) => d.id === selectedDepartmentId) || null
+    : null
 
   const columns = [
     {
@@ -338,7 +343,10 @@ const DepartmentsPage = () => {
 
       <DepartmentFormModal
         visible={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false)
+          setSelectedDepartmentId(null)
+        }}
         department={selectedDepartment}
         mode={modalMode}
       />

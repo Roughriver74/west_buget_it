@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import './config/axiosConfig' // Global axios configuration with auth interceptors
 import './index.css'
 
 dayjs.locale('ru')

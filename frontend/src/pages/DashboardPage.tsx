@@ -7,6 +7,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { ExpenseStatus } from '@/types'
 import { getExpenseStatusLabel } from '@/utils/formatters'
 import dayjs from 'dayjs'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -14,10 +15,11 @@ const DashboardPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState<number | undefined>(undefined)
+  const { selectedDepartment } = useDepartment()
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['dashboard', year, month],
-    queryFn: () => analyticsApi.getDashboard({ year, month }),
+    queryKey: ['dashboard', year, month, selectedDepartment?.id],
+    queryFn: () => analyticsApi.getDashboard({ year, month, department_id: selectedDepartment?.id }),
   })
 
   if (isLoading) {

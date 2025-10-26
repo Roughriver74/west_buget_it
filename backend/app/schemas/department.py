@@ -12,6 +12,7 @@ class DepartmentBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     code: str = Field(..., min_length=2, max_length=50)
     description: Optional[str] = None
+    ftp_subdivision_name: Optional[str] = Field(None, max_length=255, description="Название подразделения из FTP для сопоставления")
     manager_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -29,6 +30,7 @@ class DepartmentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=255)
     code: Optional[str] = Field(None, min_length=2, max_length=50)
     description: Optional[str] = None
+    ftp_subdivision_name: Optional[str] = Field(None, max_length=255, description="Название подразделения из FTP для сопоставления")
     manager_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -53,8 +55,12 @@ class DepartmentListItem(BaseModel):
     id: int
     name: str
     code: str
-    is_active: bool
+    description: Optional[str] = None
+    ftp_subdivision_name: Optional[str] = None
     manager_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    is_active: bool
 
     class Config:
         from_attributes = True

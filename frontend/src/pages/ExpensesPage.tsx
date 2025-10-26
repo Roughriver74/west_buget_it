@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, WarningOutlined, CloudDownloadOutlined } from '@ant-design/icons'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, WarningOutlined, CloudDownloadOutlined, DeleteOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
@@ -24,9 +24,15 @@ const ExpensesPage = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
 
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+
+  // Reset page when department changes
+  useEffect(() => {
+    setPage(1)
+  }, [selectedDepartment?.id])
 
   const { data: expenses, isLoading } = useQuery({
     queryKey: ['expenses', page, pageSize, search, status, categoryId, dateRange, selectedDepartment?.id],
@@ -48,6 +54,27 @@ const ExpensesPage = () => {
     queryFn: () => categoriesApi.getAll({ is_active: true }),
   })
 
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: number[]) => expensesApi.bulkDelete(ids),
+    onSuccess: (data) => {
+      message.success(`Удалено заявок: ${data.deleted_count}`)
+      setSelectedRowKeys([])
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || error.message
+      message.error(`Ошибка при удалении: ${errorMessage}`)
+    },
+  })
+
+  const handleBulkDelete = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите заявки для удаления')
+      return
+    }
+    bulkDeleteMutation.mutate(selectedRowKeys)
+  }
 
   const handleExport = () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -266,6 +293,23 @@ const ExpensesPage = () => {
         <Button icon={<DownloadOutlined />} onClick={handleExport}>
           Экспорт в Excel
         </Button>
+        <Popconfirm
+          title="Удалить выбранные заявки?"
+          description={`Вы действительно хотите удалить ${selectedRowKeys.length} заявок?`}
+          onConfirm={handleBulkDelete}
+          okText="Да"
+          cancelText="Отмена"
+          disabled={selectedRowKeys.length === 0}
+        >
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            disabled={selectedRowKeys.length === 0}
+            loading={bulkDeleteMutation.isPending}
+          >
+            Удалить выбранные ({selectedRowKeys.length})
+          </Button>
+        </Popconfirm>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           Создать заявку
         </Button>
@@ -277,6 +321,10 @@ const ExpensesPage = () => {
         rowKey="id"
         loading={isLoading}
         scroll={{ x: 1200 }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (selectedKeys) => setSelectedRowKeys(selectedKeys as number[]),
+        }}
         pagination={{
           current: page,
           pageSize: pageSize,

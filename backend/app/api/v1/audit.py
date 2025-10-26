@@ -11,7 +11,7 @@ from app.db.models import AuditLog, User, UserRoleEnum, AuditActionEnum
 from app.schemas import AuditLogInDB, AuditLogWithUser
 from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("/", response_model=List[AuditLogWithUser])

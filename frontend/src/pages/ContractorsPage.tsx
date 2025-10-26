@@ -8,6 +8,7 @@ import type { Contractor } from '@/types'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import ContractorFormModal from '@/components/contractors/ContractorFormModal'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -24,17 +25,19 @@ const ContractorsPage = () => {
   const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
+  const { selectedDepartment } = useDepartment()
 
   const queryClient = useQueryClient()
 
   const { data: contractors, isLoading } = useQuery({
-    queryKey: ['contractors', page, pageSize, search, activeFilter],
+    queryKey: ['contractors', page, pageSize, search, activeFilter, selectedDepartment?.id],
     queryFn: () =>
       contractorsApi.getAll({
         skip: (page - 1) * pageSize,
         limit: pageSize,
         search: search || undefined,
         is_active: activeFilter,
+        department_id: selectedDepartment?.id,
       }),
   })
 

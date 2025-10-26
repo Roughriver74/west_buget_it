@@ -12,7 +12,7 @@ from app.schemas import OrganizationCreate, OrganizationUpdate, OrganizationInDB
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 class BulkUpdateRequest(BaseModel):
@@ -184,7 +184,7 @@ def delete_organization(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Delete organization (soft delete - mark as inactive)"""
+    """Delete organization (permanently remove from database)"""
     db_organization = db.query(Organization).filter(Organization.id == organization_id).first()
     if not db_organization:
         raise HTTPException(
@@ -200,8 +200,8 @@ def delete_organization(
                 detail="Not enough permissions to delete this organization"
             )
 
-    # Soft delete - mark as inactive
-    db_organization.is_active = False
+    # Hard delete - permanently remove from database
+    db.delete(db_organization)
     db.commit()
     return None
 
@@ -244,7 +244,7 @@ def bulk_delete_organizations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Bulk soft delete organizations"""
+    """Bulk delete organizations (permanently remove from database)"""
     query = db.query(Organization).filter(Organization.id.in_(request.ids))
 
     # USER can only delete organizations from their department
@@ -259,7 +259,7 @@ def bulk_delete_organizations(
     organizations = query.all()
 
     for organization in organizations:
-        organization.is_active = False
+        db.delete(organization)
 
     db.commit()
 

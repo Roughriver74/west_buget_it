@@ -59,6 +59,9 @@ class Department(Base):
     description = Column(Text, nullable=True)  # Описание
     is_active = Column(Boolean, default=True, nullable=False)  # Активен ли отдел
 
+    # FTP import mapping
+    ftp_subdivision_name = Column(String(255), nullable=True, index=True)  # Название подразделения из FTP для сопоставления
+
     # Contact info
     manager_name = Column(String(255), nullable=True)  # Имя руководителя
     contact_email = Column(String(255), nullable=True)  # Email отдела
@@ -187,7 +190,7 @@ class Expense(Base):
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     # Foreign keys
-    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
     contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
 

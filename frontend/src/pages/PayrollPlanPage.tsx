@@ -47,20 +47,20 @@ export default function PayrollPlanPage() {
 
   // Fetch payroll plans
   const { data: plans = [], isLoading: plansLoading } = useQuery<PayrollPlanWithEmployee[]>({
-    queryKey: ['payroll-plans', selectedDepartment, selectedYear],
+    queryKey: ['payroll-plans', selectedDepartment?.id, selectedYear],
     queryFn: () =>
       payrollPlanAPI.list({
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
         year: selectedYear,
       }),
   });
 
   // Fetch payroll actuals
   const { data: actuals = [], isLoading: actualsLoading } = useQuery<PayrollActualWithEmployee[]>({
-    queryKey: ['payroll-actuals', selectedDepartment, selectedYear],
+    queryKey: ['payroll-actuals', selectedDepartment?.id, selectedYear],
     queryFn: () =>
       payrollActualAPI.list({
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
         year: selectedYear,
       }),
   });
@@ -106,7 +106,7 @@ export default function PayrollPlanPage() {
     try {
       await payrollPlanAPI.exportToExcel({
         year: selectedYear,
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
       });
       message.success('Экспорт планов выполнен успешно');
     } catch (error) {
@@ -118,7 +118,7 @@ export default function PayrollPlanPage() {
     try {
       await payrollActualAPI.exportToExcel({
         year: selectedYear,
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
       });
       message.success('Экспорт фактов выполнен успешно');
     } catch (error) {

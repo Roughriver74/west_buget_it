@@ -7,11 +7,12 @@ from pydantic import BaseModel
 from decimal import Decimal
 
 from app.db import get_db
-from app.db.models import BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
+from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
 from app.utils.excel_export import ExcelExporter
+from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 class CellUpdateRequest(BaseModel):
@@ -34,7 +35,8 @@ def get_budget_plans(
     category_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get budget plans"""
     query = db.query(BudgetPlan)
@@ -99,7 +101,8 @@ def create_budget_plan(plan: BudgetPlanCreate, db: Session = Depends(get_db)):
 def update_budget_plan(
     plan_id: int,
     plan: BudgetPlanUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Update budget plan"""
     db_plan = db.query(BudgetPlan).filter(BudgetPlan.id == plan_id).first()
@@ -138,7 +141,8 @@ def delete_budget_plan(plan_id: int, db: Session = Depends(get_db)):
 def get_budget_summary(
     year: int,
     month: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get budget summary (plan vs actual)"""
     # Get planned amounts
@@ -204,13 +208,24 @@ def get_budget_summary(
 
 
 @router.get("/plans/year/{year}")
-def get_budget_plan_for_year(year: int, db: Session = Depends(get_db)):
+def get_budget_plan_for_year(
+    year: int,
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get budget plan for entire year in pivot format (categories x months)"""
     # Get all active categories
-    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).order_by(BudgetCategory.name).all()
+    categories_query = db.query(BudgetCategory).filter(BudgetCategory.is_active == True)
+    if department_id:
+        categories_query = categories_query.filter(BudgetCategory.department_id == department_id)
+    categories = categories_query.order_by(BudgetCategory.name).all()
 
     # Get all plans for the year
-    plans = db.query(BudgetPlan).filter(BudgetPlan.year == year).all()
+    plans_query = db.query(BudgetPlan).filter(BudgetPlan.year == year)
+    if department_id:
+        plans_query = plans_query.filter(BudgetPlan.department_id == department_id)
+    plans = plans_query.all()
 
     # Create a lookup dictionary for plans
     plan_lookup = {}
@@ -230,7 +245,10 @@ def get_budget_plan_for_year(year: int, db: Session = Depends(get_db)):
         func.sum(Expense.amount).label("actual")
     ).filter(
         func.extract('year', Expense.request_date) == year
-    ).group_by(Expense.category_id, func.extract('month', Expense.request_date))
+    )
+    if department_id:
+        actual_query = actual_query.filter(Expense.department_id == department_id)
+    actual_query = actual_query.group_by(Expense.category_id, func.extract('month', Expense.request_date))
 
     actual_lookup = {}
     for item in actual_query.all():
@@ -312,7 +330,8 @@ def copy_budget_plan(
     year: int,
     source_year: int,
     request: CopyPlanRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Copy budget plan from source year to target year with optional coefficient"""
     # Get source plans
@@ -436,18 +455,34 @@ def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)
 
 
 @router.get("/overview/{year}/{month}")
-def get_budget_overview(year: int, month: int, db: Session = Depends(get_db)):
+def get_budget_overview(
+    year: int,
+    month: int,
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get budget overview (plan vs actual) for specific month"""
     # Get all active categories
-    categories = db.query(BudgetCategory).filter(
+    categories_query = db.query(BudgetCategory).filter(
         BudgetCategory.is_active == True
-    ).order_by(BudgetCategory.name).all()
+    )
+
+    if department_id:
+        categories_query = categories_query.filter(BudgetCategory.department_id == department_id)
+
+    categories = categories_query.order_by(BudgetCategory.name).all()
 
     # Get plans for the month
-    plans = db.query(BudgetPlan).filter(
+    plans_query = db.query(BudgetPlan).filter(
         BudgetPlan.year == year,
         BudgetPlan.month == month
-    ).all()
+    )
+
+    if department_id:
+        plans_query = plans_query.filter(BudgetPlan.department_id == department_id)
+
+    plans = plans_query.all()
 
     plan_lookup = {p.category_id: float(p.planned_amount) for p in plans}
 
@@ -458,7 +493,12 @@ def get_budget_overview(year: int, month: int, db: Session = Depends(get_db)):
     ).filter(
         func.extract('year', Expense.request_date) == year,
         func.extract('month', Expense.request_date) == month
-    ).group_by(Expense.category_id)
+    )
+
+    if department_id:
+        actual_query = actual_query.filter(Expense.department_id == department_id)
+
+    actual_query = actual_query.group_by(Expense.category_id)
 
     actual_lookup = {item.category_id: float(item.actual) for item in actual_query.all()}
 
@@ -583,10 +623,16 @@ def export_budget_plan_to_excel(year: int, db: Session = Depends(get_db)):
 
 
 @router.get("/overview/{year}/{month}/export")
-def export_budget_overview_to_excel(year: int, month: int, db: Session = Depends(get_db)):
+def export_budget_overview_to_excel(
+    year: int,
+    month: int,
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Export budget overview for specific month to Excel file"""
     # Get budget overview data (reuse the logic from get_budget_overview)
-    overview_data = get_budget_overview(year, month, db)
+    overview_data = get_budget_overview(year, month, department_id, db, current_user)
 
     # Generate Excel file
     excel_file = ExcelExporter.export_budget_overview(year, month, overview_data)

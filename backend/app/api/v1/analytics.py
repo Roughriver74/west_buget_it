@@ -5,17 +5,20 @@ from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum
+from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum, User
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
+from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("/dashboard")
 def get_dashboard_data(
     year: Optional[int] = None,
     month: Optional[int] = None,
-    db: Session = Depends(get_db)
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get dashboard data with key metrics"""
     if not year:
@@ -25,6 +28,8 @@ def get_dashboard_data(
     plan_query = db.query(func.sum(BudgetPlan.planned_amount)).filter(BudgetPlan.year == year)
     if month:
         plan_query = plan_query.filter(BudgetPlan.month == month)
+    if department_id:
+        plan_query = plan_query.filter(BudgetPlan.department_id == department_id)
     total_planned = plan_query.scalar() or 0
 
     # Get total actual
@@ -33,6 +38,8 @@ def get_dashboard_data(
     )
     if month:
         actual_query = actual_query.filter(extract('month', Expense.request_date) == month)
+    if department_id:
+        actual_query = actual_query.filter(Expense.department_id == department_id)
     total_actual = actual_query.scalar() or 0
 
     # Calculate metrics
@@ -48,6 +55,8 @@ def get_dashboard_data(
 
     if month:
         status_query = status_query.filter(extract('month', Expense.request_date) == month)
+    if department_id:
+        status_query = status_query.filter(Expense.department_id == department_id)
 
     status_query = status_query.group_by(Expense.status)
     status_stats = [
@@ -71,6 +80,8 @@ def get_dashboard_data(
 
     if month:
         category_query = category_query.filter(extract('month', Expense.request_date) == month)
+    if department_id:
+        category_query = category_query.filter(Expense.department_id == department_id)
 
     category_query = category_query.group_by(BudgetCategory.id, BudgetCategory.name, BudgetCategory.type).order_by(func.sum(Expense.amount).desc()).limit(5)
 
@@ -87,7 +98,11 @@ def get_dashboard_data(
     # Get recent expenses with eager loading (fix N+1)
     recent_expenses_query = db.query(Expense).filter(
         extract('year', Expense.request_date) == year
-    ).options(
+    )
+    if department_id:
+        recent_expenses_query = recent_expenses_query.filter(Expense.department_id == department_id)
+
+    recent_expenses_query = recent_expenses_query.options(
         joinedload(Expense.category),
         joinedload(Expense.contractor),
         joinedload(Expense.organization)
@@ -146,7 +161,11 @@ def get_dashboard_data(
 
 
 @router.get("/budget-execution")
-def get_budget_execution(year: int, db: Session = Depends(get_db)):
+def get_budget_execution(
+    year: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get monthly budget execution for the year"""
     result = []
 
@@ -184,13 +203,20 @@ def get_budget_execution(year: int, db: Session = Depends(get_db)):
 def get_analytics_by_category(
     year: int,
     month: Optional[int] = None,
-    db: Session = Depends(get_db)
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get detailed analytics by category"""
     # Get all categories ordered by parent_id and name for proper hierarchy display
-    categories = db.query(BudgetCategory).filter(
+    categories_query = db.query(BudgetCategory).filter(
         BudgetCategory.is_active == True
-    ).order_by(BudgetCategory.parent_id.nullsfirst(), BudgetCategory.name).all()
+    )
+
+    if department_id:
+        categories_query = categories_query.filter(BudgetCategory.department_id == department_id)
+
+    categories = categories_query.order_by(BudgetCategory.parent_id.nullsfirst(), BudgetCategory.name).all()
 
     result = []
     for category in categories:
@@ -201,6 +227,8 @@ def get_analytics_by_category(
         )
         if month:
             plan_query = plan_query.filter(BudgetPlan.month == month)
+        if department_id:
+            plan_query = plan_query.filter(BudgetPlan.department_id == department_id)
         planned = plan_query.scalar() or 0
 
         # Get actual amount
@@ -210,6 +238,8 @@ def get_analytics_by_category(
         )
         if month:
             actual_query = actual_query.filter(extract('month', Expense.request_date) == month)
+        if department_id:
+            actual_query = actual_query.filter(Expense.department_id == department_id)
         actual = actual_query.scalar() or 0
 
         # Get expense count
@@ -219,6 +249,8 @@ def get_analytics_by_category(
         )
         if month:
             count_query = count_query.filter(extract('month', Expense.request_date) == month)
+        if department_id:
+            count_query = count_query.filter(Expense.department_id == department_id)
         expense_count = count_query.scalar() or 0
 
         result.append({
@@ -244,7 +276,8 @@ def get_analytics_by_category(
 def get_trends(
     year: int,
     category_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Get spending trends over time"""
     query = db.query(
@@ -281,7 +314,8 @@ def get_payment_calendar(
     month: int = Query(default=None, ge=1, le=12, description="Month (1-12)"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get payment calendar view for a specific month
@@ -313,7 +347,8 @@ def get_payments_by_day(
     date: str = Path(description="Date in ISO format (YYYY-MM-DD)"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get all payments for a specific day
@@ -366,7 +401,8 @@ def get_payment_forecast(
     lookback_days: int = Query(default=90, ge=30, le=365, description="Days to look back for historical data"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Generate payment forecast for future period
@@ -417,7 +453,8 @@ def get_payment_forecast_summary(
     end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Get forecast summary comparing different methods

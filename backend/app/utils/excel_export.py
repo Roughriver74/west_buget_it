@@ -3,11 +3,13 @@ Excel export utilities for IT Budget Manager
 """
 
 from io import BytesIO
-from typing import List, Dict, Any
-from datetime import datetime
-from openpyxl import Workbook
+from typing import List, Dict, Any, Optional
+from datetime import datetime, date
+from pathlib import Path
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from calendar import monthrange
 
 
 class ExcelExporter:
@@ -640,6 +642,141 @@ class ExcelExporter:
         ws.freeze_panes = 'G6'
 
         # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return output
+
+    @staticmethod
+    def export_forecast_from_template(
+        year: int,
+        month: int,
+        forecasts: List[Dict[str, Any]],
+        department_name: str = "Шикунов",
+        template_path: Optional[Path] = None
+    ) -> BytesIO:
+        """
+        Export forecast data using existing template file
+
+        Args:
+            year: Year
+            month: Month (1-12)
+            forecasts: List of forecast items
+            department_name: Name of the sheet/department (default: "Шикунов" for IT)
+            template_path: Path to template file (optional, uses default if not provided)
+
+        Returns:
+            BytesIO: Excel file in memory
+        """
+        # Определяем путь к шаблону
+        if template_path is None:
+            # Используем путь относительно корня проекта
+            template_path = Path(__file__).parent.parent.parent.parent / "xls" / "Планирование_10.2025-3.xlsx"
+
+        if not template_path.exists():
+            raise FileNotFoundError(f"Шаблон не найден: {template_path}")
+
+        # Загружаем шаблон
+        wb = load_workbook(template_path)
+
+        # Проверяем наличие нужного листа
+        if department_name not in wb.sheetnames:
+            raise ValueError(f"Лист '{department_name}' не найден в шаблоне. Доступные листы: {wb.sheetnames}")
+
+        ws = wb[department_name]
+
+        # Определяем количество дней в месяце
+        _, num_days = monthrange(year, month)
+
+        # Группируем прогнозы по уникальной комбинации
+        grouped_forecasts = {}
+        for forecast in forecasts:
+            category = forecast.get('category') or {}
+            contractor = forecast.get('contractor') or {}
+            organization = forecast.get('organization') or {}
+
+            category_name = category.get('name', 'Без категории')
+            contractor_name = contractor.get('name', '')
+            org_name = organization.get('name', '')
+            comment = forecast.get('comment', '')
+
+            key = (category_name, org_name, contractor_name)
+
+            if key not in grouped_forecasts:
+                grouped_forecasts[key] = {
+                    'category': category_name,
+                    'organization': org_name,
+                    'contractor': contractor_name,
+                    'comment': comment,
+                    'amounts_by_day': {}
+                }
+
+            # Добавляем сумму к конкретному дню
+            forecast_date = forecast.get('date')
+            if forecast_date:
+                if isinstance(forecast_date, str):
+                    forecast_date = datetime.fromisoformat(forecast_date.replace('Z', '+00:00')).date()
+                amount = float(forecast.get('amount', 0))
+                day = forecast_date.day
+
+                if day not in grouped_forecasts[key]['amounts_by_day']:
+                    grouped_forecasts[key]['amounts_by_day'][day] = 0
+                grouped_forecasts[key]['amounts_by_day'][day] += amount
+
+        # Находим начало данных (строка 5 - это заголовки, данные начинаются со строки 6 в шаблоне)
+        # Но мы будем искать первую пустую строку после строки 4 или использовать строку 5+
+        data_start_row = 5
+
+        # Очищаем старые данные (если есть) начиная со строки data_start_row
+        # Сначала найдем последнюю заполненную строку
+        last_row = ws.max_row
+        for row in range(data_start_row, last_row + 1):
+            # Очищаем данные в колонках B-F (Статья, ЮЛ, Контрагент, Договор, Комментарии)
+            for col in range(2, 7):  # B=2, C=3, D=4, E=5, F=6
+                ws.cell(row=row, column=col).value = None
+            # Очищаем суммы по дням (колонки H и далее, H=8)
+            for col in range(8, 8 + num_days):
+                ws.cell(row=row, column=col).value = None
+
+        # Заполняем данные прогноза
+        current_row = data_start_row
+        row_number = 1
+
+        for key, data in sorted(grouped_forecasts.items()):
+            # Номер п/п (колонка B)
+            ws.cell(row=current_row, column=2, value=row_number)
+
+            # Статья ДДС (колонка C)
+            ws.cell(row=current_row, column=3, value=data['category'])
+
+            # ЮЛ (колонка D)
+            ws.cell(row=current_row, column=4, value=data['organization'])
+
+            # Контрагент (колонка E)
+            ws.cell(row=current_row, column=5, value=data['contractor'])
+
+            # Договор (колонка F) - оставляем пустым
+            ws.cell(row=current_row, column=6, value='')
+
+            # Комментарии (колонка G)
+            ws.cell(row=current_row, column=7, value=data['comment'])
+
+            # Заполняем суммы по дням (начиная с колонки H = 8)
+            for day in range(1, num_days + 1):
+                col = 7 + day  # H=8, I=9, J=10, ...
+                amount = data['amounts_by_day'].get(day, 0)
+
+                if amount > 0:
+                    ws.cell(row=current_row, column=col, value=amount)
+                    ws.cell(row=current_row, column=col).number_format = '#,##0.00'
+                else:
+                    ws.cell(row=current_row, column=col, value=None)
+
+            current_row += 1
+            row_number += 1
+
+        # Сохраняем в BytesIO
         output = BytesIO()
         wb.save(output)
         output.seek(0)

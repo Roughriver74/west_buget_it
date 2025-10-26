@@ -3,6 +3,7 @@ import { Modal, Form, Input, message, Switch } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { departmentsApi } from '@/api'
 import type { Department } from '@/contexts/DepartmentContext'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { TextArea } = Input
 
@@ -21,6 +22,7 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
 }) => {
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
+  const { refreshDepartments } = useDepartment()
 
   // Reset form when department changes
   useEffect(() => {
@@ -29,6 +31,7 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
         name: department.name,
         code: department.code,
         description: department.description || '',
+        ftp_subdivision_name: department.ftp_subdivision_name || '',
         manager_name: department.manager_name || '',
         contact_email: department.contact_email || '',
         contact_phone: department.contact_phone || '',
@@ -42,9 +45,11 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (values: any) => departmentsApi.create(values),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('Отдел успешно создан')
-      queryClient.invalidateQueries({ queryKey: ['departments'] })
+      // Force refetch all department queries
+      await queryClient.refetchQueries({ queryKey: ['departments'] })
+      await refreshDepartments() // Refresh DepartmentContext
       form.resetFields()
       onCancel()
     },
@@ -58,9 +63,11 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: number; values: any }) =>
       departmentsApi.update(id, values),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('Отдел успешно обновлен')
-      queryClient.invalidateQueries({ queryKey: ['departments'] })
+      // Force refetch all department queries
+      await queryClient.refetchQueries({ queryKey: ['departments'] })
+      await refreshDepartments() // Refresh DepartmentContext
       form.resetFields()
       onCancel()
     },
@@ -142,6 +149,17 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
             maxLength={1000}
             showCount
           />
+        </Form.Item>
+
+        <Form.Item
+          name="ftp_subdivision_name"
+          label="Подразделение (для FTP импорта)"
+          tooltip="Укажите название подразделения из FTP файла для автоматического сопоставления заявок с этим отделом"
+          rules={[
+            { max: 255, message: 'Максимум 255 символов' },
+          ]}
+        >
+          <Input placeholder="Например: (ВЕСТ) IT" />
         </Form.Item>
 
         <Form.Item

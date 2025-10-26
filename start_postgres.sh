@@ -32,7 +32,7 @@ docker run -d \
   -e POSTGRES_USER=budget_user \
   -e POSTGRES_PASSWORD=budget_pass \
   -e POSTGRES_DB=it_budget_db \
-  -p 5432:5432 \
+  -p 54329:54329 \
   -v it_budget_postgres_data:/var/lib/postgresql/data \
   postgres:15-alpine
 
@@ -65,13 +65,13 @@ echo -e "${GREEN}============================================${NC}"
 echo ""
 echo -e "${BLUE}Connection details:${NC}"
 echo -e "  Host:     localhost"
-echo -e "  Port:     5432"
+echo -e "  Port:     54329"
 echo -e "  Database: it_budget_db"
 echo -e "  User:     budget_user"
 echo -e "  Password: budget_pass"
 echo ""
 echo -e "${BLUE}Connection string:${NC}"
-echo -e "  postgresql://budget_user:budget_pass@localhost:5432/it_budget_db"
+echo -e "  postgresql://budget_user:budget_pass@localhost:54329/it_budget_db"
 echo ""
 echo -e "${BLUE}Useful commands:${NC}"
 echo -e "  ${YELLOW}Connect to DB:${NC}    docker exec -it it_budget_db psql -U budget_user -d it_budget_db"

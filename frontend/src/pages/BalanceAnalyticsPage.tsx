@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Typography, Card, Select, Space, Table, Tag, Spin, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import axios from 'axios'
+import { analyticsApi } from '@/api'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -33,6 +34,7 @@ const BalanceAnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<BalanceData | null>(null)
+  const { selectedDepartment } = useDepartment()
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
   const months = [
@@ -53,7 +55,7 @@ const BalanceAnalyticsPage: React.FC = () => {
 
   useEffect(() => {
     fetchBalanceData()
-  }, [selectedYear, selectedMonth])
+  }, [selectedYear, selectedMonth, selectedDepartment?.id])
 
   const fetchBalanceData = async () => {
     try {
@@ -64,12 +66,12 @@ const BalanceAnalyticsPage: React.FC = () => {
       if (selectedMonth !== null) {
         params.month = selectedMonth
       }
+      if (selectedDepartment?.id) {
+        params.department_id = selectedDepartment?.id
+      }
 
-      const response = await axios.get<BalanceData>(
-        'http://localhost:8000/api/v1/analytics/by-category',
-        { params }
-      )
-      setData(response.data)
+      const response = await analyticsApi.getByCategory(params)
+      setData(response)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка загрузки данных')
       console.error('Error fetching balance data:', err)

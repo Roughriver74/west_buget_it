@@ -12,10 +12,11 @@ from sqlalchemy import func, extract, and_, or_
 from pydantic import BaseModel, Field
 
 from app.db import get_db
-from app.db.models import ForecastExpense, Expense, BudgetCategory, Contractor, Organization
+from app.db.models import User,  ForecastExpense, Expense, BudgetCategory, Contractor, Organization
 from app.utils.excel_export import ExcelExporter
+from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 # Helper functions for working days
@@ -55,6 +56,7 @@ def adjust_to_workday(date_obj: date) -> date:
 
 # Pydantic schemas
 class ForecastExpenseBase(BaseModel):
+    department_id: int
     category_id: int
     contractor_id: Optional[int] = None
     organization_id: int
@@ -97,6 +99,7 @@ class GenerateForecastRequest(BaseModel):
     """Request for generating forecast"""
     target_month: int = Field(ge=1, le=12)
     target_year: int
+    department_id: int  # Department to generate forecast for
     include_regular: bool = True  # Включить регулярные расходы
     include_average: bool = True  # Включить средние по нерегулярным
 
@@ -104,7 +107,8 @@ class GenerateForecastRequest(BaseModel):
 @router.post("/generate", response_model=dict)
 def generate_forecast(
     request: GenerateForecastRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Generate forecast for next month based on:
@@ -113,8 +117,9 @@ def generate_forecast(
     """
     target_date = date(request.target_year, request.target_month, 1)
 
-    # Удаляем существующий прогноз на этот месяц
+    # Удаляем существующий прогноз на этот месяц для этого отдела
     db.query(ForecastExpense).filter(
+        ForecastExpense.department_id == request.department_id,
         extract('year', ForecastExpense.forecast_date) == request.target_year,
         extract('month', ForecastExpense.forecast_date) == request.target_month
     ).delete()
@@ -134,6 +139,8 @@ def generate_forecast(
             func.avg(Expense.amount).label('avg_amount'),
             func.count(Expense.id).label('count')
         ).filter(
+            Expense.department_id == request.department_id,
+            Expense.category_id.is_not(None),  # Только заявки с категорией
             Expense.request_date >= three_months_ago,
             Expense.request_date < target_date,
             Expense.status.in_(['PAID', 'PENDING'])
@@ -148,6 +155,7 @@ def generate_forecast(
         for reg in regular_expenses:
             # Находим все заявки этого типа для вычисления среднего дня оплаты
             expenses = db.query(Expense).filter(
+                Expense.department_id == request.department_id,
                 Expense.category_id == reg.category_id,
                 Expense.contractor_id == reg.contractor_id,
                 Expense.organization_id == reg.organization_id,
@@ -175,6 +183,7 @@ def generate_forecast(
             adjusted_date = adjust_to_workday(original_date)
 
             forecast = ForecastExpense(
+                department_id=request.department_id,
                 category_id=reg.category_id,
                 contractor_id=reg.contractor_id,
                 organization_id=reg.organization_id,
@@ -196,6 +205,7 @@ def generate_forecast(
             ForecastExpense.category_id,
             ForecastExpense.contractor_id
         ).filter(
+            ForecastExpense.department_id == request.department_id,
             ForecastExpense.is_regular == True,
             extract('year', ForecastExpense.forecast_date) == request.target_year,
             extract('month', ForecastExpense.forecast_date) == request.target_month
@@ -210,6 +220,8 @@ def generate_forecast(
             func.avg(Expense.amount).label('avg_amount'),
             func.count(Expense.id).label('count')
         ).filter(
+            Expense.department_id == request.department_id,
+            Expense.category_id.is_not(None),  # Только заявки с категорией
             Expense.request_date >= six_months_ago,
             Expense.request_date < target_date,
             Expense.status.in_(['PAID', 'PENDING'])
@@ -227,6 +239,7 @@ def generate_forecast(
 
             # Находим все заявки этой категории для вычисления среднего дня оплаты
             expenses = db.query(Expense).filter(
+                Expense.department_id == request.department_id,
                 Expense.category_id == avg.category_id,
                 Expense.organization_id == avg.organization_id,
                 Expense.request_date >= six_months_ago,
@@ -253,6 +266,7 @@ def generate_forecast(
             adjusted_date = adjust_to_workday(original_date)
 
             forecast = ForecastExpense(
+                department_id=request.department_id,
                 category_id=avg.category_id,
                 contractor_id=None,
                 organization_id=avg.organization_id,
@@ -277,10 +291,13 @@ def generate_forecast(
 def get_forecasts(
     year: int,
     month: int,
-    db: Session = Depends(get_db)
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Get all forecasts for specified month"""
+    """Get all forecasts for specified month and department"""
     forecasts = db.query(ForecastExpense).filter(
+        ForecastExpense.department_id == department_id,
         extract('year', ForecastExpense.forecast_date) == year,
         extract('month', ForecastExpense.forecast_date) == month
     ).all()
@@ -290,6 +307,7 @@ def get_forecasts(
     for f in forecasts:
         forecast_dict = {
             "id": f.id,
+            "department_id": f.department_id,
             "category_id": f.category_id,
             "contractor_id": f.contractor_id,
             "organization_id": f.organization_id,
@@ -312,21 +330,41 @@ def get_forecasts(
 @router.post("/", response_model=ForecastExpenseInDB)
 def create_forecast(
     forecast: ForecastExpenseCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Create new forecast expense"""
     db_forecast = ForecastExpense(**forecast.model_dump())
     db.add(db_forecast)
     db.commit()
     db.refresh(db_forecast)
-    return db_forecast
+
+    # Return as dict with related objects
+    return {
+        "id": db_forecast.id,
+        "department_id": db_forecast.department_id,
+        "category_id": db_forecast.category_id,
+        "contractor_id": db_forecast.contractor_id,
+        "organization_id": db_forecast.organization_id,
+        "forecast_date": db_forecast.forecast_date,
+        "amount": db_forecast.amount,
+        "comment": db_forecast.comment,
+        "is_regular": db_forecast.is_regular,
+        "based_on_expense_id": db_forecast.based_on_expense_id,
+        "created_at": db_forecast.created_at,
+        "updated_at": db_forecast.updated_at,
+        "category": {"id": db_forecast.category.id, "name": db_forecast.category.name} if db_forecast.category else None,
+        "contractor": {"id": db_forecast.contractor.id, "name": db_forecast.contractor.name} if db_forecast.contractor else None,
+        "organization": {"id": db_forecast.organization.id, "name": db_forecast.organization.name} if db_forecast.organization else None,
+    }
 
 
 @router.put("/{forecast_id}", response_model=ForecastExpenseInDB)
 def update_forecast(
     forecast_id: int,
     forecast: ForecastExpenseUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Update forecast expense"""
     db_forecast = db.query(ForecastExpense).filter(ForecastExpense.id == forecast_id).first()
@@ -342,7 +380,25 @@ def update_forecast(
 
     db.commit()
     db.refresh(db_forecast)
-    return db_forecast
+
+    # Return as dict with related objects
+    return {
+        "id": db_forecast.id,
+        "department_id": db_forecast.department_id,
+        "category_id": db_forecast.category_id,
+        "contractor_id": db_forecast.contractor_id,
+        "organization_id": db_forecast.organization_id,
+        "forecast_date": db_forecast.forecast_date,
+        "amount": db_forecast.amount,
+        "comment": db_forecast.comment,
+        "is_regular": db_forecast.is_regular,
+        "based_on_expense_id": db_forecast.based_on_expense_id,
+        "created_at": db_forecast.created_at,
+        "updated_at": db_forecast.updated_at,
+        "category": {"id": db_forecast.category.id, "name": db_forecast.category.name} if db_forecast.category else None,
+        "contractor": {"id": db_forecast.contractor.id, "name": db_forecast.contractor.name} if db_forecast.contractor else None,
+        "organization": {"id": db_forecast.organization.id, "name": db_forecast.organization.name} if db_forecast.organization else None,
+    }
 
 
 @router.delete("/{forecast_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -361,9 +417,10 @@ def delete_forecast(forecast_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/clear/{year}/{month}", status_code=status.HTTP_204_NO_CONTENT)
-def clear_forecasts(year: int, month: int, db: Session = Depends(get_db)):
-    """Clear all forecasts for specified month"""
+def clear_forecasts(year: int, month: int, department_id: int, db: Session = Depends(get_db)):
+    """Clear all forecasts for specified month and department"""
     db.query(ForecastExpense).filter(
+        ForecastExpense.department_id == department_id,
         extract('year', ForecastExpense.forecast_date) == year,
         extract('month', ForecastExpense.forecast_date) == month
     ).delete()
@@ -375,14 +432,17 @@ def clear_forecasts(year: int, month: int, db: Session = Depends(get_db)):
 def export_forecast_calendar(
     year: int,
     month: int,
-    db: Session = Depends(get_db)
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Export forecast data as Excel calendar format
     Dates in columns, categories/contractors in rows
     """
-    # Get forecasts for the month
+    # Get forecasts for the month and department
     forecasts = db.query(ForecastExpense).filter(
+        ForecastExpense.department_id == department_id,
         extract('year', ForecastExpense.forecast_date) == year,
         extract('month', ForecastExpense.forecast_date) == month
     ).all()

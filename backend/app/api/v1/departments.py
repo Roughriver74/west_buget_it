@@ -18,7 +18,7 @@ from app.schemas.department import (
 )
 from app.utils.auth import get_current_active_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 @router.get("/", response_model=List[DepartmentListItem])
@@ -101,6 +101,7 @@ async def create_department(
         name=department_data.name,
         code=department_data.code,
         description=department_data.description,
+        ftp_subdivision_name=department_data.ftp_subdivision_name,
         manager_name=department_data.manager_name,
         contact_email=department_data.contact_email,
         contact_phone=department_data.contact_phone,
@@ -189,6 +190,7 @@ async def get_department_stats(
         "name": department.name,
         "code": department.code,
         "description": department.description,
+        "ftp_subdivision_name": department.ftp_subdivision_name,
         "manager_name": department.manager_name,
         "contact_email": department.contact_email,
         "contact_phone": department.contact_phone,
@@ -246,11 +248,19 @@ async def update_department(
             )
 
     # Update fields
-    update_data = department_update.dict(exclude_unset=True)
+    update_data = department_update.model_dump(exclude_unset=True)
+
+    # Log what we're updating
+    from app.utils.logger import log_info
+    log_info(f"Updating department {department_id} with data: {update_data}", "DepartmentUpdate")
+
     for field, value in update_data.items():
+        old_value = getattr(department, field, None)
         setattr(department, field, value)
+        log_info(f"  {field}: {old_value} -> {value}", "DepartmentUpdate")
 
     db.commit()
+    log_info(f"Department {department_id} committed successfully", "DepartmentUpdate")
     db.refresh(department)
 
     return department
@@ -291,11 +301,11 @@ async def deactivate_department(
     if active_users_count > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot deactivate department with {active_users_count} active users. Please reassign or deactivate users first."
+            detail=f"Cannot delete department with {active_users_count} active users. Please reassign or deactivate users first."
         )
 
-    # Soft delete: set is_active to False
-    department.is_active = False
+    # Hard delete: permanently remove from database
+    db.delete(department)
     db.commit()
 
     return None

@@ -181,7 +181,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return user.role === role;
   };
 
-  const isAuthenticated = !!user && !!token;
+  // Check both React state AND localStorage to handle race conditions
+  // This is important when login() updates localStorage synchronously but state asynchronously
+  const isAuthenticated = (!!user && !!token) || !!localStorage.getItem('token');
 
   logger.debug('[AuthContext] State:', { hasUser: !!user, hasToken: !!token, isAuthenticated, loading });
 

@@ -79,18 +79,18 @@ else
       -e POSTGRES_USER=budget_user \
       -e POSTGRES_PASSWORD=budget_pass \
       -e POSTGRES_DB=it_budget_db \
-      -p 5432:5432 \
+      -p 54329:54329 \
       -v it_budget_postgres_data:/var/lib/postgresql/data \
       postgres:15-alpine >/dev/null 2>&1
 fi
 
 # Wait for PostgreSQL
-if ! wait_for_port 5432 "PostgreSQL"; then
+if ! wait_for_port 54329 "PostgreSQL"; then
     echo -e "${RED}❌ Failed to start PostgreSQL${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ PostgreSQL: postgresql://budget_user:***@localhost:5432/it_budget_db${NC}"
+echo -e "${GREEN}✅ PostgreSQL: postgresql://budget_user:***@localhost:54329/it_budget_db${NC}"
 echo ""
 
 # ============================================
@@ -251,7 +251,7 @@ echo -e "  ${MAGENTA}ReDoc:${NC}        http://localhost:8000/redoc"
 echo ""
 echo -e "${CYAN}📊 Database:${NC}"
 echo ""
-echo -e "  ${MAGENTA}Connection:${NC}   postgresql://budget_user:budget_pass@localhost:5432/it_budget_db"
+echo -e "  ${MAGENTA}Connection:${NC}   postgresql://budget_user:budget_pass@localhost:54329/it_budget_db"
 echo -e "  ${MAGENTA}CLI Access:${NC}   docker exec -it it_budget_db psql -U budget_user -d it_budget_db"
 echo ""
 echo -e "${CYAN}🔧 Management:${NC}"

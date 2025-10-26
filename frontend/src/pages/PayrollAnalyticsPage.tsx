@@ -57,29 +57,29 @@ export default function PayrollAnalyticsPage() {
 
   // Fetch salary statistics
   const { data: salaryStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['payroll-salary-stats', selectedDepartment],
-    queryFn: () => payrollAnalyticsAPI.getSalaryStats(selectedDepartment || undefined),
+    queryKey: ['payroll-salary-stats', selectedDepartment?.id],
+    queryFn: () => payrollAnalyticsAPI.getSalaryStats(selectedDepartment?.id),
   });
 
   // Fetch payroll structure
   const { data: structure, isLoading: structureLoading } = useQuery({
-    queryKey: ['payroll-structure', selectedYear, selectedDepartment],
-    queryFn: () => payrollAnalyticsAPI.getStructure(selectedYear, selectedDepartment || undefined),
+    queryKey: ['payroll-structure', selectedYear, selectedDepartment?.id],
+    queryFn: () => payrollAnalyticsAPI.getStructure(selectedYear, selectedDepartment?.id),
   });
 
   // Fetch payroll dynamics
   const { data: dynamics, isLoading: dynamicsLoading } = useQuery({
-    queryKey: ['payroll-dynamics', selectedYear, selectedDepartment],
-    queryFn: () => payrollAnalyticsAPI.getDynamics(selectedYear, selectedDepartment || undefined),
+    queryKey: ['payroll-dynamics', selectedYear, selectedDepartment?.id],
+    queryFn: () => payrollAnalyticsAPI.getDynamics(selectedYear, selectedDepartment?.id),
   });
 
   // Fetch payroll forecast
   const { data: forecast, isLoading: forecastLoading } = useQuery({
-    queryKey: ['payroll-forecast', selectedDepartment],
+    queryKey: ['payroll-forecast', selectedDepartment?.id],
     queryFn: () => payrollAnalyticsAPI.getForecast({
       months_ahead: 6,
       historical_months: 6,
-      department_id: selectedDepartment || undefined,
+      department_id: selectedDepartment?.id,
     }),
   });
 

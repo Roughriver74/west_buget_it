@@ -56,10 +56,10 @@ export default function EmployeesPage() {
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
-    queryKey: ['employees', selectedDepartment, searchText, statusFilter],
+    queryKey: ['employees', selectedDepartment?.id, searchText, statusFilter],
     queryFn: () =>
       employeeAPI.list({
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
         search: searchText || undefined,
         status: statusFilter,
       }),
@@ -99,7 +99,7 @@ export default function EmployeesPage() {
   const handleExport = async () => {
     try {
       await employeeAPI.exportToExcel({
-        department_id: selectedDepartment || undefined,
+        department_id: selectedDepartment?.id,
         status: statusFilter,
       });
       message.success('Экспорт выполнен успешно');

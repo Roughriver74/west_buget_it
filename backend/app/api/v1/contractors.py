@@ -12,7 +12,7 @@ from app.schemas import ContractorCreate, ContractorUpdate, ContractorInDB
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 class BulkUpdateRequest(BaseModel):
@@ -193,7 +193,7 @@ def delete_contractor(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Delete contractor (soft delete - mark as inactive)"""
+    """Delete contractor (permanently remove from database)"""
     db_contractor = db.query(Contractor).filter(Contractor.id == contractor_id).first()
     if not db_contractor:
         raise HTTPException(
@@ -209,8 +209,8 @@ def delete_contractor(
                 detail="Not enough permissions to delete this contractor"
             )
 
-    # Soft delete - mark as inactive
-    db_contractor.is_active = False
+    # Hard delete - permanently remove from database
+    db.delete(db_contractor)
     db.commit()
     return None
 
@@ -253,7 +253,7 @@ def bulk_delete_contractors(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Bulk soft delete contractors"""
+    """Bulk delete contractors (permanently remove from database)"""
     query = db.query(Contractor).filter(Contractor.id.in_(request.ids))
 
     # USER can only delete contractors from their department
@@ -268,7 +268,7 @@ def bulk_delete_contractors(
     contractors = query.all()
 
     for contractor in contractors:
-        contractor.is_active = False
+        db.delete(contractor)
 
     db.commit()
 

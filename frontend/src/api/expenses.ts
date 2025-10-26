@@ -16,36 +16,41 @@ export interface ExpenseFilters {
 
 export const expensesApi = {
   getAll: async (filters?: ExpenseFilters): Promise<ExpenseList> => {
-    const { data } = await apiClient.get('/expenses', { params: filters })
+    const { data } = await apiClient.get('expenses/', { params: filters })
     return data
   },
 
   getById: async (id: number): Promise<Expense> => {
-    const { data } = await apiClient.get(`/expenses/${id}`)
+    const { data } = await apiClient.get(`expenses/${id}`)
     return data
   },
 
   create: async (expense: Partial<Expense>): Promise<Expense> => {
-    const { data } = await apiClient.post('/expenses', expense)
+    const { data } = await apiClient.post('expenses/', expense)
     return data
   },
 
   update: async (id: number, expense: Partial<Expense>): Promise<Expense> => {
-    const { data } = await apiClient.put(`/expenses/${id}`, expense)
+    const { data } = await apiClient.put(`expenses/${id}`, expense)
     return data
   },
 
   updateStatus: async (id: number, status: ExpenseStatus): Promise<Expense> => {
-    const { data } = await apiClient.patch(`/expenses/${id}/status`, { status })
+    const { data } = await apiClient.patch(`expenses/${id}/status`, { status })
     return data
   },
 
   delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/expenses/${id}`)
+    await apiClient.delete(`expenses/${id}`)
+  },
+
+  bulkDelete: async (ids: number[]): Promise<{ deleted_count: number }> => {
+    const { data } = await apiClient.post('expenses/bulk-delete', ids)
+    return data
   },
 
   getTotals: async (filters?: { year?: number; month?: number; category_id?: number }) => {
-    const { data } = await apiClient.get('/expenses/stats/totals', { params: filters })
+    const { data } = await apiClient.get('expenses/stats/totals', { params: filters })
     return data
   },
 
@@ -55,12 +60,12 @@ export const expensesApi = {
     delete_from_month?: number
     skip_duplicates?: boolean
   }) => {
-    const { data } = await apiClient.post('/expenses/import/ftp', params)
+    const { data } = await apiClient.post('expenses/import/ftp', params)
     return data
   },
 
   markReviewed: async (id: number): Promise<Expense> => {
-    const { data } = await apiClient.patch(`/expenses/${id}/mark-reviewed`)
+    const { data } = await apiClient.patch(`expenses/${id}/mark-reviewed`)
     return data
   },
 }
