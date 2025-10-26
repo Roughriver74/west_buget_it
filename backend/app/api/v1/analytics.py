@@ -312,6 +312,7 @@ def get_trends(
 def get_payment_calendar(
     year: int = Query(default=None, description="Year for calendar"),
     month: int = Query(default=None, ge=1, le=12, description="Month (1-12)"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
     db: Session = Depends(get_db),
@@ -331,6 +332,7 @@ def get_payment_calendar(
     calendar_data = forecast_service.get_payment_calendar(
         year=year,
         month=month,
+        department_id=department_id,
         category_id=category_id,
         organization_id=organization_id,
     )
@@ -345,6 +347,7 @@ def get_payment_calendar(
 @router.get("/payment-calendar/{date}")
 def get_payments_by_day(
     date: str = Path(description="Date in ISO format (YYYY-MM-DD)"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
     db: Session = Depends(get_db),
@@ -362,6 +365,7 @@ def get_payments_by_day(
     forecast_service = PaymentForecastService(db)
     payments = forecast_service.get_payments_by_day(
         date=payment_date,
+        department_id=department_id,
         category_id=category_id,
         organization_id=organization_id,
     )

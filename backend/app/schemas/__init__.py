@@ -63,6 +63,32 @@ from .payroll import (
     EmployeePayrollStats,
     DepartmentPayrollStats,
 )
+from .budget_planning import (
+    # Scenario
+    BudgetScenarioCreate,
+    BudgetScenarioUpdate,
+    BudgetScenarioInDB,
+    # Version
+    BudgetVersionCreate,
+    BudgetVersionUpdate,
+    BudgetVersionInDB,
+    BudgetVersionWithDetails,
+    # Plan Details
+    BudgetPlanDetailCreate,
+    BudgetPlanDetailUpdate,
+    BudgetPlanDetailInDB,
+    # Approval Log
+    BudgetApprovalLogCreate,
+    BudgetApprovalLogInDB,
+    # Calculator
+    CalculateByAverageRequest,
+    CalculateByGrowthRequest,
+    CalculateByDriverRequest,
+    CalculationResult,
+    BaselineSummary,
+    VersionComparison,
+    VersionComparisonResult,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -143,4 +169,28 @@ __all__ = [
     "PayrollSummary",
     "EmployeePayrollStats",
     "DepartmentPayrollStats",
+    # Budget 2026 - Scenarios
+    "BudgetScenarioCreate",
+    "BudgetScenarioUpdate",
+    "BudgetScenarioInDB",
+    # Budget 2026 - Versions
+    "BudgetVersionCreate",
+    "BudgetVersionUpdate",
+    "BudgetVersionInDB",
+    "BudgetVersionWithDetails",
+    # Budget 2026 - Plan Details
+    "BudgetPlanDetailCreate",
+    "BudgetPlanDetailUpdate",
+    "BudgetPlanDetailInDB",
+    # Budget 2026 - Approval Log
+    "BudgetApprovalLogCreate",
+    "BudgetApprovalLogInDB",
+    # Budget 2026 - Calculator
+    "CalculateByAverageRequest",
+    "CalculateByGrowthRequest",
+    "CalculateByDriverRequest",
+    "CalculationResult",
+    "BaselineSummary",
+    "VersionComparison",
+    "VersionComparisonResult",
 ]

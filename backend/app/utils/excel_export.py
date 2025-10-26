@@ -689,6 +689,29 @@ class ExcelExporter:
         # Определяем количество дней в месяце
         _, num_days = monthrange(year, month)
 
+        # Заполняем дни недели и даты в заголовках
+        # Строка 3 - дни недели (пн, вт, ср...)
+        # Строка 4 - даты (01/10/25, 02/10/25...)
+        day_names_ru = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+
+        # Сначала очищаем строки с датами и днями недели
+        for col in range(8, 8 + num_days):
+            ws.cell(row=3, column=col, value=None)
+            ws.cell(row=4, column=col, value=None)
+
+        # Заполняем дни и даты
+        for day in range(1, num_days + 1):
+            col = 7 + day  # H=8, I=9, J=10, ...
+            day_date = date(year, month, day)
+
+            # Строка 3: День недели
+            weekday_name = day_names_ru[day_date.weekday()]
+            ws.cell(row=3, column=col, value=weekday_name)
+
+            # Строка 4: Дата в формате DD/MM/YY
+            date_str = day_date.strftime('%d/%m/%y')
+            ws.cell(row=4, column=col, value=date_str)
+
         # Группируем прогнозы по уникальной комбинации
         grouped_forecasts = {}
         for forecast in forecasts:
@@ -724,9 +747,12 @@ class ExcelExporter:
                     grouped_forecasts[key]['amounts_by_day'][day] = 0
                 grouped_forecasts[key]['amounts_by_day'][day] += amount
 
-        # Находим начало данных (строка 5 - это заголовки, данные начинаются со строки 6 в шаблоне)
-        # Но мы будем искать первую пустую строку после строки 4 или использовать строку 5+
-        data_start_row = 5
+        # Структура шаблона:
+        # Строка 3: дни недели (пн, вт, ср...)
+        # Строка 4: даты (01/10/25, 02/10/25...)
+        # Строка 5: заголовки столбцов (N п/п, Статья ДДС, ЮЛ, Контрагент, Договор, Комментарии)
+        # Строка 6 и далее: данные прогнозов
+        data_start_row = 6
 
         # Очищаем старые данные (если есть) начиная со строки data_start_row
         # Сначала найдем последнюю заполненную строку

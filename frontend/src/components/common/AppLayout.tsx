@@ -15,6 +15,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   IdcardOutlined,
+  ProjectOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import DepartmentSelector from './DepartmentSelector'
@@ -82,6 +83,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       key: '/budget/plan',
       icon: <DollarOutlined />,
       label: <Link to="/budget/plan">План бюджета</Link>,
+    },
+    {
+      key: '/budget/planning',
+      icon: <ProjectOutlined />,
+      label: <Link to="/budget/planning">Планирование бюджета</Link>,
     },
     {
       key: '/payment-calendar',

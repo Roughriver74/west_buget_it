@@ -42,6 +42,39 @@ class BudgetStatusEnum(str, enum.Enum):
     APPROVED = "APPROVED"
 
 
+class BudgetVersionStatusEnum(str, enum.Enum):
+    """Enum for budget version statuses (planning 2026 workflow)"""
+    DRAFT = "draft"  # Черновик, редактируется
+    IN_REVIEW = "in_review"  # На согласовании
+    REVISION_REQUESTED = "revision_requested"  # Возвращён на доработку
+    APPROVED = "approved"  # Утверждён
+    REJECTED = "rejected"  # Отклонён
+    ARCHIVED = "archived"  # Старая версия (для истории)
+
+
+class BudgetScenarioTypeEnum(str, enum.Enum):
+    """Enum for budget scenario types"""
+    BASE = "base"  # Базовый сценарий
+    OPTIMISTIC = "optimistic"  # Оптимистичный
+    PESSIMISTIC = "pessimistic"  # Пессимистичный
+
+
+class CalculationMethodEnum(str, enum.Enum):
+    """Enum for budget calculation methods"""
+    AVERAGE = "average"  # Среднее за базовый год
+    GROWTH = "growth"  # Прогноз с трендом
+    DRIVER_BASED = "driver_based"  # Драйвер-базированный (headcount, projects, etc)
+    SEASONAL = "seasonal"  # С учётом сезонности
+    MANUAL = "manual"  # Ручной ввод
+
+
+class ApprovalActionEnum(str, enum.Enum):
+    """Enum for approval actions"""
+    APPROVED = "approved"  # Утверждено
+    REJECTED = "rejected"  # Отклонено
+    REVISION_REQUESTED = "revision_requested"  # Запрошены правки
+
+
 class UserRoleEnum(str, enum.Enum):
     """Enum for user roles in BDR (Budget Department Reporting)"""
     ADMIN = "ADMIN"  # Администратор - управление системой и пользователями
@@ -630,3 +663,191 @@ class PayrollActual(Base):
 
     def __repr__(self):
         return f"<PayrollActual {self.year}-{self.month:02d} Employee#{self.employee_id}: {self.total_paid}>"
+
+
+# ============================================================================
+# Budget Planning 2026 Module
+# ============================================================================
+
+
+class BudgetScenario(Base):
+    """Budget scenarios (сценарии бюджета: базовый, оптимистичный, пессимистичный)"""
+    __tablename__ = "budget_scenarios"
+    __table_args__ = (
+        Index('idx_budget_scenario_year_type', 'year', 'scenario_type'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    year = Column(Integer, nullable=False, index=True)  # 2026, 2027...
+    scenario_name = Column(String(100), nullable=False)  # "Базовый", "Оптимистичный"
+    scenario_type = Column(Enum(BudgetScenarioTypeEnum), nullable=False, index=True)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Глобальные параметры сценария
+    global_growth_rate = Column(Numeric(5, 2), default=0, nullable=False)  # % роста (например, +10%)
+    inflation_rate = Column(Numeric(5, 2), default=0, nullable=False)  # Инфляция (например, +6%)
+    fx_rate = Column(Numeric(10, 4), nullable=True)  # Курс валюты для импортных расходов
+
+    # Предположения сценария (JSON)
+    assumptions = Column(JSON, nullable=True)  # Бизнес-предположения
+
+    # Описание
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Метаданные
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_by = Column(String(100), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    budget_versions = relationship("BudgetVersion", back_populates="scenario")
+
+    def __repr__(self):
+        return f"<BudgetScenario {self.year} - {self.scenario_name}>"
+
+
+class BudgetVersion(Base):
+    """Budget versions (версии бюджета с историей изменений)"""
+    __tablename__ = "budget_versions"
+    __table_args__ = (
+        Index('idx_budget_version_year_status', 'year', 'status'),
+        Index('idx_budget_version_dept_year', 'department_id', 'year'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    year = Column(Integer, nullable=False, index=True)  # 2026
+    version_number = Column(Integer, nullable=False)  # 1, 2, 3...
+    version_name = Column(String(100), nullable=True)  # "Первоначальный", "После ревью CFO"
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Foreign key to scenario
+    scenario_id = Column(Integer, ForeignKey("budget_scenarios.id"), nullable=True, index=True)
+
+    # Status workflow
+    status = Column(
+        Enum(BudgetVersionStatusEnum),
+        default=BudgetVersionStatusEnum.DRAFT,
+        nullable=False,
+        index=True
+    )
+
+    # Метаданные
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at = Column(DateTime, nullable=True)  # Когда отправлен на согласование
+    approved_at = Column(DateTime, nullable=True)
+    approved_by = Column(String(100), nullable=True)
+
+    # Комментарии процесса
+    comments = Column(Text, nullable=True)
+    change_log = Column(Text, nullable=True)  # Что изменилось от предыдущей версии
+
+    # Итоговые суммы (денормализация для быстрого доступа)
+    total_amount = Column(Numeric(15, 2), default=0, nullable=False)
+    total_capex = Column(Numeric(15, 2), default=0, nullable=False)
+    total_opex = Column(Numeric(15, 2), default=0, nullable=False)
+
+    # Timestamps
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    department_rel = relationship("Department")
+    scenario = relationship("BudgetScenario", back_populates="budget_versions")
+    plan_details = relationship("BudgetPlanDetail", back_populates="version", cascade="all, delete-orphan")
+    approval_logs = relationship("BudgetApprovalLog", back_populates="version", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<BudgetVersion {self.year} v{self.version_number} - {self.status.value}>"
+
+
+class BudgetPlanDetail(Base):
+    """Budget plan details (детализация плана по месяцам и статьям)"""
+    __tablename__ = "budget_plan_details"
+    __table_args__ = (
+        Index('idx_budget_detail_version_month_category', 'version_id', 'month', 'category_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign key to version
+    version_id = Column(Integer, ForeignKey("budget_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Период и категория
+    month = Column(Integer, nullable=False, index=True)  # 1-12 (январь-декабрь)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+    subcategory = Column(String(100), nullable=True)  # Подстатья (опционально)
+
+    # Суммы
+    planned_amount = Column(Numeric(15, 2), nullable=False)
+    type = Column(Enum(ExpenseTypeEnum), nullable=False)  # CAPEX или OPEX
+
+    # Обоснование и драйверы
+    calculation_method = Column(
+        Enum(CalculationMethodEnum),
+        nullable=True,
+        index=True
+    )  # "average", "growth", "manual", "driver_based"
+    calculation_params = Column(JSON, nullable=True)  # Параметры расчёта
+    business_driver = Column(String(100), nullable=True)  # Что влияет (headcount, проекты и т.д.)
+    justification = Column(Text, nullable=True)  # Обоснование
+
+    # Связь с фактом базового года (обычно 2025)
+    based_on_year = Column(Integer, nullable=True)  # Базовый год для расчёта
+    based_on_avg = Column(Numeric(15, 2), nullable=True)  # Среднее за базовый год
+    based_on_total = Column(Numeric(15, 2), nullable=True)  # Сумма за базовый год
+    growth_rate = Column(Numeric(5, 2), nullable=True)  # % роста/снижения
+
+    # Метаданные
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    version = relationship("BudgetVersion", back_populates="plan_details")
+    category = relationship("BudgetCategory")
+
+    def __repr__(self):
+        return f"<BudgetPlanDetail {self.month}/{self.version_id} - {self.planned_amount}>"
+
+
+class BudgetApprovalLog(Base):
+    """Budget approval log (история согласования бюджета)"""
+    __tablename__ = "budget_approval_log"
+    __table_args__ = (
+        Index('idx_approval_log_version_iteration', 'version_id', 'iteration_number'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign key to version
+    version_id = Column(Integer, ForeignKey("budget_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Информация о согласующем
+    iteration_number = Column(Integer, nullable=False)  # Раунд согласования (1, 2, 3)
+    reviewer_name = Column(String(100), nullable=False)
+    reviewer_role = Column(String(50), nullable=False)  # "CFO", "CEO", "Head of IT"
+
+    # Решение
+    action = Column(Enum(ApprovalActionEnum), nullable=False)
+    decision_date = Column(DateTime, nullable=False, index=True)
+
+    # Комментарии и изменения
+    comments = Column(Text, nullable=True)
+    requested_changes = Column(JSON, nullable=True)  # Конкретные запросы на изменение
+
+    # Следующие шаги
+    next_action = Column(String(100), nullable=True)
+    deadline = Column(Date, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    version = relationship("BudgetVersion", back_populates="approval_logs")
+
+    def __repr__(self):
+        return f"<BudgetApprovalLog v{self.version_id} round {self.iteration_number} - {self.action.value}>"

@@ -26,6 +26,7 @@ import EmployeesPage from './pages/EmployeesPage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import PayrollPlanPage from './pages/PayrollPlanPage'
 import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
+import BudgetPlanningPage from './pages/BudgetPlanningPage'
 
 function App() {
   return (
@@ -57,6 +58,16 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
                           <BudgetPlanPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Budget planning (multi-year) - Admin and Manager only */}
+                    <Route
+                      path="/budget/planning"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <BudgetPlanningPage />
                         </ProtectedRoute>
                       }
                     />

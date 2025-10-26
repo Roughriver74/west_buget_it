@@ -432,20 +432,24 @@ def clear_forecasts(year: int, month: int, department_id: int, db: Session = Dep
 def export_forecast_calendar(
     year: int,
     month: int,
-    department_id: int,
+    department_id: Optional[int] = Query(default=None, description="Filter by department"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Export forecast data as Excel calendar format
+    Export forecast data as Excel calendar format using template
     Dates in columns, categories/contractors in rows
     """
     # Get forecasts for the month and department
-    forecasts = db.query(ForecastExpense).filter(
-        ForecastExpense.department_id == department_id,
+    query = db.query(ForecastExpense).filter(
         extract('year', ForecastExpense.forecast_date) == year,
         extract('month', ForecastExpense.forecast_date) == month
-    ).all()
+    )
+
+    if department_id:
+        query = query.filter(ForecastExpense.department_id == department_id)
+
+    forecasts = query.all()
 
     # Convert to dict format for export
     forecast_dicts = []
@@ -465,8 +469,17 @@ def export_forecast_calendar(
         }
         forecast_dicts.append(forecast_dict)
 
-    # Generate Excel file
-    excel_file = ExcelExporter.export_forecast_calendar(year, month, forecast_dicts)
+    # Get department name for template sheet selection
+    department_name = "Шикунов"  # Default to IT department
+    if department_id:
+        from app.db.models import Department
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        if dept and dept.code:
+            # Use department code or name for sheet selection
+            department_name = dept.code if dept.code else dept.name
+
+    # Generate Excel file using template
+    excel_file = ExcelExporter.export_forecast_from_template(year, month, forecast_dicts, department_name)
 
     # Month names in Russian
     month_names = [

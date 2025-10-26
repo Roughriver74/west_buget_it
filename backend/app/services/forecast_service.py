@@ -24,6 +24,7 @@ class PaymentForecastService:
         self,
         year: int,
         month: int,
+        department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
     ) -> List[Dict]:
@@ -39,6 +40,8 @@ class PaymentForecastService:
             Expense.is_paid == True,
         ]
 
+        if department_id:
+            filters.append(Expense.department_id == department_id)
         if category_id:
             filters.append(Expense.category_id == category_id)
         if organization_id:
@@ -72,6 +75,7 @@ class PaymentForecastService:
     def get_payments_by_day(
         self,
         date: datetime,
+        department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
     ) -> List[Expense]:
@@ -81,6 +85,8 @@ class PaymentForecastService:
             Expense.is_paid == True,
         ]
 
+        if department_id:
+            filters.append(Expense.department_id == department_id)
         if category_id:
             filters.append(Expense.category_id == category_id)
         if organization_id:

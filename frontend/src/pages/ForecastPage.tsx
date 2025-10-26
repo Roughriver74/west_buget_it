@@ -11,6 +11,7 @@ import {
 import { forecastApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
 import type { ForecastExpense, BudgetCategory, Contractor, Organization } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs, { Dayjs } from 'dayjs'
 
 const { Title, Paragraph } = Typography
@@ -20,6 +21,7 @@ const ForecastPage = () => {
   const currentDate = dayjs()
   const nextMonth = currentDate.add(1, 'month')
   const { user } = useAuth()
+  const { selectedDepartment } = useDepartment()
 
   const [selectedYear, setSelectedYear] = useState(nextMonth.year())
   const [selectedMonth, setSelectedMonth] = useState(nextMonth.month() + 1)
@@ -31,10 +33,11 @@ const ForecastPage = () => {
   const queryClient = useQueryClient()
 
   // Load data
+  const departmentId = selectedDepartment?.id || user?.department_id
   const { data: forecasts, isLoading } = useQuery({
-    queryKey: ['forecasts', selectedYear, selectedMonth, user?.department_id],
-    queryFn: () => forecastApi.getAll(selectedYear, selectedMonth, user!.department_id),
-    enabled: !!user?.department_id,
+    queryKey: ['forecasts', selectedYear, selectedMonth, departmentId],
+    queryFn: () => forecastApi.getAll(selectedYear, selectedMonth, departmentId!),
+    enabled: !!departmentId,
   })
 
   const { data: categories } = useQuery({
@@ -43,8 +46,9 @@ const ForecastPage = () => {
   })
 
   const { data: contractors } = useQuery({
-    queryKey: ['contractors'],
-    queryFn: () => contractorsApi.getAll({ limit: 1000 }),
+    queryKey: ['contractors', departmentId],
+    queryFn: () => contractorsApi.getAll({ limit: 1000, department_id: departmentId }),
+    enabled: !!departmentId,
   })
 
   const { data: organizations } = useQuery({
@@ -57,7 +61,7 @@ const ForecastPage = () => {
     mutationFn: () => forecastApi.generate({
       target_year: selectedYear,
       target_month: selectedMonth,
-      department_id: user!.department_id,
+      department_id: departmentId!,
       include_regular: true,
       include_average: true,
     }),
@@ -109,7 +113,7 @@ const ForecastPage = () => {
   })
 
   const clearMutation = useMutation({
-    mutationFn: () => forecastApi.clear(selectedYear, selectedMonth, user!.department_id),
+    mutationFn: () => forecastApi.clear(selectedYear, selectedMonth, departmentId!),
     onSuccess: () => {
       message.success('Прогнозы очищены')
       queryClient.invalidateQueries({ queryKey: ['forecasts'] })
@@ -140,7 +144,7 @@ const ForecastPage = () => {
     addForm.validateFields().then(values => {
       createMutation.mutate({
         ...values,
-        department_id: user!.department_id,
+        department_id: departmentId!,
         forecast_date: values.forecast_date.format('YYYY-MM-DD'),
       })
     })
@@ -148,7 +152,7 @@ const ForecastPage = () => {
 
   const handleExportToExcel = async () => {
     try {
-      const blob = await forecastApi.exportToExcel(selectedYear, selectedMonth, user!.department_id)
+      const blob = await forecastApi.exportToExcel(selectedYear, selectedMonth, departmentId)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
@@ -240,7 +244,7 @@ const ForecastPage = () => {
                 (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
               }
             >
-              {contractors?.items?.map(contractor => (
+              {contractors?.map(contractor => (
                 <Option key={contractor.id} value={contractor.id}>{contractor.name}</Option>
               ))}
             </Select>
@@ -353,7 +357,7 @@ const ForecastPage = () => {
                   forecast_date: record.forecast_date,
                   amount: record.amount,
                   comment: record.comment,
-                  department_id: user!.department_id,
+                  department_id: departmentId!,
                 })
               }}
             >
@@ -564,7 +568,7 @@ const ForecastPage = () => {
                 (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
               }
             >
-              {contractors?.items?.map(contractor => (
+              {contractors?.map(contractor => (
                 <Option key={contractor.id} value={contractor.id}>{contractor.name}</Option>
               ))}
             </Select>
@@ -576,7 +580,7 @@ const ForecastPage = () => {
             rules={[{ required: true, message: 'Выберите организацию' }]}
           >
             <Select placeholder="Выберите организацию">
-              {organizations?.items?.map(org => (
+              {organizations?.map(org => (
                 <Option key={org.id} value={org.id}>{org.name}</Option>
               ))}
             </Select>

@@ -22,11 +22,13 @@ import { analyticsApi, categoriesApi, forecastApi } from '@/api'
 import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types'
 import { formatCurrency } from '@/utils/formatters'
 import PaymentForecastChart from '@/components/forecast/PaymentForecastChart'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Text } = Typography
 const { Option } = Select
 
 const PaymentCalendarPage = () => {
+  const { selectedDepartment } = useDepartment()
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
   const [categoryId, setCategoryId] = useState<number | undefined>()
   const [modalVisible, setModalVisible] = useState(false)
@@ -39,8 +41,9 @@ const PaymentCalendarPage = () => {
   // Handle forecast export
   const handleExportForecast = async () => {
     try {
+      const departmentParam = selectedDepartment?.id ? `?department_id=${selectedDepartment.id}` : ''
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/forecast/export/${currentYear}/${currentMonth}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/forecast/export/${currentYear}/${currentMonth}${departmentParam}`,
         {
           method: 'GET',
         }
@@ -66,19 +69,21 @@ const PaymentCalendarPage = () => {
 
   // Fetch calendar data
   const { data: calendarData, isLoading: calendarLoading } = useQuery({
-    queryKey: ['payment-calendar', currentYear, currentMonth, categoryId],
+    queryKey: ['payment-calendar', currentYear, currentMonth, selectedDepartment?.id, categoryId],
     queryFn: () =>
       analyticsApi.getPaymentCalendar({
         year: currentYear,
         month: currentMonth,
+        department_id: selectedDepartment?.id,
         category_id: categoryId,
       }),
   })
 
   // Fetch forecast data
   const { data: forecastData, isLoading: forecastLoading } = useQuery({
-    queryKey: ['forecast-calendar', currentYear, currentMonth],
-    queryFn: () => forecastApi.getAll(currentYear, currentMonth),
+    queryKey: ['forecast-calendar', currentYear, currentMonth, selectedDepartment?.id],
+    queryFn: () => forecastApi.getAll(currentYear, currentMonth, selectedDepartment?.id!),
+    enabled: !!selectedDepartment?.id,
   })
 
   // Fetch categories for filter

@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import time
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import create_rate_limiter
 
@@ -123,6 +123,7 @@ app.include_router(categories.router, prefix=f"{settings.API_PREFIX}/categories"
 app.include_router(contractors.router, prefix=f"{settings.API_PREFIX}/contractors", tags=["Contractors"])
 app.include_router(organizations.router, prefix=f"{settings.API_PREFIX}/organizations", tags=["Organizations"])
 app.include_router(budget.router, prefix=f"{settings.API_PREFIX}/budget", tags=["Budget"])
+app.include_router(budget_planning.router, prefix=f"{settings.API_PREFIX}/budget/planning", tags=["Budget Planning"])
 app.include_router(analytics.router, prefix=f"{settings.API_PREFIX}/analytics", tags=["Analytics"])
 app.include_router(forecast.router, prefix=f"{settings.API_PREFIX}/forecast", tags=["Forecast"])
 app.include_router(attachments.router, prefix=f"{settings.API_PREFIX}/expenses", tags=["Attachments"])
