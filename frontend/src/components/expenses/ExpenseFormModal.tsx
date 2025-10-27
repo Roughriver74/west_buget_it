@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Modal, Form, Input, Select, DatePicker, InputNumber, message, Divider, Tabs } from 'antd'
+import { Modal, Form, Input, Select, DatePicker, InputNumber, message, Tabs } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { expensesApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
-import type { Expense, ExpenseStatus, Attachment } from '@/types'
+import type { Expense, Attachment } from '@/types'
+import { ExpenseStatus } from '@/types'
 import AttachmentManager from './AttachmentManager'
 
 const { TextArea } = Input
@@ -46,11 +47,11 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
 
   // Status options
   const statusOptions: { value: ExpenseStatus; label: string }[] = [
-    { value: 'DRAFT', label: 'Черновик' },
-    { value: 'PENDING', label: 'К оплате' },
-    { value: 'PAID', label: 'Оплачена' },
-    { value: 'REJECTED', label: 'Отклонена' },
-    { value: 'CLOSED', label: 'Закрыта' },
+    { value: ExpenseStatus.DRAFT, label: 'Черновик' },
+    { value: ExpenseStatus.PENDING, label: 'К оплате' },
+    { value: ExpenseStatus.PAID, label: 'Оплачена' },
+    { value: ExpenseStatus.REJECTED, label: 'Отклонена' },
+    { value: ExpenseStatus.CLOSED, label: 'Закрыта' },
   ]
 
   // Create mutation
@@ -219,14 +220,14 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
           label="Сумма"
           rules={[{ required: true, message: 'Введите сумму' }]}
         >
-          <InputNumber
+          <InputNumber<number>
             style={{ width: '100%' }}
             min={0}
             placeholder="Введите сумму"
             formatter={(value) =>
               `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
             }
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
           />
         </Form.Item>
 

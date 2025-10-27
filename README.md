@@ -135,6 +135,20 @@ alembic downgrade -1
 # Запустить тесты
 pytest
 ```
+### Pre-commit hooks
+
+> Форматирование (black, isort) и статический анализ (flake8, mypy) запускаются автоматически перед коммитом.
+
+```bash
+# Установить pre-commit (если еще не установлен)
+pip install pre-commit
+
+# Настроить git-хуки в репозитории
+pre-commit install
+
+# Запустить проверки для всех файлов
+pre-commit run --all-files
+```
 
 ### Frontend
 
@@ -150,6 +164,18 @@ npm run preview
 
 # Линтинг
 npm run lint
+```
+
+### Генерация TypeScript типов из OpenAPI
+
+```bash
+# Экспортировать актуальную схему (запустит backend/app и сохранит openapi.json в frontend)
+python backend/scripts/export_openapi.py --output frontend/openapi.json
+
+# Сгенерировать типы в frontend/src/types/api.generated.ts
+cd frontend
+npm install
+npm run generate:types
 ```
 
 ## Основные эндпоинты API

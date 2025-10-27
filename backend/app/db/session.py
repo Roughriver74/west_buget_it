@@ -1,22 +1,37 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+
 from app.core.config import settings
 
 # Create database engine
 # SQLite specific settings
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-pool_args = {} if settings.DATABASE_URL.startswith("sqlite") else {
-    "pool_pre_ping": True,
-    "pool_size": 10,
-    "max_overflow": 20,
+is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+
+engine_kwargs = {
+    "echo": settings.DEBUG,
+    "connect_args": connect_args,
 }
+
+if not is_sqlite:
+    if settings.DB_POOL_SIZE == 0:
+        engine_kwargs["poolclass"] = NullPool
+    else:
+        engine_kwargs.update(
+            {
+                "pool_pre_ping": settings.DB_POOL_PRE_PING,
+                "pool_size": settings.DB_POOL_SIZE,
+                "max_overflow": settings.DB_MAX_OVERFLOW,
+                "pool_timeout": settings.DB_POOL_TIMEOUT,
+                "pool_recycle": settings.DB_POOL_RECYCLE,
+            }
+        )
 
 engine = create_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    connect_args=connect_args,
-    **pool_args
+    **engine_kwargs
 )
 
 # Create SessionLocal class

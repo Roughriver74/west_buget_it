@@ -43,6 +43,12 @@ export enum ExpenseType {
 }
 
 // ============================================================================
+// Common value types
+// ============================================================================
+
+export type NumericValue = number | string
+
+// ============================================================================
 // Budget Scenario Types
 // ============================================================================
 
@@ -52,9 +58,9 @@ export interface BudgetScenario {
   scenario_name: string
   scenario_type: BudgetScenarioType
   department_id: number
-  global_growth_rate: number
-  inflation_rate: number
-  fx_rate?: number
+  global_growth_rate: NumericValue
+  inflation_rate: NumericValue
+  fx_rate?: NumericValue
   assumptions?: Record<string, any>
   description?: string
   is_active: boolean
@@ -66,9 +72,9 @@ export interface BudgetScenarioCreate {
   year: number
   scenario_name: string
   scenario_type: BudgetScenarioType
-  global_growth_rate?: number
-  inflation_rate?: number
-  fx_rate?: number
+  global_growth_rate?: NumericValue
+  inflation_rate?: NumericValue
+  fx_rate?: NumericValue
   assumptions?: Record<string, any>
   description?: string
   is_active?: boolean
@@ -77,9 +83,9 @@ export interface BudgetScenarioCreate {
 
 export interface BudgetScenarioUpdate {
   scenario_name?: string
-  global_growth_rate?: number
-  inflation_rate?: number
-  fx_rate?: number
+  global_growth_rate?: NumericValue
+  inflation_rate?: NumericValue
+  fx_rate?: NumericValue
   assumptions?: Record<string, any>
   description?: string
   is_active?: boolean
@@ -105,9 +111,9 @@ export interface BudgetVersion {
   approved_by?: string
   comments?: string
   change_log?: string
-  total_amount: number
-  total_capex: number
-  total_opex: number
+  total_amount: NumericValue
+  total_capex: NumericValue
+  total_opex: NumericValue
 }
 
 export interface BudgetVersionWithDetails extends BudgetVersion {
@@ -150,16 +156,16 @@ export interface BudgetPlanDetail {
   month: number
   category_id: number
   subcategory?: string
-  planned_amount: number
+  planned_amount: NumericValue
   type: ExpenseType
   calculation_method?: CalculationMethod
   calculation_params?: Record<string, any>
   business_driver?: string
   justification?: string
   based_on_year?: number
-  based_on_avg?: number
-  based_on_total?: number
-  growth_rate?: number
+  based_on_avg?: NumericValue
+  based_on_total?: NumericValue
+  growth_rate?: NumericValue
   created_at: string
   updated_at: string
 }
@@ -169,32 +175,32 @@ export interface BudgetPlanDetailCreate {
   month: number
   category_id: number
   subcategory?: string
-  planned_amount: number
+  planned_amount: NumericValue
   type: ExpenseType
   calculation_method?: CalculationMethod
   calculation_params?: Record<string, any>
   business_driver?: string
   justification?: string
   based_on_year?: number
-  based_on_avg?: number
-  based_on_total?: number
-  growth_rate?: number
+  based_on_avg?: NumericValue
+  based_on_total?: NumericValue
+  growth_rate?: NumericValue
 }
 
 export interface BudgetPlanDetailUpdate {
   month?: number
   category_id?: number
   subcategory?: string
-  planned_amount?: number
+  planned_amount?: NumericValue
   type?: ExpenseType
   calculation_method?: CalculationMethod
   calculation_params?: Record<string, any>
   business_driver?: string
   justification?: string
   based_on_year?: number
-  based_on_avg?: number
-  based_on_total?: number
-  growth_rate?: number
+  based_on_avg?: NumericValue
+  based_on_total?: NumericValue
+  growth_rate?: NumericValue
 }
 
 // ============================================================================
@@ -264,47 +270,54 @@ export interface CalculateByDriverRequest {
 
 export interface MonthlyAmount {
   month: number
-  amount: number
+  amount: NumericValue
 }
 
 export interface CalculationResult {
   category_id: number
-  annual_total: number
-  monthly_avg: number
-  growth_percent: number
+  annual_total: NumericValue
+  monthly_avg: NumericValue
+  growth_percent: NumericValue
   monthly_breakdown: MonthlyAmount[]
   calculation_method: CalculationMethod
   calculation_params: Record<string, any>
-  based_on_total: number
-  based_on_avg: number
+  based_on_total: NumericValue
+  based_on_avg: NumericValue
 }
 
 export interface BaselineSummary {
   category_id: number
   category_name: string
-  total_amount: number
-  monthly_avg: number
+  total_amount: NumericValue
+  monthly_avg: NumericValue
   monthly_breakdown: MonthlyAmount[]
-  capex_total: number
-  opex_total: number
+  capex_total: NumericValue
+  opex_total: NumericValue
 }
 
-export interface VersionComparisonResult {
-  category: string
-  v1_amount: number
-  v2_amount: number
-  difference: number
-  difference_percent: number
+export interface VersionComparisonVersion {
+  id: number
+  version_name?: string
+  version_number: number
+  status: BudgetVersionStatus
+  total_amount: NumericValue
+}
+
+export interface VersionComparisonCategory {
+  category_id: number
+  category_name: string
+  version1_amount: NumericValue
+  version2_amount: NumericValue
+  difference_amount: NumericValue
+  difference_percent: NumericValue
 }
 
 export interface VersionComparison {
-  version1: BudgetVersion
-  version2: BudgetVersion
-  category_comparisons: VersionComparisonResult[]
-  total_v1: number
-  total_v2: number
-  total_difference: number
-  total_difference_percent: number
+  version1: VersionComparisonVersion
+  version2: VersionComparisonVersion
+  category_comparisons: VersionComparisonCategory[]
+  total_difference_amount: NumericValue
+  total_difference_percent: NumericValue
 }
 
 // ============================================================================

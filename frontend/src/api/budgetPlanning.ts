@@ -24,6 +24,13 @@ import type {
   BaselineSummary,
   VersionComparison,
 } from '@/types/budgetPlanning'
+import {
+  getCachedBaseline,
+  getInflightBaseline,
+  setCachedBaseline,
+  setInflightBaseline,
+  clearInflightBaseline,
+} from '@/utils/baselineCache'
 
 const BASE_PATH = '/budget/planning'
 
@@ -264,10 +271,31 @@ export const calculatorApi = {
    * Get baseline data for a category
    */
   getBaseline: async (categoryId: number, year: number): Promise<BaselineSummary> => {
-    const response = await apiClient.get<BaselineSummary>(
-      `${BASE_PATH}/baseline/${categoryId}?year=${year}`
-    )
-    return response.data
+    const cached = getCachedBaseline(categoryId, year)
+    if (cached) {
+      return cached
+    }
+
+    const running = getInflightBaseline(categoryId, year)
+    if (running) {
+      return running
+    }
+
+    const request = apiClient
+      .get<BaselineSummary>(`${BASE_PATH}/baseline/${categoryId}?year=${year}`)
+      .then((response) => {
+        setCachedBaseline(categoryId, year, response.data)
+        clearInflightBaseline(categoryId, year)
+        return response.data
+      })
+      .catch((error) => {
+        clearInflightBaseline(categoryId, year)
+        throw error
+      })
+
+    setInflightBaseline(categoryId, year, request)
+
+    return request
   },
 
   /**

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Button, Space, message, Modal, Form, Input, Select } from 'antd'
-import { SaveOutlined, PlusOutlined, SettingOutlined } from '@ant-design/icons'
+import { SaveOutlined, PlusOutlined } from '@ant-design/icons'
 import type { DashboardConfig, Widget } from '@/types'
 import WidgetRenderer from './widgets'
 import './CustomDashboard.css'

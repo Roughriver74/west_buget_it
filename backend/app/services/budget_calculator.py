@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.db.models import Expense, BudgetCategory, ExpenseTypeEnum
+from app.services.baseline_bus import baseline_bus
 
 
 class BudgetCalculator:
@@ -23,6 +24,26 @@ class BudgetCalculator:
         self.db = db
 
     def get_baseline_data(
+        self,
+        category_id: int,
+        base_year: int,
+        department_id: int
+    ) -> Dict[str, Any]:
+        """
+        Return baseline data using the shared baseline bus for caching/deduping.
+        """
+        return baseline_bus.get_or_compute(
+            category_id=category_id,
+            base_year=base_year,
+            department_id=department_id,
+            loader=lambda: self._compute_baseline_data(
+                category_id=category_id,
+                base_year=base_year,
+                department_id=department_id,
+            ),
+        )
+
+    def _compute_baseline_data(
         self,
         category_id: int,
         base_year: int,

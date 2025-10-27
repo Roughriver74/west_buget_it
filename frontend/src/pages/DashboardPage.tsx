@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Col, Row, Statistic, Select, Spin, Alert } from 'antd'
+import { Card, Col, Row, Statistic, Select, Alert } from 'antd'
 import { ArrowUpOutlined, ArrowDownOutlined, DollarOutlined, WarningOutlined } from '@ant-design/icons'
 import { analyticsApi } from '@/api'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -8,6 +8,8 @@ import { ExpenseStatus } from '@/types'
 import { getExpenseStatusLabel } from '@/utils/formatters'
 import dayjs from 'dayjs'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import LoadingState from '@/components/common/LoadingState'
+import ErrorState from '@/components/common/ErrorState'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -23,15 +25,11 @@ const DashboardPage = () => {
   })
 
   if (isLoading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin size="large" />
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {
-    return <Alert message="Ошибка загрузки данных" description={String(error)} type="error" showIcon />
+    return <ErrorState description={String(error)} />
   }
 
   if (!data) {

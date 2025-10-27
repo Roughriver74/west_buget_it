@@ -13,6 +13,7 @@ from app.db.models import Expense, BudgetCategory, Contractor, Organization, Exp
 from app.schemas import ExpenseCreate, ExpenseUpdate, ExpenseInDB, ExpenseList, ExpenseStatusUpdate
 from app.utils.excel_export import ExcelExporter
 from app.services.ftp_import_service import import_from_ftp
+from app.services.baseline_bus import baseline_bus
 from app.utils.auth import get_current_active_user
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
@@ -341,6 +342,11 @@ def create_expense(
     db.add(db_expense)
     db.commit()
     db.refresh(db_expense)
+    baseline_bus.invalidate_for_expense(
+        category_id=db_expense.category_id,
+        department_id=db_expense.department_id,
+        request_year=db_expense.request_date.year if db_expense.request_date else None,
+    )
     return db_expense
 
 
@@ -358,6 +364,10 @@ def update_expense(
             detail=f"Expense with id {expense_id} not found"
         )
 
+    original_category_id = db_expense.category_id
+    original_department_id = db_expense.department_id
+    original_year = db_expense.request_date.year if db_expense.request_date else None
+
     # Update fields
     update_data = expense.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -365,6 +375,16 @@ def update_expense(
 
     db.commit()
     db.refresh(db_expense)
+    baseline_bus.invalidate_for_expense(
+        category_id=original_category_id,
+        department_id=original_department_id,
+        request_year=original_year,
+    )
+    baseline_bus.invalidate_for_expense(
+        category_id=db_expense.category_id,
+        department_id=db_expense.department_id,
+        request_year=db_expense.request_date.year if db_expense.request_date else None,
+    )
     return db_expense
 
 
@@ -426,8 +446,17 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
             detail=f"Expense with id {expense_id} not found"
         )
 
+    category_id = db_expense.category_id
+    department_id = db_expense.department_id
+    request_year = db_expense.request_date.year if db_expense.request_date else None
+
     db.delete(db_expense)
     db.commit()
+    baseline_bus.invalidate_for_expense(
+        category_id=category_id,
+        department_id=department_id,
+        request_year=request_year,
+    )
     return None
 
 
@@ -452,12 +481,27 @@ def bulk_delete_expenses(
     if not expense_ids:
         return {"deleted_count": 0}
 
+    impacted_rows = db.query(
+        Expense.category_id,
+        Expense.department_id,
+        Expense.request_date,
+    ).filter(
+        Expense.id.in_(expense_ids)
+    ).all()
+
     # Delete expenses
     deleted_count = db.query(Expense).filter(
         Expense.id.in_(expense_ids)
     ).delete(synchronize_session=False)
 
     db.commit()
+
+    for category_id, department_id, request_date in impacted_rows:
+        baseline_bus.invalidate_for_expense(
+            category_id=category_id,
+            department_id=department_id,
+            request_year=request_date.year if request_date else None,
+        )
 
     return {"deleted_count": deleted_count}
 

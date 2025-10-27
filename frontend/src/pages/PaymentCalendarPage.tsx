@@ -74,7 +74,6 @@ const PaymentCalendarPage = () => {
       analyticsApi.getPaymentCalendar({
         year: currentYear,
         month: currentMonth,
-        department_id: selectedDepartment?.id,
         category_id: categoryId,
       }),
   })

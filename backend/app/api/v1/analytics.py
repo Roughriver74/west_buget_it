@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, Path
+from fastapi import APIRouter, Depends, Query, Path, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
@@ -8,11 +8,36 @@ from app.db import get_db
 from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum, User
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
+from app.schemas.analytics import (
+    DashboardData,
+    DashboardTotals,
+    DashboardCapexVsOpex,
+    DashboardStatusDistribution,
+    DashboardTopCategory,
+    DashboardRecentExpense,
+    CategoryAnalytics,
+    CategoryAnalyticsItem,
+    Trends,
+    TrendItem,
+    PaymentCalendar,
+    PaymentCalendarDay,
+    PaymentsByDay,
+    PaymentDetail,
+    PaymentForecast,
+    PaymentForecastPeriod,
+    PaymentForecastSummary,
+    PaymentForecastPoint,
+    ForecastSummary,
+    ForecastSummaryPeriod,
+    ForecastSummaryMethods,
+    ForecastSummaryMethodStats,
+    ForecastMethodEnum,
+)
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
-@router.get("/dashboard")
+@router.get("/dashboard", response_model=DashboardData)
 def get_dashboard_data(
     year: Optional[int] = None,
     month: Optional[int] = None,
@@ -139,25 +164,27 @@ def get_dashboard_data(
     capex_actual = capex_query.scalar() or 0
     opex_actual = opex_query.scalar() or 0
 
-    return {
-        "year": year,
-        "month": month,
-        "totals": {
-            "planned": float(total_planned),
-            "actual": float(total_actual),
-            "remaining": remaining,
-            "execution_percent": execution_percent
-        },
-        "capex_vs_opex": {
-            "capex": float(capex_actual),
-            "opex": float(opex_actual),
-            "capex_percent": round((float(capex_actual) / float(total_actual) * 100) if total_actual > 0 else 0, 2),
-            "opex_percent": round((float(opex_actual) / float(total_actual) * 100) if total_actual > 0 else 0, 2),
-        },
-        "status_distribution": status_stats,
-        "top_categories": top_categories,
-        "recent_expenses": recent_expenses_data
-    }
+    return DashboardData(
+        year=year,
+        month=month,
+        totals=DashboardTotals(
+            planned=float(total_planned),
+            actual=float(total_actual),
+            remaining=remaining,
+            execution_percent=execution_percent,
+        ),
+        capex_vs_opex=DashboardCapexVsOpex(
+            capex=float(capex_actual),
+            opex=float(opex_actual),
+            capex_percent=round((float(capex_actual) / float(total_actual) * 100) if total_actual > 0 else 0, 2),
+            opex_percent=round((float(opex_actual) / float(total_actual) * 100) if total_actual > 0 else 0, 2),
+        ),
+        status_distribution=[DashboardStatusDistribution(**item) for item in status_stats],
+        top_categories=[DashboardTopCategory(**item) for item in top_categories],
+        recent_expenses=[DashboardRecentExpense(**item) for item in recent_expenses_data],
+        by_month=None,
+        by_category=None,
+    )
 
 
 @router.get("/budget-execution")
@@ -199,7 +226,7 @@ def get_budget_execution(
     }
 
 
-@router.get("/by-category")
+@router.get("/by-category", response_model=CategoryAnalytics)
 def get_analytics_by_category(
     year: int,
     month: Optional[int] = None,
@@ -265,14 +292,14 @@ def get_analytics_by_category(
             "expense_count": expense_count
         })
 
-    return {
-        "year": year,
-        "month": month,
-        "categories": result
-    }
+    return CategoryAnalytics(
+        year=year,
+        month=month,
+        categories=[CategoryAnalyticsItem(**item) for item in result],
+    )
 
 
-@router.get("/trends")
+@router.get("/trends", response_model=Trends)
 def get_trends(
     year: int,
     category_id: Optional[int] = None,
@@ -301,14 +328,14 @@ def get_trends(
         for item in query.all()
     ]
 
-    return {
-        "year": year,
-        "category_id": category_id,
-        "trends": trends
-    }
+    return Trends(
+        year=year,
+        category_id=category_id,
+        trends=[TrendItem(**item) for item in trends],
+    )
 
 
-@router.get("/payment-calendar")
+@router.get("/payment-calendar", response_model=PaymentCalendar)
 def get_payment_calendar(
     year: int = Query(default=None, description="Year for calendar"),
     month: int = Query(default=None, ge=1, le=12, description="Month (1-12)"),
@@ -337,14 +364,14 @@ def get_payment_calendar(
         organization_id=organization_id,
     )
 
-    return {
-        "year": year,
-        "month": month,
-        "days": calendar_data
-    }
+    return PaymentCalendar(
+        year=year,
+        month=month,
+        days=[PaymentCalendarDay(**item) for item in calendar_data],
+    )
 
 
-@router.get("/payment-calendar/{date}")
+@router.get("/payment-calendar/{date}", response_model=PaymentsByDay)
 def get_payments_by_day(
     date: str = Path(description="Date in ISO format (YYYY-MM-DD)"),
     department_id: Optional[int] = Query(default=None, description="Filter by department"),
@@ -360,7 +387,7 @@ def get_payments_by_day(
     try:
         payment_date = datetime.fromisoformat(date)
     except ValueError:
-        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     forecast_service = PaymentForecastService(db)
     payments = forecast_service.get_payments_by_day(
@@ -389,15 +416,15 @@ def get_payments_by_day(
         for payment in payments
     ]
 
-    return {
-        "date": date,
-        "total_count": len(payments_data),
-        "total_amount": sum(p["amount"] for p in payments_data),
-        "payments": payments_data
-    }
+    return PaymentsByDay(
+        date=payment_date.date(),
+        total_count=len(payments_data),
+        total_amount=sum(p["amount"] for p in payments_data),
+        payments=[PaymentDetail(**item) for item in payments_data],
+    )
 
 
-@router.get("/payment-forecast")
+@router.get("/payment-forecast", response_model=PaymentForecast)
 def get_payment_forecast(
     start_date: str = Query(description="Start date in ISO format (YYYY-MM-DD)"),
     end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
@@ -416,10 +443,10 @@ def get_payment_forecast(
         start = datetime.fromisoformat(start_date)
         end = datetime.fromisoformat(end_date)
     except ValueError:
-        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     if end <= start:
-        return {"error": "End date must be after start date"}
+        raise HTTPException(status_code=400, detail="End date must be after start date")
 
     forecast_service = PaymentForecastService(db)
     forecast_data = forecast_service.generate_forecast(
@@ -435,23 +462,31 @@ def get_payment_forecast(
     total_predicted = sum(item['predicted_amount'] for item in forecast_data)
     avg_daily = total_predicted / len(forecast_data) if forecast_data else 0
 
-    return {
-        "period": {
-            "start_date": start_date,
-            "end_date": end_date,
-            "days": len(forecast_data),
-        },
-        "method": method,
-        "lookback_days": lookback_days,
-        "summary": {
-            "total_predicted": round(total_predicted, 2),
-            "average_daily": round(avg_daily, 2),
-        },
-        "forecast": forecast_data
-    }
+    return PaymentForecast(
+        period=PaymentForecastPeriod(
+            start_date=start_date,
+            end_date=end_date,
+            days=len(forecast_data),
+        ),
+        method=ForecastMethodEnum(method),
+        lookback_days=lookback_days,
+        summary=PaymentForecastSummary(
+            total_predicted=round(total_predicted, 2),
+            average_daily=round(avg_daily, 2),
+        ),
+        forecast=[
+            PaymentForecastPoint(
+                date=item["date"],
+                predicted_amount=item["predicted_amount"],
+                confidence=item["confidence"],
+                method=ForecastMethodEnum(item["method"]),
+            )
+            for item in forecast_data
+        ],
+    )
 
 
-@router.get("/payment-forecast/summary")
+@router.get("/payment-forecast/summary", response_model=ForecastSummary)
 def get_payment_forecast_summary(
     start_date: str = Query(description="Start date in ISO format (YYYY-MM-DD)"),
     end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
@@ -467,7 +502,7 @@ def get_payment_forecast_summary(
         start = datetime.fromisoformat(start_date)
         end = datetime.fromisoformat(end_date)
     except ValueError:
-        return {"error": "Invalid date format. Use YYYY-MM-DD"}
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     forecast_service = PaymentForecastService(db)
     summary = forecast_service.get_forecast_summary(
@@ -477,4 +512,20 @@ def get_payment_forecast_summary(
         organization_id=organization_id,
     )
 
-    return summary
+    return ForecastSummary(
+        period=ForecastSummaryPeriod(**summary["period"]),
+        forecasts=ForecastSummaryMethods(
+            simple_average=ForecastSummaryMethodStats(
+                total=summary["forecasts"]["simple_average"]["total"],
+                daily_avg=summary["forecasts"]["simple_average"]["daily_avg"],
+            ),
+            moving_average=ForecastSummaryMethodStats(
+                total=summary["forecasts"]["moving_average"]["total"],
+                daily_avg=summary["forecasts"]["moving_average"]["daily_avg"],
+            ),
+            seasonal=ForecastSummaryMethodStats(
+                total=summary["forecasts"]["seasonal"]["total"],
+                daily_avg=summary["forecasts"]["seasonal"]["daily_avg"],
+            ),
+        ),
+    )

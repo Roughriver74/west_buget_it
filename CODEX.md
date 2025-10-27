@@ -27,6 +27,9 @@ source venv/bin/activate    # macOS/Linux
 # Install dependencies
 pip install -r requirements.txt
 
+# Install and enable git hooks
+pre-commit install
+
 # Database migrations
 alembic revision --autogenerate -m "Description"  # Create migration
 alembic upgrade head                               # Apply migrations
@@ -41,6 +44,9 @@ python create_admin.py      # Creates admin:admin if not exists
 
 # Testing
 pytest                      # Run tests (when implemented)
+
+# Run all hooks manually
+pre-commit run --all-files
 ```
 
 ### Frontend (React + Vite)
@@ -52,6 +58,7 @@ npm run dev                 # Development server (port 5173)
 npm run build               # Production build
 npm run preview             # Preview production build
 npm run lint                # Run ESLint
+npm run generate:types      # Generate API types from openapi.json
 ```
 
 ### Database Access

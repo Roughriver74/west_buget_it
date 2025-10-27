@@ -37,7 +37,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
-import { payrollAnalyticsAPI, PayrollForecast } from '../api/payroll';
+import { payrollAnalyticsAPI } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import dayjs from 'dayjs';
 
@@ -337,7 +337,7 @@ export default function PayrollAnalyticsPage() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {pieChartData.map((entry, index) => (
+                    {pieChartData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -427,7 +427,14 @@ export default function PayrollAnalyticsPage() {
                   />
                   <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
                     <div>Оклад: {formatCurrency(Number(item.forecasted_base_salary))}</div>
-                    <div>Премия: {formatCurrency(Number(item.forecasted_bonus))}</div>
+                    <div>
+                      Премии:{' '}
+                      {formatCurrency(
+                        Number(item.forecasted_monthly_bonus) +
+                          Number(item.forecasted_quarterly_bonus) +
+                          Number(item.forecasted_annual_bonus)
+                      )}
+                    </div>
                     <div>Прочее: {formatCurrency(Number(item.forecasted_other))}</div>
                     <div>Сотрудников: {item.employee_count}</div>
                   </div>

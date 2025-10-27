@@ -24,6 +24,7 @@ import type {
   CalculateByGrowthRequest,
   CalculateByDriverRequest,
 } from '@/types/budgetPlanning'
+import { invalidateBaselineCache } from '@/utils/baselineCache'
 
 // ============================================================================
 // Query Keys
@@ -285,6 +286,7 @@ export const useCreatePlanDetail = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.planDetails(data.version_id) })
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      invalidateBaselineCache(typeof data.category_id === 'number' ? data.category_id : undefined)
       message.success('Строка бюджета добавлена')
     },
     onError: () => {
@@ -302,6 +304,7 @@ export const useUpdatePlanDetail = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.planDetails(data.version_id) })
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      invalidateBaselineCache(typeof data.category_id === 'number' ? data.category_id : undefined)
       message.success('Строка бюджета обновлена')
     },
     onError: () => {
@@ -313,12 +316,14 @@ export const useUpdatePlanDetail = () => {
 export const useDeletePlanDetail = () => {
   const queryClient = useQueryClient()
 
+  type DeletePlanDetailVariables = { id: number; versionId: number; categoryId: number }
+
   return useMutation({
-    mutationFn: ({ id, versionId }: { id: number; versionId: number }) =>
-      planDetailsApi.delete(id),
+    mutationFn: ({ id }: DeletePlanDetailVariables) => planDetailsApi.delete(id),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.planDetails(variables.versionId) })
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      invalidateBaselineCache(variables.categoryId)
       message.success('Строка бюджета удалена')
     },
     onError: () => {
@@ -364,7 +369,7 @@ export const useCalculateByDriver = () => {
 export const useBaseline = (categoryId: number, year: number, departmentId: number) => {
   return useQuery({
     queryKey: budgetPlanningKeys.baseline(categoryId, year, departmentId),
-    queryFn: () => calculatorApi.getBaseline(categoryId, year, departmentId),
+    queryFn: () => calculatorApi.getBaseline(categoryId, year),
     enabled: !!categoryId && !!year && !!departmentId,
   })
 }

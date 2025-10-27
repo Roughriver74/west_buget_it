@@ -8,12 +8,15 @@ This module provides common fixtures and configuration for all tests:
 - Test data factories
 """
 
+import os
 import pytest
 from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
+
+os.environ["DEBUG"] = "True"
 
 from app.main import app
 from app.db.models import Base

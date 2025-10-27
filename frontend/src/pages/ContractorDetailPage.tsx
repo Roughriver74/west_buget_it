@@ -56,7 +56,7 @@ const ContractorDetailPage = () => {
       dataIndex: 'number',
       key: 'number',
       width: 150,
-      render: (number: string, record: any) => (
+      render: (number: string) => (
         <Link to={`/expenses`} style={{ color: '#1890ff' }}>
           {number}
         </Link>

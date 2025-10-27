@@ -9,11 +9,13 @@ import io
 from app.db import get_db
 from app.db.models import Organization, User, UserRoleEnum
 from app.schemas import OrganizationCreate, OrganizationUpdate, OrganizationInDB
+from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
+CACHE_NAMESPACE = "organizations"
 
 class BulkUpdateRequest(BaseModel):
     ids: List[int]
@@ -59,8 +61,27 @@ def get_organizations(
     if is_active is not None:
         query = query.filter(Organization.is_active == is_active)
 
+    cache_key = cache_service.build_key(
+        "list",
+        current_user.role,
+        current_user.department_id,
+        department_id,
+        is_active,
+        skip,
+        limit,
+    )
+    cached_payload = cache_service.get(CACHE_NAMESPACE, cache_key)
+    if cached_payload is not None:
+        return [OrganizationInDB.model_validate(item) for item in cached_payload]
+
     organizations = query.offset(skip).limit(limit).all()
-    return organizations
+    result_models = [OrganizationInDB.model_validate(organization) for organization in organizations]
+    cache_service.set(
+        CACHE_NAMESPACE,
+        cache_key,
+        [model.model_dump() for model in result_models],
+    )
+    return result_models
 
 
 @router.get("/{organization_id}", response_model=OrganizationInDB)
@@ -142,6 +163,7 @@ def create_organization(
     db.add(db_organization)
     db.commit()
     db.refresh(db_organization)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_organization
 
 
@@ -175,6 +197,7 @@ def update_organization(
 
     db.commit()
     db.refresh(db_organization)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_organization
 
 
@@ -203,6 +226,7 @@ def delete_organization(
     # Hard delete - permanently remove from database
     db.delete(db_organization)
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return None
 
 
@@ -230,6 +254,7 @@ def bulk_update_organizations(
         organization.is_active = request.is_active
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "updated_count": len(organizations),
@@ -262,6 +287,7 @@ def bulk_delete_organizations(
         db.delete(organization)
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "deleted_count": len(organizations),
@@ -419,6 +445,7 @@ async def import_organizations(
                 errors.append(f"Строка {index + 2}: {str(e)}")
 
         db.commit()
+        cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
         return {
             "created_count": created_count,

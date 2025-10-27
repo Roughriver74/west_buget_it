@@ -8,6 +8,7 @@ import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined } from '@ant-de
 import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
 import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
+import { ExpenseType } from '@/types/budgetPlanning'
 
 const { Text } = Typography
 
@@ -46,7 +47,7 @@ const MONTHS = [
 interface Category {
   id: number
   name: string
-  type: 'OPEX' | 'CAPEX'
+  type: ExpenseType
   parentId: number | null
 }
 
@@ -60,7 +61,7 @@ interface BudgetPlanDetailsTableProps {
 interface CategoryRow {
   categoryId: number
   categoryName: string
-  categoryType: 'OPEX' | 'CAPEX'
+  categoryType: ExpenseType
   categoryLevel: number
   hasChildren: boolean
   descendantIds: number[]
@@ -228,7 +229,8 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
   }
 
   const handleSave = async () => {
-    const updates: Array<{ id?: number; data: BudgetPlanDetailCreate | BudgetPlanDetailUpdate }> = []
+    const updates: Array<{ id: number; data: BudgetPlanDetailUpdate }> = []
+    const creations: BudgetPlanDetailCreate[] = []
 
     // Collect all changed cells
     changedCells.forEach((cellKey) => {
@@ -259,20 +261,20 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
           data: {
             planned_amount: plannedAmount,
             type: row.categoryType,
-          } satisfies BudgetPlanDetailUpdate,
+          },
         })
       } else {
         if (row.hasChildren && plannedAmount === 0) {
           return
         }
         // Create new detail
-        updates.push({
-          data: baseCreatePayload,
-        })
+        creations.push(baseCreatePayload)
       }
     })
 
-    if (updates.length === 0) {
+    const totalChanges = updates.length + creations.length
+
+    if (totalChanges === 0) {
       message.info('Нет изменений для сохранения')
       return
     }
@@ -280,15 +282,15 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
     try {
       // Execute all updates
       for (const update of updates) {
-        if (update.id) {
-          await updateMutation.mutateAsync({ id: update.id, data: update.data })
-        } else {
-          await createMutation.mutateAsync(update.data)
-        }
+        await updateMutation.mutateAsync({ id: update.id, data: update.data })
+      }
+
+      for (const payload of creations) {
+        await createMutation.mutateAsync(payload)
       }
 
       setChangedCells(new Set())
-      message.success(`Сохранено ${updates.length} изменений`)
+      message.success(`Сохранено ${totalChanges} изменений`)
       onAfterSave?.()
     } catch (error) {
       message.error('Ошибка при сохранении')
@@ -397,7 +399,7 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
               backgroundColor: isChanged ? '#fff7e6' : undefined,
             }}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => (value || '').replace(/\s/g, '')}
+            parser={(value) => Number((value || '').replace(/\s/g, ''))}
             min={0}
           />
         )

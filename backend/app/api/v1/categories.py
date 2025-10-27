@@ -9,11 +9,13 @@ import io
 from app.db import get_db
 from app.db.models import BudgetCategory, User, UserRoleEnum
 from app.schemas import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCategoryInDB
+from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
+CACHE_NAMESPACE = "categories"
 
 class BulkUpdateRequest(BaseModel):
     """Request for bulk update operations"""
@@ -61,8 +63,29 @@ def get_categories(
     if is_active is not None:
         query = query.filter(BudgetCategory.is_active == is_active)
 
+    cached_key = cache_service.build_key(
+        "list",
+        current_user.role,
+        current_user.department_id,
+        department_id,
+        is_active,
+        skip,
+        limit,
+    )
+
+    cached_payload = cache_service.get(CACHE_NAMESPACE, cached_key)
+    if cached_payload is not None:
+        return [BudgetCategoryInDB.model_validate(item) for item in cached_payload]
+
     categories = query.offset(skip).limit(limit).all()
-    return categories
+    result_models = [BudgetCategoryInDB.model_validate(category) for category in categories]
+    cache_service.set(
+        CACHE_NAMESPACE,
+        cached_key,
+        [model.model_dump() for model in result_models],
+    )
+
+    return result_models
 
 
 @router.get("/{category_id}", response_model=BudgetCategoryInDB)
@@ -144,6 +167,7 @@ def create_category(
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_category
 
 
@@ -185,6 +209,7 @@ def update_category(
     db.commit()
     log_info(f"Category {category_id} committed successfully", "CategoryUpdate")
     db.refresh(db_category)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_category
 
 
@@ -213,6 +238,7 @@ def delete_category(
     # Hard delete - permanently remove from database
     db.delete(db_category)
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return None
 
 
@@ -255,6 +281,7 @@ def bulk_update_categories(
             updated_count += 1
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "message": f"Successfully updated {updated_count} categories",
@@ -294,6 +321,7 @@ def bulk_delete_categories(
         deleted_count += 1
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "message": f"Successfully deleted {deleted_count} categories",
@@ -461,6 +489,7 @@ async def import_categories(
                 errors.append(f"Row {index + 2}: {str(e)}")
 
         db.commit()
+        cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
         return {
             "message": "Import completed",

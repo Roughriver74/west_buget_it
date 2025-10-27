@@ -42,8 +42,8 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
   const requestChangesMutation = useRequestChanges()
 
   const isAdmin = user?.role === 'ADMIN'
-  const isManager = user?.role === 'MANAGER'
-  const canApprove = isAdmin || isManager
+  const isAccountant = user?.role === 'ACCOUNTANT'
+  const canApprove = isAdmin || isAccountant
 
   const handleSubmit = async () => {
     Modal.confirm({

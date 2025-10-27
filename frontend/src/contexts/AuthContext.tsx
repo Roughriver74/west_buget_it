@@ -151,7 +151,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error(error.detail || 'Registration failed');
       }
 
-      const newUser = await response.json();
+      await response.json();
 
       message.success('Registration successful! Please login.');
 

@@ -10,14 +10,13 @@ import {
   Button,
   Space,
   Card,
-  Tabs,
   Select,
-  Spin,
   Empty,
   Modal,
   Form,
   Input,
   InputNumber,
+  Result,
 } from 'antd'
 import { PlusOutlined, CalculatorOutlined } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
@@ -39,6 +38,8 @@ import {
 } from '@/hooks/useBudgetPlanning'
 import { BudgetScenarioType } from '@/types/budgetPlanning'
 import type { BudgetScenario } from '@/types/budgetPlanning'
+import LoadingState from '@/components/common/LoadingState'
+import ErrorState from '@/components/common/ErrorState'
 
 const { Title, Text } = Typography
 
@@ -56,32 +57,43 @@ const BudgetPlanningPage: React.FC = () => {
   const [scenarioForm] = Form.useForm()
   const [versionForm] = Form.useForm()
 
-  const departmentId = selectedDepartment?.id || user?.department_id
+  const departmentId = selectedDepartment?.id ?? (user?.department_id ?? undefined)
 
   // Queries
   const {
     data: scenarios = [],
     isLoading: scenariosLoading,
+    isError: scenariosError,
+    error: scenariosErrorObj,
+    refetch: refetchScenarios,
   } = useBudgetScenarios({
     year: selectedYear,
-    department_id: departmentId,
   })
 
   const {
     data: versions = [],
     isLoading: versionsLoading,
     refetch: refetchVersions,
+    isError: versionsError,
+    error: versionsErrorObj,
   } = useBudgetVersions({
     year: selectedYear,
-    department_id: departmentId,
     scenario_id: selectedScenario?.id,
   })
 
   const {
     data: categories = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErrorObj,
+    refetch: refetchCategories,
   } = useQuery({
     queryKey: ['categories', { department_id: departmentId, is_active: true }],
-    queryFn: () => categoriesApi.getAll({ department_id: departmentId, is_active: true }),
+    queryFn: () =>
+      categoriesApi.getAll({
+        is_active: true,
+        ...(departmentId ? { department_id: departmentId } : {}),
+      }),
   })
 
   const categoryOptions = useMemo(
@@ -89,7 +101,7 @@ const BudgetPlanningPage: React.FC = () => {
       categories.map((cat) => ({
         id: cat.id,
         name: cat.name,
-        type: cat.type as 'OPEX' | 'CAPEX',
+        type: cat.type,
         parentId: cat.parent_id ?? null,
       })),
     [categories]
@@ -183,6 +195,18 @@ const BudgetPlanningPage: React.FC = () => {
   const currentYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: 8 }, (_, i) => currentYear - 2 + i)
 
+  if (!departmentId) {
+    return (
+      <Result
+        status="info"
+        title="Выберите отдел"
+        subTitle="Для планирования бюджета сначала выберите отдел в шапке приложения."
+      />
+    )
+  }
+
+  const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Неизвестная ошибка')
+
   return (
     <div style={{ padding: '24px' }}>
       {/* Header */}
@@ -226,9 +250,14 @@ const BudgetPlanningPage: React.FC = () => {
         style={{ marginBottom: 24 }}
       >
         {scenariosLoading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin size="large" />
-          </div>
+          <LoadingState fullHeight={false} message="Загрузка сценариев..." />
+        ) : scenariosError ? (
+          <ErrorState
+            fullHeight={false}
+            title="Не удалось загрузить сценарии"
+            description={getErrorMessage(scenariosErrorObj)}
+            onRetry={() => refetchScenarios()}
+          />
         ) : scenarios.length === 0 ? (
           <Empty
             description={`Нет сценариев для ${selectedYear} года`}
@@ -266,7 +295,7 @@ const BudgetPlanningPage: React.FC = () => {
             <Button
               icon={<CalculatorOutlined />}
               onClick={() => setIsCalculatorOpen(true)}
-              disabled={!selectedScenario}
+              disabled={!selectedScenario || categoriesLoading || categoriesError}
             >
               Калькулятор
             </Button>
@@ -287,9 +316,14 @@ const BudgetPlanningPage: React.FC = () => {
             style={{ padding: 40 }}
           />
         ) : versionsLoading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <Spin size="large" />
-          </div>
+          <LoadingState fullHeight={false} message="Загрузка версий бюджета..." />
+        ) : versionsError ? (
+          <ErrorState
+            fullHeight={false}
+            title="Не удалось загрузить версии бюджета"
+            description={getErrorMessage(versionsErrorObj)}
+            onRetry={() => refetchVersions()}
+          />
         ) : (
           <BudgetVersionTable
             versions={versions}
@@ -399,6 +433,19 @@ const BudgetPlanningPage: React.FC = () => {
         defaultYear={selectedYear}
         departmentId={departmentId || 0}
       />
+
+      {categoriesError && (
+        <Card style={{ marginTop: 24 }} bodyStyle={{ padding: 0 }}>
+          <ErrorState
+            status="warning"
+            fullHeight={false}
+            title="Не удалось загрузить категории"
+            description={getErrorMessage(categoriesErrorObj)}
+            onRetry={() => refetchCategories()}
+            retryLabel="Повторить попытку"
+          />
+        </Card>
+      )}
 
       <BudgetVersionDetailDrawer
         open={isVersionDetailOpen}

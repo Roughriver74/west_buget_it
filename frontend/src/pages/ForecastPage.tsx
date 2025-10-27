@@ -1,18 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Typography, Card, Button, Space, Select, message, Spin, Table,
-  InputNumber, Input, Popconfirm, Tag, Modal, Form, DatePicker
+  Typography,
+  Card,
+  Button,
+  Space,
+  Select,
+  message,
+  Table,
+  InputNumber,
+  Input,
+  Popconfirm,
+  Tag,
+  Modal,
+  Form,
+  DatePicker,
+  Result,
+  Empty,
 } from 'antd'
 import {
-  PlusOutlined, DeleteOutlined, ReloadOutlined, EditOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined,
   CheckOutlined, CloseOutlined, ThunderboltOutlined, DownloadOutlined
 } from '@ant-design/icons'
 import { forecastApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
-import type { ForecastExpense, BudgetCategory, Contractor, Organization } from '@/types'
+import type { ForecastExpense } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
+import LoadingState from '@/components/common/LoadingState'
+import ErrorState from '@/components/common/ErrorState'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -33,38 +49,101 @@ const ForecastPage = () => {
   const queryClient = useQueryClient()
 
   // Load data
-  const departmentId = selectedDepartment?.id || user?.department_id
-  const { data: forecasts, isLoading } = useQuery({
+  const departmentId = selectedDepartment?.id ?? (user?.department_id ?? undefined)
+
+  const {
+    data: forecastsData,
+    isLoading: forecastsLoading,
+    isError: forecastsError,
+    error: forecastsErrorObj,
+    refetch: refetchForecasts,
+  } = useQuery({
     queryKey: ['forecasts', selectedYear, selectedMonth, departmentId],
     queryFn: () => forecastApi.getAll(selectedYear, selectedMonth, departmentId!),
     enabled: !!departmentId,
   })
 
-  const { data: categories } = useQuery({
+  const {
+    data: categoriesData = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErrorObj,
+    refetch: refetchCategories,
+  } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesApi.getAll(),
   })
 
-  const { data: contractors } = useQuery({
+  const {
+    data: contractorsData,
+    isLoading: contractorsLoading,
+    isError: contractorsError,
+    error: contractorsErrorObj,
+    refetch: refetchContractors,
+  } = useQuery({
     queryKey: ['contractors', departmentId],
     queryFn: () => contractorsApi.getAll({ limit: 1000, department_id: departmentId }),
     enabled: !!departmentId,
   })
 
-  const { data: organizations } = useQuery({
+  const {
+    data: organizationsData,
+    isLoading: organizationsLoading,
+    isError: organizationsError,
+    error: organizationsErrorObj,
+    refetch: refetchOrganizations,
+  } = useQuery({
     queryKey: ['organizations'],
     queryFn: () => organizationsApi.getAll({ limit: 100 }),
   })
 
+  const forecasts = forecastsData ?? []
+  const categories = categoriesData
+  const contractors = contractorsData ?? []
+  const organizations = organizationsData ?? []
+
+  const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Неизвестная ошибка')
+
+  const queryErrors: string[] = []
+  if (forecastsError) {
+    queryErrors.push(`Прогнозы: ${getErrorMessage(forecastsErrorObj)}`)
+  }
+  if (categoriesError) {
+    queryErrors.push(`Категории: ${getErrorMessage(categoriesErrorObj)}`)
+  }
+  if (contractorsError) {
+    queryErrors.push(`Контрагенты: ${getErrorMessage(contractorsErrorObj)}`)
+  }
+  if (organizationsError) {
+    queryErrors.push(`Организации: ${getErrorMessage(organizationsErrorObj)}`)
+  }
+
+  const handleRetry = async () => {
+    await Promise.allSettled([
+      refetchForecasts(),
+      refetchCategories(),
+      refetchContractors(),
+      refetchOrganizations(),
+    ])
+  }
+
+  const isInitialLoading =
+    forecastsLoading || categoriesLoading || contractorsLoading || organizationsLoading
+
   // Mutations
   const generateMutation = useMutation({
-    mutationFn: () => forecastApi.generate({
-      target_year: selectedYear,
-      target_month: selectedMonth,
-      department_id: departmentId!,
-      include_regular: true,
-      include_average: true,
-    }),
+    mutationFn: () => {
+      if (!departmentId) {
+        throw new Error('Отдел не выбран')
+      }
+      return forecastApi.generate({
+        target_year: selectedYear,
+        target_month: selectedMonth,
+        department_id: departmentId,
+        include_regular: true,
+        include_average: true,
+      })
+    },
     onSuccess: (data) => {
       message.success(`Прогноз создан! Добавлено: ${data.created} позиций`)
       queryClient.invalidateQueries({ queryKey: ['forecasts'] })
@@ -113,7 +192,12 @@ const ForecastPage = () => {
   })
 
   const clearMutation = useMutation({
-    mutationFn: () => forecastApi.clear(selectedYear, selectedMonth, departmentId!),
+    mutationFn: () => {
+      if (!departmentId) {
+        throw new Error('Отдел не выбран')
+      }
+      return forecastApi.clear(selectedYear, selectedMonth, departmentId)
+    },
     onSuccess: () => {
       message.success('Прогнозы очищены')
       queryClient.invalidateQueries({ queryKey: ['forecasts'] })
@@ -123,16 +207,35 @@ const ForecastPage = () => {
     },
   })
 
+  if (!departmentId) {
+    return (
+      <Result
+        status="info"
+        title="Выберите отдел"
+        subTitle="Для работы с прогнозом расходов выберите отдел в шапке приложения."
+      />
+    )
+  }
+
+  if (isInitialLoading) {
+    return <LoadingState />
+  }
+
+  if (queryErrors.length > 0) {
+    return (
+      <ErrorState
+        description={queryErrors.join(' • ')}
+        onRetry={handleRetry}
+        retryLabel="Повторить попытку"
+      />
+    )
+  }
+
   const handleSaveEdit = (id: number) => {
     if (!editingData) return
 
-    console.log('=== handleSaveEdit DEBUG ===')
-    console.log('editingData:', editingData)
-
     // Удаляем поля, которые не нужны для обновления (read-only)
     const { category, contractor, organization, created_at, updated_at, ...dataToSend } = editingData as any
-
-    console.log('dataToSend (final):', dataToSend)
 
     updateMutation.mutate({
       id,
@@ -142,9 +245,13 @@ const ForecastPage = () => {
 
   const handleAddForecast = () => {
     addForm.validateFields().then(values => {
+      if (!departmentId) {
+        message.error('Отдел не выбран')
+        return
+      }
       createMutation.mutate({
         ...values,
-        department_id: departmentId!,
+        department_id: departmentId,
         forecast_date: values.forecast_date.format('YYYY-MM-DD'),
       })
     })
@@ -152,6 +259,10 @@ const ForecastPage = () => {
 
   const handleExportToExcel = async () => {
     try {
+      if (!departmentId) {
+        message.error('Отдел не выбран')
+        return
+      }
       const blob = await forecastApi.exportToExcel(selectedYear, selectedMonth, departmentId)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -177,12 +288,9 @@ const ForecastPage = () => {
   }
 
   // Generate days for the selected month
-  const daysInMonth = dayjs(`${selectedYear}-${selectedMonth}-01`).daysInMonth()
-  const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1)
-
   // Group forecasts by day
   const forecastsByDay: Record<number, ForecastExpense[]> = {}
-  forecasts?.forEach(f => {
+  forecasts.forEach(f => {
     const day = dayjs(f.forecast_date).date()
     if (!forecastsByDay[day]) {
       forecastsByDay[day] = []
@@ -205,11 +313,14 @@ const ForecastPage = () => {
               onChange={(value) => setEditingData({ ...editingData, category_id: value })}
               style={{ width: '100%' }}
               showSearch
-              filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const label = option?.label ?? option?.value
+                return String(label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }}
             >
-              {categories?.map(cat => (
+              {categories.map(cat => (
                 <Option key={cat.id} value={cat.id}>{cat.name}</Option>
               ))}
             </Select>
@@ -240,11 +351,14 @@ const ForecastPage = () => {
               style={{ width: '100%' }}
               showSearch
               allowClear
-              filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const label = option?.label ?? option?.value
+                return String(label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }}
             >
-              {contractors?.map(contractor => (
+              {contractors.map(contractor => (
                 <Option key={contractor.id} value={contractor.id}>{contractor.name}</Option>
               ))}
             </Select>
@@ -384,15 +498,8 @@ const ForecastPage = () => {
     },
   ]
 
-  const totalAmount = forecasts?.reduce((sum, f) => sum + Number(f.amount), 0) || 0
-
-  if (isLoading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
+  const totalAmount = forecasts.reduce((sum, f) => sum + Number(f.amount), 0)
+  const isForecastsEmpty = forecasts.length === 0
 
   return (
     <div>
@@ -468,7 +575,7 @@ const ForecastPage = () => {
         </div>
       </Card>
 
-      {forecasts && forecasts.length > 0 ? (
+      {!isForecastsEmpty ? (
         <>
           <Card
             title={
@@ -502,8 +609,10 @@ const ForecastPage = () => {
         </>
       ) : (
         <Card>
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <Paragraph>Нет прогнозов на выбранный месяц</Paragraph>
+          <Empty
+            description="Нет прогнозов на выбранный месяц"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          >
             <Button
               type="primary"
               icon={<ThunderboltOutlined />}
@@ -512,7 +621,7 @@ const ForecastPage = () => {
             >
               Сгенерировать прогноз
             </Button>
-          </div>
+          </Empty>
         </Card>
       )}
 
@@ -546,11 +655,14 @@ const ForecastPage = () => {
             <Select
               showSearch
               placeholder="Выберите категорию"
-              filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const label = option?.label ?? option?.value
+                return String(label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }}
             >
-              {categories?.map(cat => (
+              {categories.map(cat => (
                 <Option key={cat.id} value={cat.id}>{cat.name}</Option>
               ))}
             </Select>
@@ -564,11 +676,14 @@ const ForecastPage = () => {
               showSearch
               allowClear
               placeholder="Выберите контрагента"
-              filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const label = option?.label ?? option?.value
+                return String(label ?? '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+              }}
             >
-              {contractors?.map(contractor => (
+              {contractors.map(contractor => (
                 <Option key={contractor.id} value={contractor.id}>{contractor.name}</Option>
               ))}
             </Select>
@@ -580,7 +695,7 @@ const ForecastPage = () => {
             rules={[{ required: true, message: 'Выберите организацию' }]}
           >
             <Select placeholder="Выберите организацию">
-              {organizations?.map(org => (
+              {organizations.map(org => (
                 <Option key={org.id} value={org.id}>{org.name}</Option>
               ))}
             </Select>

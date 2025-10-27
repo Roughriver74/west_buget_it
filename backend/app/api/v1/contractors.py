@@ -9,11 +9,13 @@ import io
 from app.db import get_db
 from app.db.models import Contractor, User, UserRoleEnum
 from app.schemas import ContractorCreate, ContractorUpdate, ContractorInDB
+from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
+CACHE_NAMESPACE = "contractors"
 
 class BulkUpdateRequest(BaseModel):
     ids: List[int]
@@ -67,8 +69,28 @@ def get_contractors(
             (Contractor.inn.ilike(f"%{search}%"))
         )
 
+    cache_key = cache_service.build_key(
+        "list",
+        current_user.role,
+        current_user.department_id,
+        department_id,
+        is_active,
+        search.lower() if search else None,
+        skip,
+        limit,
+    )
+    cached_payload = cache_service.get(CACHE_NAMESPACE, cache_key)
+    if cached_payload is not None:
+        return [ContractorInDB.model_validate(item) for item in cached_payload]
+
     contractors = query.offset(skip).limit(limit).all()
-    return contractors
+    result_models = [ContractorInDB.model_validate(contractor) for contractor in contractors]
+    cache_service.set(
+        CACHE_NAMESPACE,
+        cache_key,
+        [model.model_dump() for model in result_models],
+    )
+    return result_models
 
 
 @router.get("/{contractor_id}", response_model=ContractorInDB)
@@ -151,6 +173,7 @@ def create_contractor(
     db.add(db_contractor)
     db.commit()
     db.refresh(db_contractor)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_contractor
 
 
@@ -184,6 +207,7 @@ def update_contractor(
 
     db.commit()
     db.refresh(db_contractor)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return db_contractor
 
 
@@ -212,6 +236,7 @@ def delete_contractor(
     # Hard delete - permanently remove from database
     db.delete(db_contractor)
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
     return None
 
 
@@ -239,6 +264,7 @@ def bulk_update_contractors(
         contractor.is_active = request.is_active
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "updated_count": len(contractors),
@@ -271,6 +297,7 @@ def bulk_delete_contractors(
         db.delete(contractor)
 
     db.commit()
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     return {
         "deleted_count": len(contractors),
@@ -443,6 +470,7 @@ async def import_contractors(
                 errors.append(f"Строка {index + 2}: {str(e)}")
 
         db.commit()
+        cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
         return {
             "created_count": created_count,

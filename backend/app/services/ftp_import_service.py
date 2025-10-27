@@ -6,13 +6,14 @@ import aioftp
 import pandas as pd
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import extract, and_, or_
 from io import BytesIO
 import logging
 
 from app.db.models import Expense, BudgetCategory, Contractor, Organization, Department, ExpenseStatusEnum
+from app.services.baseline_bus import baseline_bus
 
 logger = logging.getLogger(__name__)
 
@@ -418,6 +419,20 @@ class FTPImportService:
         month: int
     ) -> int:
         """Delete all expenses from specified month onwards"""
+        impacted_rows = db.query(
+            Expense.category_id,
+            Expense.department_id,
+            Expense.request_date,
+        ).filter(
+            or_(
+                and_(
+                    extract('year', Expense.request_date) == year,
+                    extract('month', Expense.request_date) >= month
+                ),
+                extract('year', Expense.request_date) > year
+            )
+        ).all()
+
         deleted_count = db.query(Expense).filter(
             or_(
                 and_(
@@ -430,6 +445,14 @@ class FTPImportService:
 
         db.flush()
         logger.info(f"Deleted {deleted_count} expenses from {year}-{month:02d} onwards")
+
+        for category_id, department_id, request_date in impacted_rows:
+            baseline_bus.invalidate_for_expense(
+                category_id=category_id,
+                department_id=department_id,
+                request_year=request_date.year if request_date else None,
+            )
+
         return deleted_count
 
     def import_expenses(
@@ -454,6 +477,18 @@ class FTPImportService:
         created = 0
         updated = 0
         skipped = 0
+        impacted_cache_keys: Set[Tuple[int, int, int]] = set()
+
+        def track_cache_invalidation(
+            category_id: Optional[int],
+            department_id: Optional[int],
+            request_date_value: Optional[datetime],
+        ) -> None:
+            if category_id is None or department_id is None or request_date_value is None:
+                return
+            impacted_cache_keys.add(
+                (category_id, department_id, request_date_value.year)
+            )
 
         for expense_data in expenses_data:
             try:
@@ -530,14 +565,29 @@ class FTPImportService:
                         skipped += 1
                         continue
                     else:
+                        track_cache_invalidation(
+                            existing.category_id,
+                            existing.department_id,
+                            existing.request_date,
+                        )
                         # Update existing
                         for key, value in expense_fields.items():
                             setattr(existing, key, value)
+                        track_cache_invalidation(
+                            expense_fields.get('category_id'),
+                            expense_fields.get('department_id'),
+                            expense_fields.get('request_date'),
+                        )
                         updated += 1
                 else:
                     # Create new
                     new_expense = Expense(**expense_fields)
                     db.add(new_expense)
+                    track_cache_invalidation(
+                        expense_fields.get('category_id'),
+                        expense_fields.get('department_id'),
+                        expense_fields.get('request_date'),
+                    )
                     created += 1
 
             except Exception as e:
@@ -547,6 +597,13 @@ class FTPImportService:
 
         db.commit()
         logger.info(f"Import completed: {created} created, {updated} updated, {skipped} skipped")
+
+        for category_id, department_id, year in impacted_cache_keys:
+            baseline_bus.invalidate(
+                category_id=category_id,
+                department_id=department_id,
+                year=year,
+            )
 
         return created, updated, skipped
 

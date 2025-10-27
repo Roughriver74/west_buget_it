@@ -1,9 +1,11 @@
 import React from 'react'
 import { Card, Table, Tag } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import dayjs from 'dayjs'
+import { ExpenseStatus } from '@/types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
@@ -12,6 +14,14 @@ interface RecentExpensesWidgetProps {
   config: {
     limit?: number
   }
+}
+
+interface RecentExpenseRow {
+  id: number
+  number: string
+  amount: number
+  status: ExpenseStatus
+  request_date: string
 }
 
 const RecentExpensesWidget: React.FC<RecentExpensesWidgetProps> = ({ title, config }) => {
@@ -28,7 +38,7 @@ const RecentExpensesWidget: React.FC<RecentExpensesWidgetProps> = ({ title, conf
     },
   })
 
-  const columns = [
+  const columns: ColumnsType<RecentExpenseRow> = [
     {
       title: 'Номер',
       dataIndex: 'number',
@@ -54,7 +64,7 @@ const RecentExpensesWidget: React.FC<RecentExpensesWidgetProps> = ({ title, conf
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status: string) => (
+      render: (status: ExpenseStatus) => (
         <Tag color={getExpenseStatusColor(status)}>{getExpenseStatusLabel(status)}</Tag>
       ),
     },
@@ -63,7 +73,7 @@ const RecentExpensesWidget: React.FC<RecentExpensesWidgetProps> = ({ title, conf
   return (
     <Card title={title} loading={isLoading}>
       <Table
-        dataSource={data?.items || []}
+        dataSource={(data?.items as RecentExpenseRow[]) || []}
         columns={columns}
         pagination={false}
         size="small"

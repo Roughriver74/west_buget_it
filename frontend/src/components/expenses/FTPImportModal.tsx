@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, Form, Input, InputNumber, message, Alert, Statistic, Row, Col, Switch } from 'antd'
+import { Modal, Form, Input, message, Alert, Statistic, Row, Col, Switch } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { expensesApi } from '@/api'
 

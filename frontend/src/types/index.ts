@@ -1,3 +1,5 @@
+import type { components } from './api.generated'
+
 export enum ExpenseType {
   OPEX = 'OPEX',
   CAPEX = 'CAPEX',
@@ -28,6 +30,10 @@ export interface Contractor {
   name: string
   short_name?: string
   inn?: string
+  kpp?: string
+  email?: string
+  phone?: string
+  address?: string
   contact_info?: string
   is_active: boolean
   created_at: string
@@ -40,6 +46,7 @@ export interface Organization {
   legal_name?: string
   inn?: string
   kpp?: string
+  address?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -120,41 +127,7 @@ export interface ForecastExpense {
   organization?: Organization
 }
 
-export interface DashboardData {
-  year: number
-  month?: number
-  totals: {
-    planned: number
-    actual: number
-    remaining: number
-    execution_percent: number
-  }
-  capex_vs_opex: {
-    capex: number
-    opex: number
-    capex_percent: number
-    opex_percent: number
-  }
-  status_distribution: Array<{
-    status: string
-    count: number
-    amount: number
-  }>
-  top_categories: Array<{
-    category_id: number
-    category_name: string
-    category_type: string
-    amount: number
-  }>
-  recent_expenses: Array<{
-    id: number
-    number: string
-    amount: number
-    status: string
-    request_date: string
-    category_id: number
-  }>
-}
+export type DashboardData = components['schemas']['DashboardData']
 
 export interface BudgetSummary {
   year: number
@@ -190,50 +163,15 @@ export interface BudgetExecution {
   }>
 }
 
-export interface PaymentCalendarDay {
-  date: string
-  total_amount: number
-  payment_count: number
-}
+export type PaymentCalendarDay = components['schemas']['PaymentCalendarDay']
+export type PaymentCalendar = components['schemas']['PaymentCalendar']
+export type PaymentDetail = components['schemas']['PaymentDetail']
+export type PaymentsByDay = components['schemas']['PaymentsByDay']
 
-export interface PaymentCalendar {
-  year: number
-  month: number
-  days: PaymentCalendarDay[]
-}
-
-export interface PaymentDetail {
-  id: number
-  number: string
-  amount: number
-  payment_date: string | null
-  category_id: number
-  category_name: string | null
-  contractor_id: number | null
-  contractor_name: string | null
-  organization_id: number
-  organization_name: string | null
-  status: string
-  comment: string | null
-}
-
-export interface PaymentsByDay {
-  date: string
-  total_count: number
-  total_amount: number
-  payments: PaymentDetail[]
-}
-
-export type ForecastMethod = 'simple_average' | 'moving_average' | 'seasonal'
+export type ForecastMethod = components['schemas']['ForecastMethodEnum']
 
 export type ForecastConfidence = 'low' | 'medium' | 'high'
-
-export interface ForecastDataPoint {
-  date: string
-  predicted_amount: number
-  confidence: ForecastConfidence
-  method: string
-}
+export type ForecastDataPoint = components['schemas']['PaymentForecastPoint']
 
 export type WidgetType =
   | 'total_amount'
@@ -278,38 +216,6 @@ export interface DashboardConfig {
   updated_at: string
 }
 
-export interface PaymentForecast {
-  period: {
-    start_date: string
-    end_date: string
-    days: number
-  }
-  method: ForecastMethod
-  lookback_days: number
-  summary: {
-    total_predicted: number
-    average_daily: number
-  }
-  forecast: ForecastDataPoint[]
-}
+export type PaymentForecast = components['schemas']['PaymentForecast']
 
-export interface ForecastSummary {
-  period: {
-    start_date: string
-    end_date: string
-  }
-  forecasts: {
-    simple_average: {
-      total: number
-      daily_avg: number
-    }
-    moving_average: {
-      total: number
-      daily_avg: number
-    }
-    seasonal: {
-      total: number
-      daily_avg: number
-    }
-  }
-}
+export type ForecastSummary = components['schemas']['ForecastSummary']

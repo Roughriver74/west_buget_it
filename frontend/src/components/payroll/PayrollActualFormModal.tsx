@@ -229,9 +229,12 @@ export default function PayrollActualFormModal({
             disabled={isEdit}
             onChange={handleEmployeeChange}
             showSearch
-            filterOption={(input, option) =>
-              (option?.children as string).toLowerCase().includes(input.toLowerCase())
-            }
+            filterOption={(input, option) => {
+              const label = option?.label ?? option?.value
+              return String(label ?? '')
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }}
           >
             {employees.map((emp: any) => (
               <Option key={emp.id} value={emp.id}>
@@ -289,7 +292,7 @@ export default function PayrollActualFormModal({
             style={{ width: '100%' }}
             placeholder="50000"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
           />
         </Form.Item>
@@ -305,7 +308,7 @@ export default function PayrollActualFormModal({
             style={{ width: '100%' }}
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
           />
         </Form.Item>
@@ -321,7 +324,7 @@ export default function PayrollActualFormModal({
             style={{ width: '100%' }}
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
           />
         </Form.Item>
@@ -337,7 +340,7 @@ export default function PayrollActualFormModal({
             style={{ width: '100%' }}
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
           />
         </Form.Item>

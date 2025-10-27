@@ -13,7 +13,6 @@ import {
   Row,
   Col,
   Statistic,
-  Modal,
 } from 'antd'
 import {
   PlusOutlined,
@@ -22,12 +21,8 @@ import {
   CheckCircleOutlined,
   SearchOutlined,
   BankOutlined,
-  UserOutlined,
-  DollarOutlined,
-  FileTextOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 import { departmentsApi } from '@/api'
 import type { Department } from '@/contexts/DepartmentContext'
 import DepartmentFormModal from '@/components/departments/DepartmentFormModal'
@@ -129,7 +124,7 @@ const DepartmentsPage = () => {
       dataIndex: 'name',
       key: 'name',
       width: 250,
-      render: (text: string, record: Department) => (
+      render: (text: string) => (
         <Space>
           <BankOutlined />
           <strong>{text}</strong>

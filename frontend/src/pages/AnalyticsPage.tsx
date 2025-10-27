@@ -1,33 +1,56 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Typography, Card, Row, Col, Select, Spin, Alert, Space, DatePicker, Tabs, Statistic } from 'antd'
+import { Typography, Card, Row, Col, Select, Tabs, Statistic } from 'antd'
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { analyticsApi } from '@/api'
-import dayjs, { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import LoadingState from '@/components/common/LoadingState'
+import ErrorState from '@/components/common/ErrorState'
 
 const { Title, Paragraph } = Typography
-const { RangePicker } = DatePicker
 const { Option } = Select
 
 type ComparisonMode = 'none' | 'previous-period' | 'previous-year'
+type MonthlyChartItem = {
+  month: string
+  'План': number
+  'Факт': number
+  'Остаток': number
+}
+
+type CategoryChartItem = {
+  category: string
+  fullName: string
+  'План': number
+  'Факт': number
+  'Остаток': number
+}
 
 const AnalyticsPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState<number | undefined>(undefined)
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('none')
-  const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined)
 
   // Основные данные дашборда
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useQuery({
     queryKey: ['dashboard', year, month],
     queryFn: () => analyticsApi.getDashboard({ year, month }),
   })
 
   // Данные для сравнения
-  const { data: comparisonData, isLoading: comparisonLoading } = useQuery({
+  const {
+    data: comparisonData,
+    isLoading: comparisonLoading,
+    error: comparisonError,
+    refetch: refetchComparison,
+  } = useQuery({
     queryKey: ['dashboard-comparison', year, month, comparisonMode],
     queryFn: () => {
       if (comparisonMode === 'none') return null
@@ -60,36 +83,62 @@ const AnalyticsPage = () => {
   }
 
   const isLoading = dashboardLoading || (comparisonMode !== 'none' && comparisonLoading)
+  const queryError = dashboardError || comparisonError
+
+  const handleRetry = () => {
+    refetchDashboard()
+    if (comparisonMode !== 'none') {
+      refetchComparison()
+    }
+  }
 
   if (isLoading) {
+    return <LoadingState />
+  }
+
+  if (queryError) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin size="large" />
-      </div>
+      <ErrorState
+        description={String(queryError)}
+        onRetry={handleRetry}
+        retryLabel="Повторить попытку"
+      />
     )
   }
 
   if (!dashboardData) {
-    return <Alert message="Нет данных для отображения" type="info" showIcon />
+    return (
+      <ErrorState
+        status="info"
+        title="Нет данных для отображения"
+        description="Попробуйте изменить параметры фильтрации или период."
+        fullHeight
+      />
+    )
   }
 
   // Подготовка данных для графиков
-  const monthlyData = dashboardData.by_month?.map((item: any) => ({
+  const monthlyData: MonthlyChartItem[] = (dashboardData.by_month ?? []).map((item) => ({
     month: `${item.month} мес`,
     'План': item.planned,
     'Факт': item.actual,
     'Остаток': item.remaining,
-  })) || []
+  }))
 
-  const categoryData = dashboardData.by_category?.map((item: any) => ({
-    category: item.category_name.length > 20
-      ? item.category_name.substring(0, 20) + '...'
-      : item.category_name,
-    fullName: item.category_name,
-    'План': item.planned,
-    'Факт': item.actual,
-    'Остаток': item.remaining,
-  })) || []
+  const categoryData: CategoryChartItem[] = (dashboardData.by_category ?? []).map((item) => {
+    const truncatedName =
+      item.category_name.length > 20
+        ? `${item.category_name.substring(0, 20)}...`
+        : item.category_name
+
+    return {
+      category: truncatedName,
+      fullName: item.category_name,
+      'План': item.planned,
+      'Факт': item.actual,
+      'Остаток': item.remaining,
+    }
+  })
 
   // Данные сравнения периодов
   const calculateChange = (current: number, previous: number) => {
@@ -164,7 +213,7 @@ const AnalyticsPage = () => {
       </Card>
 
       {/* Сравнение периодов */}
-      {comparisonStats && (
+      {comparisonStats && comparisonData && (
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={8}>
             <Card>

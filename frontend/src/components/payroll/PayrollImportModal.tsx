@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../api/client';
 
 const { Dragger } = Upload;
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 interface PayrollImportModalProps {
   visible: boolean;

@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     DB_NAME: str = "it_budget_db"
     DB_USER: str = "budget_user"
     DB_PASSWORD: str = "budget_pass"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_PRE_PING: bool = True
 
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
@@ -35,6 +40,8 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_PASSWORD: str = ""
     USE_REDIS: bool = False  # Set to True to enable Redis
+    BASELINE_CACHE_TTL_SECONDS: int = 300
+    CACHE_TTL_SECONDS: int = 300
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -104,6 +111,13 @@ class Settings(BaseSettings):
             if '*' in v or 'http://localhost' in str(v):
                 print("⚠️  WARNING: CORS origins contains wildcards or localhost in production mode!")
 
+        return v
+
+    @field_validator('DB_POOL_SIZE', 'DB_MAX_OVERFLOW', 'DB_POOL_TIMEOUT', 'DB_POOL_RECYCLE')
+    @classmethod
+    def validate_pool_numbers(cls, v: int, info) -> int:
+        if v < 0:
+            raise ValueError(f"{info.field_name} must be non-negative")
         return v
 
 

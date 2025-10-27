@@ -11,7 +11,6 @@ import {
   Row,
   Col,
   Statistic,
-  Timeline,
   Tabs,
 } from 'antd';
 import {
@@ -50,7 +49,6 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [modalVisible, setModalVisible] = useState(false);
-  const currentYear = new Date().getFullYear();
 
   // Fetch employee details with salary history
   const { data: employee, isLoading } = useQuery({
@@ -90,8 +88,6 @@ export default function EmployeeDetailPage() {
   // Calculate statistics
   const totalPlanned = plans.reduce((sum, p) => sum + Number(p.total_planned), 0);
   const totalPaid = actuals.reduce((sum, a) => sum + Number(a.total_paid), 0);
-  const avgMonthlyPlan = plans.length > 0 ? totalPlanned / plans.length : 0;
-
   // Salary history columns
   const salaryHistoryColumns = [
     {

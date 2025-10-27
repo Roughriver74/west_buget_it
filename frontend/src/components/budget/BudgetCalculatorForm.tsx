@@ -81,7 +81,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
         const request: CalculateByAverageRequest = {
           category_id: values.category_id,
           base_year: values.base_year,
-          department_id: departmentId,
           adjustment_percent: values.adjustment_percent || 0,
           target_year: values.target_year,
         }
@@ -90,7 +89,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
         const request: CalculateByGrowthRequest = {
           category_id: values.category_id,
           base_year: values.base_year,
-          department_id: departmentId,
           growth_rate: values.growth_rate,
           inflation_rate: values.inflation_rate || 0,
           target_year: values.target_year,
@@ -100,7 +98,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
         const request: CalculateByDriverRequest = {
           category_id: values.category_id,
           base_year: values.base_year,
-          department_id: departmentId,
           driver_type: values.driver_type,
           base_driver_value: values.base_driver_value,
           planned_driver_value: values.planned_driver_value,
@@ -190,9 +187,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
               <Descriptions.Item label="Среднее в месяц">
                 {Number(baseline.monthly_avg).toLocaleString('ru-RU')} ₽
               </Descriptions.Item>
-              <Descriptions.Item label="Записей">
-                {baseline.expense_count}
-              </Descriptions.Item>
             </Descriptions>
           }
           type="info"
@@ -264,9 +258,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
             <Descriptions size="small" column={2}>
               <Descriptions.Item label="Всего за год">
                 {Number(baseline.total_amount).toLocaleString('ru-RU')} ₽
-              </Descriptions.Item>
-              <Descriptions.Item label="Записей">
-                {baseline.expense_count}
               </Descriptions.Item>
             </Descriptions>
           }
@@ -368,9 +359,6 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
               <Descriptions.Item label="Всего за год">
                 {Number(baseline.total_amount).toLocaleString('ru-RU')} ₽
               </Descriptions.Item>
-              <Descriptions.Item label="Записей">
-                {baseline.expense_count}
-              </Descriptions.Item>
             </Descriptions>
           }
           type="info"
@@ -448,11 +436,11 @@ export const BudgetCalculatorForm: React.FC<BudgetCalculatorFormProps> = ({
                   {Number(calculationResult.annual_total).toLocaleString('ru-RU')} ₽
                 </Text>
                 <Text type="secondary">
-                  Среднее в месяц: {Number(calculationResult.monthly_average).toLocaleString('ru-RU')} ₽
+                  Среднее в месяц: {Number(calculationResult.monthly_avg).toLocaleString('ru-RU')} ₽
                 </Text>
-                {calculationResult.explanation && (
-                  <Text type="secondary">{calculationResult.explanation}</Text>
-                )}
+                <Text type="secondary">
+                  Метод расчета: {calculationResult.calculation_method}
+                </Text>
               </Space>
             }
             type="success"

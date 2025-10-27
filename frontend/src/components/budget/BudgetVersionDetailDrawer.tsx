@@ -5,7 +5,7 @@
 import React, { useMemo } from 'react'
 import { Drawer, Space, Descriptions, Divider, Spin, Typography } from 'antd'
 import { useBudgetVersionWithDetails } from '@/hooks/useBudgetPlanning'
-import { BudgetVersionStatus } from '@/types/budgetPlanning'
+import { BudgetVersionStatus, ExpenseType } from '@/types/budgetPlanning'
 import { BudgetVersionStatusBadge } from './BudgetVersionStatusBadge'
 import { BudgetPlanDetailsTable } from './BudgetPlanDetailsTable'
 import { BudgetVersionActions } from './BudgetVersionActions'
@@ -16,7 +16,7 @@ const { Text } = Typography
 interface Category {
   id: number
   name: string
-  type: 'OPEX' | 'CAPEX'
+  type: ExpenseType
   parentId: number | null
 }
 
