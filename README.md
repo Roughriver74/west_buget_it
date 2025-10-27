@@ -150,6 +150,38 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+### Мониторинг: Sentry (опционально)
+
+1. Создайте проект в [Sentry](https://sentry.io/) и получите DSN.
+2. Добавьте переменные окружения:
+
+Backend (`.env`):
+
+```env
+SENTRY_DSN=your-sentry-dsn
+SENTRY_TRACES_SAMPLE_RATE=0.1   # 0.0–1.0
+SENTRY_PROFILES_SAMPLE_RATE=0.0 # 0.0–1.0
+```
+
+Frontend (`.env` в каталоге `frontend`):
+
+```env
+VITE_SENTRY_DSN=your-sentry-dsn
+VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
+```
+
+3. Перезапустите приложения. Ошибки и перформанс-трейсы будут попадать в Sentry.
+
+### Метрики: Prometheus (опционально)
+
+1. Установите переменную окружения для backend (`.env`):
+
+```env
+ENABLE_PROMETHEUS=True
+```
+
+2. Перезапустите backend. Эндпоинт `/metrics` станет доступен для Prometheus.
+
 ### Frontend
 
 ```bash

@@ -58,9 +58,13 @@ const ForecastPage = () => {
     error: forecastsErrorObj,
     refetch: refetchForecasts,
   } = useQuery({
-    queryKey: ['forecasts', selectedYear, selectedMonth, departmentId],
-    queryFn: () => forecastApi.getAll(selectedYear, selectedMonth, departmentId!),
-    enabled: !!departmentId,
+    queryKey: ['forecasts', selectedYear, selectedMonth, departmentId ?? 'none'],
+    queryFn: () => {
+      if (departmentId == null) {
+        return []
+      }
+      return forecastApi.getAll(selectedYear, selectedMonth, departmentId)
+    },
   })
 
   const {
@@ -81,9 +85,13 @@ const ForecastPage = () => {
     error: contractorsErrorObj,
     refetch: refetchContractors,
   } = useQuery({
-    queryKey: ['contractors', departmentId],
-    queryFn: () => contractorsApi.getAll({ limit: 1000, department_id: departmentId }),
-    enabled: !!departmentId,
+    queryKey: ['contractors', departmentId ?? 'none'],
+    queryFn: () => {
+      if (departmentId == null) {
+        return []
+      }
+      return contractorsApi.getAll({ limit: 1000, department_id: departmentId })
+    },
   })
 
   const {

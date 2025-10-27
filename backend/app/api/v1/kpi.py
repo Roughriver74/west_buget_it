@@ -2,12 +2,14 @@
 KPI (Key Performance Indicators) API endpoints
 Handles KPI goals, employee KPI tracking, and performance-based bonuses
 """
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import io
+from typing import List, Optional, Dict
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, Integer
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+import pandas as pd
 
 from app.db.session import get_db
 from app.db.models import (
@@ -33,6 +35,22 @@ from app.schemas.kpi import (
 from app.utils.auth import get_current_active_user
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
+
+
+MONTH_NAME_TO_NUMBER: Dict[str, int] = {
+    'январь': 1,
+    'февраль': 2,
+    'март': 3,
+    'апрель': 4,
+    'май': 5,
+    'июнь': 6,
+    'июль': 7,
+    'август': 8,
+    'сентябрь': 9,
+    'октябрь': 10,
+    'ноябрь': 11,
+    'декабрь': 12,
+}
 
 
 def check_department_access(user: User, department_id: int) -> bool:
@@ -81,6 +99,23 @@ def calculate_bonus(
         return fixed_amount + performance_amount
 
     return Decimal(0)
+
+
+def to_decimal(value) -> Optional[Decimal]:
+    """Safely convert value to Decimal or return None."""
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, str):
+        normalized = value.strip().replace(' ', '').replace(',', '.')
+        if not normalized:
+            return None
+        value = normalized
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
 
 
 # ==================== KPI Goals Endpoints ====================
@@ -448,6 +483,295 @@ async def delete_employee_kpi(
 
     db.delete(kpi)
     db.commit()
+
+
+@router.post("/employee-kpis/import", status_code=status.HTTP_200_OK)
+async def import_employee_kpis(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Import employee KPI records from Excel file (KPI_Manager_2025.xlsx template).
+
+    The workbook must contain:
+    - Sheet "УПРАВЛЕНИЕ КПИ" with summary table (columns: Сотрудник, Базовая премия, Вариант премии, КПИ Общий %).
+    - Individual sheets per employee with table that starts with header "Месяц" including "КПИ %" and "Месячная премия".
+    """
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can import KPI data"
+        )
+
+    # Validate file extension
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an Excel file (.xlsx or .xls)"
+        )
+
+    content = await file.read()
+
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty"
+        )
+
+    max_size = 10 * 1024 * 1024  # 10 MB
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum size is 10MB"
+        )
+
+    try:
+        sheets = pd.read_excel(io.BytesIO(content), sheet_name=None, header=None)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid Excel file format: {str(exc)}"
+        )
+
+    if not sheets:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Excel workbook is empty"
+        )
+
+    summary_df = None
+    for sheet_name, df in sheets.items():
+        if isinstance(sheet_name, str) and sheet_name.strip().lower() == 'управление кпи':
+            summary_df = df
+            break
+
+    if summary_df is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sheet 'УПРАВЛЕНИЕ КПИ' not found in workbook"
+        )
+
+    # Determine year (first 4-digit value in first column)
+    import_year = None
+    for value in summary_df.iloc[:, 0].dropna():
+        try:
+            numeric_value = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 2000 <= numeric_value <= 2100:
+            import_year = numeric_value
+            break
+
+    if import_year is None:
+        import_year = datetime.utcnow().year
+
+    header_row_index = None
+    for idx, value in summary_df.iloc[:, 0].items():
+        if isinstance(value, str) and value.strip().lower() == 'сотрудник':
+            header_row_index = idx
+            break
+
+    if header_row_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not find header row with column 'Сотрудник' on summary sheet"
+        )
+
+    summary_rows = summary_df.iloc[header_row_index + 1:].copy()
+    summary_rows = summary_rows[summary_rows.iloc[:, 0].notna()]
+    summary_rows = summary_rows[summary_rows.iloc[:, 0].astype(str).str.strip() != 'ИТОГО:']
+
+    employees_info = []
+    for _, row in summary_rows.iterrows():
+        employee_name = str(row.iloc[0]).strip()
+        if not employee_name:
+            continue
+        base_bonus = to_decimal(row.iloc[4]) if len(row) > 4 else None
+        bonus_type_label = str(row.iloc[5]).strip().lower() if len(row) > 5 and isinstance(row.iloc[5], str) else ''
+        overall_kpi = to_decimal(row.iloc[6]) if len(row) > 6 else None
+        employees_info.append(
+            {
+                "name": employee_name,
+                "base_bonus": base_bonus,
+                "bonus_type_label": bonus_type_label,
+                "overall_kpi": overall_kpi,
+            }
+        )
+
+    if not employees_info:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No employees found on summary sheet"
+        )
+
+    bonus_type_map = {
+        'результативный': BonusTypeEnum.PERFORMANCE_BASED,
+        'performance': BonusTypeEnum.PERFORMANCE_BASED,
+        'fixed': BonusTypeEnum.FIXED,
+        'фиксированный': BonusTypeEnum.FIXED,
+        'mixed': BonusTypeEnum.MIXED,
+        'смешанный': BonusTypeEnum.MIXED,
+    }
+
+    special_sheets = {'управление кпи', 'аналитика', 'календарь'}
+
+    created_count = 0
+    updated_count = 0
+    missing_employees: List[str] = []
+    missing_sheets: List[str] = []
+    permission_skipped: List[str] = []
+
+    for info in employees_info:
+        employee_name = info["name"]
+        employee = (
+            db.query(Employee)
+            .filter(func.lower(Employee.full_name) == employee_name.lower())
+            .first()
+        )
+
+        if not employee:
+            missing_employees.append(employee_name)
+            continue
+
+        if employee.department_id is None:
+            permission_skipped.append(employee_name)
+            continue
+
+        if not check_department_access(current_user, employee.department_id):
+            permission_skipped.append(employee_name)
+            continue
+
+        employee_sheet = None
+        for sheet_name, df in sheets.items():
+            if not isinstance(sheet_name, str):
+                continue
+            if sheet_name.strip().lower() in special_sheets:
+                continue
+            if df.empty:
+                continue
+            first_cell = df.iloc[0, 0]
+            if isinstance(first_cell, str) and employee_name.lower() in first_cell.lower():
+                employee_sheet = df
+                break
+
+        if employee_sheet is None:
+            missing_sheets.append(employee_name)
+            continue
+
+        header_idx = None
+        for idx, value in employee_sheet.iloc[:, 0].items():
+            if isinstance(value, str) and value.strip().lower() == 'месяц':
+                header_idx = idx
+                break
+
+        if header_idx is None:
+            missing_sheets.append(employee_name)
+            continue
+
+        headers = []
+        for col in employee_sheet.iloc[header_idx].tolist():
+            if isinstance(col, str):
+                headers.append(col.strip())
+            else:
+                headers.append('')
+        header_map = {col: idx for idx, col in enumerate(headers) if col}
+
+        bonus_type_enum = bonus_type_map.get(info["bonus_type_label"], BonusTypeEnum.PERFORMANCE_BASED)
+        monthly_bonus_base = info["base_bonus"] or Decimal(0)
+
+        data_rows = employee_sheet.iloc[header_idx + 1:]
+
+        for _, data_row in data_rows.iterrows():
+            month_name_raw = data_row.iloc[0]
+            if isinstance(month_name_raw, float) and pd.isna(month_name_raw):
+                continue
+            if not isinstance(month_name_raw, str):
+                continue
+            month_name = month_name_raw.strip()
+            if not month_name:
+                continue
+            lower_month = month_name.lower()
+            if lower_month.startswith('квартал') or 'итог' in lower_month:
+                break
+            month_number = MONTH_NAME_TO_NUMBER.get(lower_month)
+            if not month_number:
+                continue
+
+            kpi_percentage = None
+            if 'КПИ %' in header_map:
+                kpi_percentage = to_decimal(data_row.iloc[header_map['КПИ %']])
+
+            monthly_bonus_calculated = None
+            if 'Месячная премия' in header_map:
+                monthly_bonus_calculated = to_decimal(data_row.iloc[header_map['Месячная премия']])
+
+            quarterly_bonus_calculated = None
+            if 'Квартальная премия' in header_map:
+                quarterly_bonus_calculated = to_decimal(data_row.iloc[header_map['Квартальная премия']])
+
+            notes_value = None
+            if 'Комментарии' in header_map:
+                notes_cell = data_row.iloc[header_map['Комментарии']]
+                if isinstance(notes_cell, str) and notes_cell.strip():
+                    notes_value = notes_cell.strip()
+
+            if monthly_bonus_calculated is None and kpi_percentage is not None:
+                monthly_bonus_calculated = calculate_bonus(
+                    monthly_bonus_base,
+                    bonus_type_enum,
+                    kpi_percentage,
+                )
+
+            kpi_record = (
+                db.query(EmployeeKPI)
+                .filter(
+                    EmployeeKPI.employee_id == employee.id,
+                    EmployeeKPI.year == import_year,
+                    EmployeeKPI.month == month_number,
+                )
+                .first()
+            )
+
+            is_new_record = False
+            if not kpi_record:
+                kpi_record = EmployeeKPI(
+                    employee_id=employee.id,
+                    year=import_year,
+                    month=month_number,
+                    department_id=employee.department_id,
+                )
+                db.add(kpi_record)
+                is_new_record = True
+
+            kpi_record.kpi_percentage = kpi_percentage
+            kpi_record.monthly_bonus_type = bonus_type_enum
+            kpi_record.quarterly_bonus_type = bonus_type_enum
+            kpi_record.annual_bonus_type = bonus_type_enum
+            kpi_record.monthly_bonus_base = monthly_bonus_base
+            kpi_record.quarterly_bonus_base = Decimal(0)
+            kpi_record.annual_bonus_base = Decimal(0)
+            kpi_record.monthly_bonus_calculated = monthly_bonus_calculated or Decimal(0)
+            kpi_record.quarterly_bonus_calculated = quarterly_bonus_calculated or Decimal(0)
+            kpi_record.annual_bonus_calculated = Decimal(0)
+            kpi_record.notes = notes_value
+            kpi_record.updated_at = datetime.utcnow()
+
+            if is_new_record:
+                created_count += 1
+            else:
+                updated_count += 1
+
+    db.commit()
+
+    return {
+        "created": created_count,
+        "updated": updated_count,
+        "missing_employees": missing_employees,
+        "missing_sheets": missing_sheets,
+        "no_access": permission_skipped,
+        "year": import_year,
+    }
 
 
 # ==================== Employee KPI Goals Endpoints ====================

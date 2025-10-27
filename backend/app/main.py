@@ -4,6 +4,13 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import time
+import logging
+
+from sentry_sdk import init as sentry_init
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlAlchemyIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi
 from app.utils.logger import logger, log_error, log_info
@@ -13,6 +20,21 @@ from app.middleware import (
     create_https_redirect_middleware,
 )
 
+# Initialize Sentry (optional)
+if settings.SENTRY_DSN:
+    sentry_init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[
+            FastApiIntegration(),
+            SqlAlchemyIntegration(),
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        ],
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        environment="production" if not settings.DEBUG else "development",
+    )
+    log_info("Sentry initialized", "Startup")
+
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
@@ -21,6 +43,11 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Prometheus metrics (optional)
+if settings.ENABLE_PROMETHEUS:
+    Instrumentator().instrument(app).expose(app)
+    log_info("Prometheus metrics exposed at /metrics", "Startup")
 
 # Configure CORS
 app.add_middleware(

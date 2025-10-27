@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    # Sentry
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.0
+
+    # Observability
+    ENABLE_PROMETHEUS: bool = False
+
     # Security
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
     ALGORITHM: str = "HS256"
@@ -118,6 +126,13 @@ class Settings(BaseSettings):
     def validate_pool_numbers(cls, v: int, info) -> int:
         if v < 0:
             raise ValueError(f"{info.field_name} must be non-negative")
+        return v
+
+    @field_validator('SENTRY_TRACES_SAMPLE_RATE', 'SENTRY_PROFILES_SAMPLE_RATE')
+    @classmethod
+    def validate_sample_rate(cls, v: float, info) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError(f"{info.field_name} must be between 0.0 and 1.0")
         return v
 
 

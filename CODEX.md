@@ -30,6 +30,11 @@ pip install -r requirements.txt
 # Install and enable git hooks
 pre-commit install
 
+# Optional: Sentry monitoring
+# export SENTRY_DSN=... SENTRY_TRACES_SAMPLE_RATE=0.1
+# Optional: Prometheus metrics
+# export ENABLE_PROMETHEUS=true
+
 # Database migrations
 alembic revision --autogenerate -m "Description"  # Create migration
 alembic upgrade head                               # Apply migrations
@@ -59,6 +64,7 @@ npm run build               # Production build
 npm run preview             # Preview production build
 npm run lint                # Run ESLint
 npm run generate:types      # Generate API types from openapi.json
+# Optional: expose VITE_SENTRY_DSN for Sentry monitoring
 ```
 
 ### Database Access

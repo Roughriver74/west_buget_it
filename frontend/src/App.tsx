@@ -26,6 +26,7 @@ import EmployeesPage from './pages/EmployeesPage'
 import EmployeeDetailPage from './pages/EmployeeDetailPage'
 import PayrollPlanPage from './pages/PayrollPlanPage'
 import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
+import KpiManagementPage from './pages/KpiManagementPage'
 import BudgetPlanningPage from './pages/BudgetPlanningPage'
 
 function App() {
@@ -156,6 +157,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
                           <PayrollPlanPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/payroll/kpi"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                          <KpiManagementPage />
                         </ProtectedRoute>
                       }
                     />
