@@ -331,26 +331,39 @@
   - Инструкции по активации HTTPS в production
   - README для тестов с примерами использования
 
-### Система типов премий для ФОТ (2025-10-27)
-- ✅ Разделение премий по типам (месячные, квартальные, годовые)
+### Система типов премий для ФОТ (2025-10-27) - ПОЛНАЯ РЕАЛИЗАЦИЯ
+- ✅ Backend: Разделение премий по типам (месячные, квартальные, годовые)
   - Employee: добавлены поля monthly_bonus_base, quarterly_bonus_base, annual_bonus_base
   - PayrollPlan: заменено поле bonus на monthly_bonus, quarterly_bonus, annual_bonus
   - PayrollActual: заменено поле bonus_paid на monthly_bonus_paid, quarterly_bonus_paid, annual_bonus_paid
-- ✅ Миграция базы данных (alembic)
+- ✅ Backend: Миграция базы данных (alembic)
   - Автоматическая миграция существующих данных (bonus -> monthly_bonus)
   - Поддержка rollback с сохранением данных
   - Значения по умолчанию: 0 для новых полей
-- ✅ Обновление Pydantic схем
+- ✅ Backend: Обновление Pydantic схем
   - EmployeeBase, EmployeeCreate, EmployeeUpdate: поддержка базовых ставок премий
   - PayrollPlanBase, PayrollPlanCreate, PayrollPlanUpdate: раздельные поля для каждого типа премии
   - PayrollActualBase, PayrollActualCreate, PayrollActualUpdate: фактические выплаты по типам
   - Analytics схемы готовы к отображению разбивки премий (PayrollStructureMonth, PayrollDynamics, PayrollForecast)
-- ✅ Обновление API endpoints
+- ✅ Backend: Обновление API endpoints
   - POST /payroll/plans: автоматический расчет total_planned с учетом всех типов премий
   - PUT /payroll/plans/{id}: обновление расчета при редактировании
   - POST /payroll/actuals: автоматический расчет total_paid с учетом всех типов премий
   - PUT /payroll/actuals/{id}: обновление расчета при редактировании
   - Формула: total = base_salary + monthly_bonus + quarterly_bonus + annual_bonus + other_payments
+- ✅ Frontend: TypeScript типы для всех интерфейсов (api/payroll.ts)
+  - Обновлены все типы: Employee, PayrollPlan, PayrollActual, Create/Update интерфейсы
+  - Обновлены типы аналитики: PayrollStructureMonth, PayrollDynamics, PayrollForecast
+- ✅ Frontend: Формы создания/редактирования
+  - EmployeeFormModal: добавлены поля для базовых ставок премий (месячная, квартальная, годовая)
+  - PayrollPlanFormModal: заменено единое поле премии на три раздельных поля
+  - PayrollActualFormModal: добавлены три поля для фактических выплат премий
+  - Автозаполнение базовых ставок из профиля сотрудника
+- ✅ Frontend: Таблицы и отображение данных
+  - EmployeesPage: колонка "Премии (мес/квар/год)", статистика годового ФОТ с премиями
+  - EmployeeDetailPage: таблицы планов/фактов с разбивкой премий по типам
+  - EmployeeDetailPage: карточка "Годовые премии (база)", Descriptions с полями премий
+  - Полная детализация всех типов премий во всех интерфейсах
 
 ### Rate Limiting и Audit Logging (2025-10-25)
 - ✅ Rate Limiting Middleware
