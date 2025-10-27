@@ -124,26 +124,18 @@ fi
 source venv/bin/activate
 
 # Install dependencies
-if [ ! -f "venv/.dependencies_installed" ]; then
-    echo -e "${BLUE}📦 Installing dependencies...${NC}"
-    pip install -q -r requirements.txt
-    touch venv/.dependencies_installed
-    echo -e "${GREEN}✅ Dependencies installed${NC}"
-else
-    echo -e "${GREEN}✅ Dependencies already installed${NC}"
-fi
+# Always check for new dependencies
+echo -e "${BLUE}📦 Installing/updating dependencies...${NC}"
+pip install -q -r requirements.txt
+echo -e "${GREEN}✅ Dependencies installed${NC}"
 
-# Check if migrations are applied
-echo -e "${BLUE}🔄 Checking database migrations...${NC}"
+# Always apply migrations to ensure database is up to date
+echo -e "${BLUE}🔄 Applying database migrations...${NC}"
 unset DEBUG
-MIGRATION_CHECK=$(alembic current 2>&1)
-if echo "$MIGRATION_CHECK" | grep -q "21c6cd6d2f8b"; then
-    echo -e "${GREEN}✅ Migrations already applied${NC}"
+if alembic upgrade head 2>&1 | grep -E "(Running upgrade|Target database is not up to date)"; then
+    echo -e "${GREEN}✅ Migrations applied successfully${NC}"
 else
-    echo -e "${BLUE}🔄 Applying migrations...${NC}"
-    unset DEBUG
-    alembic upgrade head
-    echo -e "${GREEN}✅ Migrations applied${NC}"
+    echo -e "${GREEN}✅ Database is up to date${NC}"
 fi
 
 # Check if data is imported
