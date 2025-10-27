@@ -185,27 +185,37 @@
 - [ ] Анализ структуры ФОТ (оклад vs премии vs прочие выплаты)
 
 ### Система KPI сотрудников
-- [ ] Модуль KPI (Key Performance Indicators)
-  - [ ] Модель EmployeeKPI: employee_id, период, базовая_премия, КПИ_%
-  - [ ] Варианты премий: результативный, фиксированный, смешанный
-  - [ ] Связь с Employee и Department
-- [ ] Управление целями и метриками
-  - [ ] Модель KPIGoal: название, описание, вес, целевое значение
-  - [ ] Связь целей с сотрудниками (many-to-many)
-  - [ ] Треки выполнения целей по месяцам
-  - [ ] Автоматический расчет КПИ% на основе выполнения целей
-- [ ] Расчет премий по КПИ
-  - [ ] Формула: премия = базовая_премия * (КПИ% / 100)
-  - [ ] Помесячный расчет премий
-  - [ ] История изменений КПИ% и премий
-  - [ ] Импорт данных KPI из Excel (KPI_Manager_2025.xlsx)
-- [ ] Интерфейс управления KPI
+- [x] Модуль KPI (Key Performance Indicators) - Backend
+  - [x] Модель EmployeeKPI: employee_id, период, базовая_премия, КПИ_%
+  - [x] Варианты премий: результативный, фиксированный, смешанный (BonusTypeEnum)
+  - [x] Связь с Employee и Department через department_id
+  - [x] Три типа бонусов с раздельными расчетами (monthly, quarterly, annual)
+- [x] Управление целями и метриками - Backend
+  - [x] Модель KPIGoal: название, описание, вес, целевое значение, метрика
+  - [x] Модель EmployeeKPIGoal: связь целей с сотрудниками (many-to-many)
+  - [x] Треки выполнения целей по месяцам (target_value, actual_value, achievement_percentage)
+  - [x] Поддержка годовых и месячных целей
+- [x] Расчет премий по КПИ - Backend
+  - [x] Формула PERFORMANCE_BASED: премия = базовая_премия * (КПИ% / 100)
+  - [x] Формула FIXED: премия = базовая_премия (без изменений)
+  - [x] Формула MIXED: фиксированная часть + результативная часть
+  - [x] Помесячный расчет премий (monthly_bonus_calculated, etc.)
+  - [x] API endpoints для CRUD операций
+- [x] API endpoints KPI
+  - [x] /api/v1/kpi/goals - управление целями
+  - [x] /api/v1/kpi/employee-kpis - управление КПИ сотрудников
+  - [x] /api/v1/kpi/employee-kpi-goals - назначение целей сотрудникам
+  - [x] /api/v1/kpi/analytics/employee-summary - аналитика по сотрудникам
+  - [x] Role-based access control (ADMIN/MANAGER/USER)
+- [ ] Интерфейс управления KPI - Frontend
   - [ ] Страница "КПИ сотрудников" с таблицей
+  - [ ] Формы создания/редактирования целей (KPIGoal)
   - [ ] Редактирование КПИ% для каждого сотрудника
+  - [ ] Назначение целей сотрудникам
   - [ ] Календарь выплаты премий (когда отправлять)
   - [ ] Детальный просмотр KPI по сотруднику
-  - [ ] Вкладки по сотрудникам (из листов Excel)
-- [ ] Аналитика KPI
+  - [ ] Импорт данных KPI из Excel (KPI_Manager_2025.xlsx)
+- [ ] Аналитика KPI - Frontend
   - [ ] Дашборд производительности команды
   - [ ] Рейтинг сотрудников по KPI
   - [ ] Динамика изменения KPI по месяцам
@@ -374,6 +384,40 @@
   - PayrollAnalyticsPage: pie chart с детализацией структуры ФОТ по всем компонентам
   - Использование distinct colors для каждого типа премии
   - Полная интеграция с обновленными analytics endpoints
+
+### Система KPI для performance-based премий (2025-10-27) - Backend реализация
+- ✅ Database models и миграция
+  - Создана таблица kpi_goals: цели и метрики для оценки производительности
+    * Поддержка годовых и месячных целей с весами (0-100%)
+    * Категории целей, target values, единицы измерения
+    * Department-scoped для multi-tenancy
+  - Создана таблица employee_kpis: КПИ сотрудников по периодам
+    * Месячное отслеживание KPI percentage (0-200%)
+    * Три типа бонусов (monthly, quarterly, annual) с раздельной конфигурацией
+    * Поддержка трех режимов расчета: PERFORMANCE_BASED, FIXED, MIXED
+    * Автоматический расчет премий на основе КПИ%
+  - Создана таблица employee_kpi_goals: связь сотрудников с целями (many-to-many)
+    * Отслеживание target vs actual значений
+    * Автоматический расчет achievement percentage
+    * Weighted goals для расчета общего КПИ%
+  - Новые Enum'ы: BonusTypeEnum, KPIGoalStatusEnum
+  - Comprehensive indexes для производительности
+- ✅ Pydantic schemas (app/schemas/kpi.py)
+  - CRUD схемы для всех трех моделей: KPIGoal, EmployeeKPI, EmployeeKPIGoal
+  - Analytics схемы: KPIEmployeeSummary, KPIDepartmentSummary, KPIGoalProgress
+  - Полная валидация с Pydantic (ranges, constraints)
+- ✅ API endpoints (app/api/v1/kpi.py)
+  - KPI Goals CRUD: GET/POST/PUT/DELETE /api/v1/kpi/goals
+  - Employee KPI CRUD: GET/POST/PUT/DELETE /api/v1/kpi/employee-kpis
+  - Employee KPI Goals CRUD: GET/POST/PUT/DELETE /api/v1/kpi/employee-kpi-goals
+  - Analytics endpoint: GET /api/v1/kpi/analytics/employee-summary
+  - Department-based access control (ADMIN/MANAGER/USER roles)
+  - Helper function calculate_bonus() для всех трех типов бонусов:
+    * PERFORMANCE_BASED: bonus = base * (kpi% / 100)
+    * FIXED: bonus = base (без изменений)
+    * MIXED: bonus = base * (fixed_part% / 100) + base * ((100 - fixed_part)% / 100) * (kpi% / 100)
+  - Автоматический пересчет премий при изменении КПИ%
+  - Автоматический расчет achievement percentage при обновлении actual_value
 
 ### Rate Limiting и Audit Logging (2025-10-25)
 - ✅ Rate Limiting Middleware
