@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import time
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -158,6 +158,7 @@ app.include_router(dashboards.router, prefix=f"{settings.API_PREFIX}/dashboards"
 app.include_router(reports.router, prefix=f"{settings.API_PREFIX}/reports", tags=["Reports"])
 app.include_router(employees.router, prefix=f"{settings.API_PREFIX}/employees", tags=["Employees"])
 app.include_router(payroll.router, prefix=f"{settings.API_PREFIX}/payroll", tags=["Payroll"])
+app.include_router(kpi.router, prefix=f"{settings.API_PREFIX}/kpi", tags=["KPI"])
 
 
 @app.on_event("startup")

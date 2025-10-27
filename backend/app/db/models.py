@@ -82,6 +82,22 @@ class UserRoleEnum(str, enum.Enum):
     USER = "USER"  # Пользователь отдела - доступ только к своему отделу
 
 
+class BonusTypeEnum(str, enum.Enum):
+    """Enum for bonus calculation types"""
+    PERFORMANCE_BASED = "PERFORMANCE_BASED"  # Результативный - зависит от КПИ%
+    FIXED = "FIXED"  # Фиксированный - не зависит от КПИ
+    MIXED = "MIXED"  # Смешанный - часть фиксированная, часть от КПИ
+
+
+class KPIGoalStatusEnum(str, enum.Enum):
+    """Enum for KPI goal statuses"""
+    DRAFT = "DRAFT"  # Черновик
+    ACTIVE = "ACTIVE"  # Активная цель
+    ACHIEVED = "ACHIEVED"  # Достигнута
+    NOT_ACHIEVED = "NOT_ACHIEVED"  # Не достигнута
+    CANCELLED = "CANCELLED"  # Отменена
+
+
 class Department(Base):
     """Departments (отделы компании) - основа multi-tenancy"""
     __tablename__ = "departments"
@@ -866,3 +882,147 @@ class BudgetApprovalLog(Base):
 
     def __repr__(self):
         return f"<BudgetApprovalLog v{self.version_id} round {self.iteration_number} - {self.action.value}>"
+
+
+class KPIGoal(Base):
+    """KPI Goals (цели и метрики для оценки производительности)"""
+    __tablename__ = "kpi_goals"
+    __table_args__ = (
+        Index('idx_kpi_goal_dept_status', 'department_id', 'status'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Goal information
+    name = Column(String(255), nullable=False, index=True)  # Название цели
+    description = Column(Text, nullable=True)  # Описание
+    category = Column(String(100), nullable=True, index=True)  # Категория (Продажи, Качество, Эффективность и т.д.)
+
+    # Measurement
+    metric_name = Column(String(255), nullable=True)  # Название метрики
+    metric_unit = Column(String(50), nullable=True)  # Единица измерения (%, шт, руб и т.д.)
+    target_value = Column(Numeric(15, 2), nullable=True)  # Целевое значение
+    weight = Column(Numeric(5, 2), nullable=False, default=100)  # Вес цели (для расчета общего КПИ%)
+
+    # Period
+    year = Column(Integer, nullable=False, index=True)  # Год
+    is_annual = Column(Boolean, default=True, nullable=False)  # Годовая цель или ежемесячная
+
+    # Status
+    status = Column(Enum(KPIGoalStatusEnum), nullable=False, default=KPIGoalStatusEnum.DRAFT, index=True)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    department_rel = relationship("Department")
+    employee_goals = relationship("EmployeeKPIGoal", back_populates="goal")
+
+    def __repr__(self):
+        return f"<KPIGoal {self.name} (weight={self.weight})>"
+
+
+class EmployeeKPI(Base):
+    """Employee KPI (КПИ сотрудника по периодам с расчетом премий)"""
+    __tablename__ = "employee_kpis"
+    __table_args__ = (
+        Index('idx_employee_kpi_period', 'employee_id', 'year', 'month'),
+        Index('idx_employee_kpi_dept', 'department_id', 'year', 'month'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Employee and period
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)  # Месяц (1-12)
+
+    # KPI percentage (процент выполнения КПИ)
+    kpi_percentage = Column(Numeric(5, 2), nullable=True)  # КПИ% (0-200%, обычно 0-100%)
+
+    # Bonus type and calculation
+    monthly_bonus_type = Column(Enum(BonusTypeEnum), nullable=False, default=BonusTypeEnum.PERFORMANCE_BASED)
+    quarterly_bonus_type = Column(Enum(BonusTypeEnum), nullable=False, default=BonusTypeEnum.PERFORMANCE_BASED)
+    annual_bonus_type = Column(Enum(BonusTypeEnum), nullable=False, default=BonusTypeEnum.PERFORMANCE_BASED)
+
+    # Base bonuses (базовые ставки - копируются из Employee или задаются вручную)
+    monthly_bonus_base = Column(Numeric(15, 2), nullable=False, default=0)
+    quarterly_bonus_base = Column(Numeric(15, 2), nullable=False, default=0)
+    annual_bonus_base = Column(Numeric(15, 2), nullable=False, default=0)
+
+    # Calculated bonuses (рассчитанные премии с учетом КПИ%)
+    monthly_bonus_calculated = Column(Numeric(15, 2), nullable=True)  # = base * (kpi_percentage / 100) для PERFORMANCE_BASED
+    quarterly_bonus_calculated = Column(Numeric(15, 2), nullable=True)
+    annual_bonus_calculated = Column(Numeric(15, 2), nullable=True)
+
+    # Fixed part for MIXED bonus type
+    monthly_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)  # % фиксированной части (0-100%)
+    quarterly_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
+    annual_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee")
+    department_rel = relationship("Department")
+    goal_achievements = relationship("EmployeeKPIGoal", back_populates="employee_kpi")
+
+    def __repr__(self):
+        return f"<EmployeeKPI Employee#{self.employee_id} {self.year}-{self.month:02d} KPI={self.kpi_percentage}%>"
+
+
+class EmployeeKPIGoal(Base):
+    """Employee KPI Goal (связь сотрудников с целями и отслеживание выполнения)"""
+    __tablename__ = "employee_kpi_goals"
+    __table_args__ = (
+        Index('idx_emp_kpi_goal_period', 'employee_id', 'goal_id', 'year', 'month'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Relations
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False, index=True)
+    goal_id = Column(Integer, ForeignKey("kpi_goals.id"), nullable=False, index=True)
+    employee_kpi_id = Column(Integer, ForeignKey("employee_kpis.id"), nullable=True, index=True)  # Связь с периодом
+
+    # Period
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=True, index=True)  # Null для годовых целей
+
+    # Achievement tracking
+    target_value = Column(Numeric(15, 2), nullable=True)  # Целевое значение (может отличаться от goal.target_value)
+    actual_value = Column(Numeric(15, 2), nullable=True)  # Фактическое значение
+    achievement_percentage = Column(Numeric(5, 2), nullable=True)  # % выполнения цели (actual/target * 100)
+
+    # Weight for this employee (может отличаться от веса цели)
+    weight = Column(Numeric(5, 2), nullable=True)  # Вес для расчета общего КПИ%
+
+    # Status
+    status = Column(Enum(KPIGoalStatusEnum), nullable=False, default=KPIGoalStatusEnum.ACTIVE)
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Комментарии
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee = relationship("Employee")
+    goal = relationship("KPIGoal", back_populates="employee_goals")
+    employee_kpi = relationship("EmployeeKPI", back_populates="goal_achievements")
+
+    def __repr__(self):
+        return f"<EmployeeKPIGoal Employee#{self.employee_id} Goal#{self.goal_id} {self.achievement_percentage}%>"

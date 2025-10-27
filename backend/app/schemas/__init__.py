@@ -89,11 +89,33 @@ from .budget_planning import (
     VersionComparison,
     VersionComparisonResult,
 )
+from .kpi import (
+    # KPI Goals
+    KPIGoalCreate,
+    KPIGoalUpdate,
+    KPIGoalInDB,
+    # Employee KPI
+    EmployeeKPICreate,
+    EmployeeKPIUpdate,
+    EmployeeKPIInDB,
+    EmployeeKPIWithGoals,
+    # Employee KPI Goals
+    EmployeeKPIGoalCreate,
+    EmployeeKPIGoalUpdate,
+    EmployeeKPIGoalInDB,
+    EmployeeKPIGoalWithDetails,
+    # KPI Analytics
+    KPIEmployeeSummary,
+    KPIDepartmentSummary,
+    KPIGoalProgress,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
 ExpenseList.model_rebuild()
 EmployeeWithSalaryHistory.model_rebuild()
+EmployeeKPIWithGoals.model_rebuild()
+EmployeeKPIGoalWithDetails.model_rebuild()
 
 __all__ = [
     # Expense
@@ -193,4 +215,22 @@ __all__ = [
     "BaselineSummary",
     "VersionComparison",
     "VersionComparisonResult",
+    # KPI Goals
+    "KPIGoalCreate",
+    "KPIGoalUpdate",
+    "KPIGoalInDB",
+    # Employee KPI
+    "EmployeeKPICreate",
+    "EmployeeKPIUpdate",
+    "EmployeeKPIInDB",
+    "EmployeeKPIWithGoals",
+    # Employee KPI Goals
+    "EmployeeKPIGoalCreate",
+    "EmployeeKPIGoalUpdate",
+    "EmployeeKPIGoalInDB",
+    "EmployeeKPIGoalWithDetails",
+    # KPI Analytics
+    "KPIEmployeeSummary",
+    "KPIDepartmentSummary",
+    "KPIGoalProgress",
 ]
