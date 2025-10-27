@@ -11,7 +11,7 @@ import {
   EditOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import type { BudgetVersionStatus } from '@/types/budgetPlanning'
+import { BudgetVersionStatus } from '@/types/budgetPlanning'
 
 interface BudgetVersionStatusBadgeProps {
   status: BudgetVersionStatus
@@ -24,31 +24,31 @@ export const BudgetVersionStatusBadge: React.FC<BudgetVersionStatusBadgeProps> =
 }) => {
   const getStatusConfig = () => {
     switch (status) {
-      case 'DRAFT':
+      case BudgetVersionStatus.DRAFT:
         return {
           color: 'default',
           icon: <EditOutlined />,
           text: 'Черновик',
         }
-      case 'SUBMITTED':
+      case BudgetVersionStatus.IN_REVIEW:
         return {
           color: 'processing',
           icon: <SendOutlined />,
           text: 'На согласовании',
         }
-      case 'CHANGES_REQUESTED':
+      case BudgetVersionStatus.REVISION_REQUESTED:
         return {
           color: 'warning',
           icon: <ClockCircleOutlined />,
           text: 'Требуются изменения',
         }
-      case 'APPROVED':
+      case BudgetVersionStatus.APPROVED:
         return {
           color: 'success',
           icon: <CheckCircleOutlined />,
           text: 'Утверждено',
         }
-      case 'REJECTED':
+      case BudgetVersionStatus.REJECTED:
         return {
           color: 'error',
           icon: <CloseCircleOutlined />,

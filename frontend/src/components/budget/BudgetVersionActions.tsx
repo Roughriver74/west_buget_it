@@ -17,6 +17,7 @@ import {
   useRejectVersion,
   useRequestChanges,
 } from '@/hooks/useBudgetPlanning'
+import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
 
 const { TextArea } = Input
@@ -130,7 +131,7 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
   // Show actions based on version status and user role
   const renderActions = () => {
     switch (version.status) {
-      case 'DRAFT':
+      case BudgetVersionStatus.DRAFT:
         // Any user can submit their draft version
         return (
           <Button
@@ -143,8 +144,8 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
           </Button>
         )
 
-      case 'SUBMITTED':
-      case 'CHANGES_REQUESTED':
+      case BudgetVersionStatus.IN_REVIEW:
+      case BudgetVersionStatus.REVISION_REQUESTED:
         // Only ADMIN/MANAGER can approve/reject
         if (!canApprove) {
           return (
@@ -182,14 +183,14 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
           </Space>
         )
 
-      case 'APPROVED':
+      case BudgetVersionStatus.APPROVED:
         return (
           <Button type="text" disabled icon={<CheckOutlined />}>
             Утверждено
           </Button>
         )
 
-      case 'REJECTED':
+      case BudgetVersionStatus.REJECTED:
         return (
           <Button type="text" disabled danger icon={<CloseOutlined />}>
             Отклонено

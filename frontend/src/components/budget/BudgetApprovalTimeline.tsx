@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useApprovalLogs } from '@/hooks/useBudgetPlanning'
+import { ApprovalAction } from '@/types/budgetPlanning'
 
 const { Text, Paragraph } = Typography
 
@@ -36,27 +37,27 @@ export const BudgetApprovalTimeline: React.FC<BudgetApprovalTimelineProps> = ({
     return <Empty description="История согласования пуста" />
   }
 
-  const getActionConfig = (action: string) => {
+  const getActionConfig = (action: ApprovalAction | string) => {
     switch (action) {
-      case 'SUBMITTED':
+      case ApprovalAction.SUBMITTED:
         return {
           color: 'blue',
           icon: <SendOutlined />,
           label: 'Отправлено на согласование',
         }
-      case 'APPROVED':
+      case ApprovalAction.APPROVED:
         return {
           color: 'green',
           icon: <CheckCircleOutlined />,
           label: 'Утверждено',
         }
-      case 'REJECTED':
+      case ApprovalAction.REJECTED:
         return {
           color: 'red',
           icon: <CloseCircleOutlined />,
           label: 'Отклонено',
         }
-      case 'CHANGES_REQUESTED':
+      case ApprovalAction.REVISION_REQUESTED:
         return {
           color: 'orange',
           icon: <EditOutlined />,
@@ -72,7 +73,7 @@ export const BudgetApprovalTimeline: React.FC<BudgetApprovalTimelineProps> = ({
   }
 
   const timelineItems = logs
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .sort((a, b) => new Date(b.decision_date).getTime() - new Date(a.decision_date).getTime())
     .map((log) => {
       const config = getActionConfig(log.action)
 
@@ -90,7 +91,7 @@ export const BudgetApprovalTimeline: React.FC<BudgetApprovalTimelineProps> = ({
               )}
             </div>
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              {dayjs(log.timestamp).format('DD.MM.YYYY HH:mm')} • {log.reviewer_name}
+              {dayjs(log.decision_date).format('DD.MM.YYYY HH:mm')} • {log.reviewer_name}
             </Text>
             {log.comments && (
               <Paragraph

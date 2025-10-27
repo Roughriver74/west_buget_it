@@ -44,35 +44,36 @@ class BudgetStatusEnum(str, enum.Enum):
 
 class BudgetVersionStatusEnum(str, enum.Enum):
     """Enum for budget version statuses (planning 2026 workflow)"""
-    DRAFT = "draft"  # Черновик, редактируется
-    IN_REVIEW = "in_review"  # На согласовании
-    REVISION_REQUESTED = "revision_requested"  # Возвращён на доработку
-    APPROVED = "approved"  # Утверждён
-    REJECTED = "rejected"  # Отклонён
-    ARCHIVED = "archived"  # Старая версия (для истории)
+    DRAFT = "DRAFT"  # Черновик, редактируется
+    IN_REVIEW = "IN_REVIEW"  # На согласовании
+    REVISION_REQUESTED = "REVISION_REQUESTED"  # Возвращён на доработку
+    APPROVED = "APPROVED"  # Утверждён
+    REJECTED = "REJECTED"  # Отклонён
+    ARCHIVED = "ARCHIVED"  # Старая версия (для истории)
 
 
 class BudgetScenarioTypeEnum(str, enum.Enum):
     """Enum for budget scenario types"""
-    BASE = "base"  # Базовый сценарий
-    OPTIMISTIC = "optimistic"  # Оптимистичный
-    PESSIMISTIC = "pessimistic"  # Пессимистичный
+    BASE = "BASE"  # Базовый сценарий
+    OPTIMISTIC = "OPTIMISTIC"  # Оптимистичный
+    PESSIMISTIC = "PESSIMISTIC"  # Пессимистичный
 
 
 class CalculationMethodEnum(str, enum.Enum):
     """Enum for budget calculation methods"""
-    AVERAGE = "average"  # Среднее за базовый год
-    GROWTH = "growth"  # Прогноз с трендом
-    DRIVER_BASED = "driver_based"  # Драйвер-базированный (headcount, projects, etc)
-    SEASONAL = "seasonal"  # С учётом сезонности
-    MANUAL = "manual"  # Ручной ввод
+    AVERAGE = "AVERAGE"  # Среднее за базовый год
+    GROWTH = "GROWTH"  # Прогноз с трендом
+    DRIVER_BASED = "DRIVER_BASED"  # Драйвер-базированный (headcount, projects, etc)
+    SEASONAL = "SEASONAL"  # С учётом сезонности
+    MANUAL = "MANUAL"  # Ручной ввод
 
 
 class ApprovalActionEnum(str, enum.Enum):
     """Enum for approval actions"""
-    APPROVED = "approved"  # Утверждено
-    REJECTED = "rejected"  # Отклонено
-    REVISION_REQUESTED = "revision_requested"  # Запрошены правки
+    SUBMITTED = "SUBMITTED"  # Отправлено на согласование
+    APPROVED = "APPROVED"  # Утверждено
+    REJECTED = "REJECTED"  # Отклонено
+    REVISION_REQUESTED = "REVISION_REQUESTED"  # Запрошены правки
 
 
 class UserRoleEnum(str, enum.Enum):

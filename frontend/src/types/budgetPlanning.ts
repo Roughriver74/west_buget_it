@@ -8,32 +8,33 @@
 // ============================================================================
 
 export enum BudgetVersionStatus {
-  DRAFT = 'draft',
-  IN_REVIEW = 'in_review',
-  REVISION_REQUESTED = 'revision_requested',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  ARCHIVED = 'archived',
+  DRAFT = 'DRAFT',
+  IN_REVIEW = 'IN_REVIEW',
+  REVISION_REQUESTED = 'REVISION_REQUESTED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  ARCHIVED = 'ARCHIVED',
 }
 
 export enum BudgetScenarioType {
-  BASE = 'base',
-  OPTIMISTIC = 'optimistic',
-  PESSIMISTIC = 'pessimistic',
+  BASE = 'BASE',
+  OPTIMISTIC = 'OPTIMISTIC',
+  PESSIMISTIC = 'PESSIMISTIC',
 }
 
 export enum CalculationMethod {
-  AVERAGE = 'average',
-  GROWTH = 'growth',
-  DRIVER_BASED = 'driver_based',
-  SEASONAL = 'seasonal',
-  MANUAL = 'manual',
+  AVERAGE = 'AVERAGE',
+  GROWTH = 'GROWTH',
+  DRIVER_BASED = 'DRIVER_BASED',
+  SEASONAL = 'SEASONAL',
+  MANUAL = 'MANUAL',
 }
 
 export enum ApprovalAction {
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  REVISION_REQUESTED = 'revision_requested',
+  SUBMITTED = 'SUBMITTED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  REVISION_REQUESTED = 'REVISION_REQUESTED',
 }
 
 export enum ExpenseType {

@@ -12,7 +12,8 @@ import {
   SendOutlined,
   CopyOutlined,
 } from '@ant-design/icons'
-import type { BudgetVersion, BudgetVersionStatus } from '@/types/budgetPlanning'
+import { BudgetVersionStatus } from '@/types/budgetPlanning'
+import type { BudgetVersion } from '@/types/budgetPlanning'
 import dayjs from 'dayjs'
 
 interface BudgetVersionTableProps {
@@ -26,21 +27,21 @@ interface BudgetVersionTableProps {
 }
 
 const statusColors: Record<BudgetVersionStatus, string> = {
-  draft: 'default',
-  in_review: 'processing',
-  revision_requested: 'warning',
-  approved: 'success',
-  rejected: 'error',
-  archived: 'default',
+  [BudgetVersionStatus.DRAFT]: 'default',
+  [BudgetVersionStatus.IN_REVIEW]: 'processing',
+  [BudgetVersionStatus.REVISION_REQUESTED]: 'warning',
+  [BudgetVersionStatus.APPROVED]: 'success',
+  [BudgetVersionStatus.REJECTED]: 'error',
+  [BudgetVersionStatus.ARCHIVED]: 'default',
 }
 
 const statusLabels: Record<BudgetVersionStatus, string> = {
-  draft: 'Черновик',
-  in_review: 'На согласовании',
-  revision_requested: 'Требуется доработка',
-  approved: 'Утверждена',
-  rejected: 'Отклонена',
-  archived: 'Архив',
+  [BudgetVersionStatus.DRAFT]: 'Черновик',
+  [BudgetVersionStatus.IN_REVIEW]: 'На согласовании',
+  [BudgetVersionStatus.REVISION_REQUESTED]: 'Требуется доработка',
+  [BudgetVersionStatus.APPROVED]: 'Утверждена',
+  [BudgetVersionStatus.REJECTED]: 'Отклонена',
+  [BudgetVersionStatus.ARCHIVED]: 'Архив',
 }
 
 export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
@@ -141,7 +142,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
               />
             </Tooltip>
           )}
-          {onEdit && record.status === 'draft' && (
+          {onEdit && [BudgetVersionStatus.DRAFT, BudgetVersionStatus.REVISION_REQUESTED].includes(record.status) && (
             <Tooltip title="Редактировать">
               <Button
                 type="link"
@@ -151,7 +152,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
               />
             </Tooltip>
           )}
-          {onSubmit && record.status === 'draft' && (
+          {onSubmit && record.status === BudgetVersionStatus.DRAFT && (
             <Tooltip title="Отправить на согласование">
               <Popconfirm
                 title="Отправить на согласование?"
@@ -174,7 +175,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
               />
             </Tooltip>
           )}
-          {onDelete && ['draft', 'rejected'].includes(record.status) && (
+          {onDelete && [BudgetVersionStatus.DRAFT, BudgetVersionStatus.REJECTED].includes(record.status) && (
             <Tooltip title="Удалить">
               <Popconfirm
                 title="Удалить версию?"

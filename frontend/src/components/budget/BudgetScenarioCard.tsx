@@ -5,7 +5,8 @@
 import React from 'react'
 import { Card, Tag, Descriptions, Typography, Space, Button, Popconfirm } from 'antd'
 import { EditOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons'
-import type { BudgetScenario, BudgetScenarioType } from '@/types/budgetPlanning'
+import { BudgetScenarioType } from '@/types/budgetPlanning'
+import type { BudgetScenario } from '@/types/budgetPlanning'
 
 const { Text, Title } = Typography
 
@@ -18,15 +19,15 @@ interface BudgetScenarioCardProps {
 }
 
 const scenarioTypeColors: Record<BudgetScenarioType, string> = {
-  base: 'blue',
-  optimistic: 'green',
-  pessimistic: 'orange',
+  [BudgetScenarioType.BASE]: 'blue',
+  [BudgetScenarioType.OPTIMISTIC]: 'green',
+  [BudgetScenarioType.PESSIMISTIC]: 'orange',
 }
 
 const scenarioTypeLabels: Record<BudgetScenarioType, string> = {
-  base: 'Базовый',
-  optimistic: 'Оптимистичный',
-  pessimistic: 'Пессимистичный',
+  [BudgetScenarioType.BASE]: 'Базовый',
+  [BudgetScenarioType.OPTIMISTIC]: 'Оптимистичный',
+  [BudgetScenarioType.PESSIMISTIC]: 'Пессимистичный',
 }
 
 export const BudgetScenarioCard: React.FC<BudgetScenarioCardProps> = ({

@@ -185,7 +185,7 @@ export const versionsApi = {
   },
 
   /**
-   * Request changes to a submitted version (SUBMITTED -> CHANGES_REQUESTED)
+   * Request changes to a submitted version (IN_REVIEW -> REVISION_REQUESTED)
    */
   requestChanges: async (versionId: number, comments: string): Promise<BudgetVersion> => {
     const response = await apiClient.post<BudgetVersion>(

@@ -18,6 +18,8 @@ from app.db.models import (
     BudgetCategory,
     BudgetVersionStatusEnum,
     BudgetScenarioTypeEnum,
+    ExpenseTypeEnum,
+    ApprovalActionEnum,
 )
 from app.schemas import (
     # Scenarios
@@ -49,6 +51,36 @@ from app.utils.auth import get_current_active_user
 from app.services.budget_calculator import BudgetCalculator
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
+
+
+def recalculate_version_totals(db: Session, version: BudgetVersion) -> None:
+    """Recalculate cached totals for a budget version."""
+    totals = (
+        db.query(
+            func.coalesce(func.sum(BudgetPlanDetail.planned_amount), 0).label("amount"),
+            BudgetPlanDetail.type,
+        )
+        .filter(BudgetPlanDetail.version_id == version.id)
+        .group_by(BudgetPlanDetail.type)
+        .all()
+    )
+
+    total_amount = Decimal("0")
+    total_capex = Decimal("0")
+    total_opex = Decimal("0")
+
+    for amount, detail_type in totals:
+        amount = Decimal(amount)
+        total_amount += amount
+        if detail_type == ExpenseTypeEnum.CAPEX:
+            total_capex += amount
+        else:
+            total_opex += amount
+
+    version.total_amount = total_amount
+    version.total_capex = total_capex
+    version.total_opex = total_opex
+    db.flush([version])
 
 
 # ============================================================================
@@ -511,8 +543,12 @@ def create_plan_detail(
     # Create new detail
     db_detail = BudgetPlanDetail(**detail.model_dump())
     db.add(db_detail)
+    db.flush()
+
+    recalculate_version_totals(db, version)
     db.commit()
     db.refresh(db_detail)
+    db.refresh(version)
 
     return db_detail
 
@@ -553,8 +589,12 @@ def update_plan_detail(
     for field, value in update_data.items():
         setattr(db_detail, field, value)
 
+    db.flush()
+
+    recalculate_version_totals(db, version)
     db.commit()
     db.refresh(db_detail)
+    db.refresh(version)
 
     return db_detail
 
@@ -590,7 +630,11 @@ def delete_plan_detail(
         )
 
     db.delete(db_detail)
+    db.flush()
+
+    recalculate_version_totals(db, version)
     db.commit()
+    db.refresh(version)
 
     return None
 
@@ -606,7 +650,7 @@ def submit_version(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Submit version for approval (DRAFT -> SUBMITTED)"""
+    """Submit version for approval (DRAFT -> IN_REVIEW)"""
     version = db.query(BudgetVersion).filter(
         BudgetVersion.id == version_id,
         BudgetVersion.department_id == current_user.department_id
@@ -636,20 +680,26 @@ def submit_version(
             detail="Cannot submit empty version. Please add budget details first."
         )
 
-    # Update status
-    version.status = BudgetVersionStatusEnum.SUBMITTED
+    # Update status and metadata
+    version.status = BudgetVersionStatusEnum.IN_REVIEW
+    version.submitted_at = datetime.utcnow()
     db.commit()
     db.refresh(version)
+
+    # Determine iteration number (append to existing history if present)
+    max_iteration = db.query(func.max(BudgetApprovalLog.iteration_number)).filter(
+        BudgetApprovalLog.version_id == version_id
+    ).scalar() or 0
 
     # Create approval log entry
     log_entry = BudgetApprovalLog(
         version_id=version_id,
-        iteration_number=1,
-        action="SUBMITTED",
-        reviewer_id=current_user.id,
+        iteration_number=max_iteration + 1,
+        action=ApprovalActionEnum.SUBMITTED,
         reviewer_name=current_user.username,
+        reviewer_role=current_user.role.value if hasattr(current_user.role, "value") else current_user.role,
         comments=f"Version submitted for approval by {current_user.username}",
-        timestamp=datetime.utcnow()
+        decision_date=datetime.utcnow()
     )
     db.add(log_entry)
     db.commit()
@@ -664,7 +714,7 @@ def approve_version(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Approve a submitted version (SUBMITTED -> APPROVED)"""
+    """Approve a submitted version (IN_REVIEW|REVISION_REQUESTED -> APPROVED)"""
     # Only ADMIN and MANAGER can approve
     from app.db.models import UserRoleEnum
     if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
@@ -684,8 +734,8 @@ def approve_version(
             detail=f"Version with id {version_id} not found"
         )
 
-    # Only SUBMITTED or CHANGES_REQUESTED versions can be approved
-    if version.status not in [BudgetVersionStatusEnum.SUBMITTED, BudgetVersionStatusEnum.CHANGES_REQUESTED]:
+    # Only IN_REVIEW or REVISION_REQUESTED versions can be approved
+    if version.status not in [BudgetVersionStatusEnum.IN_REVIEW, BudgetVersionStatusEnum.REVISION_REQUESTED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot approve version with status {version.status}"
@@ -698,6 +748,8 @@ def approve_version(
 
     # Update status
     version.status = BudgetVersionStatusEnum.APPROVED
+    version.approved_at = datetime.utcnow()
+    version.approved_by = current_user.username
     db.commit()
     db.refresh(version)
 
@@ -705,11 +757,11 @@ def approve_version(
     log_entry = BudgetApprovalLog(
         version_id=version_id,
         iteration_number=max_iteration + 1,
-        action="APPROVED",
-        reviewer_id=current_user.id,
+        action=ApprovalActionEnum.APPROVED,
         reviewer_name=current_user.username,
+        reviewer_role=current_user.role.value if hasattr(current_user.role, "value") else current_user.role,
         comments=comments or f"Version approved by {current_user.username}",
-        timestamp=datetime.utcnow()
+        decision_date=datetime.utcnow()
     )
     db.add(log_entry)
     db.commit()
@@ -724,7 +776,7 @@ def reject_version(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Reject a submitted version (SUBMITTED -> REJECTED)"""
+    """Reject a submitted version (IN_REVIEW|REVISION_REQUESTED -> REJECTED)"""
     # Only ADMIN and MANAGER can reject
     from app.db.models import UserRoleEnum
     if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
@@ -744,8 +796,8 @@ def reject_version(
             detail=f"Version with id {version_id} not found"
         )
 
-    # Only SUBMITTED or CHANGES_REQUESTED versions can be rejected
-    if version.status not in [BudgetVersionStatusEnum.SUBMITTED, BudgetVersionStatusEnum.CHANGES_REQUESTED]:
+    # Only IN_REVIEW or REVISION_REQUESTED versions can be rejected
+    if version.status not in [BudgetVersionStatusEnum.IN_REVIEW, BudgetVersionStatusEnum.REVISION_REQUESTED]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot reject version with status {version.status}"
@@ -758,6 +810,8 @@ def reject_version(
 
     # Update status
     version.status = BudgetVersionStatusEnum.REJECTED
+    version.approved_at = None
+    version.approved_by = None
     db.commit()
     db.refresh(version)
 
@@ -765,11 +819,11 @@ def reject_version(
     log_entry = BudgetApprovalLog(
         version_id=version_id,
         iteration_number=max_iteration + 1,
-        action="REJECTED",
-        reviewer_id=current_user.id,
+        action=ApprovalActionEnum.REJECTED,
         reviewer_name=current_user.username,
+        reviewer_role=current_user.role.value if hasattr(current_user.role, "value") else current_user.role,
         comments=comments,
-        timestamp=datetime.utcnow()
+        decision_date=datetime.utcnow()
     )
     db.add(log_entry)
     db.commit()
@@ -784,7 +838,7 @@ def request_changes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Request changes to a submitted version (SUBMITTED -> CHANGES_REQUESTED)"""
+    """Request changes to a submitted version (IN_REVIEW -> REVISION_REQUESTED)"""
     # Only ADMIN and MANAGER can request changes
     from app.db.models import UserRoleEnum
     if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
@@ -804,8 +858,8 @@ def request_changes(
             detail=f"Version with id {version_id} not found"
         )
 
-    # Only SUBMITTED versions can have changes requested
-    if version.status != BudgetVersionStatusEnum.SUBMITTED:
+    # Only IN_REVIEW versions can have changes requested
+    if version.status != BudgetVersionStatusEnum.IN_REVIEW:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot request changes for version with status {version.status}"
@@ -817,7 +871,7 @@ def request_changes(
     ).scalar() or 0
 
     # Update status
-    version.status = BudgetVersionStatusEnum.CHANGES_REQUESTED
+    version.status = BudgetVersionStatusEnum.REVISION_REQUESTED
     db.commit()
     db.refresh(version)
 
@@ -825,11 +879,11 @@ def request_changes(
     log_entry = BudgetApprovalLog(
         version_id=version_id,
         iteration_number=max_iteration + 1,
-        action="CHANGES_REQUESTED",
-        reviewer_id=current_user.id,
+        action=ApprovalActionEnum.REVISION_REQUESTED,
         reviewer_name=current_user.username,
+        reviewer_role=current_user.role.value if hasattr(current_user.role, "value") else current_user.role,
         comments=comments,
-        timestamp=datetime.utcnow()
+        decision_date=datetime.utcnow()
     )
     db.add(log_entry)
     db.commit()

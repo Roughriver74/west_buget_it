@@ -2,7 +2,7 @@
  * Budget Planning Page
  * Main page for budget planning module with scenarios and versions
  */
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Typography,
   Row,
@@ -18,7 +18,6 @@ import {
   Form,
   Input,
   InputNumber,
-  message,
 } from 'antd'
 import { PlusOutlined, CalculatorOutlined } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
@@ -28,6 +27,7 @@ import { categoriesApi } from '@/api/categories'
 import { BudgetScenarioCard } from '@/components/budget/BudgetScenarioCard'
 import { BudgetVersionTable } from '@/components/budget/BudgetVersionTable'
 import { BudgetCalculatorForm } from '@/components/budget/BudgetCalculatorForm'
+import { BudgetVersionDetailDrawer } from '@/components/budget/BudgetVersionDetailDrawer'
 import {
   useBudgetScenarios,
   useBudgetVersions,
@@ -37,7 +37,8 @@ import {
   useDeleteVersion,
   useSubmitVersion,
 } from '@/hooks/useBudgetPlanning'
-import type { BudgetScenario, BudgetScenarioType } from '@/types/budgetPlanning'
+import { BudgetScenarioType } from '@/types/budgetPlanning'
+import type { BudgetScenario } from '@/types/budgetPlanning'
 
 const { Title, Text } = Typography
 
@@ -49,6 +50,9 @@ const BudgetPlanningPage: React.FC = () => {
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false)
+  const [isVersionDetailOpen, setIsVersionDetailOpen] = useState(false)
+  const [versionDetailMode, setVersionDetailMode] = useState<'view' | 'edit'>('view')
+  const [activeVersionId, setActiveVersionId] = useState<number | null>(null)
   const [scenarioForm] = Form.useForm()
   const [versionForm] = Form.useForm()
 
@@ -66,6 +70,7 @@ const BudgetPlanningPage: React.FC = () => {
   const {
     data: versions = [],
     isLoading: versionsLoading,
+    refetch: refetchVersions,
   } = useBudgetVersions({
     year: selectedYear,
     department_id: departmentId,
@@ -78,6 +83,17 @@ const BudgetPlanningPage: React.FC = () => {
     queryKey: ['categories', { department_id: departmentId, is_active: true }],
     queryFn: () => categoriesApi.getAll({ department_id: departmentId, is_active: true }),
   })
+
+  const categoryOptions = useMemo(
+    () =>
+      categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        type: cat.type as 'OPEX' | 'CAPEX',
+        parentId: cat.parent_id ?? null,
+      })),
+    [categories]
+  )
 
   // Mutations
   const createScenario = useCreateScenario()
@@ -136,6 +152,12 @@ const BudgetPlanningPage: React.FC = () => {
     await submitVersion.mutateAsync(id)
   }
 
+  const openVersionDrawer = (versionId: number, mode: 'view' | 'edit') => {
+    setActiveVersionId(versionId)
+    setVersionDetailMode(mode)
+    setIsVersionDetailOpen(true)
+  }
+
   const handleCopyVersion = (version: any) => {
     versionForm.setFieldsValue({
       version_name: `${version.version_name || 'Версия'} (копия)`,
@@ -145,13 +167,16 @@ const BudgetPlanningPage: React.FC = () => {
   }
 
   const handleViewVersion = (version: any) => {
-    message.info('Просмотр версии - в разработке')
-    // TODO: Navigate to version details page
+    openVersionDrawer(version.id, 'view')
   }
 
   const handleEditVersion = (version: any) => {
-    message.info('Редактирование версии - в разработке')
-    // TODO: Navigate to version edit page
+    openVersionDrawer(version.id, 'edit')
+  }
+
+  const handleVersionDrawerClose = () => {
+    setIsVersionDetailOpen(false)
+    setActiveVersionId(null)
   }
 
   // Generate year options (current year - 2 to current year + 5)
@@ -296,9 +321,9 @@ const BudgetPlanningPage: React.FC = () => {
             rules={[{ required: true, message: 'Выберите тип сценария' }]}
           >
             <Select placeholder="Выберите тип">
-              <Select.Option value="base">Базовый</Select.Option>
-              <Select.Option value="optimistic">Оптимистичный</Select.Option>
-              <Select.Option value="pessimistic">Пессимистичный</Select.Option>
+              <Select.Option value={BudgetScenarioType.BASE}>Базовый</Select.Option>
+              <Select.Option value={BudgetScenarioType.OPTIMISTIC}>Оптимистичный</Select.Option>
+              <Select.Option value={BudgetScenarioType.PESSIMISTIC}>Пессимистичный</Select.Option>
             </Select>
           </Form.Item>
 
@@ -373,6 +398,15 @@ const BudgetPlanningPage: React.FC = () => {
         categories={categories}
         defaultYear={selectedYear}
         departmentId={departmentId || 0}
+      />
+
+      <BudgetVersionDetailDrawer
+        open={isVersionDetailOpen}
+        mode={versionDetailMode}
+        versionId={activeVersionId}
+        categories={categoryOptions}
+        onClose={handleVersionDrawerClose}
+        onVersionUpdated={refetchVersions}
       />
     </div>
   )

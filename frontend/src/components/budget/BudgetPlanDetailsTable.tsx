@@ -2,14 +2,31 @@
  * Budget Plan Details Table Component
  * Editable table for monthly budget planning by category
  */
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Table, InputNumber, Button, Space, message, Typography } from 'antd'
-import { SaveOutlined, UndoOutlined } from '@ant-design/icons'
+import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
-import type { BudgetPlanDetail, BudgetPlanDetailCreate } from '@/types/budgetPlanning'
+import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
 
 const { Text } = Typography
+
+const CATEGORY_COLUMN_WIDTH = 320
+const MONTH_COLUMN_WIDTH = 140
+const TOTAL_COLUMN_WIDTH = 180
+
+const currencyFormatter = new Intl.NumberFormat('ru-RU', {
+  style: 'currency',
+  currency: 'RUB',
+  maximumFractionDigits: 0,
+})
+
+const numberFormatter = new Intl.NumberFormat('ru-RU', {
+  maximumFractionDigits: 0,
+})
+
+const formatCurrency = (value: number) => currencyFormatter.format(Number.isFinite(value) ? value : 0)
+const formatNumber = (value: number) => numberFormatter.format(Number.isFinite(value) ? value : 0)
 
 const MONTHS = [
   { key: 1, label: 'Январь' },
@@ -30,18 +47,24 @@ interface Category {
   id: number
   name: string
   type: 'OPEX' | 'CAPEX'
+  parentId: number | null
 }
 
 interface BudgetPlanDetailsTableProps {
   versionId: number
   categories: Category[]
   isEditable: boolean
+  onAfterSave?: () => void
 }
 
 interface CategoryRow {
   categoryId: number
   categoryName: string
   categoryType: 'OPEX' | 'CAPEX'
+  categoryLevel: number
+  hasChildren: boolean
+  descendantIds: number[]
+  parentId: number | null
   [key: string]: any // For month values (month_1, month_2, etc.)
 }
 
@@ -49,6 +72,7 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
   versionId,
   categories,
   isEditable,
+  onAfterSave,
 }) => {
   const { data: planDetails = [], isLoading } = usePlanDetails(versionId)
   const createMutation = useCreatePlanDetail()
@@ -56,45 +80,146 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
 
   const [data, setData] = useState<CategoryRow[]>([])
   const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
 
-  // Initialize data from categories and plan details
-  useEffect(() => {
-    if (categories.length === 0) return
+  const { orderedCategories, descendantsMap } = useMemo(() => {
+    if (!categories.length) {
+      return {
+        orderedCategories: [] as Array<Category & { level: number; hasChildren: boolean }>,
+        descendantsMap: new Map<number, number[]>(),
+      }
+    }
 
-    const rows: CategoryRow[] = categories.map((category) => {
+    const byParent = new Map<number | null, Category[]>()
+    categories.forEach((cat) => {
+      const parentKey = cat.parentId ?? null
+      if (!byParent.has(parentKey)) {
+        byParent.set(parentKey, [])
+      }
+      byParent.get(parentKey)!.push(cat)
+    })
+
+    const result: Array<Category & { level: number; hasChildren: boolean }> = []
+    const visited = new Set<number>()
+    const descendantsMap = new Map<number, number[]>()
+
+    const visit = (cat: Category, level: number): number[] => {
+      if (visited.has(cat.id)) {
+        return descendantsMap.get(cat.id) ?? []
+      }
+      visited.add(cat.id)
+      const children = byParent.get(cat.id) ?? []
+      result.push({ ...cat, level, hasChildren: children.length > 0 })
+      const descendants: number[] = []
+      children.forEach((child) => {
+        const childDesc = visit(child, level + 1)
+        if (childDesc.length > 0) {
+          descendants.push(...childDesc)
+        } else {
+          descendants.push(child.id)
+        }
+      })
+      descendantsMap.set(cat.id, descendants)
+      return descendants
+    }
+
+    const rootNodes = byParent.get(null) ?? []
+    rootNodes.forEach((root) => visit(root, 0))
+
+    categories.forEach((cat) => {
+      if (!visited.has(cat.id)) {
+        visit(cat, 0)
+      }
+    })
+
+    return { orderedCategories: result, descendantsMap }
+  }, [categories])
+
+  const buildRows = useCallback((): CategoryRow[] => {
+    if (orderedCategories.length === 0) {
+      return []
+    }
+
+    return orderedCategories.map((category) => {
       const row: CategoryRow = {
         categoryId: category.id,
         categoryName: category.name,
         categoryType: category.type,
+        categoryLevel: category.level,
+        hasChildren: category.hasChildren,
+        descendantIds: descendantsMap.get(category.id) ?? [],
+        parentId: category.parentId ?? null,
       }
 
-      // Initialize all months with 0
       MONTHS.forEach((month) => {
         row[`month_${month.key}`] = 0
       })
 
-      // Fill in values from planDetails
       const categoryDetails = planDetails.filter((d) => d.category_id === category.id)
       categoryDetails.forEach((detail) => {
-        row[`month_${detail.month}`] = detail.planned_amount
+        const amount = Number(detail.planned_amount ?? 0)
+        row[`month_${detail.month}`] = amount
         row[`detail_${detail.month}_id`] = detail.id
       })
 
       return row
     })
+  }, [orderedCategories, planDetails, descendantsMap])
 
-    setData(rows)
-  }, [categories, planDetails])
+  // Initialize data from categories and plan details
+  useEffect(() => {
+    setData(buildRows())
+    setChangedCells(new Set())
+  }, [buildRows])
+
+  useEffect(() => {
+    setCollapsed(new Set())
+  }, [versionId])
+
+  const dataById = useMemo(() => new Map(data.map((row) => [row.categoryId, row])), [data])
+
+  const parentLookup = useMemo(() => new Map(data.map((row) => [row.categoryId, row.parentId])), [data])
+
+  const isRowVisible = useCallback(
+    (row: CategoryRow) => {
+      let parentId = row.parentId
+      while (parentId) {
+        if (collapsed.has(parentId)) {
+          return false
+        }
+        parentId = parentLookup.get(parentId) ?? null
+      }
+      return true
+    },
+    [collapsed, parentLookup]
+  )
+
+  const visibleData = useMemo(() => data.filter(isRowVisible), [data, isRowVisible])
+
+  const toggleCollapse = useCallback((categoryId: number) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(categoryId)) {
+        next.delete(categoryId)
+      } else {
+        next.add(categoryId)
+      }
+      return next
+    })
+  }, [])
 
   const handleCellChange = (categoryId: number, month: number, value: number | null) => {
     setData((prevData) =>
       prevData.map((row) => {
         if (row.categoryId === categoryId) {
+          if (row.hasChildren) {
+            return row
+          }
           const cellKey = `${categoryId}_${month}`
           setChangedCells((prev) => new Set(prev).add(cellKey))
           return {
             ...row,
-            [`month_${month}`]: value || 0,
+            [`month_${month}`]: Number(value ?? 0),
           }
         }
         return row
@@ -103,7 +228,7 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
   }
 
   const handleSave = async () => {
-    const updates: Array<{ id?: number; data: BudgetPlanDetailCreate }> = []
+    const updates: Array<{ id?: number; data: BudgetPlanDetailCreate | BudgetPlanDetailUpdate }> = []
 
     // Collect all changed cells
     changedCells.forEach((cellKey) => {
@@ -115,31 +240,42 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       if (!row) return
 
       const detailId = row[`detail_${month}_id`]
-      const plannedAmount = row[`month_${month}`] || 0
+      const plannedAmount = Number(row[`month_${month}`] || 0)
+      const baseCreatePayload: BudgetPlanDetailCreate = {
+        version_id: versionId,
+        category_id: categoryId,
+        month,
+        planned_amount: plannedAmount,
+        type: row.categoryType,
+      }
 
       if (detailId) {
+        if (row.hasChildren) {
+          return
+        }
         // Update existing detail
         updates.push({
           id: detailId,
           data: {
-            version_id: versionId,
-            category_id: categoryId,
-            month,
             planned_amount: plannedAmount,
-          },
+            type: row.categoryType,
+          } satisfies BudgetPlanDetailUpdate,
         })
       } else {
+        if (row.hasChildren && plannedAmount === 0) {
+          return
+        }
         // Create new detail
         updates.push({
-          data: {
-            version_id: versionId,
-            category_id: categoryId,
-            month,
-            planned_amount: plannedAmount,
-          },
+          data: baseCreatePayload,
         })
       }
     })
+
+    if (updates.length === 0) {
+      message.info('Нет изменений для сохранения')
+      return
+    }
 
     try {
       // Execute all updates
@@ -153,6 +289,7 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
 
       setChangedCells(new Set())
       message.success(`Сохранено ${updates.length} изменений`)
+      onAfterSave?.()
     } catch (error) {
       message.error('Ошибка при сохранении')
     }
@@ -160,44 +297,39 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
 
   const handleReset = () => {
     setChangedCells(new Set())
-    // Reset data from planDetails
-    const rows: CategoryRow[] = categories.map((category) => {
-      const row: CategoryRow = {
-        categoryId: category.id,
-        categoryName: category.name,
-        categoryType: category.type,
-      }
-
-      MONTHS.forEach((month) => {
-        row[`month_${month.key}`] = 0
-      })
-
-      const categoryDetails = planDetails.filter((d) => d.category_id === category.id)
-      categoryDetails.forEach((detail) => {
-        row[`month_${detail.month}`] = detail.planned_amount
-        row[`detail_${detail.month}_id`] = detail.id
-      })
-
-      return row
-    })
-
-    setData(rows)
+    setData(buildRows())
     message.info('Изменения отменены')
   }
 
   // Calculate row total
   const getRowTotal = (row: CategoryRow) => {
-    return MONTHS.reduce((sum, month) => sum + (row[`month_${month.key}`] || 0), 0)
+    return MONTHS.reduce((sum, month) => sum + Number(getMonthValue(row, month.key)), 0)
   }
 
   // Calculate column total
   const getColumnTotal = (month: number) => {
-    return data.reduce((sum, row) => sum + (row[`month_${month}`] || 0), 0)
+    return data
+      .filter((row) => !row.hasChildren)
+      .reduce((sum, row) => sum + Number(row[`month_${month}`] || 0), 0)
   }
 
   // Calculate grand total
   const getGrandTotal = () => {
-    return data.reduce((sum, row) => sum + getRowTotal(row), 0)
+    return data
+      .filter((row) => !row.hasChildren)
+      .reduce((sum, row) => sum + getRowTotal(row), 0)
+  }
+
+  const getMonthValue = (row: CategoryRow, monthKey: number) => {
+    if (!row.hasChildren) {
+      return Number(row[`month_${monthKey}`] || 0)
+    }
+
+    return row.descendantIds.reduce((sum, id) => {
+      const child = dataById.get(id)
+      if (!child) return sum
+      return sum + Number(child[`month_${monthKey}`] || 0)
+    }, 0)
   }
 
   const columns: ColumnsType<CategoryRow> = [
@@ -206,33 +338,59 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       dataIndex: 'categoryName',
       key: 'categoryName',
       fixed: 'left',
-      width: 200,
-      render: (text, record) => (
-        <div>
-          <div>{text}</div>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {record.categoryType}
-          </Text>
-        </div>
-      ),
+      width: CATEGORY_COLUMN_WIDTH,
+      render: (_text, record) => {
+        const isCollapsed = collapsed.has(record.categoryId)
+        return (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              paddingLeft: record.categoryLevel * 16,
+              fontWeight: record.hasChildren ? 600 : undefined,
+              gap: 8,
+            }}
+          >
+            {record.hasChildren && (
+              <span
+                onClick={() => toggleCollapse(record.categoryId)}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+              >
+                {isCollapsed ? <RightOutlined /> : <DownOutlined />}
+              </span>
+            )}
+            {!record.hasChildren && <span style={{ width: 14 }} />}
+            <div>
+              <div>{record.categoryName}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.categoryType}
+              </Text>
+            </div>
+          </div>
+        )
+      },
     },
     ...MONTHS.map((month) => ({
       title: month.label,
       dataIndex: `month_${month.key}`,
       key: `month_${month.key}`,
-      width: 120,
+      width: MONTH_COLUMN_WIDTH,
       align: 'right' as const,
-      render: (value: number, record: CategoryRow) => {
-        if (!isEditable) {
-          return <Text>{value?.toLocaleString('ru-RU') || 0}</Text>
+      render: (_value: number, record: CategoryRow) => {
+        const displayValue = getMonthValue(record, month.key)
+        const formatted = formatNumber(Number(displayValue ?? 0))
+
+        if (!isEditable || record.hasChildren) {
+          return <Text>{formatted}</Text>
         }
 
         const cellKey = `${record.categoryId}_${month.key}`
         const isChanged = changedCells.has(cellKey)
+        const inputValue = Number(record[`month_${month.key}`] || 0)
 
         return (
           <InputNumber
-            value={value}
+            value={inputValue}
             onChange={(val) => handleCellChange(record.categoryId, month.key, val)}
             style={{
               width: '100%',
@@ -249,10 +407,10 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       title: 'Итого',
       key: 'total',
       fixed: 'right',
-      width: 150,
+      width: TOTAL_COLUMN_WIDTH,
       align: 'right' as const,
       render: (_, record) => (
-        <Text strong>{getRowTotal(record).toLocaleString('ru-RU')} ₽</Text>
+        <Text strong>{formatCurrency(getRowTotal(record))}</Text>
       ),
     },
   ]
@@ -265,20 +423,21 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
         </Table.Summary.Cell>
         {MONTHS.map((month, index) => (
           <Table.Summary.Cell key={month.key} index={index + 1} align="right">
-            <Text strong>{getColumnTotal(month.key).toLocaleString('ru-RU')}</Text>
+            <Text strong>{formatCurrency(getColumnTotal(month.key))}</Text>
           </Table.Summary.Cell>
         ))}
         <Table.Summary.Cell index={13} align="right">
-          <Text strong style={{ fontSize: 16 }}>
-            {getGrandTotal().toLocaleString('ru-RU')} ₽
-          </Text>
+          <Text strong style={{ fontSize: 16 }}>{formatCurrency(getGrandTotal())}</Text>
         </Table.Summary.Cell>
       </Table.Summary.Row>
     </Table.Summary>
   )
 
+  const tableScrollX =
+    CATEGORY_COLUMN_WIDTH + MONTHS.length * MONTH_COLUMN_WIDTH + TOTAL_COLUMN_WIDTH + 120
+
   return (
-    <div>
+    <div style={{ overflowX: 'auto' }}>
       {isEditable && changedCells.size > 0 && (
         <Space style={{ marginBottom: 16 }}>
           <Button
@@ -297,14 +456,15 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
 
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={visibleData}
         rowKey="categoryId"
         loading={isLoading}
         pagination={false}
-        scroll={{ x: 1800 }}
+        scroll={{ x: tableScrollX }}
         summary={() => summaryRow}
         bordered
         size="small"
+        tableLayout="fixed"
       />
     </div>
   )

@@ -131,11 +131,20 @@ export const useBudgetVersion = (id: number) => {
   })
 }
 
-export const useBudgetVersionWithDetails = (id: number) => {
+export const useBudgetVersionWithDetails = (
+  id?: number,
+  options?: {
+    enabled?: boolean
+  }
+) => {
+  const enabled = !!id && (options?.enabled ?? true)
+  const { enabled: _ignored, ...restOptions } = options ?? {}
+
   return useQuery({
-    queryKey: budgetPlanningKeys.versionWithDetails(id),
-    queryFn: () => versionsApi.getWithDetails(id),
-    enabled: !!id,
+    queryKey: budgetPlanningKeys.versionWithDetails(id ?? 0),
+    queryFn: () => versionsApi.getById(id as number, true, true),
+    enabled,
+    ...restOptions,
   })
 }
 
