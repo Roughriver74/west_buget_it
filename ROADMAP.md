@@ -331,6 +331,27 @@
   - Инструкции по активации HTTPS в production
   - README для тестов с примерами использования
 
+### Система типов премий для ФОТ (2025-10-27)
+- ✅ Разделение премий по типам (месячные, квартальные, годовые)
+  - Employee: добавлены поля monthly_bonus_base, quarterly_bonus_base, annual_bonus_base
+  - PayrollPlan: заменено поле bonus на monthly_bonus, quarterly_bonus, annual_bonus
+  - PayrollActual: заменено поле bonus_paid на monthly_bonus_paid, quarterly_bonus_paid, annual_bonus_paid
+- ✅ Миграция базы данных (alembic)
+  - Автоматическая миграция существующих данных (bonus -> monthly_bonus)
+  - Поддержка rollback с сохранением данных
+  - Значения по умолчанию: 0 для новых полей
+- ✅ Обновление Pydantic схем
+  - EmployeeBase, EmployeeCreate, EmployeeUpdate: поддержка базовых ставок премий
+  - PayrollPlanBase, PayrollPlanCreate, PayrollPlanUpdate: раздельные поля для каждого типа премии
+  - PayrollActualBase, PayrollActualCreate, PayrollActualUpdate: фактические выплаты по типам
+  - Analytics схемы готовы к отображению разбивки премий (PayrollStructureMonth, PayrollDynamics, PayrollForecast)
+- ✅ Обновление API endpoints
+  - POST /payroll/plans: автоматический расчет total_planned с учетом всех типов премий
+  - PUT /payroll/plans/{id}: обновление расчета при редактировании
+  - POST /payroll/actuals: автоматический расчет total_paid с учетом всех типов премий
+  - PUT /payroll/actuals/{id}: обновление расчета при редактировании
+  - Формула: total = base_salary + monthly_bonus + quarterly_bonus + annual_bonus + other_payments
+
 ### Rate Limiting и Audit Logging (2025-10-25)
 - ✅ Rate Limiting Middleware
   - Sliding window алгоритм с отслеживанием по IP
