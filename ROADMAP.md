@@ -364,6 +364,16 @@
   - EmployeeDetailPage: таблицы планов/фактов с разбивкой премий по типам
   - EmployeeDetailPage: карточка "Годовые премии (база)", Descriptions с полями премий
   - Полная детализация всех типов премий во всех интерфейсах
+- ✅ Backend: Аналитика с разбивкой типов премий
+  - get_payroll_structure(): обновлена агрегация для трех типов премий (monthly, quarterly, annual)
+  - get_payroll_dynamics(): план vs факт с детализацией по каждому типу премии
+  - get_payroll_forecast(): прогнозирование каждого типа премии отдельно
+  - Экспорт Excel: планы и факты с раздельными колонками для всех типов премий
+- ✅ Frontend: Визуализация аналитики премий
+  - PayrollAnalyticsPage: обновлен stacked bar chart (5 сегментов: оклад + 3 типа премий + прочие)
+  - PayrollAnalyticsPage: pie chart с детализацией структуры ФОТ по всем компонентам
+  - Использование distinct colors для каждого типа премии
+  - Полная интеграция с обновленными analytics endpoints
 
 ### Rate Limiting и Audit Logging (2025-10-25)
 - ✅ Rate Limiting Middleware
