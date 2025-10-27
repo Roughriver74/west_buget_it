@@ -202,6 +202,60 @@ export const useSubmitVersion = () => {
   })
 }
 
+export const useApproveVersion = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, comments }: { id: number; comments?: string }) =>
+      versionsApi.approve(id, comments),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.version(variables.id) })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.approvalLogs(variables.id) })
+      message.success('Версия утверждена')
+    },
+    onError: () => {
+      message.error('Ошибка при утверждении версии')
+    },
+  })
+}
+
+export const useRejectVersion = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, comments }: { id: number; comments: string }) =>
+      versionsApi.reject(id, comments),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.version(variables.id) })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.approvalLogs(variables.id) })
+      message.success('Версия отклонена')
+    },
+    onError: () => {
+      message.error('Ошибка при отклонении версии')
+    },
+  })
+}
+
+export const useRequestChanges = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, comments }: { id: number; comments: string }) =>
+      versionsApi.requestChanges(id, comments),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.version(variables.id) })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.approvalLogs(variables.id) })
+      message.success('Запрошены изменения')
+    },
+    onError: () => {
+      message.error('Ошибка при запросе изменений')
+    },
+  })
+}
+
 // ============================================================================
 // Plan Details Hooks
 // ============================================================================

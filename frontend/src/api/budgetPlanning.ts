@@ -151,6 +151,49 @@ export const versionsApi = {
 
     return versionsApi.create(createData)
   },
+
+  /**
+   * Submit version for approval (DRAFT -> SUBMITTED)
+   */
+  submit: async (versionId: number): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/submit`
+    )
+    return response.data
+  },
+
+  /**
+   * Approve a submitted version (SUBMITTED -> APPROVED)
+   */
+  approve: async (versionId: number, comments?: string): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/approve`,
+      { comments }
+    )
+    return response.data
+  },
+
+  /**
+   * Reject a submitted version (SUBMITTED -> REJECTED)
+   */
+  reject: async (versionId: number, comments: string): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/reject`,
+      { comments }
+    )
+    return response.data
+  },
+
+  /**
+   * Request changes to a submitted version (SUBMITTED -> CHANGES_REQUESTED)
+   */
+  requestChanges: async (versionId: number, comments: string): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/request-changes`,
+      { comments }
+    )
+    return response.data
+  },
 }
 
 // ============================================================================

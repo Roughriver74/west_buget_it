@@ -413,6 +413,539 @@ def delete_version(
 
 
 # ============================================================================
+# Budget Plan Details Endpoints
+# ============================================================================
+
+
+@router.get("/plan-details", response_model=List[BudgetPlanDetailInDB])
+def get_plan_details(
+    version_id: Optional[int] = Query(None, description="Filter by version ID"),
+    category_id: Optional[int] = Query(None, description="Filter by category ID"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Filter by month"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get budget plan details with optional filters"""
+    query = db.query(BudgetPlanDetail)
+
+    # Apply filters
+    if version_id:
+        query = query.filter(BudgetPlanDetail.version_id == version_id)
+    if category_id:
+        query = query.filter(BudgetPlanDetail.category_id == category_id)
+    if month:
+        query = query.filter(BudgetPlanDetail.month == month)
+
+    # Multi-tenancy: filter by department through version
+    query = query.join(BudgetVersion).filter(
+        BudgetVersion.department_id == current_user.department_id
+    )
+
+    details = query.order_by(
+        BudgetPlanDetail.version_id,
+        BudgetPlanDetail.month,
+        BudgetPlanDetail.category_id
+    ).all()
+
+    return details
+
+
+@router.get("/plan-details/{detail_id}", response_model=BudgetPlanDetailInDB)
+def get_plan_detail(
+    detail_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get a specific plan detail by ID"""
+    detail = db.query(BudgetPlanDetail).join(BudgetVersion).filter(
+        BudgetPlanDetail.id == detail_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan detail with id {detail_id} not found"
+        )
+
+    return detail
+
+
+@router.post("/plan-details", response_model=BudgetPlanDetailInDB, status_code=status.HTTP_201_CREATED)
+def create_plan_detail(
+    detail: BudgetPlanDetailCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a new plan detail"""
+    # Verify version exists and belongs to user's department
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == detail.version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {detail.version_id} not found"
+        )
+
+    # Don't allow editing approved versions
+    if version.status == BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot edit approved version"
+        )
+
+    # Verify category exists
+    category = db.query(BudgetCategory).filter(
+        BudgetCategory.id == detail.category_id
+    ).first()
+
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Category with id {detail.category_id} not found"
+        )
+
+    # Create new detail
+    db_detail = BudgetPlanDetail(**detail.model_dump())
+    db.add(db_detail)
+    db.commit()
+    db.refresh(db_detail)
+
+    return db_detail
+
+
+@router.put("/plan-details/{detail_id}", response_model=BudgetPlanDetailInDB)
+def update_plan_detail(
+    detail_id: int,
+    detail: BudgetPlanDetailUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Update a plan detail"""
+    # Get detail with department check
+    db_detail = db.query(BudgetPlanDetail).join(BudgetVersion).filter(
+        BudgetPlanDetail.id == detail_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not db_detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan detail with id {detail_id} not found"
+        )
+
+    # Check version status
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == db_detail.version_id
+    ).first()
+
+    if version.status == BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot edit approved version"
+        )
+
+    # Update fields
+    update_data = detail.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_detail, field, value)
+
+    db.commit()
+    db.refresh(db_detail)
+
+    return db_detail
+
+
+@router.delete("/plan-details/{detail_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_plan_detail(
+    detail_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a plan detail"""
+    # Get detail with department check
+    db_detail = db.query(BudgetPlanDetail).join(BudgetVersion).filter(
+        BudgetPlanDetail.id == detail_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not db_detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan detail with id {detail_id} not found"
+        )
+
+    # Check version status
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == db_detail.version_id
+    ).first()
+
+    if version.status == BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete from approved version"
+        )
+
+    db.delete(db_detail)
+    db.commit()
+
+    return None
+
+
+# ============================================================================
+# Version Approval Workflow Endpoints
+# ============================================================================
+
+
+@router.post("/versions/{version_id}/submit", response_model=BudgetVersionInDB)
+def submit_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Submit version for approval (DRAFT -> SUBMITTED)"""
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only DRAFT versions can be submitted
+    if version.status != BudgetVersionStatusEnum.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot submit version with status {version.status}. Only DRAFT versions can be submitted."
+        )
+
+    # Check if version has any plan details
+    details_count = db.query(func.count(BudgetPlanDetail.id)).filter(
+        BudgetPlanDetail.version_id == version_id
+    ).scalar()
+
+    if details_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot submit empty version. Please add budget details first."
+        )
+
+    # Update status
+    version.status = BudgetVersionStatusEnum.SUBMITTED
+    db.commit()
+    db.refresh(version)
+
+    # Create approval log entry
+    log_entry = BudgetApprovalLog(
+        version_id=version_id,
+        iteration_number=1,
+        action="SUBMITTED",
+        reviewer_id=current_user.id,
+        reviewer_name=current_user.username,
+        comments=f"Version submitted for approval by {current_user.username}",
+        timestamp=datetime.utcnow()
+    )
+    db.add(log_entry)
+    db.commit()
+
+    return version
+
+
+@router.post("/versions/{version_id}/approve", response_model=BudgetVersionInDB)
+def approve_version(
+    version_id: int,
+    comments: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Approve a submitted version (SUBMITTED -> APPROVED)"""
+    # Only ADMIN and MANAGER can approve
+    from app.db.models import UserRoleEnum
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER users can approve budget versions"
+        )
+
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only SUBMITTED or CHANGES_REQUESTED versions can be approved
+    if version.status not in [BudgetVersionStatusEnum.SUBMITTED, BudgetVersionStatusEnum.CHANGES_REQUESTED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot approve version with status {version.status}"
+        )
+
+    # Get current iteration number
+    max_iteration = db.query(func.max(BudgetApprovalLog.iteration_number)).filter(
+        BudgetApprovalLog.version_id == version_id
+    ).scalar() or 0
+
+    # Update status
+    version.status = BudgetVersionStatusEnum.APPROVED
+    db.commit()
+    db.refresh(version)
+
+    # Create approval log entry
+    log_entry = BudgetApprovalLog(
+        version_id=version_id,
+        iteration_number=max_iteration + 1,
+        action="APPROVED",
+        reviewer_id=current_user.id,
+        reviewer_name=current_user.username,
+        comments=comments or f"Version approved by {current_user.username}",
+        timestamp=datetime.utcnow()
+    )
+    db.add(log_entry)
+    db.commit()
+
+    return version
+
+
+@router.post("/versions/{version_id}/reject", response_model=BudgetVersionInDB)
+def reject_version(
+    version_id: int,
+    comments: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Reject a submitted version (SUBMITTED -> REJECTED)"""
+    # Only ADMIN and MANAGER can reject
+    from app.db.models import UserRoleEnum
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER users can reject budget versions"
+        )
+
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only SUBMITTED or CHANGES_REQUESTED versions can be rejected
+    if version.status not in [BudgetVersionStatusEnum.SUBMITTED, BudgetVersionStatusEnum.CHANGES_REQUESTED]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot reject version with status {version.status}"
+        )
+
+    # Get current iteration number
+    max_iteration = db.query(func.max(BudgetApprovalLog.iteration_number)).filter(
+        BudgetApprovalLog.version_id == version_id
+    ).scalar() or 0
+
+    # Update status
+    version.status = BudgetVersionStatusEnum.REJECTED
+    db.commit()
+    db.refresh(version)
+
+    # Create approval log entry
+    log_entry = BudgetApprovalLog(
+        version_id=version_id,
+        iteration_number=max_iteration + 1,
+        action="REJECTED",
+        reviewer_id=current_user.id,
+        reviewer_name=current_user.username,
+        comments=comments,
+        timestamp=datetime.utcnow()
+    )
+    db.add(log_entry)
+    db.commit()
+
+    return version
+
+
+@router.post("/versions/{version_id}/request-changes", response_model=BudgetVersionInDB)
+def request_changes(
+    version_id: int,
+    comments: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Request changes to a submitted version (SUBMITTED -> CHANGES_REQUESTED)"""
+    # Only ADMIN and MANAGER can request changes
+    from app.db.models import UserRoleEnum
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER users can request changes to budget versions"
+        )
+
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only SUBMITTED versions can have changes requested
+    if version.status != BudgetVersionStatusEnum.SUBMITTED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot request changes for version with status {version.status}"
+        )
+
+    # Get current iteration number
+    max_iteration = db.query(func.max(BudgetApprovalLog.iteration_number)).filter(
+        BudgetApprovalLog.version_id == version_id
+    ).scalar() or 0
+
+    # Update status
+    version.status = BudgetVersionStatusEnum.CHANGES_REQUESTED
+    db.commit()
+    db.refresh(version)
+
+    # Create approval log entry
+    log_entry = BudgetApprovalLog(
+        version_id=version_id,
+        iteration_number=max_iteration + 1,
+        action="CHANGES_REQUESTED",
+        reviewer_id=current_user.id,
+        reviewer_name=current_user.username,
+        comments=comments,
+        timestamp=datetime.utcnow()
+    )
+    db.add(log_entry)
+    db.commit()
+
+    return version
+
+
+# ============================================================================
+# Version Comparison Endpoints
+# ============================================================================
+
+
+@router.get("/versions/compare", response_model=VersionComparisonResult)
+def compare_versions(
+    v1: int = Query(..., description="First version ID"),
+    v2: int = Query(..., description="Second version ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Compare two budget versions"""
+    # Get both versions
+    version1 = db.query(BudgetVersion).filter(
+        BudgetVersion.id == v1,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    version2 = db.query(BudgetVersion).filter(
+        BudgetVersion.id == v2,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version1:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {v1} not found"
+        )
+
+    if not version2:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {v2} not found"
+        )
+
+    # Get plan details for both versions
+    details1 = db.query(BudgetPlanDetail).filter(
+        BudgetPlanDetail.version_id == v1
+    ).all()
+
+    details2 = db.query(BudgetPlanDetail).filter(
+        BudgetPlanDetail.version_id == v2
+    ).all()
+
+    # Calculate totals
+    total1 = sum(d.planned_amount for d in details1)
+    total2 = sum(d.planned_amount for d in details2)
+    diff_amount = total2 - total1
+    diff_percent = (diff_amount / total1 * 100) if total1 > 0 else 0
+
+    # Group by category for comparison
+    from collections import defaultdict
+    category_map1 = defaultdict(Decimal)
+    category_map2 = defaultdict(Decimal)
+
+    for d in details1:
+        category_map1[d.category_id] += d.planned_amount
+
+    for d in details2:
+        category_map2[d.category_id] += d.planned_amount
+
+    # Build category comparisons
+    all_categories = set(category_map1.keys()) | set(category_map2.keys())
+    category_comparisons = []
+
+    for cat_id in all_categories:
+        amount1 = category_map1.get(cat_id, Decimal(0))
+        amount2 = category_map2.get(cat_id, Decimal(0))
+        diff = amount2 - amount1
+        diff_pct = (diff / amount1 * 100) if amount1 > 0 else 0
+
+        # Get category name
+        category = db.query(BudgetCategory).filter(BudgetCategory.id == cat_id).first()
+
+        category_comparisons.append({
+            "category_id": cat_id,
+            "category_name": category.name if category else f"Category {cat_id}",
+            "version1_amount": float(amount1),
+            "version2_amount": float(amount2),
+            "difference_amount": float(diff),
+            "difference_percent": float(diff_pct)
+        })
+
+    # Sort by absolute difference
+    category_comparisons.sort(key=lambda x: abs(x["difference_amount"]), reverse=True)
+
+    return VersionComparisonResult(
+        version1={
+            "id": version1.id,
+            "version_name": version1.version_name,
+            "version_number": version1.version_number,
+            "status": version1.status,
+            "total_amount": float(total1)
+        },
+        version2={
+            "id": version2.id,
+            "version_name": version2.version_name,
+            "version_number": version2.version_number,
+            "status": version2.status,
+            "total_amount": float(total2)
+        },
+        total_difference_amount=float(diff_amount),
+        total_difference_percent=float(diff_percent),
+        category_comparisons=category_comparisons
+    )
+
+
+# ============================================================================
 # Calculator Endpoints
 # ============================================================================
 
