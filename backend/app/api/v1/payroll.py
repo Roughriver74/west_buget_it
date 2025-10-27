@@ -161,8 +161,14 @@ async def create_payroll_plan(
             detail="Payroll plan already exists for this employee, year, and month"
         )
 
-    # Calculate total planned amount
-    total_planned = plan_data.base_salary + plan_data.bonus + plan_data.other_payments
+    # Calculate total planned amount (salary + all bonus types + other)
+    total_planned = (
+        plan_data.base_salary +
+        plan_data.monthly_bonus +
+        plan_data.quarterly_bonus +
+        plan_data.annual_bonus +
+        plan_data.other_payments
+    )
 
     # Create new payroll plan
     new_plan = PayrollPlan(
@@ -213,8 +219,14 @@ async def update_payroll_plan(
     for field, value in update_data.items():
         setattr(plan, field, value)
 
-    # Recalculate total planned amount
-    plan.total_planned = plan.base_salary + plan.bonus + plan.other_payments
+    # Recalculate total planned amount (salary + all bonus types + other)
+    plan.total_planned = (
+        plan.base_salary +
+        plan.monthly_bonus +
+        plan.quarterly_bonus +
+        plan.annual_bonus +
+        plan.other_payments
+    )
 
     db.commit()
     db.refresh(plan)
@@ -343,8 +355,14 @@ async def create_payroll_actual(
             detail="Payroll actual already exists for this employee, year, and month"
         )
 
-    # Calculate total paid amount
-    total_paid = actual_data.base_salary_paid + actual_data.bonus_paid + actual_data.other_payments_paid
+    # Calculate total paid amount (salary + all bonus types + other)
+    total_paid = (
+        actual_data.base_salary_paid +
+        actual_data.monthly_bonus_paid +
+        actual_data.quarterly_bonus_paid +
+        actual_data.annual_bonus_paid +
+        actual_data.other_payments_paid
+    )
 
     # Create new payroll actual
     new_actual = PayrollActual(
@@ -395,8 +413,14 @@ async def update_payroll_actual(
     for field, value in update_data.items():
         setattr(actual, field, value)
 
-    # Recalculate total paid amount
-    actual.total_paid = actual.base_salary_paid + actual.bonus_paid + actual.other_payments_paid
+    # Recalculate total paid amount (salary + all bonus types + other)
+    actual.total_paid = (
+        actual.base_salary_paid +
+        actual.monthly_bonus_paid +
+        actual.quarterly_bonus_paid +
+        actual.annual_bonus_paid +
+        actual.other_payments_paid
+    )
 
     db.commit()
     db.refresh(actual)

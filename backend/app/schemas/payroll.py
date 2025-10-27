@@ -17,6 +17,10 @@ class EmployeeBase(BaseModel):
     fire_date: Optional[date] = None
     status: EmployeeStatusEnum = EmployeeStatusEnum.ACTIVE
     base_salary: Decimal = Field(..., ge=0)
+    # Bonus base rates (базовые ставки премий)
+    monthly_bonus_base: Decimal = Field(0, ge=0, description="Базовая месячная премия")
+    quarterly_bonus_base: Decimal = Field(0, ge=0, description="Базовая квартальная премия")
+    annual_bonus_base: Decimal = Field(0, ge=0, description="Базовая годовая премия")
     department_id: int
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
@@ -37,6 +41,10 @@ class EmployeeUpdate(BaseModel):
     fire_date: Optional[date] = None
     status: Optional[EmployeeStatusEnum] = None
     base_salary: Optional[Decimal] = Field(None, ge=0)
+    # Bonus base rates (optional for update)
+    monthly_bonus_base: Optional[Decimal] = Field(None, ge=0)
+    quarterly_bonus_base: Optional[Decimal] = Field(None, ge=0)
+    annual_bonus_base: Optional[Decimal] = Field(None, ge=0)
     department_id: Optional[int] = None
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
@@ -96,7 +104,10 @@ class PayrollPlanBase(BaseModel):
     employee_id: int
     department_id: int
     base_salary: Decimal = Field(..., ge=0)
-    bonus: Decimal = Field(0, ge=0)
+    # Bonuses by type (премии по типам)
+    monthly_bonus: Decimal = Field(0, ge=0, description="Месячная премия")
+    quarterly_bonus: Decimal = Field(0, ge=0, description="Квартальная премия")
+    annual_bonus: Decimal = Field(0, ge=0, description="Годовая премия")
     other_payments: Decimal = Field(0, ge=0)
     total_planned: Decimal = Field(..., ge=0)
     notes: Optional[str] = None
@@ -108,7 +119,10 @@ class PayrollPlanCreate(BaseModel):
     month: int = Field(..., ge=1, le=12)
     employee_id: int
     base_salary: Decimal = Field(..., ge=0)
-    bonus: Decimal = Field(0, ge=0)
+    # Bonuses by type
+    monthly_bonus: Decimal = Field(0, ge=0)
+    quarterly_bonus: Decimal = Field(0, ge=0)
+    annual_bonus: Decimal = Field(0, ge=0)
     other_payments: Decimal = Field(0, ge=0)
     notes: Optional[str] = None
 
@@ -116,7 +130,10 @@ class PayrollPlanCreate(BaseModel):
 class PayrollPlanUpdate(BaseModel):
     """Schema for updating payroll plan"""
     base_salary: Optional[Decimal] = Field(None, ge=0)
-    bonus: Optional[Decimal] = Field(None, ge=0)
+    # Bonuses by type (optional for update)
+    monthly_bonus: Optional[Decimal] = Field(None, ge=0)
+    quarterly_bonus: Optional[Decimal] = Field(None, ge=0)
+    annual_bonus: Optional[Decimal] = Field(None, ge=0)
     other_payments: Optional[Decimal] = Field(None, ge=0)
     notes: Optional[str] = None
 
@@ -148,7 +165,10 @@ class PayrollActualBase(BaseModel):
     employee_id: int
     department_id: int
     base_salary_paid: Decimal = Field(..., ge=0)
-    bonus_paid: Decimal = Field(0, ge=0)
+    # Actual bonuses by type (фактические премии по типам)
+    monthly_bonus_paid: Decimal = Field(0, ge=0, description="Месячная премия (факт)")
+    quarterly_bonus_paid: Decimal = Field(0, ge=0, description="Квартальная премия (факт)")
+    annual_bonus_paid: Decimal = Field(0, ge=0, description="Годовая премия (факт)")
     other_payments_paid: Decimal = Field(0, ge=0)
     total_paid: Decimal = Field(..., ge=0)
     payment_date: Optional[date] = None
@@ -162,7 +182,10 @@ class PayrollActualCreate(BaseModel):
     month: int = Field(..., ge=1, le=12)
     employee_id: int
     base_salary_paid: Decimal = Field(..., ge=0)
-    bonus_paid: Decimal = Field(0, ge=0)
+    # Actual bonuses by type
+    monthly_bonus_paid: Decimal = Field(0, ge=0)
+    quarterly_bonus_paid: Decimal = Field(0, ge=0)
+    annual_bonus_paid: Decimal = Field(0, ge=0)
     other_payments_paid: Decimal = Field(0, ge=0)
     payment_date: Optional[date] = None
     expense_id: Optional[int] = None
@@ -172,7 +195,10 @@ class PayrollActualCreate(BaseModel):
 class PayrollActualUpdate(BaseModel):
     """Schema for updating payroll actual"""
     base_salary_paid: Optional[Decimal] = Field(None, ge=0)
-    bonus_paid: Optional[Decimal] = Field(None, ge=0)
+    # Actual bonuses by type (optional for update)
+    monthly_bonus_paid: Optional[Decimal] = Field(None, ge=0)
+    quarterly_bonus_paid: Optional[Decimal] = Field(None, ge=0)
+    annual_bonus_paid: Optional[Decimal] = Field(None, ge=0)
     other_payments_paid: Optional[Decimal] = Field(None, ge=0)
     payment_date: Optional[date] = None
     expense_id: Optional[int] = None
@@ -252,7 +278,11 @@ class PayrollStructureMonth(BaseModel):
     year: int
     month: int
     total_base_salary: Decimal
-    total_bonus: Decimal
+    # Bonuses by type (разбивка премий по типам)
+    total_monthly_bonus: Decimal = Field(default=0, description="Месячные премии")
+    total_quarterly_bonus: Decimal = Field(default=0, description="Квартальные премии")
+    total_annual_bonus: Decimal = Field(default=0, description="Годовые премии")
+    total_bonus: Decimal = Field(default=0, description="Всего премий (сумма всех типов)")
     total_other_payments: Decimal
     total_amount: Decimal
     employee_count: int
@@ -263,11 +293,19 @@ class PayrollDynamics(BaseModel):
     year: int
     month: int
     planned_base_salary: Decimal
-    planned_bonus: Decimal
+    # Planned bonuses by type
+    planned_monthly_bonus: Decimal = 0
+    planned_quarterly_bonus: Decimal = 0
+    planned_annual_bonus: Decimal = 0
+    planned_bonus: Decimal  # Total planned bonuses
     planned_other: Decimal
     planned_total: Decimal
     actual_base_salary: Decimal
-    actual_bonus: Decimal
+    # Actual bonuses by type
+    actual_monthly_bonus: Decimal = 0
+    actual_quarterly_bonus: Decimal = 0
+    actual_annual_bonus: Decimal = 0
+    actual_bonus: Decimal  # Total actual bonuses
     actual_other: Decimal
     actual_total: Decimal
     employee_count: int
@@ -279,7 +317,11 @@ class PayrollForecast(BaseModel):
     month: int
     forecasted_total: Decimal
     forecasted_base_salary: Decimal
-    forecasted_bonus: Decimal
+    # Forecasted bonuses by type
+    forecasted_monthly_bonus: Decimal = 0
+    forecasted_quarterly_bonus: Decimal = 0
+    forecasted_annual_bonus: Decimal = 0
+    forecasted_bonus: Decimal  # Total forecasted bonuses
     forecasted_other: Decimal
     employee_count: int
     confidence: str  # "high", "medium", "low"

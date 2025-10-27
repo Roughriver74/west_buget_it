@@ -525,6 +525,11 @@ class Employee(Base):
     # Salary information
     base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад
 
+    # Bonus base rates (базовые ставки премий)
+    monthly_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая месячная премия
+    quarterly_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая квартальная премия
+    annual_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая годовая премия
+
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
@@ -600,7 +605,12 @@ class PayrollPlan(Base):
 
     # Planned amounts
     base_salary = Column(Numeric(15, 2), nullable=False)  # Плановый оклад
-    bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Плановая премия
+
+    # Planned bonuses by type (плановые премии по типам)
+    monthly_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Месячная премия
+    quarterly_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Квартальная премия (Q1-Q4)
+    annual_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Годовая премия
+
     other_payments = Column(Numeric(15, 2), default=0, nullable=False)  # Прочие выплаты
     total_planned = Column(Numeric(15, 2), nullable=False)  # Итого план (вычисляется)
 
@@ -639,7 +649,12 @@ class PayrollActual(Base):
 
     # Actual amounts paid
     base_salary_paid = Column(Numeric(15, 2), nullable=False)  # Фактически выплаченный оклад
-    bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Фактически выплаченная премия
+
+    # Actual bonuses by type (фактические премии по типам)
+    monthly_bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Месячная премия (факт)
+    quarterly_bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Квартальная премия (факт)
+    annual_bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Годовая премия (факт)
+
     other_payments_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Прочие фактические выплаты
     total_paid = Column(Numeric(15, 2), nullable=False)  # Итого факт (вычисляется)
 
