@@ -90,7 +90,9 @@ export default function PayrollPlanFormModal({
           month: plan.month,
           employee_id: plan.employee_id,
           base_salary: plan.base_salary,
-          bonus: plan.bonus,
+          monthly_bonus: plan.monthly_bonus,
+          quarterly_bonus: plan.quarterly_bonus,
+          annual_bonus: plan.annual_bonus,
           other_payments: plan.other_payments,
         });
       } else if (defaultValues) {
@@ -98,22 +100,31 @@ export default function PayrollPlanFormModal({
           year: defaultValues.year || currentYear,
           month: defaultValues.month,
           employee_id: defaultValues.employee_id,
-          bonus: 0,
+          monthly_bonus: 0,
+          quarterly_bonus: 0,
+          annual_bonus: 0,
           other_payments: 0,
         });
 
-        // Auto-fill base salary from employee if employee is selected
+        // Auto-fill base salary and bonus rates from employee if employee is selected
         if (defaultValues.employee_id) {
           const employee = employees.find((e: any) => e.id === defaultValues.employee_id);
           if (employee) {
-            form.setFieldsValue({ base_salary: employee.base_salary });
+            form.setFieldsValue({
+              base_salary: employee.base_salary,
+              monthly_bonus: employee.monthly_bonus_base || 0,
+              quarterly_bonus: employee.quarterly_bonus_base || 0,
+              annual_bonus: employee.annual_bonus_base || 0,
+            });
           }
         }
       } else {
         form.resetFields();
         form.setFieldsValue({
           year: currentYear,
-          bonus: 0,
+          monthly_bonus: 0,
+          quarterly_bonus: 0,
+          annual_bonus: 0,
           other_payments: 0,
         });
       }
@@ -128,7 +139,12 @@ export default function PayrollPlanFormModal({
   const handleEmployeeChange = (employeeId: number) => {
     const employee = employees.find((e: any) => e.id === employeeId);
     if (employee) {
-      form.setFieldsValue({ base_salary: employee.base_salary });
+      form.setFieldsValue({
+        base_salary: employee.base_salary,
+        monthly_bonus: employee.monthly_bonus_base || 0,
+        quarterly_bonus: employee.quarterly_bonus_base || 0,
+        annual_bonus: employee.annual_bonus_base || 0,
+      });
     }
   };
 
@@ -141,14 +157,18 @@ export default function PayrollPlanFormModal({
           id: planId,
           data: {
             base_salary: values.base_salary,
-            bonus: values.bonus || 0,
+            monthly_bonus: values.monthly_bonus || 0,
+            quarterly_bonus: values.quarterly_bonus || 0,
+            annual_bonus: values.annual_bonus || 0,
             other_payments: values.other_payments || 0,
           }
         });
       } else {
         createMutation.mutate({
           ...values,
-          bonus: values.bonus || 0,
+          monthly_bonus: values.monthly_bonus || 0,
+          quarterly_bonus: values.quarterly_bonus || 0,
+          annual_bonus: values.annual_bonus || 0,
           other_payments: values.other_payments || 0,
         } as PayrollPlanCreate);
       }
@@ -240,15 +260,47 @@ export default function PayrollPlanFormModal({
         </Form.Item>
 
         <Form.Item
-          name="bonus"
-          label="Премия"
+          name="monthly_bonus"
+          label="Месячная премия"
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
         >
           <InputNumber
             style={{ width: '100%' }}
-            placeholder="10000"
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="quarterly_bonus"
+          label="Квартальная премия"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="annual_bonus"
+          label="Годовая премия"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => value!.replace(/\s?/g, '')}
             addonAfter="₽"

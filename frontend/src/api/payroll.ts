@@ -11,6 +11,9 @@ export interface Employee {
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
   base_salary: number;
+  monthly_bonus_base: number;
+  quarterly_bonus_base: number;
+  annual_bonus_base: number;
   department_id: number;
   email?: string;
   phone?: string;
@@ -41,7 +44,9 @@ export interface PayrollPlan {
   employee_id: number;
   department_id: number;
   base_salary: number;
-  bonus: number;
+  monthly_bonus: number;
+  quarterly_bonus: number;
+  annual_bonus: number;
   other_payments: number;
   total_planned: number;
   notes?: string;
@@ -60,7 +65,9 @@ export interface PayrollActual {
   employee_id: number;
   department_id: number;
   base_salary_paid: number;
-  bonus_paid: number;
+  monthly_bonus_paid: number;
+  quarterly_bonus_paid: number;
+  annual_bonus_paid: number;
   other_payments_paid: number;
   total_paid: number;
   payment_date?: string;
@@ -101,7 +108,9 @@ export interface PayrollStructureMonth {
   year: number;
   month: number;
   total_base_salary: number;
-  total_bonus: number;
+  total_monthly_bonus: number;
+  total_quarterly_bonus: number;
+  total_annual_bonus: number;
   total_other_payments: number;
   total_amount: number;
   employee_count: number;
@@ -111,11 +120,15 @@ export interface PayrollDynamics {
   year: number;
   month: number;
   planned_base_salary: number;
-  planned_bonus: number;
+  planned_monthly_bonus: number;
+  planned_quarterly_bonus: number;
+  planned_annual_bonus: number;
   planned_other: number;
   planned_total: number;
   actual_base_salary: number;
-  actual_bonus: number;
+  actual_monthly_bonus: number;
+  actual_quarterly_bonus: number;
+  actual_annual_bonus: number;
   actual_other: number;
   actual_total: number;
   employee_count: number;
@@ -126,7 +139,9 @@ export interface PayrollForecast {
   month: number;
   forecasted_total: number;
   forecasted_base_salary: number;
-  forecasted_bonus: number;
+  forecasted_monthly_bonus: number;
+  forecasted_quarterly_bonus: number;
+  forecasted_annual_bonus: number;
   forecasted_other: number;
   employee_count: number;
   confidence: string;
@@ -163,6 +178,9 @@ export interface EmployeeCreate {
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
   base_salary: number;
+  monthly_bonus_base?: number;
+  quarterly_bonus_base?: number;
+  annual_bonus_base?: number;
   department_id: number;
   email?: string;
   phone?: string;
@@ -177,6 +195,9 @@ export interface EmployeeUpdate {
   fire_date?: string;
   status?: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
   base_salary?: number;
+  monthly_bonus_base?: number;
+  quarterly_bonus_base?: number;
+  annual_bonus_base?: number;
   department_id?: number;
   email?: string;
   phone?: string;
@@ -188,14 +209,18 @@ export interface PayrollPlanCreate {
   month: number;
   employee_id: number;
   base_salary: number;
-  bonus?: number;
+  monthly_bonus?: number;
+  quarterly_bonus?: number;
+  annual_bonus?: number;
   other_payments?: number;
   notes?: string;
 }
 
 export interface PayrollPlanUpdate {
   base_salary?: number;
-  bonus?: number;
+  monthly_bonus?: number;
+  quarterly_bonus?: number;
+  annual_bonus?: number;
   other_payments?: number;
   notes?: string;
 }
@@ -205,7 +230,9 @@ export interface PayrollActualCreate {
   month: number;
   employee_id: number;
   base_salary_paid: number;
-  bonus_paid?: number;
+  monthly_bonus_paid?: number;
+  quarterly_bonus_paid?: number;
+  annual_bonus_paid?: number;
   other_payments_paid?: number;
   payment_date?: string;
   expense_id?: number;
@@ -214,7 +241,9 @@ export interface PayrollActualCreate {
 
 export interface PayrollActualUpdate {
   base_salary_paid?: number;
-  bonus_paid?: number;
+  monthly_bonus_paid?: number;
+  quarterly_bonus_paid?: number;
+  annual_bonus_paid?: number;
   other_payments_paid?: number;
   payment_date?: string;
   expense_id?: number;
