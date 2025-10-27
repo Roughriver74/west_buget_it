@@ -44,7 +44,7 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-const COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'];
+const COLORS = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2'];
 const MONTH_NAMES = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
@@ -104,19 +104,25 @@ export default function PayrollAnalyticsPage() {
   const structureChartData = structure?.map((item) => ({
     month: MONTH_NAMES[item.month - 1],
     'Оклад': Number(item.total_base_salary),
-    'Премия': Number(item.total_bonus),
-    'Прочие выплаты': Number(item.total_other_payments),
+    'Премия мес.': Number(item.total_monthly_bonus),
+    'Премия квар.': Number(item.total_quarterly_bonus),
+    'Премия год.': Number(item.total_annual_bonus),
+    'Прочие': Number(item.total_other_payments),
   })) || [];
 
   // Calculate average structure for pie chart
   const totalBaseSalary = structure?.reduce((sum, item) => sum + Number(item.total_base_salary), 0) || 0;
-  const totalBonus = structure?.reduce((sum, item) => sum + Number(item.total_bonus), 0) || 0;
+  const totalMonthlyBonus = structure?.reduce((sum, item) => sum + Number(item.total_monthly_bonus), 0) || 0;
+  const totalQuarterlyBonus = structure?.reduce((sum, item) => sum + Number(item.total_quarterly_bonus), 0) || 0;
+  const totalAnnualBonus = structure?.reduce((sum, item) => sum + Number(item.total_annual_bonus), 0) || 0;
   const totalOther = structure?.reduce((sum, item) => sum + Number(item.total_other_payments), 0) || 0;
-  const totalSum = totalBaseSalary + totalBonus + totalOther;
+  const totalSum = totalBaseSalary + totalMonthlyBonus + totalQuarterlyBonus + totalAnnualBonus + totalOther;
 
   const pieChartData = [
     { name: 'Оклад', value: totalBaseSalary, percent: totalSum > 0 ? (totalBaseSalary / totalSum * 100).toFixed(1) : 0 },
-    { name: 'Премия', value: totalBonus, percent: totalSum > 0 ? (totalBonus / totalSum * 100).toFixed(1) : 0 },
+    { name: 'Премия месячная', value: totalMonthlyBonus, percent: totalSum > 0 ? (totalMonthlyBonus / totalSum * 100).toFixed(1) : 0 },
+    { name: 'Премия квартальная', value: totalQuarterlyBonus, percent: totalSum > 0 ? (totalQuarterlyBonus / totalSum * 100).toFixed(1) : 0 },
+    { name: 'Премия годовая', value: totalAnnualBonus, percent: totalSum > 0 ? (totalAnnualBonus / totalSum * 100).toFixed(1) : 0 },
     { name: 'Прочие выплаты', value: totalOther, percent: totalSum > 0 ? (totalOther / totalSum * 100).toFixed(1) : 0 },
   ];
 
@@ -305,8 +311,10 @@ export default function PayrollAnalyticsPage() {
                   <Tooltip formatter={(value: number) => formatCurrency(value)} />
                   <Legend />
                   <Bar dataKey="Оклад" stackId="a" fill="#1890ff" />
-                  <Bar dataKey="Премия" stackId="a" fill="#52c41a" />
-                  <Bar dataKey="Прочие выплаты" stackId="a" fill="#faad14" />
+                  <Bar dataKey="Премия мес." stackId="a" fill="#52c41a" />
+                  <Bar dataKey="Премия квар." stackId="a" fill="#faad14" />
+                  <Bar dataKey="Премия год." stackId="a" fill="#f5222d" />
+                  <Bar dataKey="Прочие" stackId="a" fill="#722ed1" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

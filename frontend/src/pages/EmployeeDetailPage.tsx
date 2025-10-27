@@ -148,10 +148,22 @@ export default function EmployeeDetailPage() {
       render: (value: number) => formatCurrency(value),
     },
     {
-      title: 'Премия',
-      dataIndex: 'bonus',
-      key: 'bonus',
-      render: (value: number) => formatCurrency(value),
+      title: 'Премия (мес)',
+      dataIndex: 'monthly_bonus',
+      key: 'monthly_bonus',
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Премия (квар)',
+      dataIndex: 'quarterly_bonus',
+      key: 'quarterly_bonus',
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Премия (год)',
+      dataIndex: 'annual_bonus',
+      key: 'annual_bonus',
+      render: (value: number) => formatCurrency(value || 0),
     },
     {
       title: 'Прочие',
@@ -187,10 +199,22 @@ export default function EmployeeDetailPage() {
       render: (value: number) => formatCurrency(value),
     },
     {
-      title: 'Премия',
-      dataIndex: 'bonus_paid',
-      key: 'bonus_paid',
-      render: (value: number) => formatCurrency(value),
+      title: 'Премия (мес)',
+      dataIndex: 'monthly_bonus_paid',
+      key: 'monthly_bonus_paid',
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Премия (квар)',
+      dataIndex: 'quarterly_bonus_paid',
+      key: 'quarterly_bonus_paid',
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Премия (год)',
+      dataIndex: 'annual_bonus_paid',
+      key: 'annual_bonus_paid',
+      render: (value: number) => formatCurrency(value || 0),
     },
     {
       title: 'Прочие',
@@ -243,6 +267,16 @@ export default function EmployeeDetailPage() {
         <Col span={6}>
           <Card>
             <Statistic
+              title="Годовые премии (база)"
+              value={Number(employee.monthly_bonus_base || 0) * 12 + Number(employee.quarterly_bonus_base || 0) * 4 + Number(employee.annual_bonus_base || 0)}
+              precision={2}
+              suffix="₽"
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
               title="Всего запланировано"
               value={totalPlanned}
               precision={2}
@@ -258,16 +292,6 @@ export default function EmployeeDetailPage() {
               precision={2}
               suffix="₽"
               valueStyle={{ color: '#3f8600' }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="Средняя выплата/месяц"
-              value={avgMonthlyPlan}
-              precision={2}
-              suffix="₽"
             />
           </Card>
         </Col>
@@ -298,8 +322,17 @@ export default function EmployeeDetailPage() {
           )}
           <Descriptions.Item label="Email">{employee.email || '-'}</Descriptions.Item>
           <Descriptions.Item label="Телефон">{employee.phone || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Оклад" span={2}>
+          <Descriptions.Item label="Оклад">
             <strong>{formatCurrency(employee.base_salary)}</strong>
+          </Descriptions.Item>
+          <Descriptions.Item label="Премия месячная">
+            {formatCurrency(employee.monthly_bonus_base || 0)}
+          </Descriptions.Item>
+          <Descriptions.Item label="Премия квартальная">
+            {formatCurrency(employee.quarterly_bonus_base || 0)}
+          </Descriptions.Item>
+          <Descriptions.Item label="Премия годовая">
+            {formatCurrency(employee.annual_bonus_base || 0)}
           </Descriptions.Item>
           {employee.notes && (
             <Descriptions.Item label="Примечания" span={2}>

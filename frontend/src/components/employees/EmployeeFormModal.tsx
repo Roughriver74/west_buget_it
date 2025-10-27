@@ -153,6 +153,54 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
         </Form.Item>
 
         <Form.Item
+          name="monthly_bonus_base"
+          label="Базовая месячная премия"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="quarterly_bonus_base"
+          label="Базовая квартальная премия"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="annual_bonus_base"
+          label="Базовая годовая премия"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
           name="department_id"
           label="Отдел"
           rules={[{ required: true, message: 'Выберите отдел' }]}

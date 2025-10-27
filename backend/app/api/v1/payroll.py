@@ -161,8 +161,14 @@ async def create_payroll_plan(
             detail="Payroll plan already exists for this employee, year, and month"
         )
 
-    # Calculate total planned amount
-    total_planned = plan_data.base_salary + plan_data.bonus + plan_data.other_payments
+    # Calculate total planned amount (salary + all bonus types + other)
+    total_planned = (
+        plan_data.base_salary +
+        plan_data.monthly_bonus +
+        plan_data.quarterly_bonus +
+        plan_data.annual_bonus +
+        plan_data.other_payments
+    )
 
     # Create new payroll plan
     new_plan = PayrollPlan(
@@ -213,8 +219,14 @@ async def update_payroll_plan(
     for field, value in update_data.items():
         setattr(plan, field, value)
 
-    # Recalculate total planned amount
-    plan.total_planned = plan.base_salary + plan.bonus + plan.other_payments
+    # Recalculate total planned amount (salary + all bonus types + other)
+    plan.total_planned = (
+        plan.base_salary +
+        plan.monthly_bonus +
+        plan.quarterly_bonus +
+        plan.annual_bonus +
+        plan.other_payments
+    )
 
     db.commit()
     db.refresh(plan)
@@ -343,8 +355,14 @@ async def create_payroll_actual(
             detail="Payroll actual already exists for this employee, year, and month"
         )
 
-    # Calculate total paid amount
-    total_paid = actual_data.base_salary_paid + actual_data.bonus_paid + actual_data.other_payments_paid
+    # Calculate total paid amount (salary + all bonus types + other)
+    total_paid = (
+        actual_data.base_salary_paid +
+        actual_data.monthly_bonus_paid +
+        actual_data.quarterly_bonus_paid +
+        actual_data.annual_bonus_paid +
+        actual_data.other_payments_paid
+    )
 
     # Create new payroll actual
     new_actual = PayrollActual(
@@ -395,8 +413,14 @@ async def update_payroll_actual(
     for field, value in update_data.items():
         setattr(actual, field, value)
 
-    # Recalculate total paid amount
-    actual.total_paid = actual.base_salary_paid + actual.bonus_paid + actual.other_payments_paid
+    # Recalculate total paid amount (salary + all bonus types + other)
+    actual.total_paid = (
+        actual.base_salary_paid +
+        actual.monthly_bonus_paid +
+        actual.quarterly_bonus_paid +
+        actual.annual_bonus_paid +
+        actual.other_payments_paid
+    )
 
     db.commit()
     db.refresh(actual)
@@ -555,7 +579,9 @@ async def export_payroll_plans(
             "Сотрудник": plan.employee_rel.full_name,
             "Должность": plan.employee_rel.position,
             "Оклад": float(plan.base_salary),
-            "Премия": float(plan.bonus),
+            "Премия месячная": float(plan.monthly_bonus),
+            "Премия квартальная": float(plan.quarterly_bonus),
+            "Премия годовая": float(plan.annual_bonus),
             "Прочие выплаты": float(plan.other_payments),
             "Итого запланировано": float(plan.total_planned),
             "Примечания": plan.notes or "",
@@ -620,7 +646,9 @@ async def export_payroll_actuals(
             "Сотрудник": actual.employee_rel.full_name,
             "Должность": actual.employee_rel.position,
             "Оклад выплачено": float(actual.base_salary_paid),
-            "Премия выплачено": float(actual.bonus_paid),
+            "Премия месячная выплачено": float(actual.monthly_bonus_paid),
+            "Премия квартальная выплачено": float(actual.quarterly_bonus_paid),
+            "Премия годовая выплачено": float(actual.annual_bonus_paid),
             "Прочие выплаты": float(actual.other_payments_paid),
             "Итого выплачено": float(actual.total_paid),
             "Дата выплаты": actual.payment_date.strftime("%Y-%m-%d") if actual.payment_date else "",
@@ -742,7 +770,9 @@ async def get_payroll_structure(
     query = db.query(
         PayrollPlan.month,
         func.sum(PayrollPlan.base_salary).label('total_base_salary'),
-        func.sum(PayrollPlan.bonus).label('total_bonus'),
+        func.sum(PayrollPlan.monthly_bonus).label('total_monthly_bonus'),
+        func.sum(PayrollPlan.quarterly_bonus).label('total_quarterly_bonus'),
+        func.sum(PayrollPlan.annual_bonus).label('total_annual_bonus'),
         func.sum(PayrollPlan.other_payments).label('total_other_payments'),
         func.sum(PayrollPlan.total_planned).label('total_amount'),
         func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
@@ -759,7 +789,9 @@ async def get_payroll_structure(
             year=year,
             month=row.month,
             total_base_salary=row.total_base_salary or Decimal(0),
-            total_bonus=row.total_bonus or Decimal(0),
+            total_monthly_bonus=row.total_monthly_bonus or Decimal(0),
+            total_quarterly_bonus=row.total_quarterly_bonus or Decimal(0),
+            total_annual_bonus=row.total_annual_bonus or Decimal(0),
             total_other_payments=row.total_other_payments or Decimal(0),
             total_amount=row.total_amount or Decimal(0),
             employee_count=row.employee_count
@@ -794,7 +826,9 @@ async def get_payroll_dynamics(
     plan_query = db.query(
         PayrollPlan.month,
         func.sum(PayrollPlan.base_salary).label('planned_base_salary'),
-        func.sum(PayrollPlan.bonus).label('planned_bonus'),
+        func.sum(PayrollPlan.monthly_bonus).label('planned_monthly_bonus'),
+        func.sum(PayrollPlan.quarterly_bonus).label('planned_quarterly_bonus'),
+        func.sum(PayrollPlan.annual_bonus).label('planned_annual_bonus'),
         func.sum(PayrollPlan.other_payments).label('planned_other'),
         func.sum(PayrollPlan.total_planned).label('planned_total'),
         func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
@@ -812,7 +846,9 @@ async def get_payroll_dynamics(
     actual_query = db.query(
         PayrollActual.month,
         func.sum(PayrollActual.base_salary_paid).label('actual_base_salary'),
-        func.sum(PayrollActual.bonus_paid).label('actual_bonus'),
+        func.sum(PayrollActual.monthly_bonus_paid).label('actual_monthly_bonus'),
+        func.sum(PayrollActual.quarterly_bonus_paid).label('actual_quarterly_bonus'),
+        func.sum(PayrollActual.annual_bonus_paid).label('actual_annual_bonus'),
         func.sum(PayrollActual.other_payments_paid).label('actual_other'),
         func.sum(PayrollActual.total_paid).label('actual_total')
     ).filter(PayrollActual.year == year)
@@ -836,11 +872,15 @@ async def get_payroll_dynamics(
                 year=year,
                 month=month,
                 planned_base_salary=plan.planned_base_salary if plan else Decimal(0),
-                planned_bonus=plan.planned_bonus if plan else Decimal(0),
+                planned_monthly_bonus=plan.planned_monthly_bonus if plan else Decimal(0),
+                planned_quarterly_bonus=plan.planned_quarterly_bonus if plan else Decimal(0),
+                planned_annual_bonus=plan.planned_annual_bonus if plan else Decimal(0),
                 planned_other=plan.planned_other if plan else Decimal(0),
                 planned_total=plan.planned_total if plan else Decimal(0),
                 actual_base_salary=actual.actual_base_salary if actual else Decimal(0),
-                actual_bonus=actual.actual_bonus if actual else Decimal(0),
+                actual_monthly_bonus=actual.actual_monthly_bonus if actual else Decimal(0),
+                actual_quarterly_bonus=actual.actual_quarterly_bonus if actual else Decimal(0),
+                actual_annual_bonus=actual.actual_annual_bonus if actual else Decimal(0),
                 actual_other=actual.actual_other if actual else Decimal(0),
                 actual_total=actual.actual_total if actual else Decimal(0),
                 employee_count=plan.employee_count if plan else 0
@@ -892,7 +932,9 @@ async def get_payroll_forecast(
         # Query plans for this month
         plan_query = db.query(
             func.sum(PayrollPlan.base_salary).label('base_salary'),
-            func.sum(PayrollPlan.bonus).label('bonus'),
+            func.sum(PayrollPlan.monthly_bonus).label('monthly_bonus'),
+            func.sum(PayrollPlan.quarterly_bonus).label('quarterly_bonus'),
+            func.sum(PayrollPlan.annual_bonus).label('annual_bonus'),
             func.sum(PayrollPlan.other_payments).label('other_payments'),
             func.sum(PayrollPlan.total_planned).label('total'),
             func.count(func.distinct(PayrollPlan.employee_id)).label('employee_count')
@@ -913,7 +955,9 @@ async def get_payroll_forecast(
                 'year': year,
                 'month': month,
                 'base_salary': float(result.base_salary or 0),
-                'bonus': float(result.bonus or 0),
+                'monthly_bonus': float(result.monthly_bonus or 0),
+                'quarterly_bonus': float(result.quarterly_bonus or 0),
+                'annual_bonus': float(result.annual_bonus or 0),
                 'other_payments': float(result.other_payments or 0),
                 'total': float(result.total or 0),
                 'employee_count': result.employee_count
@@ -927,7 +971,9 @@ async def get_payroll_forecast(
 
     # Calculate averages from historical data
     avg_base_salary = sum(d['base_salary'] for d in historical_data) / len(historical_data)
-    avg_bonus = sum(d['bonus'] for d in historical_data) / len(historical_data)
+    avg_monthly_bonus = sum(d['monthly_bonus'] for d in historical_data) / len(historical_data)
+    avg_quarterly_bonus = sum(d['quarterly_bonus'] for d in historical_data) / len(historical_data)
+    avg_annual_bonus = sum(d['annual_bonus'] for d in historical_data) / len(historical_data)
     avg_other = sum(d['other_payments'] for d in historical_data) / len(historical_data)
     avg_total = sum(d['total'] for d in historical_data) / len(historical_data)
     avg_employee_count = int(sum(d['employee_count'] for d in historical_data) / len(historical_data))
@@ -964,7 +1010,9 @@ async def get_payroll_forecast(
             month=forecast_month,
             forecasted_total=Decimal(str(avg_total * trend_multiplier)),
             forecasted_base_salary=Decimal(str(avg_base_salary * trend_multiplier)),
-            forecasted_bonus=Decimal(str(avg_bonus * trend_multiplier)),
+            forecasted_monthly_bonus=Decimal(str(avg_monthly_bonus * trend_multiplier)),
+            forecasted_quarterly_bonus=Decimal(str(avg_quarterly_bonus * trend_multiplier)),
+            forecasted_annual_bonus=Decimal(str(avg_annual_bonus * trend_multiplier)),
             forecasted_other=Decimal(str(avg_other * trend_multiplier)),
             employee_count=avg_employee_count,
             confidence=confidence,

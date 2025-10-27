@@ -82,7 +82,9 @@ export default function PayrollActualFormModal({
         year: defaultValues.year || currentYear,
         month: defaultValues.month,
         employee_id: defaultValues.employee_id,
-        bonus_paid: 0,
+        monthly_bonus_paid: 0,
+        quarterly_bonus_paid: 0,
+        annual_bonus_paid: 0,
         other_payments_paid: 0,
         payment_date: dayjs(),
       });
@@ -98,15 +100,22 @@ export default function PayrollActualFormModal({
             const plan = plans[0];
             form.setFieldsValue({
               base_salary_paid: plan.base_salary,
-              bonus_paid: plan.bonus,
+              monthly_bonus_paid: plan.monthly_bonus,
+              quarterly_bonus_paid: plan.quarterly_bonus,
+              annual_bonus_paid: plan.annual_bonus,
               other_payments_paid: plan.other_payments,
             });
           }
         }).catch(() => {
-          // If no plan found, try to get employee base salary
+          // If no plan found, try to get employee base salary and bonus rates
           const employee = employees.find((e: any) => e.id === defaultValues.employee_id);
           if (employee) {
-            form.setFieldsValue({ base_salary_paid: employee.base_salary });
+            form.setFieldsValue({
+              base_salary_paid: employee.base_salary,
+              monthly_bonus_paid: employee.monthly_bonus_base || 0,
+              quarterly_bonus_paid: employee.quarterly_bonus_base || 0,
+              annual_bonus_paid: employee.annual_bonus_base || 0,
+            });
           }
         });
       }
@@ -114,7 +123,9 @@ export default function PayrollActualFormModal({
       form.resetFields();
       form.setFieldsValue({
         year: currentYear,
-        bonus_paid: 0,
+        monthly_bonus_paid: 0,
+        quarterly_bonus_paid: 0,
+        annual_bonus_paid: 0,
         other_payments_paid: 0,
         payment_date: dayjs(),
       });
@@ -137,7 +148,9 @@ export default function PayrollActualFormModal({
           const plan = plans[0];
           form.setFieldsValue({
             base_salary_paid: plan.base_salary,
-            bonus_paid: plan.bonus,
+            monthly_bonus_paid: plan.monthly_bonus,
+            quarterly_bonus_paid: plan.quarterly_bonus,
+            annual_bonus_paid: plan.annual_bonus,
             other_payments_paid: plan.other_payments,
           });
           return;
@@ -147,10 +160,15 @@ export default function PayrollActualFormModal({
       }
     }
 
-    // Fallback to employee base salary
+    // Fallback to employee base salary and bonus rates
     const employee = employees.find((e: any) => e.id === employeeId);
     if (employee) {
-      form.setFieldsValue({ base_salary_paid: employee.base_salary });
+      form.setFieldsValue({
+        base_salary_paid: employee.base_salary,
+        monthly_bonus_paid: employee.monthly_bonus_base || 0,
+        quarterly_bonus_paid: employee.quarterly_bonus_base || 0,
+        annual_bonus_paid: employee.annual_bonus_base || 0,
+      });
     }
   };
 
@@ -160,7 +178,9 @@ export default function PayrollActualFormModal({
       const data = {
         ...values,
         payment_date: values.payment_date ? values.payment_date.format('YYYY-MM-DD') : undefined,
-        bonus_paid: values.bonus_paid || 0,
+        monthly_bonus_paid: values.monthly_bonus_paid || 0,
+        quarterly_bonus_paid: values.quarterly_bonus_paid || 0,
+        annual_bonus_paid: values.annual_bonus_paid || 0,
         other_payments_paid: values.other_payments_paid || 0,
       };
 
@@ -169,7 +189,9 @@ export default function PayrollActualFormModal({
           id: actualId,
           data: {
             base_salary_paid: data.base_salary_paid,
-            bonus_paid: data.bonus_paid,
+            monthly_bonus_paid: data.monthly_bonus_paid,
+            quarterly_bonus_paid: data.quarterly_bonus_paid,
+            annual_bonus_paid: data.annual_bonus_paid,
             other_payments_paid: data.other_payments_paid,
             payment_date: data.payment_date,
           }
@@ -273,15 +295,47 @@ export default function PayrollActualFormModal({
         </Form.Item>
 
         <Form.Item
-          name="bonus_paid"
-          label="Премия (выплачено)"
+          name="monthly_bonus_paid"
+          label="Месячная премия (выплачено)"
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
         >
           <InputNumber
             style={{ width: '100%' }}
-            placeholder="10000"
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="quarterly_bonus_paid"
+          label="Квартальная премия (выплачено)"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => value!.replace(/\s?/g, '')}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="annual_bonus_paid"
+          label="Годовая премия (выплачено)"
+          rules={[
+            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => value!.replace(/\s?/g, '')}
             addonAfter="₽"

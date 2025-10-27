@@ -5,9 +5,13 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import time
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi
 from app.utils.logger import logger, log_error, log_info
-from app.middleware import create_rate_limiter
+from app.middleware import (
+    create_rate_limiter,
+    create_security_headers_middleware,
+    create_https_redirect_middleware,
+)
 
 # Create FastAPI application
 app = FastAPI(
@@ -26,6 +30,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configure HTTPS redirect (disabled by default)
+# To enable HTTPS redirect in production:
+# 1. Ensure SSL/TLS certificates are properly configured
+# 2. Set up reverse proxy (nginx/load balancer) with X-Forwarded-Proto header
+# 3. Uncomment the middleware below and set enabled=not settings.DEBUG
+# 4. Also set enable_hsts=True in security headers middleware
+#
+# app.add_middleware(
+#     create_https_redirect_middleware(
+#         enabled=not settings.DEBUG  # Enable in production only
+#     )
+# )
+
+# Configure security headers
+# Enable HSTS only if HTTPS is enabled (check settings.DEBUG for production)
+app.add_middleware(
+    create_security_headers_middleware(
+        is_production=not settings.DEBUG,
+        enable_hsts=False  # Set to True when HTTPS is enabled in production
+    )
+)
+log_info(f"Security headers enabled (production mode: {not settings.DEBUG})", "Startup")
 
 # Configure rate limiting
 # 100 requests per minute, 1000 requests per hour per IP
@@ -131,6 +158,7 @@ app.include_router(dashboards.router, prefix=f"{settings.API_PREFIX}/dashboards"
 app.include_router(reports.router, prefix=f"{settings.API_PREFIX}/reports", tags=["Reports"])
 app.include_router(employees.router, prefix=f"{settings.API_PREFIX}/employees", tags=["Employees"])
 app.include_router(payroll.router, prefix=f"{settings.API_PREFIX}/payroll", tags=["Payroll"])
+app.include_router(kpi.router, prefix=f"{settings.API_PREFIX}/kpi", tags=["KPI"])
 
 
 @app.on_event("startup")

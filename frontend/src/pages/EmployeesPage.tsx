@@ -111,6 +111,9 @@ export default function EmployeesPage() {
   // Calculate statistics
   const activeEmployees = employees.filter((e) => e.status === 'ACTIVE');
   const totalSalary = activeEmployees.reduce((sum, e) => sum + Number(e.base_salary), 0);
+  const totalBonuses = activeEmployees.reduce((sum, e) =>
+    sum + Number(e.monthly_bonus_base || 0) * 12 + Number(e.quarterly_bonus_base || 0) * 4 + Number(e.annual_bonus_base || 0), 0);
+  const totalPayroll = totalSalary * 12 + totalBonuses;
   const avgSalary = activeEmployees.length > 0 ? totalSalary / activeEmployees.length : 0;
 
   const columns = [
@@ -145,6 +148,17 @@ export default function EmployeesPage() {
       key: 'base_salary',
       render: (salary: number) => formatCurrency(salary),
       sorter: (a: Employee, b: Employee) => Number(a.base_salary) - Number(b.base_salary),
+    },
+    {
+      title: 'Премии (мес/квар/год)',
+      key: 'bonuses',
+      render: (_: any, record: Employee) => {
+        const monthly = Number(record.monthly_bonus_base || 0);
+        const quarterly = Number(record.quarterly_bonus_base || 0);
+        const annual = Number(record.annual_bonus_base || 0);
+        const total = monthly + quarterly + annual;
+        return total > 0 ? `${formatCurrency(monthly)} / ${formatCurrency(quarterly)} / ${formatCurrency(annual)}` : '-';
+      },
     },
     {
       title: 'Статус',
@@ -231,9 +245,9 @@ export default function EmployeesPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Общий ФОТ"
-              value={totalSalary}
-              precision={2}
+              title="Годовой ФОТ (окл.+прем.)"
+              value={totalPayroll}
+              precision={0}
               suffix="₽"
             />
           </Card>
