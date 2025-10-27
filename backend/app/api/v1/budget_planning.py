@@ -110,15 +110,13 @@ def create_scenario(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new budget scenario"""
-    # Ensure department_id matches current user
-    if scenario.department_id != current_user.department_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create scenario for another department"
-        )
+    # Auto-assign department_id from current_user
+    scenario_data = scenario.model_dump()
+    scenario_data['department_id'] = current_user.department_id
+    scenario_data['created_by'] = current_user.username
 
     # Create scenario
-    db_scenario = BudgetScenario(**scenario.model_dump())
+    db_scenario = BudgetScenario(**scenario_data)
     db.add(db_scenario)
     db.commit()
     db.refresh(db_scenario)
@@ -286,13 +284,6 @@ def create_version(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new budget version"""
-    # Ensure department_id matches current user
-    if version.department_id != current_user.department_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create version for another department"
-        )
-
     # Auto-increment version number for the year
     max_version = db.query(func.max(BudgetVersion.version_number)).filter(
         BudgetVersion.year == version.year,
@@ -302,11 +293,12 @@ def create_version(
     version_number = (max_version or 0) + 1
 
     # Extract extra fields that are not in the model
-    copy_from_version_id = version.copy_from_version_id if hasattr(version, 'copy_from_version_id') else None
-    auto_calculate = version.auto_calculate if hasattr(version, 'auto_calculate') else False
+    copy_from_version_id = version.copy_from_version_id
+    auto_calculate = version.auto_calculate
 
-    # Create version
+    # Create version with auto-assigned department_id
     version_data = version.model_dump(exclude={'copy_from_version_id', 'auto_calculate'})
+    version_data['department_id'] = current_user.department_id
     version_data['version_number'] = version_number
     version_data['created_by'] = current_user.username
 
@@ -462,18 +454,11 @@ def calculate_by_average(
     current_user: User = Depends(get_current_active_user)
 ):
     """Calculate budget using average method"""
-    # Verify department access
-    if request.department_id != current_user.department_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot calculate for another department"
-        )
-
     calculator = BudgetCalculator(db)
     result = calculator.calculate_by_average(
         category_id=request.category_id,
         base_year=request.base_year,
-        department_id=request.department_id,
+        department_id=current_user.department_id,
         adjustment_percent=request.adjustment_percent,
         target_year=request.target_year,
     )
@@ -488,17 +473,11 @@ def calculate_by_growth(
     current_user: User = Depends(get_current_active_user)
 ):
     """Calculate budget using growth method"""
-    if request.department_id != current_user.department_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot calculate for another department"
-        )
-
     calculator = BudgetCalculator(db)
     result = calculator.calculate_by_growth(
         category_id=request.category_id,
         base_year=request.base_year,
-        department_id=request.department_id,
+        department_id=current_user.department_id,
         growth_rate=request.growth_rate,
         inflation_rate=request.inflation_rate,
         target_year=request.target_year,
@@ -514,17 +493,11 @@ def calculate_by_driver(
     current_user: User = Depends(get_current_active_user)
 ):
     """Calculate budget using driver-based method"""
-    if request.department_id != current_user.department_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot calculate for another department"
-        )
-
     calculator = BudgetCalculator(db)
     result = calculator.calculate_by_driver(
         category_id=request.category_id,
         base_year=request.base_year,
-        department_id=request.department_id,
+        department_id=current_user.department_id,
         driver_type=request.driver_type,
         base_driver_value=request.base_driver_value,
         planned_driver_value=request.planned_driver_value,

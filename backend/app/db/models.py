@@ -543,8 +543,8 @@ class Employee(Base):
 
     # Bonus base rates (базовые ставки премий)
     monthly_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая месячная премия
-    quarterly_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая квартальная премия
-    annual_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая годовая премия
+    quarterly_bonus_base = Column(Numeric(15, 2), default=None, nullable=True)  # Базовая квартальная премия (опционально)
+    annual_bonus_base = Column(Numeric(15, 2), default=None, nullable=True)  # Базовая годовая премия (опционально)
 
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)

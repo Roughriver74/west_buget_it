@@ -65,14 +65,13 @@ export interface BudgetScenarioCreate {
   year: number
   scenario_name: string
   scenario_type: BudgetScenarioType
-  department_id: number
   global_growth_rate?: number
   inflation_rate?: number
   fx_rate?: number
   assumptions?: Record<string, any>
   description?: string
   is_active?: boolean
-  created_by?: string
+  // department_id is auto-assigned from current_user on backend
 }
 
 export interface BudgetScenarioUpdate {
@@ -118,16 +117,15 @@ export interface BudgetVersionWithDetails extends BudgetVersion {
 
 export interface BudgetVersionCreate {
   year: number
-  version_number: number
   version_name?: string
-  department_id: number
   scenario_id?: number
   status?: BudgetVersionStatus
   comments?: string
   change_log?: string
-  created_by?: string
   copy_from_version_id?: number
   auto_calculate?: boolean
+  // department_id is auto-assigned from current_user on backend
+  // version_number is auto-incremented on backend
 }
 
 export interface BudgetVersionUpdate {
@@ -237,30 +235,30 @@ export interface BudgetApprovalLogCreate {
 export interface CalculateByAverageRequest {
   category_id: number
   base_year: number
-  department_id: number
   adjustment_percent?: number
   target_year: number
+  // department_id is auto-assigned from current_user on backend
 }
 
 export interface CalculateByGrowthRequest {
   category_id: number
   base_year: number
-  department_id: number
   growth_rate: number
   inflation_rate?: number
   target_year: number
+  // department_id is auto-assigned from current_user on backend
 }
 
 export interface CalculateByDriverRequest {
   category_id: number
   base_year: number
-  department_id: number
   driver_type: string
   base_driver_value: number
   planned_driver_value: number
   cost_per_unit?: number
   adjustment_percent?: number
   target_year: number
+  // department_id is auto-assigned from current_user on backend
 }
 
 export interface MonthlyAmount {

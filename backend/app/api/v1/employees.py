@@ -127,9 +127,12 @@ async def create_employee(
             detail="Only administrators and managers can create employees"
         )
 
+    # Auto-assign department_id from current_user
+    department_id = current_user.department_id
+
     # Check if department exists
     department = db.query(Department).filter(
-        Department.id == employee_data.department_id
+        Department.id == department_id
     ).first()
     if not department:
         raise HTTPException(
@@ -137,18 +140,11 @@ async def create_employee(
             detail="Department not found"
         )
 
-    # Check department access
-    if not check_department_access(current_user, employee_data.department_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this department"
-        )
-
     # Check if employee number already exists (if provided)
     if employee_data.employee_number:
         existing = db.query(Employee).filter(
             Employee.employee_number == employee_data.employee_number,
-            Employee.department_id == employee_data.department_id
+            Employee.department_id == department_id
         ).first()
         if existing:
             raise HTTPException(
@@ -156,8 +152,10 @@ async def create_employee(
                 detail="Employee number already exists in this department"
             )
 
-    # Create new employee
-    new_employee = Employee(**employee_data.model_dump())
+    # Create new employee with auto-assigned department_id
+    employee_dict = employee_data.model_dump()
+    employee_dict['department_id'] = department_id
+    new_employee = Employee(**employee_dict)
     db.add(new_employee)
     db.commit()
     db.refresh(new_employee)

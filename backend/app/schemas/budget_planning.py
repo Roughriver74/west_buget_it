@@ -25,7 +25,6 @@ class BudgetScenarioBase(BaseModel):
     year: int = Field(..., description="Planning year (e.g., 2026)")
     scenario_name: str = Field(..., max_length=100, description="Scenario name")
     scenario_type: BudgetScenarioTypeEnum
-    department_id: int
     global_growth_rate: Decimal = Field(default=Decimal("0"), description="Global growth rate %")
     inflation_rate: Decimal = Field(default=Decimal("0"), description="Inflation rate %")
     fx_rate: Optional[Decimal] = Field(None, description="FX rate for imports")
@@ -35,8 +34,8 @@ class BudgetScenarioBase(BaseModel):
 
 
 class BudgetScenarioCreate(BudgetScenarioBase):
-    """Schema for creating budget scenario"""
-    created_by: Optional[str] = None
+    """Schema for creating budget scenario - department_id auto-assigned from current_user"""
+    pass
 
 
 class BudgetScenarioUpdate(BaseModel):
@@ -53,6 +52,7 @@ class BudgetScenarioUpdate(BaseModel):
 class BudgetScenarioInDB(BudgetScenarioBase):
     """Schema for budget scenario from database"""
     id: int
+    department_id: int
     created_at: datetime
     created_by: Optional[str]
 
@@ -67,9 +67,7 @@ class BudgetScenarioInDB(BudgetScenarioBase):
 class BudgetVersionBase(BaseModel):
     """Base schema for budget version"""
     year: int = Field(..., description="Planning year (e.g., 2026)")
-    version_number: int = Field(..., ge=1, description="Version number (1, 2, 3...)")
     version_name: Optional[str] = Field(None, max_length=100, description="Version name")
-    department_id: int
     scenario_id: Optional[int] = None
     status: BudgetVersionStatusEnum = BudgetVersionStatusEnum.DRAFT
     comments: Optional[str] = None
@@ -77,8 +75,7 @@ class BudgetVersionBase(BaseModel):
 
 
 class BudgetVersionCreate(BudgetVersionBase):
-    """Schema for creating budget version"""
-    created_by: Optional[str] = None
+    """Schema for creating budget version - department_id auto-assigned from current_user, version_number auto-incremented"""
     copy_from_version_id: Optional[int] = Field(None, description="Copy from existing version")
     auto_calculate: bool = Field(False, description="Auto-calculate from previous year")
 
@@ -98,6 +95,8 @@ class BudgetVersionUpdate(BaseModel):
 class BudgetVersionInDB(BudgetVersionBase):
     """Schema for budget version from database"""
     id: int
+    version_number: int
+    department_id: int
     created_by: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -210,29 +209,26 @@ class BudgetApprovalLogInDB(BudgetApprovalLogBase):
 
 
 class CalculateByAverageRequest(BaseModel):
-    """Request schema for calculate by average method"""
+    """Request schema for calculate by average method - department_id auto-assigned from current_user"""
     category_id: int
     base_year: int = Field(..., description="Base year for calculation (e.g., 2025)")
-    department_id: int
     adjustment_percent: Decimal = Field(default=Decimal("0"), description="Adjustment % (inflation, growth)")
     target_year: int = Field(..., description="Target year (e.g., 2026)")
 
 
 class CalculateByGrowthRequest(BaseModel):
-    """Request schema for calculate by growth method"""
+    """Request schema for calculate by growth method - department_id auto-assigned from current_user"""
     category_id: int
     base_year: int
-    department_id: int
     growth_rate: Decimal = Field(..., description="Growth rate %")
     inflation_rate: Decimal = Field(default=Decimal("0"), description="Inflation rate %")
     target_year: int
 
 
 class CalculateByDriverRequest(BaseModel):
-    """Request schema for calculate by driver method"""
+    """Request schema for calculate by driver method - department_id auto-assigned from current_user"""
     category_id: int
     base_year: int
-    department_id: int
     driver_type: str = Field(..., description="Driver type: headcount, projects, revenue, etc")
     base_driver_value: Decimal = Field(..., description="Driver value in base year")
     planned_driver_value: Decimal = Field(..., description="Planned driver value for target year")

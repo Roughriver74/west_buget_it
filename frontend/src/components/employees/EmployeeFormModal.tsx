@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, Select, DatePicker, message } from 'antd';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeAPI, Employee, EmployeeCreate, EmployeeUpdate } from '../../api/payroll';
-import { departmentsAPI } from '../../api/departments';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -25,12 +24,6 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const isEdit = !!employee;
-
-  // Fetch departments for dropdown
-  const { data: departments = [] } = useQuery({
-    queryKey: ['departments'],
-    queryFn: () => departmentsAPI.list(),
-  });
 
   // Create mutation
   const createMutation = useMutation({
@@ -63,6 +56,11 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
     if (visible && employee) {
       form.setFieldsValue({
         ...employee,
+        // Convert numeric string fields to numbers for proper validation
+        base_salary: employee.base_salary ? Number(employee.base_salary) : undefined,
+        monthly_bonus_base: employee.monthly_bonus_base ? Number(employee.monthly_bonus_base) : undefined,
+        quarterly_bonus_base: employee.quarterly_bonus_base ? Number(employee.quarterly_bonus_base) : undefined,
+        annual_bonus_base: employee.annual_bonus_base ? Number(employee.annual_bonus_base) : undefined,
         hire_date: employee.hire_date ? dayjs(employee.hire_date) : null,
         fire_date: employee.fire_date ? dayjs(employee.fire_date) : null,
       });
@@ -146,8 +144,17 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <InputNumber
             style={{ width: '100%' }}
             placeholder="50000"
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            formatter={(value) => {
+              if (value === undefined || value === null || value === '') return '';
+              return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            }}
+            parser={(value) => {
+              if (!value) return undefined as any;
+              const cleaned = value.replace(/\s/g, '');
+              if (cleaned === '') return undefined as any;
+              const num = Number(cleaned);
+              return isNaN(num) ? undefined as any : num;
+            }}
             addonAfter="₽"
           />
         </Form.Item>
@@ -162,8 +169,17 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            formatter={(value) => {
+              if (value === undefined || value === null || value === '') return '';
+              return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            }}
+            parser={(value) => {
+              if (!value) return undefined as any;
+              const cleaned = value.replace(/\s/g, '');
+              if (cleaned === '') return undefined as any;
+              const num = Number(cleaned);
+              return isNaN(num) ? undefined as any : num;
+            }}
             addonAfter="₽"
           />
         </Form.Item>
@@ -178,8 +194,17 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            formatter={(value) => {
+              if (value === undefined || value === null || value === '') return '';
+              return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            }}
+            parser={(value) => {
+              if (!value) return undefined as any;
+              const cleaned = value.replace(/\s/g, '');
+              if (cleaned === '') return undefined as any;
+              const num = Number(cleaned);
+              return isNaN(num) ? undefined as any : num;
+            }}
             addonAfter="₽"
           />
         </Form.Item>
@@ -194,24 +219,19 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            formatter={(value) => {
+              if (value === undefined || value === null || value === '') return '';
+              return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            }}
+            parser={(value) => {
+              if (!value) return undefined as any;
+              const cleaned = value.replace(/\s/g, '');
+              if (cleaned === '') return undefined as any;
+              const num = Number(cleaned);
+              return isNaN(num) ? undefined as any : num;
+            }}
             addonAfter="₽"
           />
-        </Form.Item>
-
-        <Form.Item
-          name="department_id"
-          label="Отдел"
-          rules={[{ required: true, message: 'Выберите отдел' }]}
-        >
-          <Select placeholder="Выберите отдел">
-            {departments.map((dept: any) => (
-              <Option key={dept.id} value={dept.id}>
-                {dept.name}
-              </Option>
-            ))}
-          </Select>
         </Form.Item>
 
         <Form.Item

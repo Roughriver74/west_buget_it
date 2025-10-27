@@ -19,21 +19,20 @@ class EmployeeBase(BaseModel):
     base_salary: Decimal = Field(..., ge=0)
     # Bonus base rates (базовые ставки премий)
     monthly_bonus_base: Decimal = Field(0, ge=0, description="Базовая месячная премия")
-    quarterly_bonus_base: Decimal = Field(0, ge=0, description="Базовая квартальная премия")
-    annual_bonus_base: Decimal = Field(0, ge=0, description="Базовая годовая премия")
-    department_id: int
+    quarterly_bonus_base: Optional[Decimal] = Field(None, ge=0, description="Базовая квартальная премия (опционально)")
+    annual_bonus_base: Optional[Decimal] = Field(None, ge=0, description="Базовая годовая премия (опционально)")
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
     notes: Optional[str] = None
 
 
 class EmployeeCreate(EmployeeBase):
-    """Schema for creating employee"""
+    """Schema for creating employee - department_id auto-assigned from current_user"""
     pass
 
 
 class EmployeeUpdate(BaseModel):
-    """Schema for updating employee"""
+    """Schema for updating employee - department_id cannot be changed via update"""
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     position: Optional[str] = Field(None, min_length=1, max_length=255)
     employee_number: Optional[str] = Field(None, max_length=50)
@@ -45,7 +44,6 @@ class EmployeeUpdate(BaseModel):
     monthly_bonus_base: Optional[Decimal] = Field(None, ge=0)
     quarterly_bonus_base: Optional[Decimal] = Field(None, ge=0)
     annual_bonus_base: Optional[Decimal] = Field(None, ge=0)
-    department_id: Optional[int] = None
     email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
     notes: Optional[str] = None
@@ -54,6 +52,7 @@ class EmployeeUpdate(BaseModel):
 class EmployeeInDB(EmployeeBase):
     """Schema for employee in database"""
     id: int
+    department_id: int
     created_at: datetime
     updated_at: datetime
 
