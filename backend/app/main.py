@@ -8,7 +8,6 @@ import logging
 
 from sentry_sdk import init as sentry_init
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlAlchemyIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
@@ -26,7 +25,6 @@ if settings.SENTRY_DSN:
         dsn=settings.SENTRY_DSN,
         integrations=[
             FastApiIntegration(),
-            SqlAlchemyIntegration(),
             LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
         ],
         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,

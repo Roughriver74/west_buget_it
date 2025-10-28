@@ -210,14 +210,15 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
   }, [])
 
   const handleCellChange = (categoryId: number, month: number, value: number | null) => {
+    const cellKey = `${categoryId}_${month}`
+    setChangedCells((prev) => new Set(prev).add(cellKey))
+
     setData((prevData) =>
       prevData.map((row) => {
         if (row.categoryId === categoryId) {
           if (row.hasChildren) {
             return row
           }
-          const cellKey = `${categoryId}_${month}`
-          setChangedCells((prev) => new Set(prev).add(cellKey))
           return {
             ...row,
             [`month_${month}`]: Number(value ?? 0),
@@ -280,13 +281,33 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
     }
 
     try {
-      // Execute all updates
-      for (const update of updates) {
-        await updateMutation.mutateAsync({ id: update.id, data: update.data })
-      }
+      // Execute all updates in parallel
+      const updatePromises = updates.map((update) =>
+        updateMutation.mutateAsync({ id: update.id, data: update.data }).catch((err) => ({
+          error: err,
+          type: 'update' as const,
+          id: update.id,
+        }))
+      )
 
-      for (const payload of creations) {
-        await createMutation.mutateAsync(payload)
+      const createPromises = creations.map((payload) =>
+        createMutation.mutateAsync(payload).catch((err) => ({
+          error: err,
+          type: 'create' as const,
+          payload,
+        }))
+      )
+
+      const results = await Promise.all([...updatePromises, ...createPromises])
+
+      // Check for errors
+      const errors = results.filter((r) => r && 'error' in r)
+
+      if (errors.length > 0) {
+        message.error(`Ошибка при сохранении ${errors.length} из ${totalChanges} изменений`)
+        console.error('Ошибки сохранения:', errors)
+        // Don't clear changed cells if there were errors
+        return
       }
 
       setChangedCells(new Set())
@@ -294,6 +315,7 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       onAfterSave?.()
     } catch (error) {
       message.error('Ошибка при сохранении')
+      console.error('Ошибка сохранения:', error)
     }
   }
 
@@ -303,36 +325,53 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
     message.info('Изменения отменены')
   }
 
-  // Calculate row total
-  const getRowTotal = (row: CategoryRow) => {
-    return MONTHS.reduce((sum, month) => sum + Number(getMonthValue(row, month.key)), 0)
-  }
+  // Get month value for a row (handles both leaf and parent categories)
+  const getMonthValue = useCallback(
+    (row: CategoryRow, monthKey: number): number => {
+      if (!row.hasChildren) {
+        return Number(row[`month_${monthKey}`] || 0)
+      }
 
-  // Calculate column total
-  const getColumnTotal = (month: number) => {
-    return data
-      .filter((row) => !row.hasChildren)
-      .reduce((sum, row) => sum + Number(row[`month_${month}`] || 0), 0)
-  }
+      // For parent categories, sum values of all leaf descendants
+      return row.descendantIds.reduce((sum, id) => {
+        const child = dataById.get(id)
+        if (!child) return sum
+        // Only sum leaf nodes (non-parent categories)
+        if (!child.hasChildren) {
+          return sum + Number(child[`month_${monthKey}`] || 0)
+        }
+        return sum
+      }, 0)
+    },
+    [dataById]
+  )
 
-  // Calculate grand total
-  const getGrandTotal = () => {
+  // Calculate row total (memoized)
+  const getRowTotal = useCallback(
+    (row: CategoryRow) => {
+      return MONTHS.reduce((sum, month) => sum + getMonthValue(row, month.key), 0)
+    },
+    [getMonthValue]
+  )
+
+  // Calculate column totals (memoized)
+  const columnTotals = useMemo(() => {
+    const totals = new Map<number, number>()
+    MONTHS.forEach((month) => {
+      const total = data
+        .filter((row) => !row.hasChildren)
+        .reduce((sum, row) => sum + Number(row[`month_${month.key}`] || 0), 0)
+      totals.set(month.key, total)
+    })
+    return totals
+  }, [data])
+
+  // Calculate grand total (memoized)
+  const grandTotal = useMemo(() => {
     return data
       .filter((row) => !row.hasChildren)
       .reduce((sum, row) => sum + getRowTotal(row), 0)
-  }
-
-  const getMonthValue = (row: CategoryRow, monthKey: number) => {
-    if (!row.hasChildren) {
-      return Number(row[`month_${monthKey}`] || 0)
-    }
-
-    return row.descendantIds.reduce((sum, id) => {
-      const child = dataById.get(id)
-      if (!child) return sum
-      return sum + Number(child[`month_${monthKey}`] || 0)
-    }, 0)
-  }
+  }, [data, getRowTotal])
 
   const columns: ColumnsType<CategoryRow> = [
     {
@@ -425,11 +464,11 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
         </Table.Summary.Cell>
         {MONTHS.map((month, index) => (
           <Table.Summary.Cell key={month.key} index={index + 1} align="right">
-            <Text strong>{formatCurrency(getColumnTotal(month.key))}</Text>
+            <Text strong>{formatCurrency(columnTotals.get(month.key) || 0)}</Text>
           </Table.Summary.Cell>
         ))}
         <Table.Summary.Cell index={13} align="right">
-          <Text strong style={{ fontSize: 16 }}>{formatCurrency(getGrandTotal())}</Text>
+          <Text strong style={{ fontSize: 16 }}>{formatCurrency(grandTotal)}</Text>
         </Table.Summary.Cell>
       </Table.Summary.Row>
     </Table.Summary>

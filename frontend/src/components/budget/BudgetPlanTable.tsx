@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { Table, Tag, Spin, message, Button, Space, Alert } from 'antd'
-import { CopyOutlined, PlusOutlined, DownloadOutlined, WarningOutlined } from '@ant-design/icons'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Table, Tag, Spin, message, Button, Space, Alert, Segmented } from 'antd'
+import { CopyOutlined, PlusOutlined, DownloadOutlined, WarningOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import EditableCell from './EditableCell'
@@ -12,12 +12,26 @@ interface BudgetPlanTableProps {
 }
 
 const MONTH_NAMES = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
+const MONTH_SEGMENT_OPTIONS = MONTH_NAMES.map((label, index) => ({ label, value: index + 1 }))
+const MONTH_COLUMN_WIDTH = 270
+const TABLE_SCROLL_WIDTH = 300 + MONTH_COLUMN_WIDTH * 12 + 270
+const STICKY_HEADER_OFFSET = 64
+const CONTROL_PANEL_HEIGHT = 110 // Высота панели управления
 
-const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
+const BudgetPlanTable = React.forwardRef<
+  { scrollBy: (direction: 'left' | 'right') => void },
+  BudgetPlanTableProps
+>((props, ref) => {
+  const { year } = props
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set())
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const [activeMonth, setActiveMonth] = useState<number>(year === currentYear ? currentMonth : 1)
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollTargetRef = useRef<HTMLDivElement | null>(null)
 
   // Загрузка плана на год
   const { data: planData, isLoading } = useQuery({
@@ -88,10 +102,137 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
     return new Intl.NumberFormat('ru-RU').format(num)
   }
 
+  useEffect(() => {
+    setActiveMonth(year === currentYear ? currentMonth : 1)
+  }, [year, currentYear, currentMonth])
+
+  const updateScrollState = useCallback(() => {
+    // Функция для обновления состояния прокрутки (может использоваться для кнопок навигации)
+    const target = scrollTargetRef.current ?? scrollContainerRef.current
+    if (!target) return
+    // В будущем здесь можно добавить логику для кнопок навигации
+  }, [])
+
+  const resolveScrollTarget = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return null
+    const content = container.querySelector<HTMLDivElement>('.ant-table-content')
+    const body = container.querySelector<HTMLDivElement>('.ant-table-body')
+    return content ?? body ?? container
+  }, [])
+
+  const scrollToMonth = useCallback((month: number, behavior: ScrollBehavior = 'smooth', retryCount: number = 0) => {
+    // Используем двойной requestAnimationFrame для гарантии полного рендеринга
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const target = scrollTargetRef.current ?? scrollContainerRef.current
+          if (!target) {
+            console.warn('Scroll target not found')
+            return
+          }
+
+          // Проверяем, что таблица отрендерена
+          const tableBody = target.querySelector('.ant-table-body')
+          if (!tableBody && retryCount < 5) {
+            console.warn(`Table body not found, retrying... (${retryCount + 1}/5)`)
+            // Повторная попытка через 100мс (максимум 5 попыток)
+            setTimeout(() => {
+              const fn = (scrollToMonth as any) as (m: number, b: ScrollBehavior, r: number) => void
+              fn(month, behavior, retryCount + 1)
+            }, 100)
+            return
+          }
+
+          const approximateCenterOffset = target.clientWidth * 0.25
+          const columnOffset = Math.max(0, (month - 1) * MONTH_COLUMN_WIDTH - approximateCenterOffset)
+          target.scrollTo({ left: columnOffset, behavior })
+          requestAnimationFrame(updateScrollState)
+        }, 200)
+      })
+    })
+  }, [updateScrollState])
+
+  const isInitialMount = useRef(true)
+
+  useEffect(() => {
+    const target = resolveScrollTarget()
+    if (!target) return
+
+    scrollTargetRef.current = target
+
+    const handleScroll = () => updateScrollState()
+    const handleResize = () => updateScrollState()
+
+    updateScrollState()
+
+    // Первичная прокрутка только при загрузке данных
+    if (isInitialMount.current) {
+      scrollToMonth(activeMonth, 'auto')
+      isInitialMount.current = false
+    }
+
+    target.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      target.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [planData, resolveScrollTarget, updateScrollState, scrollToMonth, activeMonth])
+
+  // Отдельный эффект для плавной прокрутки при переключении месяцев
+  useEffect(() => {
+    if (!planData || isInitialMount.current) return
+
+    // Даём таблице время на рендер перед прокруткой
+    const timer = setTimeout(() => {
+      scrollToMonth(activeMonth, 'smooth')
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [activeMonth, planData, scrollToMonth])
+
+  // Все хуки должны быть вызваны ПЕРЕД условными возвратами
+  const scrollBy = useCallback(
+    (direction: 'left' | 'right') => {
+      const target = scrollTargetRef.current ?? scrollContainerRef.current
+      if (!target) return
+      const step = target.clientWidth * 0.6
+      const delta = direction === 'left' ? -step : step
+      target.scrollBy({ left: delta, behavior: 'smooth' })
+      requestAnimationFrame(updateScrollState)
+    },
+    [updateScrollState]
+  )
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      scrollBy,
+    }),
+    [scrollBy]
+  )
+
+  const handleMonthSelect = useCallback(
+    (month: number) => {
+      setActiveMonth(month)
+      scrollToMonth(month)
+    },
+    [scrollToMonth]
+  )
+
+  const handleResetMonth = useCallback(() => {
+    const targetMonth = year === currentYear ? currentMonth : 1
+    setActiveMonth(targetMonth)
+    scrollToMonth(targetMonth)
+  }, [year, currentYear, currentMonth, scrollToMonth])
+
+  // Условные возвраты ПОСЛЕ всех хуков
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin size="large" />
+      <div style={{ textAlign: 'center', padding: '50px', minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" tip="Загрузка плана..." />
       </div>
     )
   }
@@ -194,14 +335,24 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
     ...Array.from({ length: 12 }, (_, i) => i + 1).map((month) => ({
       title: MONTH_NAMES[month - 1],
       key: `month-${month}`,
-      width: 270,
+      width: MONTH_COLUMN_WIDTH,
       align: 'right' as const,
+      className: activeMonth === month ? 'active-month-header' : undefined,
+      onHeaderCell: () => ({
+        className: activeMonth === month ? 'active-month-header' : undefined,
+      }),
       children: [
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>План</div>,
           key: `month-${month}-plan`,
           width: 90,
           align: 'right' as const,
+          onHeaderCell: () => ({
+            className: activeMonth === month ? 'active-month-subheader' : undefined,
+          }),
+          onCell: () => ({
+            className: activeMonth === month ? 'active-month-cell' : undefined,
+          }),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const isEditable = record.isChild === true
@@ -216,7 +367,11 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
                 />
               )
             }
-            return <span style={{fontSize: 13}}>{formatNumber(value)}</span>
+            return (
+              <span style={{fontSize: 13, fontWeight: activeMonth === month ? 600 : 'normal'}}>
+                {formatNumber(value)}
+              </span>
+            )
           },
         },
         {
@@ -224,10 +379,20 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
           key: `month-${month}-actual`,
           width: 90,
           align: 'right' as const,
+          onHeaderCell: () => ({
+            className: activeMonth === month ? 'active-month-subheader' : undefined,
+          }),
+          onCell: () => ({
+            className: activeMonth === month ? 'active-month-cell' : undefined,
+          }),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const value = monthData?.actual_amount || 0
-            return <span style={{fontSize: 13, color: '#666'}}>{formatNumber(value)}</span>
+            return (
+              <span style={{fontSize: 13, color: '#666', fontWeight: activeMonth === month ? 600 : 'normal'}}>
+                {formatNumber(value)}
+              </span>
+            )
           },
         },
         {
@@ -235,11 +400,27 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
           key: `month-${month}-remaining`,
           width: 90,
           align: 'right' as const,
+          onHeaderCell: () => ({
+            className: activeMonth === month ? 'active-month-subheader' : undefined,
+          }),
+          onCell: () => ({
+            className: activeMonth === month ? 'active-month-cell' : undefined,
+          }),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const remaining = monthData?.remaining || 0
             const color = remaining < 0 ? '#ff4d4f' : (remaining > 0 ? '#52c41a' : '#666')
-            return <span style={{fontSize: 13, color, fontWeight: remaining < 0 ? 'bold' : 'normal'}}>{formatNumber(remaining)}</span>
+            return (
+              <span
+                style={{
+                  fontSize: 13,
+                  color,
+                  fontWeight: remaining < 0 || activeMonth === month ? 'bold' : 'normal',
+                }}
+              >
+                {formatNumber(remaining)}
+              </span>
+            )
           },
         },
       ]
@@ -412,30 +593,79 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
         />
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        <Space>
+      {/* Липкая панель управления */}
+      <div
+        style={{
+          position: 'sticky',
+          top: STICKY_HEADER_OFFSET,
+          zIndex: 10,
+          backgroundColor: '#fff',
+          paddingTop: 12,
+          paddingBottom: 12,
+          marginBottom: 0,
+          borderBottom: '2px solid #f0f0f0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+            marginBottom: 12,
+          }}
+        >
+          <Space size="middle" align="center" wrap>
+            <span style={{ fontWeight: 500 }}>Месяц:</span>
+            <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+              <Segmented
+                options={MONTH_SEGMENT_OPTIONS}
+                value={activeMonth}
+                onChange={(value) => handleMonthSelect(Number(value))}
+              />
+            </div>
+          </Space>
           <Button
-            icon={<CopyOutlined />}
-            onClick={() => setCopyModalOpen(true)}
+            type="link"
+            icon={<CalendarOutlined />}
+            onClick={handleResetMonth}
+            style={{ padding: 0 }}
           >
-            Скопировать из другого года
+            К текущему месяцу
           </Button>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-            type="default"
-          >
-            Экспорт в Excel
-          </Button>
-        </Space>
+        </div>
+
+        <div>
+          <Space>
+            <Button
+              icon={<CopyOutlined />}
+              onClick={() => setCopyModalOpen(true)}
+            >
+              Скопировать из другого года
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              type="default"
+            >
+              Экспорт в Excel
+            </Button>
+          </Space>
+        </div>
       </div>
 
-      <div style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', position: 'relative' }}>
+      <div
+        ref={scrollContainerRef}
+        style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
+      >
         <Table
+          sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
           columns={columns}
           dataSource={dataWithTotals}
           pagination={false}
-          scroll={{ x: 4500 }}
+          scroll={{ x: TABLE_SCROLL_WIDTH }}
           bordered
           size="small"
           rowClassName={(record) => {
@@ -484,6 +714,89 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
           padding: 8px !important;
         }
 
+        .active-month-header {
+          background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
+          color: #0958d9 !important;
+          font-weight: 600 !important;
+        }
+        .active-month-subheader {
+          background-color: rgba(24, 144, 255, 0.12) !important;
+          color: #0958d9 !important;
+          font-weight: 600 !important;
+        }
+        .active-month-cell {
+          background-color: rgba(222, 242, 255, 0.7) !important;
+          transition: background-color 0.2s ease;
+        }
+        .active-month-cell:hover {
+          background-color: rgba(184, 218, 255, 0.8) !important;
+        }
+
+        .ant-table-sticky-holder {
+          background: #fff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          z-index: 5;
+        }
+        .ant-table-sticky-scroll {
+          display: none;
+        }
+
+        /* Плавная прокрутка */
+        .ant-table-content {
+          scroll-behavior: smooth;
+        }
+
+        .budget-scroll-button {
+          width: 56px !important;
+          height: 56px !important;
+          border: none !important;
+          background: linear-gradient(135deg, rgba(24, 144, 255, 0.95) 0%, rgba(69, 166, 255, 0.95) 100%) !important;
+          color: #fff !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-shadow: 0 4px 16px rgba(24, 144, 255, 0.4), 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+          backdrop-filter: blur(8px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          font-size: 20px !important;
+        }
+        .budget-scroll-button:hover {
+          background: linear-gradient(135deg, rgba(24, 144, 255, 1) 0%, rgba(69, 166, 255, 1) 100%) !important;
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 6px 20px rgba(24, 144, 255, 0.5), 0 10px 30px rgba(0, 0, 0, 0.2) !important;
+          color: #fff !important;
+        }
+        .budget-scroll-button:active {
+          transform: translateY(0) scale(1);
+          box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3), 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+        .budget-scroll-button:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          transform: none !important;
+        }
+
+        /* Прозрачная версия кнопок */
+        .budget-scroll-button-transparent {
+          background: rgba(255, 255, 255, 0.75) !important;
+          color: #1890ff !important;
+          border: 2px solid rgba(24, 144, 255, 0.3) !important;
+          box-shadow: 0 2px 12px rgba(24, 144, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+          backdrop-filter: blur(12px) saturate(180%);
+        }
+        .budget-scroll-button-transparent:hover {
+          background: rgba(255, 255, 255, 0.9) !important;
+          color: #0958d9 !important;
+          border: 2px solid rgba(24, 144, 255, 0.6) !important;
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 4px 16px rgba(24, 144, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+        }
+        .budget-scroll-button-transparent:active {
+          transform: translateY(0) scale(1);
+          background: rgba(255, 255, 255, 0.85) !important;
+          box-shadow: 0 1px 6px rgba(24, 144, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+        }
+
         /* Голубая полоса прокрутки */
         ::-webkit-scrollbar {
           height: 16px !important;
@@ -513,6 +826,8 @@ const BudgetPlanTable: React.FC<BudgetPlanTableProps> = ({ year }) => {
       `}</style>
     </div>
   )
-}
+})
+
+BudgetPlanTable.displayName = 'BudgetPlanTable'
 
 export default BudgetPlanTable

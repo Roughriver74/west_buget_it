@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Typography, Card, Select, Space } from 'antd'
+import { Typography, Card, Select, Space, Button } from 'antd'
 import BudgetPlanTable from '@/components/budget/BudgetPlanTable'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -8,6 +9,7 @@ const { Option } = Select
 const BudgetPlanPage: React.FC = () => {
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(currentYear)
+  const tableRef = React.useRef<{ scrollBy: (direction: 'left' | 'right') => void } | null>(null)
 
   // Генерируем список последних 5 лет и следующие 2 года
   const years = Array.from({ length: 8 }, (_, i) => currentYear - 3 + i)
@@ -39,10 +41,44 @@ const BudgetPlanPage: React.FC = () => {
         </Space>
       </div>
 
-      <Card styles={{ body: { padding: 0, overflow: 'auto' } }}>
-        <div style={{ padding: 24 }}>
-          <BudgetPlanTable year={selectedYear} />
+      <Card styles={{ body: { padding: 24, position: 'relative' } }}>
+        {/* Плавающие кнопки навигации привязанные к липкой панели */}
+        <div
+          style={{
+            position: 'sticky',
+            top: 64,
+            zIndex: 100,
+            pointerEvents: 'none',
+            display: 'flex',
+            justifyContent: 'space-between',
+            padding: '0 12px',
+            height: 0,
+            marginBottom: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Button
+              shape="circle"
+              size="large"
+              icon={<LeftOutlined />}
+              onClick={() => tableRef.current?.scrollBy('left')}
+              className="budget-scroll-button budget-scroll-button-transparent"
+              style={{ pointerEvents: 'auto' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Button
+              shape="circle"
+              size="large"
+              icon={<RightOutlined />}
+              onClick={() => tableRef.current?.scrollBy('right')}
+              className="budget-scroll-button budget-scroll-button-transparent"
+              style={{ pointerEvents: 'auto' }}
+            />
+          </div>
         </div>
+
+        <BudgetPlanTable year={selectedYear} ref={tableRef} />
       </Card>
 
       <div style={{ marginTop: 16, padding: 16, backgroundColor: '#f0f5ff', borderRadius: 8 }}>
