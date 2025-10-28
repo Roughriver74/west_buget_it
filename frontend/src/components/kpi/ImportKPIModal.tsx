@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Modal, Form, Upload, DatePicker, message, Alert, Typography, List, Statistic, Row, Col, Divider } from 'antd'
-import { UploadOutlined, InboxOutlined } from '@ant-design/icons'
+import { Modal, Form, Upload, DatePicker, message, Alert, Typography, List, Statistic, Row, Col, Divider, Button } from 'antd'
+import { UploadOutlined, InboxOutlined, DownloadOutlined } from '@ant-design/icons'
 import type { UploadFile, UploadProps } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
@@ -49,6 +49,21 @@ const ImportKPIModal: React.FC<ImportKPIModalProps> = ({ visible, onCancel }) =>
       setIsUploading(false)
     },
   })
+
+  const handleDownloadTemplate = () => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const url = `${API_URL}/api/v1/templates/download/kpi`
+
+    // Create temporary link and trigger download
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'Шаблон_КПИ.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    message.success('Скачивание шаблона начато')
+  }
 
   const handleSubmit = async () => {
     try {
@@ -149,6 +164,15 @@ const ImportKPIModal: React.FC<ImportKPIModalProps> = ({ visible, onCancel }) =>
             showIcon
             style={{ marginBottom: 16 }}
           />
+
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleDownloadTemplate}
+            style={{ marginBottom: 16 }}
+            type="default"
+          >
+            Скачать шаблон Excel
+          </Button>
 
           <Form form={form} layout="vertical">
             <Form.Item
