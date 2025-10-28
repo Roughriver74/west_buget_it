@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
-import { Modal, Form, InputNumber, Select, DatePicker, message } from 'antd';
+import { useEffect, useState } from 'react';
+import { Modal, Form, InputNumber, Select, DatePicker, message, Divider, Typography } from 'antd';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { payrollActualAPI, employeeAPI, payrollPlanAPI, PayrollActualCreate, PayrollActualUpdate } from '../../api/payroll';
 import dayjs from 'dayjs';
+
+const { Text } = Typography;
 
 const { Option } = Select;
 
@@ -42,6 +44,24 @@ export default function PayrollActualFormModal({
   const queryClient = useQueryClient();
   const isEdit = !!actualId;
   const currentYear = new Date().getFullYear();
+
+  // Watch form values for tax calculation
+  const [baseSalary, setBaseSalary] = useState(0);
+  const [monthlyBonus, setMonthlyBonus] = useState(0);
+  const [quarterlyBonus, setQuarterlyBonus] = useState(0);
+  const [annualBonus, setAnnualBonus] = useState(0);
+  const [otherPayments, setOtherPayments] = useState(0);
+  const [incomeTaxRate, setIncomeTaxRate] = useState(0.13);
+  const [socialTaxAmount, setSocialTaxAmount] = useState(0);
+
+  // Calculate gross amount (total before taxes)
+  const grossAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
+
+  // Calculate income tax amount
+  const incomeTaxAmount = Math.round(grossAmount * incomeTaxRate);
+
+  // Calculate net amount (gross - taxes)
+  const netAmount = grossAmount - incomeTaxAmount - socialTaxAmount;
 
   // Fetch employees for dropdown
   const { data: employees = [] } = useQuery({
@@ -86,6 +106,8 @@ export default function PayrollActualFormModal({
         quarterly_bonus_paid: 0,
         annual_bonus_paid: 0,
         other_payments_paid: 0,
+        income_tax_rate: 13,  // Default 13%
+        social_tax_amount: 0,
         payment_date: dayjs(),
       });
 
@@ -127,6 +149,8 @@ export default function PayrollActualFormModal({
         quarterly_bonus_paid: 0,
         annual_bonus_paid: 0,
         other_payments_paid: 0,
+        income_tax_rate: 13,  // Default 13%
+        social_tax_amount: 0,
         payment_date: dayjs(),
       });
     }
@@ -182,6 +206,9 @@ export default function PayrollActualFormModal({
         quarterly_bonus_paid: values.quarterly_bonus_paid || 0,
         annual_bonus_paid: values.annual_bonus_paid || 0,
         other_payments_paid: values.other_payments_paid || 0,
+        income_tax_rate: (values.income_tax_rate || 13) / 100,  // Convert percentage to decimal
+        income_tax_amount: incomeTaxAmount,
+        social_tax_amount: values.social_tax_amount || 0,
       };
 
       if (isEdit && actualId) {
@@ -193,6 +220,9 @@ export default function PayrollActualFormModal({
             quarterly_bonus_paid: data.quarterly_bonus_paid,
             annual_bonus_paid: data.annual_bonus_paid,
             other_payments_paid: data.other_payments_paid,
+            income_tax_rate: data.income_tax_rate,
+            income_tax_amount: data.income_tax_amount,
+            social_tax_amount: data.social_tax_amount,
             payment_date: data.payment_date,
           }
         });
@@ -293,6 +323,7 @@ export default function PayrollActualFormModal({
             placeholder="50000"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setBaseSalary(value || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -309,6 +340,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setMonthlyBonus(value || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -325,6 +357,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setQuarterlyBonus(value || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -341,6 +374,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setAnnualBonus(value || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -356,7 +390,67 @@ export default function PayrollActualFormModal({
             style={{ width: '100%' }}
             placeholder="5000"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => value!.replace(/\s?/g, '')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setOtherPayments(value || 0)}
+            addonAfter="₽"
+          />
+        </Form.Item>
+
+        <Divider orientation="left">Налоги</Divider>
+
+        <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>Начислено (Gross):</Text>
+            <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%):</Text>
+            <Text type="danger">-{incomeTaxAmount.toLocaleString('ru-RU')} ₽</Text>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>Социальные отчисления:</Text>
+            <Text type="danger">-{socialTaxAmount.toLocaleString('ru-RU')} ₽</Text>
+          </div>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Text strong>К выплате (Net):</Text>
+            <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
+              {netAmount.toLocaleString('ru-RU')} ₽
+            </Text>
+          </div>
+        </div>
+
+        <Form.Item
+          name="income_tax_rate"
+          label="Ставка НДФЛ (%)"
+          rules={[
+            { required: true, message: 'Введите ставку НДФЛ' },
+            { type: 'number', min: 0, max: 100, message: 'Ставка должна быть от 0 до 100%' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="13"
+            min={0}
+            max={100}
+            onChange={(value) => setIncomeTaxRate((value || 13) / 100)}
+            addonAfter="%"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="social_tax_amount"
+          label="Социальные отчисления"
+          rules={[
+            { type: 'number', min: 0, message: 'Отчисления не могут быть отрицательными' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0"
+            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            onChange={(value) => setSocialTaxAmount(value || 0)}
             addonAfter="₽"
           />
         </Form.Item>
