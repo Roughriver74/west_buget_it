@@ -165,9 +165,8 @@
 ### 📊 НИЗКИЙ ПРИОРИТЕТ - DevOps & Мониторинг
 - [x] **Sentry интеграция** - error tracking для production
 - [x] **Prometheus metrics** - экспорт метрик для мониторинга
-- [ ] **Docker** - Создание  образов фронтенд и бэкенд, полный перевод приложения на Docker.
+- [x] **Docker** - Создание образов фронтенд и бэкенд, полный перевод приложения на Docker.
 - [ ] **CI/CD pipeline** - GitHub Actions для тестов и деплоя
-- [ ] **Docker multi-stage builds** - оптимизация образов
 - [ ] **Logging aggregation** - ELK stack или CloudWatch
 
 ### 📝 Технический долг
@@ -481,6 +480,100 @@
 ---
 
 ## ✅ Недавно добавлено
+
+### Docker контейнеризация для production (2025-10-28)
+- ✅ Production-ready Dockerfiles
+  - backend/Dockerfile.prod - Multi-stage build для оптимизации размера образа
+    * Stage 1 (builder): компиляция зависимостей с gcc, libpq-dev
+    * Stage 2 (runtime): минимальный образ с Python 3.11-slim
+    * Non-root пользователь (appuser) для безопасности
+    * Gunicorn с 4 workers и UvicornWorker для production
+    * Health check через curl http://localhost:8000/health
+    * Оптимизированные параметры: timeout 120s, keep-alive 5s
+  - frontend/Dockerfile.prod - Multi-stage build для React приложения
+    * Stage 1 (builder): npm ci и npm run build
+    * Stage 2 (runtime): Nginx 1.25-alpine для обслуживания статики
+    * Non-root nginx пользователь для безопасности
+    * Health check через wget
+    * Оптимизированный размер образа
+- ✅ Nginx конфигурация (frontend/nginx.conf)
+  - React Router поддержка (try_files для SPA)
+  - Security headers: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy
+  - Gzip compression для текстовых файлов
+  - Кеширование статических ресурсов (1 год для JS/CSS/images)
+  - Health check endpoint /health
+  - Client max body size 10MB для загрузки файлов
+  - Скрытие версии Nginx для безопасности
+- ✅ Docker Compose Production (docker-compose.prod.yml)
+  - PostgreSQL 15-alpine с health checks
+  - Redis 7-alpine для кеширования и rate limiting
+  - Backend с настройками production (DEBUG=False, Gunicorn)
+  - Frontend с Nginx
+  - Volumes для persistent data: postgres_data, redis_data, uploads, logs, templates
+  - Custom network (budget_network) для изоляции сервисов
+  - Environment variables через .env файл
+  - Health checks для всех сервисов
+  - Depends_on с condition: service_healthy для корректной последовательности запуска
+- ✅ .dockerignore файлы
+  - backend/.dockerignore: исключение venv, __pycache__, logs, .env
+  - frontend/.dockerignore: исключение node_modules, dist, .env
+  - Оптимизация Docker build context
+- ✅ Environment configuration
+  - .env.prod.example - Подробный шаблон конфигурации с документацией
+    * Database configuration (DB_USER, DB_PASSWORD, DB_NAME, DB_PORT)
+    * Security (SECRET_KEY генерация, JWT настройки)
+    * CORS origins для production
+    * Application settings (DEBUG=False, версия, API prefix)
+    * Monitoring (Sentry DSN, Prometheus)
+    * Redis для distributed rate limiting
+    * Production deployment notes и best practices
+    * SSL/HTTPS инструкции
+    * Scaling рекомендации
+- ✅ Deployment documentation (DEPLOYMENT.md)
+  - Системные требования и проверка Docker
+  - Быстрый старт: клонирование, конфигурация, сборка, инициализация БД
+  - Конфигурация: детальное описание всех переменных окружения
+  - Три сценария развертывания:
+    * Локальный сервер (прямое использование Docker Compose)
+    * С обратным прокси (Nginx/Traefik для SSL)
+    * Docker Swarm / Kubernetes для масштабирования
+  - Мониторинг и обслуживание:
+    * Просмотр логов
+    * Health checks
+    * Обновление приложения
+    * Масштабирование backend
+    * Очистка ресурсов
+  - Безопасность:
+    * Security checklist
+    * Firewall настройка (UFW)
+    * Ограничение доступа к PostgreSQL
+    * SSL сертификаты (Let's Encrypt)
+  - Резервное копирование:
+    * Бэкап PostgreSQL (pg_dump)
+    * Восстановление из бэкапа
+    * Автоматизация через cron
+    * Бэкап загруженных файлов
+  - Устранение неполадок:
+    * Backend не запускается
+    * Frontend ошибки API
+    * Проблемы с загрузкой файлов
+    * Высокое потребление памяти
+    * БД переполнена
+  - Полный русскоязычный гайд на 400+ строк
+- ✅ Health endpoints
+  - Backend: GET /health → {"status": "healthy"}
+  - Frontend: GET /health → "healthy" (через Nginx)
+  - Интеграция в Docker health checks
+- ✅ Production-ready настройки
+  - Multi-stage builds для минимизации размера образов
+  - Non-root users для повышения безопасности
+  - Gunicorn вместо Uvicorn для production backend
+  - Nginx для эффективного обслуживания статики
+  - Health checks для мониторинга состояния контейнеров
+  - Volume mounts для persistent data
+  - Network isolation через custom network
+  - Environment-based configuration
+  - Security headers и HTTPS support
 
 ### Excel шаблоны для всех функций импорта (2025-10-28)
 - ✅ Генератор Excel шаблонов
