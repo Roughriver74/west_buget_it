@@ -93,15 +93,17 @@ export interface PayrollSummary {
 
 export interface SalaryStatistics {
   total_employees: number;
-  active_employees: number;
+  active_employees?: number;
+  avg_salary?: number;
   min_salary: number;
   max_salary: number;
-  average_salary: number;
+  average_salary?: number;
   median_salary: number;
   percentile_25: number;
   percentile_75: number;
   percentile_90: number;
-  total_payroll: number;
+  std_deviation?: number;
+  total_payroll?: number;
 }
 
 export interface PayrollStructureMonth {
@@ -146,6 +148,21 @@ export interface PayrollForecast {
   employee_count: number;
   confidence: string;
   based_on_months: number;
+}
+
+export interface SalaryDistributionBucket {
+  range_min: number;
+  range_max: number;
+  range_label: string;
+  employee_count: number;
+  percentage: number;
+  avg_salary: number;
+}
+
+export interface SalaryDistribution {
+  total_employees: number;
+  buckets: SalaryDistributionBucket[];
+  statistics: SalaryStatistics;
 }
 
 export interface EmployeePayrollStats {
@@ -522,6 +539,18 @@ export const payrollAnalyticsAPI = {
       }>;
       message: string;
     }>('payroll/analytics/register-payroll-payment', null, { params });
+    return response.data;
+  },
+
+  // Get salary distribution (histogram)
+  getSalaryDistribution: async (params: {
+    year?: number;
+    department_id?: number;
+    bucket_size?: number;
+  }) => {
+    const response = await apiClient.get<SalaryDistribution>('payroll/analytics/salary-distribution', {
+      params,
+    });
     return response.data;
   },
 };

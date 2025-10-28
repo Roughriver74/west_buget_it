@@ -83,7 +83,16 @@ export default function PayrollAnalyticsPage() {
     }),
   });
 
-  const isLoading = statsLoading || structureLoading || dynamicsLoading || forecastLoading;
+  // Fetch salary distribution
+  const { data: salaryDistribution, isLoading: distributionLoading } = useQuery({
+    queryKey: ['salary-distribution', selectedDepartment?.id],
+    queryFn: () => payrollAnalyticsAPI.getSalaryDistribution({
+      department_id: selectedDepartment?.id,
+      bucket_size: 50000, // 50k per bucket
+    }),
+  });
+
+  const isLoading = statsLoading || structureLoading || dynamicsLoading || forecastLoading || distributionLoading;
 
   if (isLoading) {
     return (
@@ -371,6 +380,111 @@ export default function PayrollAnalyticsPage() {
           </Card>
         </Col>
       </Row>
+
+      {/* Salary Distribution Histogram */}
+      {salaryDistribution && salaryDistribution.buckets.length > 0 && (
+        <Card
+          title="Распределение зарплат (гистограмма)"
+          style={{ marginTop: '24px' }}
+        >
+          <Row gutter={[24, 24]}>
+            <Col span={16}>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={salaryDistribution.buckets}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="range_label"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    label={{ value: 'Количество сотрудников', angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => {
+                      if (name === 'employee_count') return [value, 'Сотрудников'];
+                      return [value, name];
+                    }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <Card size="small">
+                            <div><strong>{data.range_label}</strong></div>
+                            <div>Сотрудников: {data.employee_count} ({data.percentage}%)</div>
+                            <div>Средняя ЗП: {formatCurrency(data.avg_salary)}</div>
+                          </Card>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="employee_count" fill="#1890ff" name="Сотрудников" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Col>
+            <Col span={8}>
+              <Card size="small" title="Статистика распределения">
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Statistic
+                    title="Всего сотрудников"
+                    value={salaryDistribution.total_employees}
+                    prefix={<TeamOutlined />}
+                  />
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div style={{ fontSize: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span>Минимум:</span>
+                      <strong>{formatCurrency(salaryDistribution.statistics.min_salary)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span>Максимум:</span>
+                      <strong>{formatCurrency(salaryDistribution.statistics.max_salary)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span>Медиана:</span>
+                      <strong>{formatCurrency(salaryDistribution.statistics.median_salary)}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span>Среднее:</span>
+                      <strong>{formatCurrency(salaryDistribution.statistics.avg_salary || 0)}</strong>
+                    </div>
+                  </div>
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div style={{ fontSize: 13 }}>
+                    <div><strong>Процентили:</strong></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span>25%:</span>
+                      <span>{formatCurrency(salaryDistribution.statistics.percentile_25)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>75%:</span>
+                      <span>{formatCurrency(salaryDistribution.statistics.percentile_75)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>90%:</span>
+                      <span>{formatCurrency(salaryDistribution.statistics.percentile_90)}</span>
+                    </div>
+                  </div>
+                  {salaryDistribution.statistics.std_deviation && (
+                    <>
+                      <Divider style={{ margin: '8px 0' }} />
+                      <div style={{ fontSize: 13 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Стд. отклонение:</span>
+                          <span>{formatCurrency(salaryDistribution.statistics.std_deviation)}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Space>
+              </Card>
+            </Col>
+          </Row>
+        </Card>
+      )}
 
       {/* Payroll Forecast */}
       {forecast && forecast.length > 0 && (

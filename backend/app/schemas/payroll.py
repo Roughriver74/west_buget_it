@@ -325,3 +325,20 @@ class PayrollForecast(BaseModel):
     employee_count: int
     confidence: str  # "high", "medium", "low"
     based_on_months: int  # How many historical months used for forecast
+
+
+class SalaryDistributionBucket(BaseModel):
+    """Salary distribution bucket (histogram bin)"""
+    range_min: Decimal = Field(..., description="Минимум диапазона зарплаты")
+    range_max: Decimal = Field(..., description="Максимум диапазона зарплаты")
+    range_label: str = Field(..., description="Метка диапазона (например, '50k-100k')")
+    employee_count: int = Field(..., description="Количество сотрудников в диапазоне")
+    percentage: float = Field(..., description="Процент от общего количества сотрудников")
+    avg_salary: Decimal = Field(..., description="Средняя зарплата в диапазоне")
+
+
+class SalaryDistribution(BaseModel):
+    """Salary distribution statistics with histogram"""
+    total_employees: int = Field(..., description="Общее количество сотрудников")
+    buckets: List[SalaryDistributionBucket] = Field(..., description="Диапазоны распределения зарплат")
+    statistics: SalaryStatistics = Field(..., description="Общая статистика зарплат")

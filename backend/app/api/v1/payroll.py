@@ -1669,3 +1669,180 @@ async def register_payroll_payment(
         "message": f"{'Preview: Would register' if dry_run else 'Registered'} {employee_count} payroll payment{'s' if employee_count != 1 else ''} "
                    f"({payment_type}) for {year}-{month:02d}{f'. Skipped {skipped_count} existing record(s)' if skipped_count > 0 else ''}"
     }
+
+
+# ==================== Salary Distribution (Histogram) ====================
+
+@router.get("/analytics/salary-distribution")
+async def get_salary_distribution(
+    year: Optional[int] = Query(None, description="Filter by year"),
+    department_id: Optional[int] = Query(None, description="Filter by department"),
+    bucket_size: int = Query(50000, ge=10000, le=200000, description="Size of each salary bucket (default 50000)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get salary distribution across employees (histogram)
+
+    Returns distribution of salaries by buckets (ranges) with statistics:
+    - Number of employees in each range
+    - Percentage of total employees
+    - Average salary in range
+
+    Args:
+        year: Optional year to filter by (uses most recent payroll plans if not specified)
+        department_id: Optional department filter
+        bucket_size: Size of each salary bucket/bin (default 50000)
+
+    Returns:
+        {
+            "total_employees": int,
+            "buckets": [
+                {
+                    "range_min": Decimal,
+                    "range_max": Decimal,
+                    "range_label": str,
+                    "employee_count": int,
+                    "percentage": float,
+                    "avg_salary": Decimal
+                }
+            ],
+            "statistics": SalaryStatistics
+        }
+    """
+    from app.schemas.payroll import SalaryDistribution, SalaryDistributionBucket
+
+    # Apply department filter based on role
+    dept_filter = None
+    if current_user.role == UserRoleEnum.USER:
+        dept_filter = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        if department_id:
+            dept_filter = department_id
+
+    # Get active employees with their total compensation
+    # Total compensation = base_salary + monthly_bonus_base + quarterly_bonus_base/4 + annual_bonus_base/12
+    # (amortizing quarterly and annual bonuses to monthly equivalent)
+
+    query = db.query(
+        Employee,
+        (
+            Employee.base_salary +
+            func.coalesce(Employee.monthly_bonus_base, 0) +
+            func.coalesce(Employee.quarterly_bonus_base, 0) / 4 +
+            func.coalesce(Employee.annual_bonus_base, 0) / 12
+        ).label('total_compensation')
+    ).filter(
+        Employee.status == EmployeeStatusEnum.ACTIVE
+    )
+
+    if dept_filter:
+        query = query.filter(Employee.department_id == dept_filter)
+
+    # Get all employees with their total compensation
+    employees_data = query.all()
+
+    if not employees_data:
+        # Return empty distribution
+        return {
+            "total_employees": 0,
+            "buckets": [],
+            "statistics": {
+                "total_employees": 0,
+                "avg_salary": 0,
+                "median_salary": 0,
+                "min_salary": 0,
+                "max_salary": 0,
+                "percentile_25": 0,
+                "percentile_75": 0,
+                "percentile_90": 0,
+                "std_deviation": 0
+            }
+        }
+
+    # Extract salaries
+    salaries = [float(total_comp) for _, total_comp in employees_data]
+    salaries_sorted = sorted(salaries)
+    total_employees = len(salaries)
+
+    # Calculate statistics
+    import statistics
+    avg_salary = statistics.mean(salaries)
+    median_salary = statistics.median(salaries)
+    min_salary = min(salaries)
+    max_salary = max(salaries)
+
+    # Calculate percentiles
+    def percentile(data, p):
+        n = len(data)
+        if n == 0:
+            return 0
+        k = (n - 1) * p / 100
+        f = int(k)
+        c = k - f
+        if f + 1 < n:
+            return data[f] + (data[f + 1] - data[f]) * c
+        else:
+            return data[f]
+
+    percentile_25 = percentile(salaries_sorted, 25)
+    percentile_75 = percentile(salaries_sorted, 75)
+    percentile_90 = percentile(salaries_sorted, 90)
+
+    std_deviation = statistics.stdev(salaries) if len(salaries) > 1 else 0
+
+    # Create buckets (histogram bins)
+    buckets = []
+
+    # Determine min and max bucket boundaries
+    bucket_min = int(min_salary // bucket_size) * bucket_size
+    bucket_max = int(max_salary // bucket_size + 1) * bucket_size
+
+    # Create bucket ranges
+    current_min = bucket_min
+    while current_min < bucket_max:
+        current_max = current_min + bucket_size
+
+        # Count employees in this range
+        employees_in_range = [
+            sal for sal in salaries
+            if current_min <= sal < current_max or (current_max == bucket_max and sal == current_max)
+        ]
+
+        if employees_in_range:
+            count = len(employees_in_range)
+            percentage = (count / total_employees) * 100
+            avg_in_range = sum(employees_in_range) / count
+
+            # Format range label
+            if current_min >= 1000000:
+                label = f"{current_min // 1000}k-{current_max // 1000}k"
+            else:
+                label = f"{int(current_min):,}-{int(current_max):,}"
+
+            buckets.append({
+                "range_min": Decimal(str(current_min)),
+                "range_max": Decimal(str(current_max)),
+                "range_label": label,
+                "employee_count": count,
+                "percentage": round(percentage, 2),
+                "avg_salary": Decimal(str(round(avg_in_range, 2)))
+            })
+
+        current_min = current_max
+
+    return {
+        "total_employees": total_employees,
+        "buckets": buckets,
+        "statistics": {
+            "total_employees": total_employees,
+            "avg_salary": Decimal(str(round(avg_salary, 2))),
+            "median_salary": Decimal(str(round(median_salary, 2))),
+            "min_salary": Decimal(str(round(min_salary, 2))),
+            "max_salary": Decimal(str(round(max_salary, 2))),
+            "percentile_25": Decimal(str(round(percentile_25, 2))),
+            "percentile_75": Decimal(str(round(percentile_75, 2))),
+            "percentile_90": Decimal(str(round(percentile_90, 2))),
+            "std_deviation": Decimal(str(round(std_deviation, 2)))
+        }
+    }
