@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, InputNumber, Select, DatePicker, message, Divider, Typography } from 'antd';
+import { Modal, Form, InputNumber, Select, DatePicker, message, Divider, Typography, Alert } from 'antd';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { payrollActualAPI, employeeAPI, payrollPlanAPI, PayrollActualCreate, PayrollActualUpdate } from '../../api/payroll';
 import dayjs from 'dayjs';
+import { shouldPayQuarterlyBonus, shouldPayAnnualBonus, calculateSocialTax } from '../../utils/payroll';
 
 const { Text } = Typography;
 
@@ -52,16 +53,22 @@ export default function PayrollActualFormModal({
   const [annualBonus, setAnnualBonus] = useState(0);
   const [otherPayments, setOtherPayments] = useState(0);
   const [incomeTaxRate, setIncomeTaxRate] = useState(0.13);
-  const [socialTaxAmount, setSocialTaxAmount] = useState(0);
+  const [currentMonth, setCurrentMonth] = useState<number | undefined>(undefined);
 
   // Calculate gross amount (total before taxes)
   const grossAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
 
-  // Calculate income tax amount
+  // Calculate income tax amount (13% - paid by employee from gross)
   const incomeTaxAmount = Math.round(grossAmount * incomeTaxRate);
 
-  // Calculate net amount (gross - taxes)
-  const netAmount = grossAmount - incomeTaxAmount - socialTaxAmount;
+  // Calculate social tax amount (30.2% - paid by employer, NOT deducted from employee)
+  const socialTaxAmount = calculateSocialTax(grossAmount);
+
+  // Calculate net amount (gross - income tax only, social tax is NOT deducted from employee!)
+  const netAmount = grossAmount - incomeTaxAmount;
+
+  // Calculate employer cost (gross + social tax)
+  const employerCost = grossAmount + socialTaxAmount;
 
   // Fetch employees for dropdown
   const { data: employees = [] } = useQuery({
@@ -107,9 +114,13 @@ export default function PayrollActualFormModal({
         annual_bonus_paid: 0,
         other_payments_paid: 0,
         income_tax_rate: 13,  // Default 13%
-        social_tax_amount: 0,
         payment_date: dayjs(),
       });
+
+      // Set current month for bonus alerts
+      if (defaultValues.month) {
+        setCurrentMonth(defaultValues.month);
+      }
 
       // Try to get plan for this employee/year/month and pre-fill values
       if (defaultValues.employee_id && defaultValues.year && defaultValues.month) {
@@ -150,9 +161,9 @@ export default function PayrollActualFormModal({
         annual_bonus_paid: 0,
         other_payments_paid: 0,
         income_tax_rate: 13,  // Default 13%
-        social_tax_amount: 0,
         payment_date: dayjs(),
       });
+      setCurrentMonth(undefined);
     }
   }, [visible, defaultValues, employees, form, currentYear]);
 
@@ -208,7 +219,7 @@ export default function PayrollActualFormModal({
         other_payments_paid: values.other_payments_paid || 0,
         income_tax_rate: (values.income_tax_rate || 13) / 100,  // Convert percentage to decimal
         income_tax_amount: incomeTaxAmount,
-        social_tax_amount: values.social_tax_amount || 0,
+        social_tax_amount: socialTaxAmount,  // Automatically calculated (30.2%)
       };
 
       if (isEdit && actualId) {
@@ -293,7 +304,11 @@ export default function PayrollActualFormModal({
           label="Месяц"
           rules={[{ required: true, message: 'Выберите месяц' }]}
         >
-          <Select placeholder="Выберите месяц" disabled={isEdit}>
+          <Select
+            placeholder="Выберите месяц"
+            disabled={isEdit}
+            onChange={(value) => setCurrentMonth(value)}
+          >
             {MONTHS.map((month) => (
               <Option key={month.value} value={month.value}>
                 {month.label}
@@ -309,6 +324,32 @@ export default function PayrollActualFormModal({
         >
           <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
         </Form.Item>
+
+        {currentMonth && (
+          <Alert
+            message="Какие премии начисляются в этом месяце"
+            description={
+              <div>
+                <div>✓ Месячная премия: всегда начисляется</div>
+                {shouldPayQuarterlyBonus(currentMonth) && (
+                  <div>✓ Квартальная премия: начисляется в этом месяце (конец квартала)</div>
+                )}
+                {!shouldPayQuarterlyBonus(currentMonth) && (
+                  <div>✗ Квартальная премия: НЕ начисляется (только в марте, июне, сентябре и декабре)</div>
+                )}
+                {shouldPayAnnualBonus(currentMonth) && (
+                  <div>✓ Годовая премия: начисляется в этом месяце (декабрь)</div>
+                )}
+                {!shouldPayAnnualBonus(currentMonth) && (
+                  <div>✗ Годовая премия: НЕ начисляется (только в декабре)</div>
+                )}
+              </div>
+            }
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         <Form.Item
           name="base_salary_paid"
@@ -396,26 +437,33 @@ export default function PayrollActualFormModal({
           />
         </Form.Item>
 
-        <Divider orientation="left">Налоги</Divider>
+        <Divider orientation="left">Расчет выплаты и налогов</Divider>
 
         <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>Начислено (Gross):</Text>
+            <Text>Начислено сотруднику (Gross):</Text>
             <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%):</Text>
+            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%) - вычитается из зарплаты:</Text>
             <Text type="danger">-{incomeTaxAmount.toLocaleString('ru-RU')} ₽</Text>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>Социальные отчисления:</Text>
-            <Text type="danger">-{socialTaxAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
           <Divider style={{ margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Text strong>К выплате (Net):</Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text strong style={{ color: '#52c41a' }}>К выплате сотруднику (Net):</Text>
             <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
               {netAmount.toLocaleString('ru-RU')} ₽
+            </Text>
+          </div>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>Страховые взносы работодателя (30.2%):</Text>
+            <Text style={{ color: '#fa8c16' }}>+{socialTaxAmount.toLocaleString('ru-RU')} ₽</Text>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Text strong style={{ color: '#fa8c16' }}>Полная стоимость для компании:</Text>
+            <Text strong style={{ fontSize: 18, color: '#fa8c16' }}>
+              {employerCost.toLocaleString('ru-RU')} ₽
             </Text>
           </div>
         </div>
@@ -438,22 +486,13 @@ export default function PayrollActualFormModal({
           />
         </Form.Item>
 
-        <Form.Item
-          name="social_tax_amount"
-          label="Социальные отчисления"
-          rules={[
-            { type: 'number', min: 0, message: 'Отчисления не могут быть отрицательными' },
-          ]}
-        >
-          <InputNumber
-            style={{ width: '100%' }}
-            placeholder="0"
-            formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setSocialTaxAmount(value || 0)}
-            addonAfter="₽"
-          />
-        </Form.Item>
+        <Alert
+          message="Страховые взносы рассчитываются автоматически"
+          description="Страховые взносы работодателя (30.2%) рассчитываются автоматически от суммы начислений. ПФР 22% + ОМС 5.1% + ФСС 2.9% + травматизм 0.2%"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
       </Form>
     </Modal>
   );
