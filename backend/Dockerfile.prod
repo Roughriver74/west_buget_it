@@ -50,6 +50,11 @@ ENV PATH="/opt/venv/bin:$PATH" \
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Copy and prepare entrypoint script (with automatic migrations)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && \
+    chown appuser:appuser /app/entrypoint.sh
+
 # Create necessary directories and set permissions
 RUN mkdir -p /app/uploads /app/logs /app/templates && \
     chown -R appuser:appuser /app
@@ -64,13 +69,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run with gunicorn for production (better than uvicorn for production)
-CMD ["gunicorn", "app.main:app", \
-     "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "120", \
-     "--keep-alive", "5", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "--log-level", "info"]
+# Use entrypoint script (runs migrations and starts Gunicorn)
+ENTRYPOINT ["/app/entrypoint.sh"]
