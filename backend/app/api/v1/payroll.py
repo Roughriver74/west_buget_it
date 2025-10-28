@@ -1599,6 +1599,7 @@ async def register_payroll_payment(
             ).first()
 
             if kpi_data:
+                # Используем рассчитанные премии из KPI
                 # Месячные премии: всегда начисляются
                 monthly_bonus = kpi_data.monthly_bonus_calculated or Decimal(0)
 
@@ -1614,9 +1615,20 @@ async def register_payroll_payment(
                 else:
                     annual_bonus = Decimal(0)
             else:
-                monthly_bonus = Decimal(0)
-                quarterly_bonus = Decimal(0)
-                annual_bonus = Decimal(0)
+                # Если нет данных KPI, используем запланированные премии из PayrollPlan
+                monthly_bonus = plan.monthly_bonus or Decimal(0)
+
+                # Квартальные премии: только в марте, июне, сентябре, декабре
+                if month in [3, 6, 9, 12]:
+                    quarterly_bonus = plan.quarterly_bonus or Decimal(0)
+                else:
+                    quarterly_bonus = Decimal(0)
+
+                # Годовые премии: только в декабре
+                if month == 12:
+                    annual_bonus = plan.annual_bonus or Decimal(0)
+                else:
+                    annual_bonus = Decimal(0)
 
         # Calculate total
         total_paid = base_salary + monthly_bonus + quarterly_bonus + annual_bonus
