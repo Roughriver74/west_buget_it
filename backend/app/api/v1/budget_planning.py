@@ -46,6 +46,11 @@ from app.schemas import (
     BaselineSummary,
     VersionComparison,
     VersionComparisonResult,
+    # Plan vs Actual
+    PlanVsActualSummary,
+    CategoryPlanVsActual,
+    MonthlyPlanVsActual,
+    BudgetAlert,
 )
 from app.utils.auth import get_current_active_user
 from app.services.budget_calculator import BudgetCalculator
@@ -997,6 +1002,415 @@ def compare_versions(
         total_difference_percent=float(diff_percent),
         category_comparisons=category_comparisons
     )
+
+
+# ============================================================================
+# Baseline Management Endpoints
+# ============================================================================
+
+
+@router.post("/versions/{version_id}/set-baseline", response_model=BudgetVersionInDB)
+def set_baseline_version(
+    version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Set a budget version as the baseline for its year and department.
+    Only APPROVED versions can be set as baseline.
+    Only one version can be baseline per year/department combination.
+    """
+    # Get the version
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only APPROVED versions can be set as baseline
+    if version.status != BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only APPROVED versions can be set as baseline. Current status: {version.status}"
+        )
+
+    # Check if there's already a baseline for this year/department
+    existing_baseline = db.query(BudgetVersion).filter(
+        BudgetVersion.department_id == current_user.department_id,
+        BudgetVersion.year == version.year,
+        BudgetVersion.is_baseline == True,
+        BudgetVersion.id != version_id
+    ).first()
+
+    if existing_baseline:
+        # Unset the existing baseline
+        existing_baseline.is_baseline = False
+        db.flush([existing_baseline])
+
+    # Set this version as baseline
+    version.is_baseline = True
+    db.commit()
+    db.refresh(version)
+
+    return version
+
+
+@router.get("/versions/baseline/{year}", response_model=BudgetVersionInDB)
+def get_baseline_version(
+    year: int,
+    department_id: Optional[int] = Query(None, description="Department ID (for ADMIN/MANAGER)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get the baseline version for a specific year and department.
+    """
+    from app.db.models import UserRoleEnum
+
+    # Determine which department to query
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        query_department_id = current_user.department_id
+    elif department_id is not None:
+        # ADMIN/MANAGER can specify department
+        query_department_id = department_id
+    else:
+        # ADMIN/MANAGER must specify department
+        query_department_id = current_user.department_id
+
+    # Get baseline version
+    baseline = db.query(BudgetVersion).filter(
+        BudgetVersion.department_id == query_department_id,
+        BudgetVersion.year == year,
+        BudgetVersion.is_baseline == True
+    ).first()
+
+    if not baseline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No baseline version found for year {year} and department {query_department_id}"
+        )
+
+    return baseline
+
+
+# ============================================================================
+# Plan vs Actual Endpoints
+# ============================================================================
+
+
+@router.get("/plan-vs-actual", response_model=PlanVsActualSummary)
+def get_plan_vs_actual(
+    year: int = Query(..., description="Year to analyze"),
+    department_id: Optional[int] = Query(None, description="Department ID (for ADMIN/MANAGER)"),
+    month_start: Optional[int] = Query(None, ge=1, le=12, description="Start month for analysis"),
+    month_end: Optional[int] = Query(None, ge=1, le=12, description="End month for analysis"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get plan vs actual report for a year.
+
+    Compares the baseline budget version (planned) with actual expenses.
+    Returns monthly and category breakdowns with variance analysis.
+    """
+    from app.db.models import UserRoleEnum, Expense, Department
+    from collections import defaultdict
+    from decimal import Decimal
+
+    # Determine department based on role
+    if current_user.role == UserRoleEnum.USER:
+        query_department_id = current_user.department_id
+    elif department_id is not None:
+        query_department_id = department_id
+    else:
+        query_department_id = current_user.department_id
+
+    # Get baseline version for the year
+    baseline = db.query(BudgetVersion).filter(
+        BudgetVersion.department_id == query_department_id,
+        BudgetVersion.year == year,
+        BudgetVersion.is_baseline == True
+    ).first()
+
+    if not baseline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No baseline version found for year {year} and department {query_department_id}"
+        )
+
+    # Get department info
+    department = db.query(Department).filter(Department.id == query_department_id).first()
+
+    # Get planned amounts from baseline version
+    planned_query = db.query(BudgetPlanDetail).filter(
+        BudgetPlanDetail.version_id == baseline.id
+    )
+
+    if month_start:
+        planned_query = planned_query.filter(BudgetPlanDetail.month >= month_start)
+    if month_end:
+        planned_query = planned_query.filter(BudgetPlanDetail.month <= month_end)
+
+    planned_details = planned_query.all()
+
+    # Get actual expenses for the year
+    actual_query = db.query(Expense).filter(
+        Expense.department_id == query_department_id,
+        func.extract('year', Expense.planned_date) == year,
+        Expense.status.in_(['PAID', 'CLOSED'])  # Only count paid expenses
+    )
+
+    if month_start:
+        actual_query = actual_query.filter(func.extract('month', Expense.planned_date) >= month_start)
+    if month_end:
+        actual_query = actual_query.filter(func.extract('month', Expense.planned_date) <= month_end)
+
+    actual_expenses = actual_query.all()
+
+    # Calculate monthly aggregates
+    monthly_planned = defaultdict(lambda: Decimal("0"))
+    monthly_actual = defaultdict(lambda: Decimal("0"))
+    monthly_category_planned = defaultdict(lambda: defaultdict(lambda: Decimal("0")))
+    monthly_category_actual = defaultdict(lambda: defaultdict(lambda: Decimal("0")))
+
+    for detail in planned_details:
+        monthly_planned[detail.month] += detail.planned_amount
+        monthly_category_planned[detail.month][detail.category_id] += detail.planned_amount
+
+    for expense in actual_expenses:
+        month = expense.planned_date.month
+        monthly_actual[month] += expense.amount
+        monthly_category_actual[month][expense.category_id] += expense.amount
+
+    # Calculate category aggregates
+    category_planned = defaultdict(lambda: Decimal("0"))
+    category_actual = defaultdict(lambda: Decimal("0"))
+    category_info = {}
+
+    for detail in planned_details:
+        category_planned[detail.category_id] += detail.planned_amount
+        if detail.category_id not in category_info:
+            category_info[detail.category_id] = {
+                "name": detail.category.name if detail.category else f"Category {detail.category_id}",
+                "type": detail.type
+            }
+
+    for expense in actual_expenses:
+        category_actual[expense.category_id] += expense.amount
+        if expense.category_id not in category_info:
+            category_info[expense.category_id] = {
+                "name": expense.category.name if expense.category else f"Category {expense.category_id}",
+                "type": expense.category.type if expense.category else ExpenseTypeEnum.OPEX
+            }
+
+    # Calculate totals
+    total_planned = sum(category_planned.values())
+    total_actual = sum(category_actual.values())
+    total_variance = total_actual - total_planned
+    total_variance_percent = (total_variance / total_planned * 100) if total_planned > 0 else Decimal("0")
+    total_execution_percent = (total_actual / total_planned * 100) if total_planned > 0 else Decimal("0")
+
+    # Calculate CAPEX/OPEX breakdown
+    capex_planned = sum(detail.planned_amount for detail in planned_details if detail.type == ExpenseTypeEnum.CAPEX)
+    opex_planned = sum(detail.planned_amount for detail in planned_details if detail.type == ExpenseTypeEnum.OPEX)
+    capex_actual = sum(expense.amount for expense in actual_expenses if expense.category and expense.category.type == ExpenseTypeEnum.CAPEX)
+    opex_actual = sum(expense.amount for expense in actual_expenses if expense.category and expense.category.type == ExpenseTypeEnum.OPEX)
+
+    # Build monthly data
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+    monthly_data = []
+    over_budget_months = []
+
+    for month in range(1, 13):
+        if month_start and month < month_start:
+            continue
+        if month_end and month > month_end:
+            continue
+
+        planned = monthly_planned.get(month, Decimal("0"))
+        actual = monthly_actual.get(month, Decimal("0"))
+        variance = actual - planned
+        variance_percent = (variance / planned * 100) if planned > 0 else Decimal("0")
+        execution_percent = (actual / planned * 100) if planned > 0 else Decimal("0")
+        is_over = actual > planned
+
+        if is_over:
+            over_budget_months.append(month)
+
+        # Build category breakdown for this month
+        all_categories = set(monthly_category_planned[month].keys()) | set(monthly_category_actual[month].keys())
+        month_categories = []
+
+        for cat_id in all_categories:
+            cat_planned = monthly_category_planned[month].get(cat_id, Decimal("0"))
+            cat_actual = monthly_category_actual[month].get(cat_id, Decimal("0"))
+            cat_variance = cat_actual - cat_planned
+            cat_variance_percent = (cat_variance / cat_planned * 100) if cat_planned > 0 else Decimal("0")
+            cat_execution_percent = (cat_actual / cat_planned * 100) if cat_planned > 0 else Decimal("0")
+
+            month_categories.append(CategoryPlanVsActual(
+                category_id=cat_id,
+                category_name=category_info.get(cat_id, {}).get("name", f"Category {cat_id}"),
+                category_type=category_info.get(cat_id, {}).get("type", ExpenseTypeEnum.OPEX),
+                planned_amount=cat_planned,
+                actual_amount=cat_actual,
+                variance_amount=cat_variance,
+                variance_percent=cat_variance_percent,
+                execution_percent=cat_execution_percent,
+                is_over_budget=cat_actual > cat_planned
+            ))
+
+        monthly_data.append(MonthlyPlanVsActual(
+            month=month,
+            month_name=month_names[month - 1],
+            planned_amount=planned,
+            actual_amount=actual,
+            variance_amount=variance,
+            variance_percent=variance_percent,
+            execution_percent=execution_percent,
+            is_over_budget=is_over,
+            categories=month_categories
+        ))
+
+    # Build category data
+    all_categories = set(category_planned.keys()) | set(category_actual.keys())
+    category_data = []
+    over_budget_categories = []
+
+    for cat_id in all_categories:
+        planned = category_planned.get(cat_id, Decimal("0"))
+        actual = category_actual.get(cat_id, Decimal("0"))
+        variance = actual - planned
+        variance_percent = (variance / planned * 100) if planned > 0 else Decimal("0")
+        execution_percent = (actual / planned * 100) if planned > 0 else Decimal("0")
+        is_over = actual > planned
+
+        if is_over:
+            over_budget_categories.append(category_info.get(cat_id, {}).get("name", f"Category {cat_id}"))
+
+        category_data.append(CategoryPlanVsActual(
+            category_id=cat_id,
+            category_name=category_info.get(cat_id, {}).get("name", f"Category {cat_id}"),
+            category_type=category_info.get(cat_id, {}).get("type", ExpenseTypeEnum.OPEX),
+            planned_amount=planned,
+            actual_amount=actual,
+            variance_amount=variance,
+            variance_percent=variance_percent,
+            execution_percent=execution_percent,
+            is_over_budget=is_over
+        ))
+
+    # Sort categories by variance (most over budget first)
+    category_data.sort(key=lambda x: x.variance_amount, reverse=True)
+
+    return PlanVsActualSummary(
+        year=year,
+        department_id=query_department_id,
+        department_name=department.name if department else None,
+        baseline_version_id=baseline.id,
+        baseline_version_name=baseline.version_name,
+        total_planned=total_planned,
+        total_actual=total_actual,
+        total_variance=total_variance,
+        total_variance_percent=total_variance_percent,
+        total_execution_percent=total_execution_percent,
+        capex_planned=capex_planned,
+        capex_actual=capex_actual,
+        opex_planned=opex_planned,
+        opex_actual=opex_actual,
+        monthly_data=monthly_data,
+        category_data=category_data,
+        over_budget_categories=over_budget_categories,
+        over_budget_months=over_budget_months
+    )
+
+
+@router.get("/budget-alerts", response_model=List[BudgetAlert])
+def get_budget_alerts(
+    year: int = Query(..., description="Year to analyze"),
+    department_id: Optional[int] = Query(None, description="Department ID (for ADMIN/MANAGER)"),
+    threshold_percent: float = Query(10.0, description="Alert threshold percentage"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get budget alerts for categories and months exceeding threshold.
+
+    Returns alerts for:
+    - Categories over budget by threshold %
+    - Months over budget by threshold %
+    - Overall budget if exceeded
+    """
+    # Get plan vs actual data
+    plan_vs_actual = get_plan_vs_actual(
+        year=year,
+        department_id=department_id,
+        month_start=None,
+        month_end=None,
+        db=db,
+        current_user=current_user
+    )
+
+    alerts = []
+
+    # Check total budget
+    if plan_vs_actual.total_variance_percent > threshold_percent:
+        severity = "critical" if plan_vs_actual.total_variance_percent > 20 else "warning"
+        alerts.append(BudgetAlert(
+            alert_type="total",
+            severity=severity,
+            entity_name="Общий бюджет",
+            planned_amount=plan_vs_actual.total_planned,
+            actual_amount=plan_vs_actual.total_actual,
+            variance_amount=plan_vs_actual.total_variance,
+            variance_percent=plan_vs_actual.total_variance_percent,
+            message=f"Превышение общего бюджета на {plan_vs_actual.total_variance_percent:.1f}%"
+        ))
+
+    # Check categories
+    for category in plan_vs_actual.category_data:
+        if category.is_over_budget and category.variance_percent > threshold_percent:
+            severity = "critical" if category.variance_percent > 20 else "warning"
+            alerts.append(BudgetAlert(
+                alert_type="category",
+                severity=severity,
+                entity_id=category.category_id,
+                entity_name=category.category_name,
+                planned_amount=category.planned_amount,
+                actual_amount=category.actual_amount,
+                variance_amount=category.variance_amount,
+                variance_percent=category.variance_percent,
+                message=f"Превышение бюджета по категории '{category.category_name}' на {category.variance_percent:.1f}%"
+            ))
+
+    # Check months
+    for month_data in plan_vs_actual.monthly_data:
+        if month_data.is_over_budget and month_data.variance_percent > threshold_percent:
+            severity = "critical" if month_data.variance_percent > 20 else "warning"
+            alerts.append(BudgetAlert(
+                alert_type="month",
+                severity=severity,
+                entity_id=month_data.month,
+                entity_name=month_data.month_name,
+                planned_amount=month_data.planned_amount,
+                actual_amount=month_data.actual_amount,
+                variance_amount=month_data.variance_amount,
+                variance_percent=month_data.variance_percent,
+                message=f"Превышение бюджета в {month_data.month_name} на {month_data.variance_percent:.1f}%"
+            ))
+
+    # Sort by severity and variance
+    alerts.sort(key=lambda x: (x.severity == "warning", -x.variance_percent))
+
+    return alerts
 
 
 # ============================================================================

@@ -70,6 +70,7 @@ class BudgetVersionBase(BaseModel):
     version_name: Optional[str] = Field(None, max_length=100, description="Version name")
     scenario_id: Optional[int] = None
     status: BudgetVersionStatusEnum = BudgetVersionStatusEnum.DRAFT
+    is_baseline: bool = Field(default=False, description="Is this the baseline version for the year")
     comments: Optional[str] = None
     change_log: Optional[str] = None
 
@@ -85,6 +86,7 @@ class BudgetVersionUpdate(BaseModel):
     version_name: Optional[str] = Field(None, max_length=100)
     scenario_id: Optional[int] = None
     status: Optional[BudgetVersionStatusEnum] = None
+    is_baseline: Optional[bool] = None
     comments: Optional[str] = None
     change_log: Optional[str] = None
     submitted_at: Optional[datetime] = None
@@ -282,6 +284,82 @@ class VersionComparison(BaseModel):
     total_v2: Decimal
     total_difference: Decimal
     total_difference_percent: Decimal
+
+
+# ============================================================================
+# Plan vs Actual Schemas
+# ============================================================================
+
+
+class CategoryPlanVsActual(BaseModel):
+    """Plan vs Actual for a single category"""
+    category_id: int
+    category_name: str
+    category_type: ExpenseTypeEnum
+    planned_amount: Decimal
+    actual_amount: Decimal
+    variance_amount: Decimal  # actual - planned
+    variance_percent: Decimal  # (variance / planned) * 100
+    execution_percent: Decimal  # (actual / planned) * 100
+    is_over_budget: bool
+
+
+class MonthlyPlanVsActual(BaseModel):
+    """Plan vs Actual for a specific month"""
+    month: int  # 1-12
+    month_name: str  # "Январь", "Февраль", etc.
+    planned_amount: Decimal
+    actual_amount: Decimal
+    variance_amount: Decimal
+    variance_percent: Decimal
+    execution_percent: Decimal
+    is_over_budget: bool
+    categories: List[CategoryPlanVsActual]
+
+
+class PlanVsActualSummary(BaseModel):
+    """Overall summary of plan vs actual for a year"""
+    year: int
+    department_id: int
+    department_name: Optional[str] = None
+    baseline_version_id: Optional[int] = None
+    baseline_version_name: Optional[str] = None
+
+    # Totals
+    total_planned: Decimal
+    total_actual: Decimal
+    total_variance: Decimal
+    total_variance_percent: Decimal
+    total_execution_percent: Decimal
+
+    # CAPEX/OPEX breakdown
+    capex_planned: Decimal
+    capex_actual: Decimal
+    opex_planned: Decimal
+    opex_actual: Decimal
+
+    # Monthly breakdown
+    monthly_data: List[MonthlyPlanVsActual]
+
+    # Category breakdown
+    category_data: List[CategoryPlanVsActual]
+
+    # Alerts
+    over_budget_categories: List[str]  # List of category names
+    over_budget_months: List[int]  # List of month numbers
+
+
+class BudgetAlert(BaseModel):
+    """Budget alert for overspending"""
+    alert_type: str  # "category", "month", "total"
+    severity: str  # "warning", "critical"
+    entity_id: Optional[int] = None  # category_id or month number
+    entity_name: str
+    planned_amount: Decimal
+    actual_amount: Decimal
+    variance_amount: Decimal
+    variance_percent: Decimal
+    message: str
 
 
 # Update forward references

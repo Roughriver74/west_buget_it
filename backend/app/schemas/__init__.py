@@ -113,6 +113,11 @@ from .budget_planning import (
     BaselineSummary,
     VersionComparison,
     VersionComparisonResult,
+    # Plan vs Actual
+    PlanVsActualSummary,
+    CategoryPlanVsActual,
+    MonthlyPlanVsActual,
+    BudgetAlert,
 )
 from .kpi import (
     # KPI Goals
@@ -264,6 +269,11 @@ __all__ = [
     "BaselineSummary",
     "VersionComparison",
     "VersionComparisonResult",
+    # Budget 2026 - Plan vs Actual
+    "PlanVsActualSummary",
+    "CategoryPlanVsActual",
+    "MonthlyPlanVsActual",
+    "BudgetAlert",
     # KPI Goals
     "KPIGoalCreate",
     "KPIGoalUpdate",
