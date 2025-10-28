@@ -55,17 +55,21 @@ export default function PayrollActualFormModal({
   const [incomeTaxRate, setIncomeTaxRate] = useState(0.13);
   const [currentMonth, setCurrentMonth] = useState<number | undefined>(undefined);
 
-  // Calculate gross amount (total before taxes)
-  const grossAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
+  // ВАЖНО: Введенные суммы - это то, что сотрудник получает НА РУКИ (net amount)
+  // Нужно рассчитать gross и НДФЛ сверху
 
-  // Calculate income tax amount (13% - paid by employee from gross)
-  const incomeTaxAmount = Math.round(grossAmount * incomeTaxRate);
+  // Net amount (на руки) - сумма всех введенных значений
+  const netAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
+
+  // Calculate gross amount from net: gross = net / (1 - tax_rate)
+  // Например: если net = 100,000 и НДФЛ 13%, то gross = 100,000 / 0.87 = 114,942.53
+  const grossAmount = netAmount > 0 ? Math.round(netAmount / (1 - incomeTaxRate)) : 0;
+
+  // Calculate income tax amount: income_tax = gross - net
+  const incomeTaxAmount = grossAmount - netAmount;
 
   // Calculate social tax amount (30.2% - paid by employer, NOT deducted from employee)
   const socialTaxAmount = calculateSocialTax(grossAmount);
-
-  // Calculate net amount (gross - income tax only, social tax is NOT deducted from employee!)
-  const netAmount = grossAmount - incomeTaxAmount;
 
   // Calculate employer cost (gross + social tax)
   const employerCost = grossAmount + socialTaxAmount;
@@ -353,7 +357,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="base_salary_paid"
-          label="Оклад (выплачено)"
+          label="Оклад (на руки)"
+          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
           rules={[
             { required: true, message: 'Введите выплаченный оклад' },
             { type: 'number', min: 0, message: 'Оклад не может быть отрицательным' },
@@ -371,7 +376,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="monthly_bonus_paid"
-          label="Месячная премия (выплачено)"
+          label="Месячная премия (на руки)"
+          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -388,7 +394,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="quarterly_bonus_paid"
-          label="Квартальная премия (выплачено)"
+          label="Квартальная премия (на руки)"
+          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -405,7 +412,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="annual_bonus_paid"
-          label="Годовая премия (выплачено)"
+          label="Годовая премия (на руки)"
+          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -422,7 +430,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="other_payments_paid"
-          label="Прочие выплаты (выплачено)"
+          label="Прочие выплаты (на руки)"
+          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
           rules={[
             { type: 'number', min: 0, message: 'Прочие выплаты не могут быть отрицательными' },
           ]}
@@ -439,21 +448,29 @@ export default function PayrollActualFormModal({
 
         <Divider orientation="left">Расчет выплаты и налогов</Divider>
 
+        <Alert
+          message="Расчет налогов"
+          description="Введенные суммы (оклад, премии) - это то, что сотрудник получает НА РУКИ. НДФЛ и страховые взносы рассчитываются автоматически."
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
         <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>Начислено сотруднику (Gross):</Text>
-            <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%) - вычитается из зарплаты:</Text>
-            <Text type="danger">-{incomeTaxAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
-          <Divider style={{ margin: '8px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text strong style={{ color: '#52c41a' }}>К выплате сотруднику (Net):</Text>
+            <Text strong style={{ color: '#52c41a' }}>Сумма на руки (введенные значения):</Text>
             <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
               {netAmount.toLocaleString('ru-RU')} ₽
             </Text>
+          </div>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%) - удержан из начислений:</Text>
+            <Text type="danger">+{incomeTaxAmount.toLocaleString('ru-RU')} ₽</Text>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text>Начислено сотруднику (Gross):</Text>
+            <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
           </div>
           <Divider style={{ margin: '8px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
