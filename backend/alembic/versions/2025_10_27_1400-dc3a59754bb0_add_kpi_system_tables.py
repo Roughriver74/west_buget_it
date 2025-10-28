@@ -30,12 +30,23 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ### Create Enums ###
-    bonus_type_enum = postgresql.ENUM('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum')
-    bonus_type_enum.create(op.get_bind(), checkfirst=True)
+    # ### Create Enums with IF NOT EXISTS ###
+    # Using raw SQL to safely create enum types if they don't already exist
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE bonustypeenum AS ENUM ('PERFORMANCE_BASED', 'FIXED', 'MIXED');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
-    kpi_goal_status_enum = postgresql.ENUM('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED', name='kpigoalstatusenum')
-    kpi_goal_status_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE kpigoalstatusenum AS ENUM ('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
     # ### Create kpi_goals table ###
     op.create_table(
@@ -162,8 +173,6 @@ def downgrade() -> None:
     op.drop_table('kpi_goals')
 
     # ### Drop Enums ###
-    kpi_goal_status_enum = postgresql.ENUM('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED', name='kpigoalstatusenum')
-    kpi_goal_status_enum.drop(op.get_bind(), checkfirst=True)
-
-    bonus_type_enum = postgresql.ENUM('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum')
-    bonus_type_enum.drop(op.get_bind(), checkfirst=True)
+    # Using raw SQL to safely drop enum types if they exist
+    op.execute("DROP TYPE IF EXISTS kpigoalstatusenum")
+    op.execute("DROP TYPE IF EXISTS bonustypeenum")
