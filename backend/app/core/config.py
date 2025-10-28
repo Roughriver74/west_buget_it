@@ -1,7 +1,42 @@
-from typing import List
+from typing import List, Union, Annotated, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, ValidationError
+from pydantic import field_validator, ValidationError, BeforeValidator
 import secrets
+import json
+import os
+
+
+def parse_cors_origins(v: Any) -> List[str]:
+    """
+    Parse CORS origins from environment variable or list
+    Supports both JSON string and Python list formats
+    """
+    # If it's already a list, use it directly
+    if isinstance(v, list):
+        return v
+
+    # If it's a string, try to parse it as JSON
+    if isinstance(v, str):
+        try:
+            # Remove outer quotes if present
+            v = v.strip()
+            if v.startswith("'") and v.endswith("'"):
+                v = v[1:-1]
+            if v.startswith('"') and v.endswith('"'):
+                v = v[1:-1]
+
+            origins = json.loads(v)
+            if not isinstance(origins, list):
+                raise ValueError("CORS_ORIGINS must be a list")
+            return origins
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse CORS_ORIGINS as JSON: {e}\n"
+                f"Expected format: '[\"http://example.com\",\"http://example.org\"]'\n"
+                f"Received: {v}"
+            )
+
+    raise ValueError(f"CORS_ORIGINS must be a list or JSON string, got {type(v)}")
 
 
 class Settings(BaseSettings):
@@ -26,8 +61,11 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
 
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # CORS - BeforeValidator handles parsing from env var
+    CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors_origins)] = [
+        "http://localhost:5173",
+        "http://localhost:3000"
+    ]
 
     # Sentry
     SENTRY_DSN: str | None = None
@@ -106,48 +144,18 @@ class Settings(BaseSettings):
 
         return v
 
-    @field_validator('CORS_ORIGINS', mode='before')
+    @field_validator('CORS_ORIGINS')
     @classmethod
-    def validate_cors_origins(cls, v) -> List[str]:
+    def validate_cors_origins(cls, v: List[str]) -> List[str]:
         """
-        Parse and validate CORS origins from environment variable or list
-        Supports both JSON string and Python list formats
+        Validate CORS origins to warn about wildcards in production
+        (parsing is handled by BeforeValidator)
         """
-        import json
-        import os
-
-        # If it's already a list, use it directly
-        if isinstance(v, list):
-            origins = v
-        # If it's a string, try to parse it as JSON
-        elif isinstance(v, str):
-            try:
-                # Remove outer quotes if present
-                v = v.strip()
-                if v.startswith("'") and v.endswith("'"):
-                    v = v[1:-1]
-                if v.startswith('"') and v.endswith('"'):
-                    v = v[1:-1]
-
-                origins = json.loads(v)
-                if not isinstance(origins, list):
-                    raise ValueError("CORS_ORIGINS must be a list")
-            except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"Failed to parse CORS_ORIGINS as JSON: {e}\n"
-                    f"Expected format: '[\"http://example.com\",\"http://example.org\"]'\n"
-                    f"Received: {v}"
-                )
-        else:
-            raise ValueError(f"CORS_ORIGINS must be a list or JSON string, got {type(v)}")
-
-        # Validate in production
         debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
         if not debug:
-            if '*' in origins or any('localhost' in origin for origin in origins):
+            if '*' in v or any('localhost' in origin for origin in v):
                 print("⚠️  WARNING: CORS origins contains wildcards or localhost in production mode!")
-
-        return origins
+        return v
 
     @field_validator('DB_POOL_SIZE', 'DB_MAX_OVERFLOW', 'DB_POOL_TIMEOUT', 'DB_POOL_RECYCLE')
     @classmethod
