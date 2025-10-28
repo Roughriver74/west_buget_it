@@ -9,7 +9,6 @@ import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
 import FTPImportModal from '@/components/expenses/FTPImportModal'
 import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPaymentModal'
-import GeneratePayrollExpensesModal from '@/components/payroll/GeneratePayrollExpensesModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
 
@@ -27,7 +26,6 @@ const ExpensesPage = () => {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
   const [registerPaymentModalVisible, setRegisterPaymentModalVisible] = useState(false)
-  const [generateExpensesModalVisible, setGenerateExpensesModalVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
 
   const queryClient = useQueryClient()
@@ -293,13 +291,6 @@ const ExpensesPage = () => {
         />
         <Button icon={<CloudUploadOutlined />} onClick={() => setImportModalVisible(true)}>
           Импорт из FTP
-        </Button>
-        <Button
-          icon={<DollarOutlined />}
-          onClick={() => setGenerateExpensesModalVisible(true)}
-          style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
-        >
-          Создать заявки на зарплату
         </Button>
         <Button
           icon={<DollarOutlined />}
