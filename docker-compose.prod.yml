@@ -104,7 +104,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8888}
+        VITE_API_URL: ${VITE_API_URL}
     image: it-budget-frontend:prod
     container_name: it_budget_frontend_prod
     restart: always
