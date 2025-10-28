@@ -116,6 +116,15 @@ export default function EmployeesPage() {
   const totalPayroll = totalSalary * 12 + totalBonuses;
   const avgSalary = activeEmployees.length > 0 ? totalSalary / activeEmployees.length : 0;
 
+  // Tax calculations (расчет налогов)
+  const incomeTaxRate = 0.13; // 13% НДФЛ
+  const socialTaxRate = 0.302; // 30.2% страховые взносы (ПФР 22% + ОМС 5.1% + ФСС 2.9% + травматизм 0.2%)
+  const totalGross = totalPayroll; // Общая начисленная сумма (gross)
+  const totalIncomeTax = Math.round(totalGross * incomeTaxRate); // НДФЛ
+  const totalSocialTax = Math.round(totalGross * socialTaxRate); // Страховые взносы
+  const totalEmployerCost = totalGross + totalSocialTax; // Полная стоимость для работодателя
+  const totalNet = totalGross - totalIncomeTax; // Сумма на руки сотрудникам
+
   const columns = [
     {
       title: 'ФИО',
@@ -223,7 +232,7 @@ export default function EmployeesPage() {
       </div>
 
       {/* Statistics Cards */}
-      <Row gutter={16} style={{ marginBottom: '24px' }}>
+      <Row gutter={16} style={{ marginBottom: '16px' }}>
         <Col span={6}>
           <Card>
             <Statistic
@@ -245,7 +254,7 @@ export default function EmployeesPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Годовой ФОТ (окл.+прем.)"
+              title="Годовой ФОТ (начислено)"
               value={totalPayroll}
               precision={0}
               suffix="₽"
@@ -257,8 +266,56 @@ export default function EmployeesPage() {
             <Statistic
               title="Средний оклад"
               value={avgSalary}
-              precision={2}
+              precision={0}
               suffix="₽"
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Tax Statistics Cards */}
+      <Row gutter={16} style={{ marginBottom: '24px' }}>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="НДФЛ (13%)"
+              value={totalIncomeTax}
+              precision={0}
+              suffix="₽"
+              valueStyle={{ color: '#cf1322' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic
+              title="Страховые взносы (30.2%)"
+              value={totalSocialTax}
+              precision={0}
+              suffix="₽"
+              valueStyle={{ color: '#d46b08' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ backgroundColor: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Statistic
+              title="К выплате сотрудникам (Net)"
+              value={totalNet}
+              precision={0}
+              suffix="₽"
+              valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ backgroundColor: '#fff7e6', border: '1px solid #ffd591' }}>
+            <Statistic
+              title="Полная стоимость для компании"
+              value={totalEmployerCost}
+              precision={0}
+              suffix="₽"
+              valueStyle={{ color: '#fa8c16', fontWeight: 'bold' }}
             />
           </Card>
         </Col>
