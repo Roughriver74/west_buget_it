@@ -1696,6 +1696,119 @@ async def register_payroll_payment(
 
 # ==================== Salary Distribution (Histogram) ====================
 
+@router.post("/analytics/register-payroll-payment-bulk")
+async def register_payroll_payment_bulk(
+    payments: List[PayrollActualCreate],
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk register payroll payments with custom amounts (for edited data)
+
+    This endpoint allows registering multiple PayrollActual records at once
+    with custom amounts that can be edited by the user.
+
+    Args:
+        payments: List of payroll actual records to create
+
+    Returns:
+        {
+            "success": bool,
+            "created_count": int,
+            "skipped_count": int,
+            "total_amount": Decimal,
+            "errors": List[str]
+        }
+    """
+    # Only ADMIN and MANAGER can register payroll
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can register payroll payments"
+        )
+
+    created_count = 0
+    skipped_count = 0
+    total_amount = Decimal(0)
+    errors = []
+
+    for payment in payments:
+        try:
+            # Get employee to verify access and get department_id
+            employee = db.query(Employee).filter(Employee.id == payment.employee_id).first()
+            if not employee:
+                errors.append(f"Employee ID {payment.employee_id} not found")
+                skipped_count += 1
+                continue
+
+            # Check department access
+            if not check_department_access(current_user, employee.department_id):
+                errors.append(f"Access denied to employee ID {payment.employee_id}")
+                skipped_count += 1
+                continue
+
+            # Check if actual already exists
+            existing = db.query(PayrollActual).filter(
+                PayrollActual.employee_id == payment.employee_id,
+                PayrollActual.year == payment.year,
+                PayrollActual.month == payment.month,
+                PayrollActual.payment_date == payment.payment_date
+            ).first()
+
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Calculate total paid
+            total_paid = (
+                payment.base_salary_paid +
+                payment.monthly_bonus_paid +
+                payment.quarterly_bonus_paid +
+                payment.annual_bonus_paid +
+                payment.other_payments_paid
+            )
+
+            # Create PayrollActual record
+            payroll_actual = PayrollActual(
+                year=payment.year,
+                month=payment.month,
+                employee_id=payment.employee_id,
+                department_id=employee.department_id,
+                base_salary_paid=payment.base_salary_paid,
+                monthly_bonus_paid=payment.monthly_bonus_paid,
+                quarterly_bonus_paid=payment.quarterly_bonus_paid,
+                annual_bonus_paid=payment.annual_bonus_paid,
+                other_payments_paid=payment.other_payments_paid,
+                income_tax_rate=payment.income_tax_rate,
+                income_tax_amount=payment.income_tax_amount,
+                social_tax_amount=payment.social_tax_amount,
+                total_paid=total_paid,
+                payment_date=payment.payment_date,
+                notes=f"Массовая регистрация выплат за {payment.month:02d}.{payment.year}"
+            )
+            db.add(payroll_actual)
+
+            created_count += 1
+            total_amount += total_paid
+
+        except Exception as e:
+            errors.append(f"Error processing employee ID {payment.employee_id}: {str(e)}")
+            skipped_count += 1
+            continue
+
+    # Commit all changes
+    if created_count > 0:
+        db.commit()
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "skipped_count": skipped_count,
+        "total_amount": float(total_amount),
+        "errors": errors[:10] if errors else []  # Return first 10 errors
+    }
+
+
 @router.get("/analytics/salary-distribution")
 async def get_salary_distribution(
     year: Optional[int] = Query(None, description="Filter by year"),

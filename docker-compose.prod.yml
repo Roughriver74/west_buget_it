@@ -109,7 +109,7 @@ services:
     container_name: it_budget_frontend_prod
     restart: always
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-3001}:80"
     depends_on:
       - backend
     networks:

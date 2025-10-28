@@ -565,4 +565,16 @@ export const payrollAnalyticsAPI = {
     });
     return response.data;
   },
+
+  // Bulk register payroll payments with custom amounts (for edited data)
+  registerPayrollPaymentBulk: async (payments: PayrollActualCreate[]) => {
+    const response = await apiClient.post<{
+      success: boolean;
+      created_count: number;
+      skipped_count: number;
+      total_amount: number;
+      errors: string[];
+    }>('payroll/analytics/register-payroll-payment-bulk', payments);
+    return response.data;
+  },
 };
