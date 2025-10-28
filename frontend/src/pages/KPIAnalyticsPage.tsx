@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Card, Row, Col, Statistic, DatePicker, Spin, Alert, Table, Progress, Tag } from 'antd'
 import { useQuery } from '@tanstack/react-query'
-import { Area, Bar, Pie, Column } from '@ant-design/plots'
+import { Area, Pie, Column } from '@ant-design/plots'
 import { TrophyOutlined, TeamOutlined, RiseOutlined, DollarOutlined, AimOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { kpiApi } from '@/api/kpi'
@@ -15,15 +15,6 @@ const KPIAnalyticsPage: React.FC = () => {
   const { data: employeeSummary, isLoading: loadingEmployees } = useQuery({
     queryKey: ['kpi-employee-summary', year, selectedDepartment?.id],
     queryFn: () => kpiApi.getEmployeeSummary({
-      year,
-      department_id: selectedDepartment?.id
-    }),
-    enabled: !!year,
-  })
-
-  const { data: departmentSummary, isLoading: loadingDepartments } = useQuery({
-    queryKey: ['kpi-department-summary', year, selectedDepartment?.id],
-    queryFn: () => kpiApi.getDepartmentSummary({
       year,
       department_id: selectedDepartment?.id
     }),
@@ -54,10 +45,12 @@ const KPIAnalyticsPage: React.FC = () => {
     enabled: !!year,
   })
 
-  const isLoading = loadingEmployees || loadingDepartments || loadingGoals || loadingTrends || loadingBonus
+  const isLoading = loadingEmployees || loadingGoals || loadingTrends || loadingBonus
 
   // Calculate summary statistics
-  const avgKPI = employeeSummary?.reduce((sum, e) => sum + Number(e.kpi_percentage || 0), 0) / (employeeSummary?.length || 1)
+  const avgKPI = (employeeSummary && employeeSummary.length > 0)
+    ? employeeSummary.reduce((sum, e) => sum + Number(e.kpi_percentage || 0), 0) / employeeSummary.length
+    : 0
   const totalBonuses = employeeSummary?.reduce((sum, e) => sum + Number(e.total_bonus_calculated || 0), 0) || 0
   const totalEmployees = employeeSummary?.length || 0
   const goalsAchieved = employeeSummary?.reduce((sum, e) => sum + (e.goals_achieved || 0), 0) || 0

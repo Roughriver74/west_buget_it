@@ -583,14 +583,17 @@ const KPIManagementPage = () => {
       title: 'Сотрудник',
       dataIndex: 'employee_id',
       key: 'employee',
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{record.employee?.full_name}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {record.employee?.position || '—'}
-          </Text>
-        </Space>
-      ),
+      render: (_, record) => {
+        const employee = employeeMap.get(record.employee_id)
+        return (
+          <Space direction="vertical" size={0}>
+            <Text strong>{employee?.full_name || `ID ${record.employee_id}`}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {employee?.position || '—'}
+            </Text>
+          </Space>
+        )
+      },
     },
     {
       title: 'Период',
@@ -637,13 +640,11 @@ const KPIManagementPage = () => {
       title: 'Назначенные цели',
       key: 'goals',
       render: (_, record) =>
-        record.goal_achievements?.length ? (
+        record.goal_achievements && record.goal_achievements.length > 0 ? (
           <Space direction="vertical" size={4}>
             {record.goal_achievements.map((assignment) => (
-              <Tag key={assignment.id} color={statusColor[assignment.status]}>
-                {assignment.goal?.name ||
-                  goalMap.get(assignment.goal_id)?.name ||
-                  `Цель #${assignment.goal_id}`}
+              <Tag key={assignment.id} color={statusColor[assignment.status as keyof typeof statusColor]}>
+                {goalMap.get(assignment.goal_id)?.name || `Цель #${assignment.goal_id}`}
               </Tag>
             ))}
           </Space>
@@ -1180,9 +1181,13 @@ const KPIManagementPage = () => {
               showSearch
               placeholder="Выберите сотрудника"
               optionFilterProp="children"
-              filterOption={(input, option) =>
-                (option?.children as string).toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const children = option?.children as any
+                if (typeof children === 'string') {
+                  return (children as string).toLowerCase().includes(input.toLowerCase())
+                }
+                return true
+              }}
               disabled={!!kpiModal.editing}
             >
               {employees.map((employee) => (
@@ -1285,9 +1290,13 @@ const KPIManagementPage = () => {
               showSearch
               placeholder="Выберите сотрудника"
               optionFilterProp="children"
-              filterOption={(input, option) =>
-                (option?.children as string).toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const children = option?.children as any
+                if (typeof children === 'string') {
+                  return (children as string).toLowerCase().includes(input.toLowerCase())
+                }
+                return true
+              }}
               disabled={!!assignmentModal.editing}
             >
               {employees.map((employee) => (
@@ -1303,9 +1312,13 @@ const KPIManagementPage = () => {
               placeholder="Выберите цель"
               optionFilterProp="children"
               showSearch
-              filterOption={(input, option) =>
-                (option?.children as string).toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => {
+                const children = option?.children as any
+                if (typeof children === 'string') {
+                  return (children as string).toLowerCase().includes(input.toLowerCase())
+                }
+                return true
+              }}
             >
               {goals.map((goal) => (
                 <Option key={goal.id} value={goal.id}>
@@ -1323,9 +1336,7 @@ const KPIManagementPage = () => {
                 const goalNames =
                   kpi.goal_achievements?.map(
                     (assignment) =>
-                      assignment.goal?.name ||
-                      goalMap.get(assignment.goal_id)?.name ||
-                      `Цель #${assignment.goal_id}`
+                      goalMap.get(assignment.goal_id)?.name || `Цель #${assignment.goal_id}`
                   ) ?? []
                 const label = [
                   employeeName,

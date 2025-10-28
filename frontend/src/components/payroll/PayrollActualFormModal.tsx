@@ -369,7 +369,7 @@ export default function PayrollActualFormModal({
             placeholder="50000"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setBaseSalary(value || 0)}
+            onChange={(value) => setBaseSalary(Number(value) || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -387,7 +387,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setMonthlyBonus(value || 0)}
+            onChange={(value) => setMonthlyBonus(Number(value) || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -405,7 +405,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setQuarterlyBonus(value || 0)}
+            onChange={(value) => setQuarterlyBonus(Number(value) || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -423,7 +423,7 @@ export default function PayrollActualFormModal({
             placeholder="0"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setAnnualBonus(value || 0)}
+            onChange={(value) => setAnnualBonus(Number(value) || 0)}
             addonAfter="₽"
           />
         </Form.Item>
@@ -441,7 +441,7 @@ export default function PayrollActualFormModal({
             placeholder="5000"
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
-            onChange={(value) => setOtherPayments(value || 0)}
+            onChange={(value) => setOtherPayments(Number(value) || 0)}
             addonAfter="₽"
           />
         </Form.Item>

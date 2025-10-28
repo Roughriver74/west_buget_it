@@ -122,7 +122,7 @@ class PaymentDetail(BaseModel):
     category_name: Optional[str]
     contractor_id: Optional[int]
     contractor_name: Optional[str]
-    organization_id: int
+    organization_id: Optional[int]
     organization_name: Optional[str]
     status: str
     comment: Optional[str]

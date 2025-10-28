@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal, Form, Upload, DatePicker, message, Alert, Typography, List, Statistic, Row, Col, Divider, Button } from 'antd'
-import { UploadOutlined, InboxOutlined, DownloadOutlined } from '@ant-design/icons'
+import { InboxOutlined, DownloadOutlined } from '@ant-design/icons'
 import type { UploadFile, UploadProps } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'

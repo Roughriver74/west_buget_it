@@ -15,9 +15,32 @@ export type EmployeeKPIGoalCreate = components['schemas']['EmployeeKPIGoalCreate
 export type EmployeeKPIGoalUpdate = components['schemas']['EmployeeKPIGoalUpdate']
 
 export type KPIEmployeeSummary = components['schemas']['KPIEmployeeSummary']
-export type KPIDepartmentSummary = components['schemas']['KPIDepartmentSummary']
-export type KPIGoalProgress = components['schemas']['KPIGoalProgress']
 export type BonusType = components['schemas']['BonusTypeEnum']
+
+// Manual type definitions for analytics (not auto-generated)
+export interface KPIDepartmentSummary {
+  department_id: number
+  department_name: string
+  year: number
+  month: number | null
+  avg_kpi_percentage: string | number
+  total_employees: number
+  total_bonus_calculated: string | number
+  goals_count: number
+  goals_achieved: number
+}
+
+export interface KPIGoalProgress {
+  goal_id: number
+  goal_name: string
+  category: string | null
+  target_value: string | number | null
+  metric_unit: string | null
+  employees_assigned: number
+  employees_achieved: number
+  avg_achievement_percentage: string | number
+  total_weight: string | number
+}
 
 export interface KPIImportResult {
   success: boolean

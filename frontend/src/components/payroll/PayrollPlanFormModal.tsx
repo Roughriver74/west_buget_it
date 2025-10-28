@@ -258,7 +258,7 @@ export default function PayrollPlanFormModal({
             placeholder="50000"
             min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>
@@ -272,7 +272,7 @@ export default function PayrollPlanFormModal({
             placeholder="0"
             min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>
@@ -286,7 +286,7 @@ export default function PayrollPlanFormModal({
             placeholder="0"
             min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>
@@ -300,7 +300,7 @@ export default function PayrollPlanFormModal({
             placeholder="0"
             min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>
@@ -314,7 +314,7 @@ export default function PayrollPlanFormModal({
             placeholder="5000"
             min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-            parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
+            parser={(value) => Number((value ?? '').replace(/\s?/g, '')) as any}
             addonAfter="₽"
           />
         </Form.Item>

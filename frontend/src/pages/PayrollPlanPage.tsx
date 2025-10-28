@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Table,
   Card,
@@ -13,6 +13,7 @@ import {
   Dropdown,
   MenuProps,
   message,
+  Modal,
 } from 'antd';
 import {
   DollarOutlined,
@@ -40,6 +41,7 @@ const MONTHS = [
 
 export default function PayrollPlanPage() {
   const { selectedDepartment } = useDepartment();
+  const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [planModalVisible, setPlanModalVisible] = useState(false);
@@ -47,6 +49,7 @@ export default function PayrollPlanPage() {
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [generateExpensesModalVisible, setGenerateExpensesModalVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
+  const [editingPlan, setEditingPlan] = useState<PayrollPlanWithEmployee | null>(null);
 
   // Fetch payroll plans
   const { data: plans = [], isLoading: plansLoading } = useQuery<PayrollPlanWithEmployee[]>({
@@ -103,6 +106,25 @@ export default function PayrollPlanPage() {
   const handleAddActual = (month?: number) => {
     setSelectedMonth(month);
     setActualModalVisible(true);
+  };
+
+  const handleDeletePlan = (planId: number) => {
+    Modal.confirm({
+      title: 'Удалить план?',
+      content: 'Вы уверены, что хотите удалить этот план ФОТ?',
+      okText: 'Удалить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        try {
+          await payrollPlanAPI.delete(planId);
+          message.success('План ФОТ удален');
+          queryClient.invalidateQueries({ queryKey: ['payroll-plans'] });
+        } catch (error: any) {
+          message.error(error.response?.data?.detail || 'Ошибка при удалении плана');
+        }
+      },
+    });
   };
 
   const handleExportPlans = async () => {
@@ -325,6 +347,98 @@ export default function PayrollPlanPage() {
           rowKey="month"
           loading={plansLoading || actualsLoading}
           pagination={false}
+          expandable={{
+            expandedRowRender: (record) => {
+              const monthPlans = plans.filter((p) => p.month === record.month);
+
+              if (monthPlans.length === 0) {
+                return <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>
+                  Нет планов за этот месяц
+                </div>;
+              }
+
+              const detailColumns = [
+                {
+                  title: 'Сотрудник',
+                  key: 'employee_name',
+                  render: (_: any, plan: PayrollPlanWithEmployee) => plan.employee?.full_name || '-',
+                },
+                {
+                  title: 'Оклад',
+                  dataIndex: 'base_salary',
+                  key: 'base_salary',
+                  render: (value: number) => formatCurrency(value),
+                },
+                {
+                  title: 'Премия (мес)',
+                  dataIndex: 'monthly_bonus',
+                  key: 'monthly_bonus',
+                  render: (value: number) => formatCurrency(value || 0),
+                },
+                {
+                  title: 'Премия (квар)',
+                  dataIndex: 'quarterly_bonus',
+                  key: 'quarterly_bonus',
+                  render: (value: number) => formatCurrency(value || 0),
+                },
+                {
+                  title: 'Премия (год)',
+                  dataIndex: 'annual_bonus',
+                  key: 'annual_bonus',
+                  render: (value: number) => formatCurrency(value || 0),
+                },
+                {
+                  title: 'Прочие',
+                  dataIndex: 'other_payments',
+                  key: 'other_payments',
+                  render: (value: number) => formatCurrency(value || 0),
+                },
+                {
+                  title: 'Итого',
+                  dataIndex: 'total_planned',
+                  key: 'total_planned',
+                  render: (value: number) => <strong>{formatCurrency(value)}</strong>,
+                },
+                {
+                  title: 'Действия',
+                  key: 'actions',
+                  render: (_: any, plan: PayrollPlanWithEmployee) => (
+                    <Space size="small">
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={() => {
+                          setEditingPlan(plan);
+                          setPlanModalVisible(true);
+                        }}
+                      >
+                        Редактировать
+                      </Button>
+                      <Button
+                        type="link"
+                        danger
+                        size="small"
+                        onClick={() => handleDeletePlan(plan.id)}
+                      >
+                        Удалить
+                      </Button>
+                    </Space>
+                  ),
+                },
+              ];
+
+              return (
+                <Table
+                  columns={detailColumns}
+                  dataSource={monthPlans}
+                  rowKey="id"
+                  pagination={false}
+                  size="small"
+                />
+              );
+            },
+            rowExpandable: (record) => record.employeeCount > 0,
+          }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
@@ -363,6 +477,7 @@ export default function PayrollPlanPage() {
 
       <PayrollPlanFormModal
         visible={planModalVisible}
+        planId={editingPlan?.id}
         defaultValues={{
           year: selectedYear,
           month: selectedMonth,
@@ -370,6 +485,7 @@ export default function PayrollPlanPage() {
         onCancel={() => {
           setPlanModalVisible(false);
           setSelectedMonth(undefined);
+          setEditingPlan(null);
         }}
       />
 
