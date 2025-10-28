@@ -14,6 +14,7 @@ import {
   Statistic,
   Row,
   Col,
+  Modal,
 } from 'antd';
 import {
   PlusOutlined,
@@ -72,8 +73,43 @@ export default function EmployeesPage() {
       message.success('Сотрудник удален');
       queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
-    onError: () => {
-      message.error('Ошибка при удалении сотрудника');
+    onError: (error: any) => {
+      const errorDetail = error.response?.data?.detail;
+
+      // Check if it's a structured error with related records
+      if (errorDetail && typeof errorDetail === 'object' && errorDetail.message) {
+        Modal.error({
+          title: errorDetail.message || 'Невозможно удалить сотрудника',
+          content: (
+            <div>
+              <p><strong>Причина:</strong> {errorDetail.reason || 'Неизвестная причина'}</p>
+              {errorDetail.related_records && errorDetail.related_records.length > 0 && (
+                <>
+                  <p><strong>Связанные записи:</strong></p>
+                  <ul>
+                    {errorDetail.related_records.map((record: string, index: number) => (
+                      <li key={index}>{record}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {errorDetail.suggestion && (
+                <p style={{ marginTop: 16, fontWeight: 'bold', color: '#1890ff' }}>
+                  💡 {errorDetail.suggestion}
+                </p>
+              )}
+            </div>
+          ),
+          width: 600,
+        });
+      } else {
+        // Fallback for other errors
+        message.error(
+          typeof errorDetail === 'string'
+            ? errorDetail
+            : 'Ошибка при удалении сотрудника'
+        );
+      }
     },
   });
 

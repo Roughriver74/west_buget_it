@@ -12,7 +12,10 @@ import pandas as pd
 import io
 
 from app.db.session import get_db
-from app.db.models import Employee, User, UserRoleEnum, Department, SalaryHistory, EmployeeStatusEnum
+from app.db.models import (
+    Employee, User, UserRoleEnum, Department, SalaryHistory, EmployeeStatusEnum,
+    PayrollPlan, PayrollActual, EmployeeKPI
+)
 from app.schemas.payroll import (
     EmployeeCreate,
     EmployeeUpdate,
@@ -241,6 +244,9 @@ async def delete_employee(
 ):
     """
     Delete an employee (ADMIN only)
+
+    NOTE: Employees with payroll history, salary history, or KPI records cannot be deleted.
+    Instead, change their status to FIRED.
     """
     # Only ADMIN can delete employees
     if current_user.role != UserRoleEnum.ADMIN:
@@ -263,6 +269,50 @@ async def delete_employee(
             detail="Access denied to this employee"
         )
 
+    # Check for related records
+    related_issues = []
+
+    # Check salary history
+    salary_history_count = db.query(SalaryHistory).filter(
+        SalaryHistory.employee_id == employee_id
+    ).count()
+    if salary_history_count > 0:
+        related_issues.append(f"История изменений зарплаты: {salary_history_count} записей")
+
+    # Check payroll plans
+    payroll_plans_count = db.query(PayrollPlan).filter(
+        PayrollPlan.employee_id == employee_id
+    ).count()
+    if payroll_plans_count > 0:
+        related_issues.append(f"Плановые начисления: {payroll_plans_count} записей")
+
+    # Check payroll actuals
+    payroll_actuals_count = db.query(PayrollActual).filter(
+        PayrollActual.employee_id == employee_id
+    ).count()
+    if payroll_actuals_count > 0:
+        related_issues.append(f"Фактические выплаты: {payroll_actuals_count} записей")
+
+    # Check employee KPIs
+    employee_kpis_count = db.query(EmployeeKPI).filter(
+        EmployeeKPI.employee_id == employee_id
+    ).count()
+    if employee_kpis_count > 0:
+        related_issues.append(f"Записи KPI: {employee_kpis_count} записей")
+
+    # If there are related records, prevent deletion
+    if related_issues:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Невозможно удалить сотрудника с историей начислений и выплат",
+                "reason": "У сотрудника есть связанные записи",
+                "related_records": related_issues,
+                "suggestion": f"Вместо удаления измените статус сотрудника на 'Уволен' (FIRED). ФИО: {employee.full_name}"
+            }
+        )
+
+    # If no related records, safe to delete
     db.delete(employee)
     db.commit()
     return None
