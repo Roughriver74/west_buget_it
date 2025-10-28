@@ -448,4 +448,80 @@ export const payrollAnalyticsAPI = {
     });
     return response.data;
   },
+
+  // Integration with Expenses: Generate payroll expense requests
+  generatePayrollExpenses: async (params: {
+    year: number;
+    month: number;
+    department_id?: number;
+    dry_run?: boolean;
+  }) => {
+    const response = await apiClient.post<{
+      success: boolean;
+      dry_run: boolean;
+      year: number;
+      month: number;
+      department_id?: number;
+      salary_category_id: number;
+      salary_category_name: string;
+      statistics: {
+        employee_count: number;
+        total_amount: number;
+        expenses_created: number;
+      };
+      preview: Array<{
+        employee_id: number;
+        employee_name: string;
+        position: string;
+        base_salary: number;
+        kpi_percentage: number | null;
+        kpi_bonuses: number;
+        total_amount: number;
+        department_id: number;
+      }>;
+      message: string;
+    }>('payroll/generate-payroll-expenses', null, { params });
+    return response.data;
+  },
+
+  // Register actual payroll payments from PayrollPlan
+  registerPayrollPayment: async (params: {
+    year: number;
+    month: number;
+    payment_type: 'advance' | 'final';
+    payment_date?: string;
+    department_id?: number;
+    dry_run?: boolean;
+  }) => {
+    const response = await apiClient.post<{
+      success: boolean;
+      dry_run: boolean;
+      payment_type: string;
+      payment_date: string;
+      year: number;
+      month: number;
+      department_id?: number;
+      statistics: {
+        employee_count: number;
+        total_amount: number;
+        records_created: number;
+        skipped_existing: number;
+      };
+      preview: Array<{
+        employee_id: number;
+        employee_name: string;
+        position: string;
+        base_salary_paid: number;
+        monthly_bonus_paid: number;
+        quarterly_bonus_paid: number;
+        annual_bonus_paid: number;
+        total_paid: number;
+        payment_type: string;
+        payment_date: string;
+        department_id: number;
+      }>;
+      message: string;
+    }>('payroll/analytics/register-payroll-payment', null, { params });
+    return response.data;
+  },
 };

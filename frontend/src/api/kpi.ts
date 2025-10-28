@@ -15,6 +15,8 @@ export type EmployeeKPIGoalCreate = components['schemas']['EmployeeKPIGoalCreate
 export type EmployeeKPIGoalUpdate = components['schemas']['EmployeeKPIGoalUpdate']
 
 export type KPIEmployeeSummary = components['schemas']['KPIEmployeeSummary']
+export type KPIDepartmentSummary = components['schemas']['KPIDepartmentSummary']
+export type KPIGoalProgress = components['schemas']['KPIGoalProgress']
 export type BonusType = components['schemas']['BonusTypeEnum']
 
 export interface KPIImportResult {
@@ -24,6 +26,25 @@ export interface KPIImportResult {
   missing_sheets: string[]
   no_access: string[]
   year: number
+}
+
+export interface KPITrendData {
+  month: number
+  avg_kpi: number
+  min_kpi: number
+  max_kpi: number
+  employee_count: number
+  total_bonus: number
+}
+
+export interface BonusDistributionData {
+  department_id: number
+  department_name: string
+  monthly_total: number
+  quarterly_total: number
+  annual_total: number
+  total_bonus: number
+  employee_count: number
 }
 
 export const kpiApi = {
@@ -117,6 +138,26 @@ export const kpiApi = {
 
   getEmployeeSummary: async (params: { year: number; month?: number; department_id?: number }): Promise<KPIEmployeeSummary[]> => {
     const { data } = await apiClient.get<KPIEmployeeSummary[]>('kpi/analytics/employee-summary', { params })
+    return data
+  },
+
+  getDepartmentSummary: async (params: { year: number; month?: number; department_id?: number }): Promise<KPIDepartmentSummary[]> => {
+    const { data } = await apiClient.get<KPIDepartmentSummary[]>('kpi/analytics/department-summary', { params })
+    return data
+  },
+
+  getGoalProgress: async (params: { year: number; month?: number; department_id?: number }): Promise<KPIGoalProgress[]> => {
+    const { data } = await apiClient.get<KPIGoalProgress[]>('kpi/analytics/goal-progress', { params })
+    return data
+  },
+
+  getKpiTrends: async (params: { year: number; employee_id?: number; department_id?: number }): Promise<KPITrendData[]> => {
+    const { data } = await apiClient.get<KPITrendData[]>('kpi/analytics/kpi-trends', { params })
+    return data
+  },
+
+  getBonusDistribution: async (params: { year: number; month?: number }): Promise<BonusDistributionData[]> => {
+    const { data } = await apiClient.get<BonusDistributionData[]>('kpi/analytics/bonus-distribution', { params })
     return data
   },
 }

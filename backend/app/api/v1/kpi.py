@@ -1002,3 +1002,256 @@ async def get_employee_kpi_summary(
         )
         for r in results
     ]
+
+
+@router.get("/analytics/department-summary", response_model=List[KPIDepartmentSummary])
+async def get_department_kpi_summary(
+    year: int,
+    month: Optional[int] = None,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get KPI summary grouped by department"""
+    query = db.query(
+        Department.id.label('department_id'),
+        Department.name.label('department_name'),
+        EmployeeKPI.year,
+        EmployeeKPI.month,
+        func.avg(EmployeeKPI.kpi_percentage).label('avg_kpi_percentage'),
+        func.count(func.distinct(EmployeeKPI.employee_id)).label('total_employees'),
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        ).label('total_bonus_calculated'),
+        func.count(func.distinct(EmployeeKPIGoal.id)).label('goals_count'),
+        func.sum(
+            func.cast(EmployeeKPIGoal.status == KPIGoalStatusEnum.ACHIEVED, Integer)
+        ).label('goals_achieved')
+    ).join(Employee, Employee.department_id == Department.id).join(
+        EmployeeKPI, EmployeeKPI.employee_id == Employee.id
+    ).outerjoin(EmployeeKPIGoal).filter(
+        EmployeeKPI.year == year
+    )
+
+    if month is not None:
+        query = query.filter(EmployeeKPI.month == month)
+
+    # Department filter based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Department.id == current_user.department_id)
+    elif department_id:
+        query = query.filter(Department.id == department_id)
+
+    query = query.group_by(
+        Department.id,
+        Department.name,
+        EmployeeKPI.year,
+        EmployeeKPI.month
+    )
+
+    results = query.all()
+
+    return [
+        KPIDepartmentSummary(
+            department_id=r.department_id,
+            department_name=r.department_name,
+            year=r.year,
+            month=r.month,
+            avg_kpi_percentage=r.avg_kpi_percentage or Decimal(0),
+            total_employees=r.total_employees or 0,
+            total_bonus_calculated=r.total_bonus_calculated or Decimal(0),
+            goals_count=r.goals_count or 0,
+            goals_achieved=r.goals_achieved or 0
+        )
+        for r in results
+    ]
+
+
+@router.get("/analytics/goal-progress", response_model=List[KPIGoalProgress])
+async def get_goal_progress(
+    year: int,
+    month: Optional[int] = None,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get progress tracking for all KPI goals"""
+    query = db.query(
+        KPIGoal.id.label('goal_id'),
+        KPIGoal.name.label('goal_name'),
+        KPIGoal.category,
+        KPIGoal.target_value,
+        KPIGoal.metric_unit,
+        func.count(func.distinct(EmployeeKPIGoal.employee_id)).label('employees_assigned'),
+        func.sum(
+            func.cast(EmployeeKPIGoal.status == KPIGoalStatusEnum.ACHIEVED, Integer)
+        ).label('employees_achieved'),
+        func.avg(EmployeeKPIGoal.achievement_percentage).label('avg_achievement_percentage'),
+        func.sum(EmployeeKPIGoal.weight).label('total_weight')
+    ).outerjoin(
+        EmployeeKPIGoal,
+        and_(
+            EmployeeKPIGoal.goal_id == KPIGoal.id,
+            EmployeeKPIGoal.year == year
+        )
+    ).filter(
+        KPIGoal.year == year
+    )
+
+    if month is not None:
+        query = query.filter(
+            or_(
+                EmployeeKPIGoal.month == month,
+                EmployeeKPIGoal.month.is_(None)  # Include annual goals
+            )
+        )
+
+    # Department filter
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(KPIGoal.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(KPIGoal.department_id == department_id)
+
+    query = query.group_by(
+        KPIGoal.id,
+        KPIGoal.name,
+        KPIGoal.category,
+        KPIGoal.target_value,
+        KPIGoal.metric_unit
+    )
+
+    results = query.all()
+
+    return [
+        KPIGoalProgress(
+            goal_id=r.goal_id,
+            goal_name=r.goal_name,
+            category=r.category,
+            target_value=r.target_value,
+            metric_unit=r.metric_unit,
+            employees_assigned=r.employees_assigned or 0,
+            employees_achieved=r.employees_achieved or 0,
+            avg_achievement_percentage=r.avg_achievement_percentage or Decimal(0),
+            total_weight=r.total_weight or Decimal(0)
+        )
+        for r in results
+    ]
+
+
+@router.get("/analytics/kpi-trends")
+async def get_kpi_trends(
+    year: int,
+    employee_id: Optional[int] = None,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get KPI trends over months"""
+    query = db.query(
+        EmployeeKPI.month,
+        func.avg(EmployeeKPI.kpi_percentage).label('avg_kpi'),
+        func.min(EmployeeKPI.kpi_percentage).label('min_kpi'),
+        func.max(EmployeeKPI.kpi_percentage).label('max_kpi'),
+        func.count(func.distinct(EmployeeKPI.employee_id)).label('employee_count'),
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        ).label('total_bonus')
+    ).filter(EmployeeKPI.year == year)
+
+    # Department filter
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(EmployeeKPI.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(EmployeeKPI.department_id == department_id)
+
+    if employee_id:
+        query = query.filter(EmployeeKPI.employee_id == employee_id)
+
+    query = query.group_by(EmployeeKPI.month).order_by(EmployeeKPI.month)
+
+    results = query.all()
+
+    return [
+        {
+            "month": r.month,
+            "avg_kpi": float(r.avg_kpi or 0),
+            "min_kpi": float(r.min_kpi or 0),
+            "max_kpi": float(r.max_kpi or 0),
+            "employee_count": r.employee_count or 0,
+            "total_bonus": float(r.total_bonus or 0)
+        }
+        for r in results
+    ]
+
+
+@router.get("/analytics/bonus-distribution")
+async def get_bonus_distribution(
+    year: int,
+    month: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get bonus distribution by department and type"""
+    query = db.query(
+        Department.id.label('department_id'),
+        Department.name.label('department_name'),
+        func.sum(EmployeeKPI.monthly_bonus_calculated).label('monthly_total'),
+        func.sum(EmployeeKPI.quarterly_bonus_calculated).label('quarterly_total'),
+        func.sum(EmployeeKPI.annual_bonus_calculated).label('annual_total'),
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        ).label('total_bonus'),
+        func.count(func.distinct(EmployeeKPI.employee_id)).label('employee_count')
+    ).join(Employee, Employee.department_id == Department.id).join(
+        EmployeeKPI, EmployeeKPI.employee_id == Employee.id
+    ).filter(EmployeeKPI.year == year)
+
+    if month is not None:
+        query = query.filter(EmployeeKPI.month == month)
+
+    # Department filter
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Department.id == current_user.department_id)
+
+    query = query.group_by(Department.id, Department.name)
+
+    results = query.all()
+
+    return [
+        {
+            "department_id": r.department_id,
+            "department_name": r.department_name,
+            "monthly_total": float(r.monthly_total or 0),
+            "quarterly_total": float(r.quarterly_total or 0),
+            "annual_total": float(r.annual_total or 0),
+            "total_bonus": float(r.total_bonus or 0),
+            "employee_count": r.employee_count or 0
+        }
+        for r in results
+    ]

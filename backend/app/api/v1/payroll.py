@@ -14,7 +14,7 @@ import io
 
 from app.db.session import get_db
 from app.db.models import (
-    PayrollPlan, PayrollActual, Employee, User, UserRoleEnum, Department
+    PayrollPlan, PayrollActual, Employee, User, UserRoleEnum, Department, EmployeeKPI, EmployeeStatusEnum
 )
 from app.schemas.payroll import (
     PayrollPlanCreate,
@@ -1223,3 +1223,449 @@ async def import_payroll_plans(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Import failed: {str(e)}"
         )
+
+
+# ==================== Integration with Expenses ====================
+
+@router.post("/generate-payroll-expenses")
+async def generate_payroll_expenses(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    department_id: Optional[int] = None,
+    dry_run: bool = Query(False, description="Preview without creating expenses"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate expense requests for payroll based on PayrollPlan + EmployeeKPI data.
+
+    This integrates FOT (payroll) + KPI + Budget systems by automatically creating
+    expense requests for salary payments.
+
+    Args:
+        year: Target year
+        month: Target month (1-12)
+        department_id: Optional department filter (ADMIN/MANAGER can specify, USER auto-filtered)
+        dry_run: If True, returns preview without creating expenses
+
+    Returns:
+        Statistics about generated expenses and preview data
+    """
+    from app.db.models import BudgetCategory, CategoryTypeEnum, Expense, ExpenseStatusEnum, EmployeeKPI
+
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can generate payroll expenses"
+        )
+
+    # Department filter based on role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+
+    # Find or create "Заработная плата" category
+    salary_category = db.query(BudgetCategory).filter(
+        BudgetCategory.name == "Заработная плата",
+        BudgetCategory.type == CategoryTypeEnum.OPEX
+    ).first()
+
+    if not salary_category:
+        # Create category for each department or as global
+        departments = db.query(Department).filter(Department.is_active == True).all()
+        if not departments:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No active departments found"
+            )
+
+        # Create for first department (can be enhanced later)
+        salary_category = BudgetCategory(
+            name="Заработная плата",
+            type=CategoryTypeEnum.OPEX,
+            description="Автоматически созданная категория для учета зарплаты сотрудников",
+            is_active=True,
+            department_id=departments[0].id
+        )
+        db.add(salary_category)
+        db.flush()  # Get ID without committing
+
+    # Query payroll plans
+    query = db.query(PayrollPlan).join(Employee).filter(
+        PayrollPlan.year == year,
+        PayrollPlan.month == month,
+        Employee.status == EmployeeStatusEnum.ACTIVE
+    )
+
+    if department_id:
+        query = query.filter(PayrollPlan.department_id == department_id)
+
+    payroll_plans = query.all()
+
+    if not payroll_plans:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No payroll plans found for {year}-{month:02d}"
+        )
+
+    # Prepare expense data
+    expenses_to_create = []
+    total_amount = Decimal(0)
+    employee_count = 0
+
+    for plan in payroll_plans:
+        # Get employee
+        employee = db.query(Employee).filter(Employee.id == plan.employee_id).first()
+        if not employee:
+            continue
+
+        # Get KPI data for the same period
+        kpi_data = db.query(EmployeeKPI).filter(
+            EmployeeKPI.employee_id == plan.employee_id,
+            EmployeeKPI.year == year,
+            EmployeeKPI.month == month
+        ).first()
+
+        # Calculate total salary: base salary + bonuses from KPI
+        total_salary = plan.base_salary or Decimal(0)
+
+        if kpi_data:
+            # Add KPI bonuses
+            total_salary += (kpi_data.monthly_bonus_calculated or Decimal(0))
+            total_salary += (kpi_data.quarterly_bonus_calculated or Decimal(0))
+            total_salary += (kpi_data.annual_bonus_calculated or Decimal(0))
+
+        # Check if expense already exists
+        existing = db.query(Expense).filter(
+            Expense.department_id == plan.department_id,
+            Expense.category_id == salary_category.id,
+            func.extract('year', Expense.request_date) == year,
+            func.extract('month', Expense.request_date) == month,
+            Expense.comment.ilike(f"%{employee.full_name}%")
+        ).first()
+
+        if existing:
+            continue  # Skip if already exists
+
+        # Prepare expense data
+        expense_data = {
+            "employee_id": employee.id,
+            "employee_name": employee.full_name,
+            "position": employee.position,
+            "base_salary": plan.base_salary or Decimal(0),
+            "kpi_percentage": kpi_data.kpi_percentage if kpi_data else None,
+            "kpi_bonuses": (
+                (kpi_data.monthly_bonus_calculated or Decimal(0)) +
+                (kpi_data.quarterly_bonus_calculated or Decimal(0)) +
+                (kpi_data.annual_bonus_calculated or Decimal(0))
+            ) if kpi_data else Decimal(0),
+            "total_amount": total_salary,
+            "department_id": plan.department_id,
+        }
+
+        expenses_to_create.append(expense_data)
+        total_amount += total_salary
+        employee_count += 1
+
+        # If not dry run, create the expense
+        if not dry_run:
+            expense = Expense(
+                department_id=plan.department_id,
+                category_id=salary_category.id,
+                amount=total_salary,
+                request_date=datetime(year, month, 1),
+                status=ExpenseStatusEnum.PENDING,
+                comment=f"Заработная плата: {employee.full_name} ({employee.position}) за {month:02d}.{year}. "
+                        f"Оклад: {plan.base_salary or 0:,.2f} ₽"
+                        + (f", КПИ премии: {expense_data['kpi_bonuses']:,.2f} ₽" if expense_data['kpi_bonuses'] > 0 else ""),
+                requester=current_user.full_name or current_user.username
+            )
+            db.add(expense)
+
+    # Commit if not dry run
+    if not dry_run:
+        db.commit()
+
+    return {
+        "success": True,
+        "dry_run": dry_run,
+        "year": year,
+        "month": month,
+        "department_id": department_id,
+        "salary_category_id": salary_category.id,
+        "salary_category_name": salary_category.name,
+        "statistics": {
+            "employee_count": employee_count,
+            "total_amount": float(total_amount),
+            "expenses_created": employee_count if not dry_run else 0,
+        },
+        "preview": expenses_to_create if dry_run else expenses_to_create[:5],  # Show first 5 in non-dry-run
+        "message": f"{'Preview: Would create' if dry_run else 'Created'} {employee_count} payroll expense{'s' if employee_count != 1 else ''} for {year}-{month:02d}"
+    }
+
+
+@router.get("/analytics/budget-summary")
+async def get_payroll_budget_summary(
+    year: int = Query(..., ge=2020, le=2100),
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get payroll data aggregated in budget format (by month)
+    For integration with overall budget planning and analytics
+    """
+    # Build base query
+    query = db.query(
+        PayrollPlan.month,
+        func.sum(PayrollPlan.total_planned).label('total_planned'),
+        func.count(PayrollPlan.id).label('employee_count')
+    ).filter(
+        PayrollPlan.year == year
+    )
+
+    # Apply department filter based on role
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(PayrollPlan.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        if department_id:
+            query = query.filter(PayrollPlan.department_id == department_id)
+
+    # Group by month
+    query = query.group_by(PayrollPlan.month).order_by(PayrollPlan.month)
+
+    results = query.all()
+
+    # Format results
+    summary = []
+    for row in results:
+        summary.append({
+            "month": row.month,
+            "total_planned": float(row.total_planned or 0),
+            "employee_count": row.employee_count,
+            "category_name": "Заработная плата",
+            "type": "OPEX"
+        })
+
+    # Calculate totals
+    total_amount = sum(item['total_planned'] for item in summary)
+    total_employees = sum(item['employee_count'] for item in summary) // len(summary) if summary else 0
+
+    return {
+        "year": year,
+        "department_id": department_id,
+        "monthly_summary": summary,
+        "totals": {
+            "total_amount": total_amount,
+            "average_employees": total_employees,
+            "months_with_data": len(summary)
+        }
+    }
+
+
+@router.post("/analytics/register-payroll-payment")
+async def register_payroll_payment(
+    year: int = Query(..., ge=2020, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    payment_type: str = Query(..., description="Payment type: 'advance' or 'final'"),
+    payment_date: Optional[str] = Query(None, description="Payment date in ISO format (YYYY-MM-DD)"),
+    department_id: Optional[int] = None,
+    dry_run: bool = Query(False, description="Preview without creating records"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Register actual payroll payments based on PayrollPlan
+
+    Creates PayrollActual records with auto-filled amounts from PayrollPlan and EmployeeKPI.
+    Supports two payment types:
+    - 'advance': 50% of base salary only, no bonuses (typically paid on 25th)
+    - 'final': 50% of base salary + 100% bonuses from previous month (typically paid on 10th)
+
+    Args:
+        year: Year of payment
+        month: Month of payment (1-12)
+        payment_type: 'advance' or 'final'
+        payment_date: Optional payment date (defaults to 10th for advance, 25th for final)
+        department_id: Optional department filter (MANAGER/ADMIN only)
+        dry_run: If True, returns preview without creating records
+
+    Returns:
+        {
+            "success": bool,
+            "dry_run": bool,
+            "payment_type": str,
+            "payment_date": str,
+            "statistics": {
+                "employee_count": int,
+                "total_amount": float,
+                "records_created": int
+            },
+            "preview": List[dict],
+            "message": str
+        }
+    """
+    # Validate payment type
+    if payment_type not in ['advance', 'final']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="payment_type must be 'advance' or 'final'"
+        )
+
+    # Calculate payment date if not provided
+    if payment_date:
+        try:
+            parsed_date = datetime.strptime(payment_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid payment_date format. Use YYYY-MM-DD"
+            )
+    else:
+        # Default dates: 25th for advance, 10th for final
+        day = 25 if payment_type == 'advance' else 10
+        parsed_date = datetime(year, month, day).date()
+
+    # For advance: 50% of base salary only
+    # For final: 50% of base salary + 100% of bonuses
+    is_advance = payment_type == 'advance'
+
+    # Query PayrollPlan with Employee join
+    query = db.query(PayrollPlan, Employee).join(
+        Employee, PayrollPlan.employee_id == Employee.id
+    ).filter(
+        PayrollPlan.year == year,
+        PayrollPlan.month == month,
+        Employee.status == EmployeeStatusEnum.ACTIVE
+    )
+
+    # Apply department filter based on role
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(PayrollPlan.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        if department_id:
+            query = query.filter(PayrollPlan.department_id == department_id)
+
+    payroll_plans = query.all()
+
+    if not payroll_plans:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active payroll plans found for {year}-{month:02d}"
+        )
+
+    # Prepare PayrollActual data
+    actuals_to_create = []
+    total_amount = Decimal(0)
+    employee_count = 0
+    skipped_count = 0
+
+    for plan, employee in payroll_plans:
+        # Check if PayrollActual already exists for this payment
+        existing = db.query(PayrollActual).filter(
+            PayrollActual.employee_id == plan.employee_id,
+            PayrollActual.year == year,
+            PayrollActual.month == month,
+            PayrollActual.payment_date == parsed_date
+        ).first()
+
+        if existing:
+            skipped_count += 1
+            continue  # Skip if already registered
+
+        # Get KPI data for the same period
+        kpi_data = db.query(EmployeeKPI).filter(
+            EmployeeKPI.employee_id == plan.employee_id,
+            EmployeeKPI.year == year,
+            EmployeeKPI.month == month
+        ).first()
+
+        # Calculate amounts based on payment_type
+        # Advance (25th): 50% of base salary only
+        # Final (10th): 50% of base salary + 100% of bonuses
+        if is_advance:
+            # Аванс: 50% оклада, без премий
+            base_salary = (plan.base_salary or Decimal(0)) * Decimal('0.5')
+            monthly_bonus = Decimal(0)
+            quarterly_bonus = Decimal(0)
+            annual_bonus = Decimal(0)
+        else:
+            # Окончательный расчет: 50% оклада + все премии
+            base_salary = (plan.base_salary or Decimal(0)) * Decimal('0.5')
+
+            if kpi_data:
+                monthly_bonus = kpi_data.monthly_bonus_calculated or Decimal(0)
+                quarterly_bonus = kpi_data.quarterly_bonus_calculated or Decimal(0)
+                annual_bonus = kpi_data.annual_bonus_calculated or Decimal(0)
+            else:
+                monthly_bonus = Decimal(0)
+                quarterly_bonus = Decimal(0)
+                annual_bonus = Decimal(0)
+
+        # Calculate total
+        total_paid = base_salary + monthly_bonus + quarterly_bonus + annual_bonus
+
+        # Prepare actual data
+        actual_data = {
+            "employee_id": employee.id,
+            "employee_name": employee.full_name,
+            "position": employee.position,
+            "base_salary_paid": float(base_salary),
+            "monthly_bonus_paid": float(monthly_bonus),
+            "quarterly_bonus_paid": float(quarterly_bonus),
+            "annual_bonus_paid": float(annual_bonus),
+            "total_paid": float(total_paid),
+            "payment_type": payment_type,
+            "payment_date": parsed_date.isoformat(),
+            "department_id": plan.department_id,
+        }
+
+        actuals_to_create.append(actual_data)
+        total_amount += total_paid
+        employee_count += 1
+
+        # If not dry run, create the PayrollActual record
+        if not dry_run:
+            payroll_actual = PayrollActual(
+                year=year,
+                month=month,
+                employee_id=plan.employee_id,
+                department_id=plan.department_id,
+                base_salary_paid=base_salary,
+                monthly_bonus_paid=monthly_bonus,
+                quarterly_bonus_paid=quarterly_bonus,
+                annual_bonus_paid=annual_bonus,
+                other_payments_paid=Decimal(0),
+                total_paid=total_paid,
+                payment_date=parsed_date,
+                notes=f"{'Аванс' if payment_type == 'advance' else 'Окончательный расчет'} за {month:02d}.{year}"
+            )
+            db.add(payroll_actual)
+
+    # Commit if not dry run
+    if not dry_run:
+        db.commit()
+
+    return {
+        "success": True,
+        "dry_run": dry_run,
+        "payment_type": payment_type,
+        "payment_date": parsed_date.isoformat(),
+        "year": year,
+        "month": month,
+        "department_id": department_id,
+        "statistics": {
+            "employee_count": employee_count,
+            "total_amount": float(total_amount),
+            "records_created": employee_count if not dry_run else 0,
+            "skipped_existing": skipped_count,
+        },
+        "preview": actuals_to_create if dry_run else actuals_to_create[:10],  # Show first 10 in non-dry-run
+        "message": f"{'Preview: Would register' if dry_run else 'Registered'} {employee_count} payroll payment{'s' if employee_count != 1 else ''} "
+                   f"({payment_type}) for {year}-{month:02d}{f'. Skipped {skipped_count} existing record(s)' if skipped_count > 0 else ''}"
+    }

@@ -5,7 +5,7 @@ from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum, User
+from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum, User, PayrollPlan
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (
@@ -49,13 +49,24 @@ def get_dashboard_data(
     if not year:
         year = datetime.now().year
 
-    # Get total planned
+    # Get total planned from BudgetPlan
     plan_query = db.query(func.sum(BudgetPlan.planned_amount)).filter(BudgetPlan.year == year)
     if month:
         plan_query = plan_query.filter(BudgetPlan.month == month)
     if department_id:
         plan_query = plan_query.filter(BudgetPlan.department_id == department_id)
-    total_planned = plan_query.scalar() or 0
+    budget_planned = plan_query.scalar() or 0
+
+    # Get total planned from PayrollPlan (FOT)
+    payroll_query = db.query(func.sum(PayrollPlan.total_planned)).filter(PayrollPlan.year == year)
+    if month:
+        payroll_query = payroll_query.filter(PayrollPlan.month == month)
+    if department_id:
+        payroll_query = payroll_query.filter(PayrollPlan.department_id == department_id)
+    payroll_planned = payroll_query.scalar() or 0
+
+    # Combined total planned (BudgetPlan + PayrollPlan)
+    total_planned = float(budget_planned) + float(payroll_planned)
 
     # Get total actual
     actual_query = db.query(func.sum(Expense.amount)).filter(
@@ -390,14 +401,17 @@ def get_payments_by_day(
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     forecast_service = PaymentForecastService(db)
-    payments = forecast_service.get_payments_by_day(
+    result = forecast_service.get_payments_by_day(
         date=payment_date,
         department_id=department_id,
         category_id=category_id,
         organization_id=organization_id,
     )
 
-    # Convert to dict format
+    payments = result['expenses']
+    payroll_forecast = result['payroll_forecast']
+
+    # Convert expenses to dict format
     payments_data = [
         {
             "id": payment.id,
@@ -416,10 +430,33 @@ def get_payments_by_day(
         for payment in payments
     ]
 
+    # Add payroll forecast as a "virtual" payment if exists
+    total_amount = sum(p["amount"] for p in payments_data)
+    total_count = len(payments_data)
+
+    if payroll_forecast:
+        # Add forecast as a virtual payment entry
+        payments_data.append({
+            "id": -1,  # Virtual ID for forecast
+            "number": f"ФОТ-{payment_date.year}-{payment_date.month:02d}-{payment_date.day:02d}",
+            "amount": payroll_forecast['amount'],
+            "payment_date": payment_date.isoformat(),
+            "category_id": None,
+            "category_name": "Заработная плата (прогноз)",
+            "contractor_id": None,
+            "contractor_name": f"{payroll_forecast['employee_count']} сотрудников",
+            "organization_id": None,
+            "organization_name": None,
+            "status": "FORECAST",
+            "comment": payroll_forecast['description'],
+        })
+        total_amount += payroll_forecast['amount']
+        total_count += 1
+
     return PaymentsByDay(
         date=payment_date.date(),
-        total_count=len(payments_data),
-        total_amount=sum(p["amount"] for p in payments_data),
+        total_count=total_count,
+        total_amount=total_amount,
         payments=[PaymentDetail(**item) for item in payments_data],
     )
 

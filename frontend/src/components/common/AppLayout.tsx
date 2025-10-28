@@ -64,95 +64,111 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   // Build menu items based on user role
   const baseMenuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: <Link to="/dashboard">Дашборд</Link>,
-    },
-    {
-      key: '/budget',
-      icon: <DollarOutlined />,
-      label: <Link to="/budget">Бюджет</Link>,
-    },
-    {
-      key: '/expenses',
-      icon: <FileTextOutlined />,
-      label: <Link to="/expenses">Заявки</Link>,
-    },
-    {
-      key: '/budget/plan',
-      icon: <DollarOutlined />,
-      label: <Link to="/budget/plan">План бюджета</Link>,
-    },
-    {
-      key: '/budget/planning',
-      icon: <ProjectOutlined />,
-      label: <Link to="/budget/planning">Планирование бюджета</Link>,
-    },
-    {
-      key: '/payment-calendar',
-      icon: <CalendarOutlined />,
-      label: <Link to="/payment-calendar">Календарь оплат</Link>,
-    },
-    {
-      key: '/forecast',
-      icon: <FundOutlined />,
-      label: <Link to="/forecast">Прогноз расходов</Link>,
-    },
-    {
-      key: 'analytics-submenu',
-      icon: <BarChartOutlined />,
-      label: 'Аналитика',
-      children: [
-        {
-          key: '/analytics',
-          label: <Link to="/analytics">Дашборд</Link>,
-        },
-        {
-          key: '/analytics/balance',
-          label: <Link to="/analytics/balance">План-Факт-Остаток</Link>,
-        },
-      ],
-    },
-    {
-      key: '/categories',
-      icon: <DatabaseOutlined />,
-      label: <Link to="/categories">Статьи расходов</Link>,
-    },
-    {
-      key: 'payroll-submenu',
-      icon: <IdcardOutlined />,
-      label: 'ФОТ (Зарплаты)',
-      children: [
-        {
-          key: '/employees',
-          label: <Link to="/employees">Сотрудники</Link>,
-        },
-        {
-          key: '/payroll/plan',
-          label: <Link to="/payroll/plan">Планирование ФОТ</Link>,
-        },
-        {
-          key: '/payroll/kpi',
-          label: <Link to="/payroll/kpi">KPI сотрудников</Link>,
-        },
-        {
-          key: '/payroll/analytics',
-          label: <Link to="/payroll/analytics">Аналитика ФОТ</Link>,
-        },
-      ],
-    },
-    {
-      key: '/contractors',
-      icon: <TeamOutlined />,
-      label: <Link to="/contractors">Контрагенты</Link>,
-    },
-    {
-      key: '/organizations',
-      icon: <BankOutlined />,
-      label: <Link to="/organizations">Организации</Link>,
-    },
-  ]
+		{
+			key: '/dashboard',
+			icon: <DashboardOutlined />,
+			label: <Link to='/dashboard'>Дашборд</Link>,
+		},
+		{
+			key: '/budget',
+			icon: <DollarOutlined />,
+			label: <Link to='/budget'>Бюджет</Link>,
+			children: [
+				{
+					key: '/budget/planning',
+					icon: <ProjectOutlined />,
+					label: <Link to='/budget/planning'>Планирование</Link>,
+				},
+				{
+					key: '/budget/plan',
+					icon: <DollarOutlined />,
+					label: <Link to='/budget/plan'>Год в целом</Link>,
+				},
+			],
+		},
+		{
+			key: '/expenses',
+			icon: <FileTextOutlined />,
+			label: <Link to='/expenses'>Заявки</Link>,
+		},
+
+		{
+			key: '/payment-calendar',
+			icon: <CalendarOutlined />,
+			label: <Link to='/payment-calendar'>Календарь оплат</Link>,
+		},
+
+		{
+			key: 'analytics-submenu',
+			icon: <BarChartOutlined />,
+			label: 'Аналитика',
+			children: [
+				{
+					key: '/forecast',
+					icon: <FundOutlined />,
+					label: <Link to='/forecast'>Прогноз расходов</Link>,
+				},
+				{
+					key: '/analytics',
+					label: <Link to='/analytics'>Дашборд</Link>,
+				},
+				{
+					key: '/analytics/balance',
+					label: <Link to='/analytics/balance'>План-Факт-Остаток</Link>,
+				},
+			],
+		},
+
+		{
+			key: 'payroll-submenu',
+			icon: <IdcardOutlined />,
+			label: 'ФОТ (Зарплаты)',
+			children: [
+				{
+					key: '/employees',
+					label: <Link to='/employees'>Сотрудники</Link>,
+				},
+				{
+					key: '/payroll/plan',
+					label: <Link to='/payroll/plan'>Планирование ФОТ</Link>,
+				},
+				{
+					key: '/payroll/kpi',
+					label: <Link to='/payroll/kpi'>KPI сотрудников</Link>,
+				},
+				{
+					key: '/kpi/analytics',
+					label: <Link to='/kpi/analytics'>Аналитика КПИ</Link>,
+				},
+				{
+					key: '/payroll/analytics',
+					label: <Link to='/payroll/analytics'>Аналитика ФОТ</Link>,
+				},
+			],
+		},
+		{
+			key: 'categories-submenu',
+			icon: <BarChartOutlined />,
+			label: 'Справочники',
+			children: [
+				{
+					key: '/categories',
+					icon: <DatabaseOutlined />,
+					label: <Link to='/categories'>Статьи расходов</Link>,
+				},
+				{
+					key: '/contractors',
+					icon: <TeamOutlined />,
+					label: <Link to='/contractors'>Контрагенты</Link>,
+				},
+				{
+					key: '/organizations',
+					icon: <BankOutlined />,
+					label: <Link to='/organizations'>Организации</Link>,
+				},
+			],
+		},
+	]
 
   // Add admin-only menu items
   const menuItems = user?.role === 'ADMIN'

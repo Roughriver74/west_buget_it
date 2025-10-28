@@ -21,6 +21,7 @@ import {
   DownOutlined,
   DownloadOutlined,
   UploadOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
@@ -28,6 +29,7 @@ import { formatCurrency } from '../utils/formatters';
 import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
 import PayrollActualFormModal from '../components/payroll/PayrollActualFormModal';
 import PayrollImportModal from '../components/payroll/PayrollImportModal';
+import GeneratePayrollExpensesModal from '../components/payroll/GeneratePayrollExpensesModal';
 
 const { Option } = Select;
 
@@ -43,6 +45,7 @@ export default function PayrollPlanPage() {
   const [planModalVisible, setPlanModalVisible] = useState(false);
   const [actualModalVisible, setActualModalVisible] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
+  const [generateExpensesModalVisible, setGenerateExpensesModalVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
 
   // Fetch payroll plans
@@ -147,6 +150,15 @@ export default function PayrollPlanPage() {
       label: 'Импорт из Excel',
       icon: <UploadOutlined />,
       onClick: () => setImportModalVisible(true),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'generate-expenses',
+      label: 'Создать заявки на ЗП',
+      icon: <FileTextOutlined />,
+      onClick: () => setGenerateExpensesModalVisible(true),
     },
   ];
 
@@ -376,6 +388,11 @@ export default function PayrollPlanPage() {
       <PayrollImportModal
         visible={importModalVisible}
         onCancel={() => setImportModalVisible(false)}
+      />
+
+      <GeneratePayrollExpensesModal
+        open={generateExpensesModalVisible}
+        onClose={() => setGenerateExpensesModalVisible(false)}
       />
     </div>
   );

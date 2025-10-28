@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**IT Budget Manager** - Full-stack web application for managing IT department budgets with expense tracking, forecasting, payroll management, and analytics. Written in Russian for Russian-speaking organizations.
+**IT Budget Manager** - Full-stack web application for managing IT department budgets with expense tracking, forecasting, payroll management, KPI system, and analytics. Written in Russian for Russian-speaking organizations.
 
 **Stack**: FastAPI + React/TypeScript + PostgreSQL + Docker
 
@@ -40,7 +40,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 python create_admin.py      # Creates admin:admin if not exists
 
 # Testing
-pytest                      # Run tests (when implemented)
+pytest                      # Run tests
+pytest tests/test_auth.py   # Run specific test file
+pytest -v -s                # Verbose with output
 ```
 
 ### Frontend (React + Vite)
@@ -52,6 +54,7 @@ npm run dev                 # Development server (port 5173)
 npm run build               # Production build
 npm run preview             # Preview production build
 npm run lint                # Run ESLint
+npm run lint:fix            # Fix ESLint issues
 ```
 
 ### Database Access
@@ -67,6 +70,7 @@ postgresql://budget_user:budget_pass@localhost:54329/it_budget_db
 ```bash
 cd backend
 python scripts/import_excel.py --file ../IT_Budget_Analysis_Full.xlsx
+python scripts/import_planfact_2025.py  # Import plan/fact data for 2025
 ```
 
 ## Critical Architecture Principles
@@ -160,12 +164,14 @@ Check roles on both backend (API endpoints) and frontend (UI components).
 
 ### Backend Structure (`backend/app/`)
 ```
-api/v1/              # API endpoints (17 modules)
+api/v1/              # API endpoints (20+ modules)
 ├── auth.py          # Authentication & JWT
 ├── expenses.py      # Expense management
 ├── budget.py        # Budget planning & tracking
+├── budget_plan_details.py  # Budget plan versioning & approval
 ├── forecast.py      # Forecasting & predictions
 ├── payroll.py       # Payroll & employee management
+├── kpi.py           # KPI system for performance bonuses
 ├── analytics.py     # Analytics & reporting
 ├── departments.py   # Department management
 ├── audit.py         # Audit logging
@@ -176,9 +182,10 @@ db/
 └── session.py       # Database session management
 
 core/
-└── config.py        # Settings & configuration
+├── config.py        # Settings & configuration
+└── security.py      # Security headers & CORS
 
-schemas/             # Pydantic schemas (15+ files)
+schemas/             # Pydantic schemas (20+ files)
 services/            # Business logic services
 middleware/          # Custom middleware (rate limiting)
 utils/               # Utilities & logging
@@ -186,16 +193,21 @@ utils/               # Utilities & logging
 
 ### Frontend Structure (`frontend/src/`)
 ```
-pages/               # 27 page components
+pages/               # 30+ page components
 ├── DashboardPage.tsx
 ├── ExpensesPage.tsx
 ├── BudgetPlanPage.tsx
 ├── PayrollPlanPage.tsx
+├── KpiManagementPage.tsx
 └── ...
 
 components/          # Reusable components
 ├── common/          # Shared components (AppLayout, etc.)
 ├── budget/          # Budget-specific components
+│   ├── BudgetPlanTable.tsx         # Main budget table with sticky controls
+│   ├── BudgetPlanDetailsTable.tsx  # Budget details with versioning
+│   ├── EditableCell.tsx            # Inline editing
+│   └── CopyPlanModal.tsx           # Copy from previous year
 ├── expenses/        # Expense-specific components
 ├── payroll/         # Payroll-specific components
 └── ...
@@ -219,10 +231,15 @@ hooks/               # Custom React hooks
 - `organizations` - Internal organizations
 - `expenses` - Expense requests with statuses
 - `budget_plans` - Budget planning by month
+- `budget_plan_versions` - Version control for budget plans
+- `budget_plan_details` - Detailed monthly budget data per category
 - `forecast_expenses` - Forecasted expenses
 - `employees` - Employee records
-- `payroll_plans` - Payroll planning
+- `payroll_plans` - Payroll planning with bonus types
 - `payroll_actuals` - Actual payroll payments
+- `employee_kpis` - KPI tracking per employee
+- `kpi_goals` - KPI goals and targets
+- `goal_achievements` - KPI achievement tracking
 - `audit_logs` - Audit trail (department_id nullable)
 - `attachments` - File attachments (linked via expense_id)
 
@@ -246,8 +263,104 @@ hooks/               # Custom React hooks
 **Filtering**: Support for `department_id`, `is_active`, date ranges
 **Bulk Operations**: Mass activate/deactivate/delete for reference data
 **Excel Export/Import**: Available for categories, contractors, organizations, payroll plans
+**Versioning**: Budget plans support versioning with approval workflow
 
 ## Important Development Patterns
+
+### React Component Best Practices
+
+#### 1. **React Hooks Rules - CRITICAL**
+```typescript
+// ✅ CORRECT - All hooks BEFORE conditional returns
+const MyComponent = () => {
+  const [state, setState] = useState()
+  const data = useQuery()
+  const callback = useCallback(() => {}, [])
+
+  // Conditional returns AFTER all hooks
+  if (loading) return <Spinner />
+  if (!data) return null
+
+  return <div>...</div>
+}
+
+// ❌ WRONG - Hooks after conditional returns
+const MyComponent = () => {
+  if (loading) return <Spinner />  // NEVER do this!
+
+  const [state, setState] = useState()  // Too late!
+}
+```
+
+#### 2. **Performance Optimization**
+```typescript
+// Use useMemo for expensive calculations
+const expensiveValue = useMemo(() => {
+  return data.reduce((sum, item) => sum + item.value, 0)
+}, [data])
+
+// Use useCallback for functions passed as props
+const handleClick = useCallback((id: number) => {
+  doSomething(id)
+}, [dependencies])
+
+// Memoize components with React.memo
+const ExpensiveComponent = React.memo(({ data }) => {
+  return <div>{data.map(...)}</div>
+})
+```
+
+#### 3. **Sticky Positioning Pattern**
+```typescript
+// For sticky headers/controls in tables
+<div style={{
+  position: 'sticky',
+  top: 64,              // Header offset
+  zIndex: 10,           // Above table
+  backgroundColor: '#fff',
+  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
+}}>
+  {/* Control panel content */}
+</div>
+```
+
+#### 4. **Ant Design Spin Component**
+```typescript
+// ✅ CORRECT - Spin with tip requires container
+<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+  <Spin size="large" tip="Loading..." />
+</div>
+
+// ❌ WRONG - Nested content causes warning
+<Spin size="large" tip="Loading...">
+  <div style={{ minHeight: 200 }} />
+</Spin>
+```
+
+#### 5. **Table Scroll Synchronization**
+```typescript
+// Wait for table to render before scrolling
+const scrollToColumn = useCallback((columnIndex: number) => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const target = tableRef.current
+        if (!target) return
+
+        // Verify table is rendered
+        const tableBody = target.querySelector('.ant-table-body')
+        if (!tableBody) {
+          // Retry if not ready
+          setTimeout(() => scrollToColumn(columnIndex), 100)
+          return
+        }
+
+        target.scrollTo({ left: columnOffset, behavior: 'smooth' })
+      }, 200)
+    })
+  })
+}, [])
+```
 
 ### Adding New Feature with Database Entity
 
@@ -317,14 +430,31 @@ hooks/               # Custom React hooks
    })
    ```
 
-### Error Handling
+## Recent Features (v0.5.0+)
 
-**Backend**: All exceptions logged via `app/utils/logger.py`. Global exception handlers in `app/main.py`.
-**Frontend**: ErrorBoundary component wraps app for React error catching.
+### Budget Planning Enhancements
+- **Versioning System**: Budget plans support multiple versions with approval workflow
+- **Monthly Details**: Detailed budget planning per category and month
+- **Status Tracking**: Draft → Pending → Approved workflow
+- **Plan Comparison**: Compare different versions side-by-side
 
-### Rate Limiting
+### KPI System
+- **Goal Management**: Define KPI goals with targets and weights
+- **Achievement Tracking**: Track actual vs. target performance
+- **Performance Bonuses**: Calculate bonuses based on KPI achievement
+- **Monthly/Quarterly Tracking**: Support for different bonus periods
 
-Backend has rate limiting: **100 requests/minute**, **1000 requests/hour** per IP.
+### Payroll Enhancements
+- **Bonus Types**: FIXED, PERFORMANCE_BASED, MIXED bonus types
+- **KPI Integration**: Link bonuses to KPI achievements
+- **Analytics**: Breakdown of salary components (base, bonuses, etc.)
+
+### Monitoring & Security
+- **Sentry Integration**: Error tracking and monitoring
+- **Prometheus Metrics**: Performance monitoring
+- **Security Headers**: HSTS, CSP, X-Frame-Options
+- **HTTPS Enforcement**: Automatic redirect in production
+- **Redis Rate Limiting**: Distributed rate limiting
 
 ## Configuration
 
@@ -345,11 +475,19 @@ CORS_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
 DEBUG=True
 APP_NAME="IT Budget Manager"
 API_PREFIX=/api/v1
+
+# Monitoring (Optional)
+SENTRY_DSN=your-sentry-dsn
+PROMETHEUS_ENABLED=true
+
+# Redis (Optional - for rate limiting)
+REDIS_URL=redis://localhost:6379
 ```
 
 ### Frontend Environment Variables (`.env`)
 ```bash
 VITE_API_URL=http://localhost:8000
+VITE_SENTRY_DSN=your-sentry-dsn
 ```
 
 ## Testing Strategy
@@ -358,21 +496,29 @@ VITE_API_URL=http://localhost:8000
 - MANAGER/ADMIN roles: Verify department filtering works
 - Test department switching updates all data
 - Verify JWT authentication on all protected routes
+- Test budget version workflow (draft → pending → approved)
+- Test KPI calculations and bonus generation
 
 ## Key Files to Reference
 
 **Backend Examples**:
 - `backend/app/api/v1/expenses.py` - Complete CRUD with roles & filtering
+- `backend/app/api/v1/budget_plan_details.py` - Versioning and approval workflow
+- `backend/app/api/v1/kpi.py` - KPI system with calculations
 - `backend/app/api/v1/analytics.py` - Complex queries with aggregations
 - `backend/app/db/models.py` - All database models
 
 **Frontend Examples**:
-- `frontend/src/pages/ExpensesPage.tsx` - Full page with useDepartment
+- `frontend/src/pages/BudgetPlanPage.tsx` - Budget planning with sticky controls
+- `frontend/src/components/budget/BudgetPlanTable.tsx` - Complex table with performance optimization
+- `frontend/src/components/budget/BudgetPlanDetailsTable.tsx` - Editable table with memoization
+- `frontend/src/pages/KpiManagementPage.tsx` - Complex form with multiple sections
 - `frontend/src/components/common/AppLayout.tsx` - Layout & navigation
 - `frontend/src/contexts/DepartmentContext.tsx` - Department selection
 
 **Documentation**:
-- `DEVELOPMENT_PRINCIPLES.md` - **CRITICAL**: Mandatory security & architecture rules
+- `docs/DEVELOPMENT_PRINCIPLES.md` - Mandatory security & architecture rules
+- `docs/MULTI_TENANCY_ARCHITECTURE.md` - Multi-tenancy implementation details
 - `ROADMAP.md` - Project history and future plans
 - `README.md` - Quick start guide
 
@@ -380,6 +526,7 @@ VITE_API_URL=http://localhost:8000
 
 Located in `backend/scripts/`:
 - `import_excel.py` - Import budget data from Excel
+- `import_planfact_2025.py` - Import plan/fact data for specific year
 - `create_admin.py` - Create admin user
 - Various utility scripts for data management
 
@@ -389,6 +536,7 @@ Defined in `docker-compose.yml`:
 - **db**: PostgreSQL 15 (port 54329)
 - **backend**: FastAPI (port 8000)
 - **frontend**: React/Vite (port 5173)
+- **redis**: Redis (port 6379) - Optional, for rate limiting
 
 ## Security Notes
 
@@ -399,6 +547,8 @@ Defined in `docker-compose.yml`:
 - Use HTTPS
 - Review rate limiting settings
 - Enable Redis for distributed rate limiting
+- Configure Sentry for error tracking
+- Set up proper database backups
 
 ## Debugging
 
@@ -406,10 +556,15 @@ Defined in `docker-compose.yml`:
 **Frontend logs**: `tail -f frontend.log`
 **Process IDs**: Check `backend.pid`, `frontend.pid`
 
+**Common Issues**:
+- React hooks order errors: Ensure all hooks are called before conditional returns
+- Table scroll issues: Use double requestAnimationFrame + setTimeout for table rendering
+- Ant Design warnings: Check prop usage in documentation
+- Performance issues: Use React DevTools Profiler to identify slow components
+
 ## Known Limitations
 
-- Rate limiting is in-memory (use Redis for production)
 - File uploads limited to 10MB
 - Excel import limited to specific formats
-- No email verification yet
-- No password recovery yet
+- Token refresh not implemented (requires re-login after 30 min)
+- Some advanced KPI calculations may require optimization for large datasets

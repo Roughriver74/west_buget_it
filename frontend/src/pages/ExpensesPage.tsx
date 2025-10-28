@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
 import FTPImportModal from '@/components/expenses/FTPImportModal'
+import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPaymentModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
 
@@ -24,6 +25,7 @@ const ExpensesPage = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
+  const [registerPaymentModalVisible, setRegisterPaymentModalVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
 
   const queryClient = useQueryClient()
@@ -290,6 +292,13 @@ const ExpensesPage = () => {
         <Button icon={<CloudUploadOutlined />} onClick={() => setImportModalVisible(true)}>
           Импорт из FTP
         </Button>
+        <Button
+          icon={<DollarOutlined />}
+          onClick={() => setRegisterPaymentModalVisible(true)}
+          type="primary"
+        >
+          Зарегистрировать выплату ЗП
+        </Button>
         <Button icon={<DownloadOutlined />} onClick={handleExport}>
           Экспорт в Excel
         </Button>
@@ -348,6 +357,11 @@ const ExpensesPage = () => {
       <FTPImportModal
         visible={importModalVisible}
         onCancel={() => setImportModalVisible(false)}
+      />
+
+      <RegisterPayrollPaymentModal
+        open={registerPaymentModalVisible}
+        onClose={() => setRegisterPaymentModalVisible(false)}
       />
     </div>
   )

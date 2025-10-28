@@ -8,7 +8,7 @@ from sqlalchemy import func, and_, extract
 from decimal import Decimal
 from collections import defaultdict
 
-from app.db.models import Expense, ExpenseStatusEnum
+from app.db.models import Expense, ExpenseStatusEnum, PayrollPlan
 
 
 ForecastMethod = Literal["simple_average", "moving_average", "seasonal"]
@@ -68,7 +68,52 @@ class PaymentForecastService:
                 'date': row.payment_day.isoformat(),
                 'total_amount': float(row.total_amount),
                 'payment_count': row.payment_count,
+                'is_forecast': False,
             })
+
+        # Add payroll forecast data (FOT) - typically paid on 10th and 25th
+        payroll_query = self.db.query(
+            func.sum(PayrollPlan.total_planned).label('total_planned'),
+            func.count(PayrollPlan.id).label('employee_count')
+        ).filter(
+            PayrollPlan.year == year,
+            PayrollPlan.month == month
+        )
+
+        if department_id:
+            payroll_query = payroll_query.filter(PayrollPlan.department_id == department_id)
+
+        payroll_result = payroll_query.first()
+
+        if payroll_result and payroll_result.total_planned:
+            # Split payroll into two payments: 25th (advance) and 10th (final)
+            # Advance (25th): 50% of base salary only
+            # Final (10th): 50% of base salary + 100% of bonuses
+            total_payroll = float(payroll_result.total_planned)
+            employee_count = payroll_result.employee_count
+
+            # Advance payment on 25th (50% of total)
+            advance_payment_date = datetime(year, month, 25).date()
+            calendar_data.append({
+                'date': advance_payment_date.isoformat(),
+                'total_amount': total_payroll * 0.5,  # Approximately 50% (base salary portion)
+                'payment_count': employee_count,
+                'is_forecast': True,
+                'forecast_type': 'payroll_advance',
+            })
+
+            # Final payment on 10th (remaining 50% + bonuses)
+            final_payment_date = datetime(year, month, 10).date()
+            calendar_data.append({
+                'date': final_payment_date.isoformat(),
+                'total_amount': total_payroll * 0.5,  # Approximately 50% (base salary + bonuses)
+                'payment_count': employee_count,
+                'is_forecast': True,
+                'forecast_type': 'payroll_final',
+            })
+
+        # Sort by date
+        calendar_data.sort(key=lambda x: x['date'])
 
         return calendar_data
 
@@ -78,8 +123,12 @@ class PaymentForecastService:
         department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
-    ) -> List[Expense]:
-        """Get all payments for a specific day"""
+        include_forecast: bool = True,
+    ):
+        """
+        Get all payments for a specific day
+        Returns: dict with 'expenses' list and optional 'payroll_forecast' data
+        """
         filters = [
             func.date(Expense.payment_date) == date.date(),
             Expense.is_paid == True,
@@ -92,7 +141,42 @@ class PaymentForecastService:
         if organization_id:
             filters.append(Expense.organization_id == organization_id)
 
-        return self.db.query(Expense).filter(and_(*filters)).all()
+        expenses = self.db.query(Expense).filter(and_(*filters)).all()
+
+        result = {
+            'expenses': expenses,
+            'payroll_forecast': None
+        }
+
+        # Check if this is a payroll forecast day (10th or 25th) and include_forecast is True
+        # 25th = Advance (аванс), 10th = Final (окончательный расчет)
+        if include_forecast and date.day in [10, 25]:
+            payroll_query = self.db.query(
+                func.sum(PayrollPlan.total_planned).label('total_planned'),
+                func.count(PayrollPlan.id).label('employee_count')
+            ).filter(
+                PayrollPlan.year == date.year,
+                PayrollPlan.month == date.month
+            )
+
+            if department_id:
+                payroll_query = payroll_query.filter(PayrollPlan.department_id == department_id)
+
+            payroll_result = payroll_query.first()
+
+            if payroll_result and payroll_result.total_planned:
+                total_payroll = float(payroll_result.total_planned)
+                # 25th: advance (50%), 10th: final (50%)
+                amount = total_payroll * 0.5
+
+                result['payroll_forecast'] = {
+                    'amount': amount,
+                    'employee_count': payroll_result.employee_count,
+                    'type': 'payroll_advance' if date.day == 25 else 'payroll_final',
+                    'description': f"{'Аванс (50% оклада)' if date.day == 25 else 'Окончательный расчет (50% оклада + премии)'} по зарплате ({payroll_result.employee_count} сотрудников)"
+                }
+
+        return result
 
     def generate_forecast(
         self,
