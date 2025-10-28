@@ -1,5 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Tabs,
   Card,
@@ -48,6 +47,7 @@ import type { Employee } from '@/api/payroll'
 import type { Dayjs } from 'dayjs'
 import { formatCurrency } from '@/utils/formatters'
 import { UploadOutlined } from '@ant-design/icons'
+import ImportKPIModal from '@/components/kpi/ImportKPIModal'
 
 const { Option } = Select
 const { Title, Text } = Typography
@@ -219,40 +219,6 @@ const KPIManagementPage = () => {
     },
   })
 
-  const importKpiMutation = useMutation({
-    mutationFn: (file: File) => kpiApi.importEmployeeKpis(file),
-    onSuccess: (result) => {
-      message.success(
-        `Импорт завершен за ${result.year} год: создано ${result.created}, обновлено ${result.updated}`
-      )
-      if (result.missing_employees?.length) {
-        message.warning(
-          `Не найдены сотрудники в системе: ${result.missing_employees.join(', ')}`
-        )
-      }
-      if (result.missing_sheets?.length) {
-        message.warning(
-          `Листы с данными не найдены в файле для: ${result.missing_sheets.join(', ')}`
-        )
-      }
-      if (result.no_access?.length) {
-        message.warning(
-          `Пропущены сотрудники без доступа: ${result.no_access.join(', ')}`
-        )
-      }
-      queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
-      queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
-      queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
-    },
-    onError: (error: any) => {
-      const detail =
-        error?.response?.data?.detail ||
-        error?.message ||
-        'Не удалось импортировать KPI данные'
-      message.error(`Ошибка импорта: ${detail}`)
-    },
-  })
-
   const [goalModal, setGoalModal] = useState<{ open: boolean; editing?: KPIGoal }>({
     open: false,
   })
@@ -266,7 +232,7 @@ const KPIManagementPage = () => {
     editing?: EmployeeKPIGoal
   }>({ open: false })
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [importModalVisible, setImportModalVisible] = useState(false)
 
   const [detailEmployeeId, setDetailEmployeeId] = useState<number | null>(null)
 
@@ -275,15 +241,7 @@ const KPIManagementPage = () => {
   const assignmentForm = Form.useForm<EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate>()[0]
 
   const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleImportFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      importKpiMutation.mutate(file)
-    }
-    event.target.value = ''
+    setImportModalVisible(true)
   }
 
   const employees = employeesQuery.data || []
@@ -984,13 +942,6 @@ const KPIManagementPage = () => {
 
   return (
     <div>
-      <input
-        type="file"
-        accept=".xlsx,.xls"
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-        onChange={handleImportFileChange}
-      />
       <Title level={2} style={{ marginBottom: 24 }}>
         KPI сотрудников
       </Title>
@@ -1091,7 +1042,6 @@ const KPIManagementPage = () => {
                 <Button
                   icon={<UploadOutlined />}
                   onClick={handleImportClick}
-                  loading={importKpiMutation.isPending}
                 >
                   Импорт из Excel
                 </Button>
@@ -1549,6 +1499,12 @@ const KPIManagementPage = () => {
           <Empty description="Данные о сотруднике недоступны" />
         )}
       </Drawer>
+
+      {/* Import KPI Modal */}
+      <ImportKPIModal
+        visible={importModalVisible}
+        onCancel={() => setImportModalVisible(false)}
+      />
     </div>
   )
 }

@@ -20,12 +20,17 @@ export type KPIGoalProgress = components['schemas']['KPIGoalProgress']
 export type BonusType = components['schemas']['BonusTypeEnum']
 
 export interface KPIImportResult {
-  created: number
-  updated: number
-  missing_employees: string[]
-  missing_sheets: string[]
-  no_access: string[]
-  year: number
+  success: boolean
+  message: string
+  statistics: {
+    employees_created: number
+    employees_updated: number
+    kpi_records_created: number
+    kpi_records_updated: number
+    total_processed: number
+    errors: number
+  }
+  errors: string[] | null
 }
 
 export interface KPITrendData {
@@ -158,6 +163,22 @@ export const kpiApi = {
 
   getBonusDistribution: async (params: { year: number; month?: number }): Promise<BonusDistributionData[]> => {
     const { data } = await apiClient.get<BonusDistributionData[]>('kpi/analytics/bonus-distribution', { params })
+    return data
+  },
+
+  importKPI: async (file: File, year: number, month: number): Promise<KPIImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await apiClient.post<KPIImportResult>(
+      `kpi/import?year=${year}&month=${month}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
     return data
   },
 }

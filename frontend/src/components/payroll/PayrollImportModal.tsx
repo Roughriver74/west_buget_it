@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Modal, Upload, message, Alert, Statistic, Row, Col, Typography } from 'antd';
-import { InboxOutlined } from '@ant-design/icons';
+import { Modal, Upload, message, Alert, Statistic, Row, Col, Typography, Button } from 'antd';
+import { InboxOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../api/client';
 
@@ -75,6 +75,20 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
     onCancel();
   };
 
+  const handleDownloadTemplate = () => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const url = `${API_URL}/api/v1/templates/download/payroll_plans`;
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Шаблон_План_ФОТ.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    message.success('Скачивание шаблона начато');
+  };
+
   const uploadProps = {
     name: 'file',
     multiple: false,
@@ -130,6 +144,15 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
             showIcon
             style={{ marginBottom: 20 }}
           />
+
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleDownloadTemplate}
+            style={{ marginBottom: 20 }}
+            type="default"
+          >
+            Скачать шаблон Excel
+          </Button>
 
           <Dragger {...uploadProps} disabled={importMutation.isPending}>
             <p className="ant-upload-drag-icon">
