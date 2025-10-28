@@ -1,0 +1,61 @@
+# Pylint configuration for IT Budget Manager Backend
+
+[MASTER]
+# Python code to execute, usually for sys.path manipulation
+init-hook='import sys; sys.path.append("/home/user/west_buget_it/backend")'
+
+# Files or directories to be skipped
+ignore=alembic,migrations,.git,__pycache__,venv,.venv,build,dist,.eggs
+
+# Use multiple processes to speed up Pylint
+jobs=4
+
+[MESSAGES CONTROL]
+# Disable specific warnings
+disable=
+    missing-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-instance-attributes,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    fixme,
+    invalid-name,
+    logging-fstring-interpolation,
+    broad-except,
+    import-outside-toplevel,
+    duplicate-code
+
+[FORMAT]
+# Maximum line length
+max-line-length=120
+
+# Expected format of line ending
+expected-line-ending-format=LF
+
+[BASIC]
+# Good variable names
+good-names=i,j,k,ex,Run,_,id,pk,db
+
+[DESIGN]
+# Maximum number of arguments
+max-args=10
+
+# Maximum number of attributes
+max-attributes=15
+
+# Maximum number of public methods
+max-public-methods=30
+
+[IMPORTS]
+# Allow wildcard imports from typing
+allow-wildcard-with-all=yes
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=10
+
+# Ignore imports when computing similarities
+ignore-imports=yes
+

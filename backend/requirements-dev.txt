@@ -1,0 +1,52 @@
+# Development Dependencies для IT Budget Manager
+
+# Основные зависимости (из requirements.txt)
+-r requirements.txt
+
+# Линтеры и форматтеры кода
+black==23.12.1           # Code formatter (PEP 8)
+isort==5.13.2            # Import sorting
+flake8==7.0.0            # Style guide enforcement
+flake8-docstrings==1.7.0 # Docstring linting
+flake8-bugbear==23.12.23 # Additional bug patterns
+flake8-comprehensions==3.14.0  # Comprehensions linting
+pylint==3.0.3            # Comprehensive code analysis
+
+# Type checking
+mypy==1.8.0              # Static type checker
+types-redis==4.6.0.20240106  # Type stubs for redis
+types-python-dateutil==2.8.19.14  # Type stubs for dateutil
+sqlalchemy[mypy]==2.0.23  # SQLAlchemy mypy plugin
+
+# Testing
+pytest==7.4.3            # Testing framework (уже в requirements.txt)
+pytest-asyncio==0.21.1   # Async testing support
+pytest-cov==4.1.0        # Coverage plugin
+pytest-mock==3.12.0      # Mocking support
+pytest-benchmark==4.0.0  # Performance benchmarking
+httpx==0.25.1           # HTTP client for testing (уже в requirements.txt)
+faker==22.0.0            # Fake data generation
+
+# Pre-commit hooks
+pre-commit==3.6.0        # Git pre-commit framework
+
+# Documentation
+sphinx==7.2.6            # Documentation generator
+sphinx-rtd-theme==2.0.0  # ReadTheDocs theme
+sphinx-autodoc-typehints==1.25.2  # Type hints in docs
+
+# Database tools
+factory-boy==3.3.0       # Test fixtures
+alembic-autogenerate-enums==0.1.1  # Better enum migrations
+
+# Debugging
+ipdb==0.13.13            # Interactive debugger
+ipython==8.19.0          # Enhanced Python shell
+
+# Security
+bandit==1.7.6            # Security issue scanner
+safety==3.0.1            # Dependency vulnerability scanner
+
+# Performance profiling
+py-spy==0.3.14           # Sampling profiler
+memory-profiler==0.61.0  # Memory usage profiler

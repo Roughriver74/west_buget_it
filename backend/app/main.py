@@ -11,7 +11,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -185,6 +185,7 @@ app.include_router(employees.router, prefix=f"{settings.API_PREFIX}/employees", 
 app.include_router(payroll.router, prefix=f"{settings.API_PREFIX}/payroll", tags=["Payroll"])
 app.include_router(kpi.router, prefix=f"{settings.API_PREFIX}/kpi", tags=["KPI"])
 app.include_router(templates.router, prefix=f"{settings.API_PREFIX}/templates", tags=["Templates"])
+app.include_router(comprehensive_report.router, prefix=f"{settings.API_PREFIX}/reports/comprehensive", tags=["Comprehensive Report"])
 
 
 @app.on_event("startup")
