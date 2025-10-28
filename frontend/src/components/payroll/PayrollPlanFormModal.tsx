@@ -156,7 +156,7 @@ export default function PayrollPlanFormModal({
         updateMutation.mutate({
           id: planId,
           data: {
-            base_salary: values.base_salary,
+            base_salary: values.base_salary || 0,
             monthly_bonus: values.monthly_bonus || 0,
             quarterly_bonus: values.quarterly_bonus || 0,
             annual_bonus: values.annual_bonus || 0,
@@ -166,6 +166,7 @@ export default function PayrollPlanFormModal({
       } else {
         createMutation.mutate({
           ...values,
+          base_salary: values.base_salary || 0,
           monthly_bonus: values.monthly_bonus || 0,
           quarterly_bonus: values.quarterly_bonus || 0,
           annual_bonus: values.annual_bonus || 0,
