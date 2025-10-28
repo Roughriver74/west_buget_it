@@ -1,6 +1,6 @@
 from typing import List, Union, Annotated, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, ValidationError, BeforeValidator
+from pydantic import field_validator, ValidationError, BeforeValidator, Field
 import secrets
 import json
 import os
@@ -61,11 +61,23 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
 
-    # CORS - BeforeValidator handles parsing from env var
-    CORS_ORIGINS: Annotated[List[str], BeforeValidator(parse_cors_origins)] = [
-        "http://localhost:5173",
-        "http://localhost:3000"
-    ]
+    # CORS - stored as string to avoid Pydantic auto-parsing, then converted to list
+    cors_origins_raw: Union[str, List[str]] = Field(
+        default='["http://localhost:5173","http://localhost:3000"]',
+        validation_alias='CORS_ORIGINS'
+    )
+
+    @property
+    def CORS_ORIGINS(self) -> List[str]:
+        """Parse CORS_ORIGINS from string or list"""
+        return parse_cors_origins(self.cors_origins_raw)
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="allow"
+    )
 
     # Sentry
     SENTRY_DSN: str | None = None
@@ -88,13 +100,6 @@ class Settings(BaseSettings):
     USE_REDIS: bool = False  # Set to True to enable Redis
     BASELINE_CACHE_TTL_SECONDS: int = 300
     CACHE_TTL_SECONDS: int = 300
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
-        extra="allow"
-    )
 
     @field_validator('SECRET_KEY')
     @classmethod
@@ -144,18 +149,6 @@ class Settings(BaseSettings):
 
         return v
 
-    @field_validator('CORS_ORIGINS')
-    @classmethod
-    def validate_cors_origins(cls, v: List[str]) -> List[str]:
-        """
-        Validate CORS origins to warn about wildcards in production
-        (parsing is handled by BeforeValidator)
-        """
-        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
-        if not debug:
-            if '*' in v or any('localhost' in origin for origin in v):
-                print("⚠️  WARNING: CORS origins contains wildcards or localhost in production mode!")
-        return v
 
     @field_validator('DB_POOL_SIZE', 'DB_MAX_OVERFLOW', 'DB_POOL_TIMEOUT', 'DB_POOL_RECYCLE')
     @classmethod

@@ -430,24 +430,24 @@ def get_payments_by_day(
         for payment in payments
     ]
 
-    # Add payroll forecast as a "virtual" payment if exists
+    # Add payroll actual payments as a "virtual" payment if exists
     total_amount = sum(p["amount"] for p in payments_data)
     total_count = len(payments_data)
 
-    if payroll_forecast:
-        # Add forecast as a virtual payment entry
+    if payroll_forecast and payroll_forecast['type'] == 'payroll_actual':
+        # Add actual payroll payment as a virtual payment entry (only if actual, not forecast)
         payments_data.append({
-            "id": -1,  # Virtual ID for forecast
+            "id": -1,  # Virtual ID for payroll
             "number": f"ФОТ-{payment_date.year}-{payment_date.month:02d}-{payment_date.day:02d}",
             "amount": payroll_forecast['amount'],
             "payment_date": payment_date.isoformat(),
             "category_id": None,
-            "category_name": "Заработная плата (прогноз)",
+            "category_name": "Заработная плата",
             "contractor_id": None,
             "contractor_name": f"{payroll_forecast['employee_count']} сотрудников",
             "organization_id": None,
             "organization_name": None,
-            "status": "FORECAST",
+            "status": "PAID",
             "comment": payroll_forecast['description'],
         })
         total_amount += payroll_forecast['amount']
