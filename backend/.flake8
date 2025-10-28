@@ -1,0 +1,76 @@
+# .flake8 - Flake8 конфигурация для IT Budget Manager Backend
+
+[flake8]
+# Максимальная длина строки (совместимо с black)
+max-line-length = 120
+
+# Целевая версия Python
+python-version = 3.11
+
+# Игнорируемые ошибки
+ignore =
+    # E203: whitespace before ':' (несовместимо с black)
+    E203,
+    # W503: line break before binary operator (устаревшее правило)
+    W503,
+    # E501: line too long (black уже контролирует)
+    E501,
+    # D100: Missing docstring in public module
+    D100,
+    # D104: Missing docstring in public package
+    D104,
+    # D107: Missing docstring in __init__
+    D107,
+
+# Исключаемые директории
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .eggs,
+    *.egg,
+    build,
+    dist,
+    alembic/versions,
+    migrations,
+    .mypy_cache,
+    .pytest_cache,
+    .tox,
+    htmlcov,
+    .coverage
+
+# Путь к файлам
+filename =
+    *.py
+
+# Максимальная сложность (McCabe)
+max-complexity = 15
+
+# Минимальная версия Python
+min-python-version = 3.11.0
+
+# Показывать источник ошибки
+show-source = true
+
+# Показывать pep8 имя ошибки
+show-pep8 = true
+
+# Статистика
+count = true
+statistics = true
+
+# Docstring соглашения
+docstring-convention = google
+
+# Per-file ignores
+per-file-ignores =
+    # __init__.py файлы могут иметь неиспользуемые импорты
+    __init__.py:F401,F403
+    # Тестовые файлы могут иметь неиспользуемые аргументы и длинные строки
+    tests/*:D,E501
+    # Alembic миграции
+    alembic/versions/*:E501,D,F401
+    # Schemas могут иметь много атрибутов
+    app/schemas/*:E501

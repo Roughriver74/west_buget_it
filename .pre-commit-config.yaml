@@ -1,41 +1,94 @@
+# .pre-commit-config.yaml - Pre-commit hooks configuration для IT Budget Manager
+
+# См. https://pre-commit.com для дополнительной информации
+# См. https://pre-commit.com/hooks.html для доступных hooks
+
 repos:
+  # Общие pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
-      - id: check-merge-conflict
-      - id: end-of-file-fixer
       - id: trailing-whitespace
+        name: Удаление trailing whitespace
+      - id: end-of-file-fixer
+        name: Проверка end-of-file
+      - id: check-yaml
+        name: Проверка YAML синтаксиса
+        args: ['--unsafe']  # Для docker-compose
+      - id: check-json
+        name: Проверка JSON синтаксиса
+      - id: check-added-large-files
+        name: Проверка больших файлов
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Проверка merge конфликтов
+      - id: check-toml
+        name: Проверка TOML синтаксиса
+      - id: detect-private-key
+        name: Обнаружение приватных ключей
+      - id: mixed-line-ending
+        name: Проверка line endings
+        args: ['--fix=lf']
 
+  # Black - форматирование Python кода
   - repo: https://github.com/psf/black
     rev: 23.12.1
     hooks:
       - id: black
-        types: [python]
-        additional_dependencies:
-          - click==8.1.7
+        name: Black code formatter
+        language_version: python3.11
+        args: ['--config', 'backend/pyproject.toml']
+        files: ^backend/
 
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+  # isort - сортировка импортов
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
     hooks:
       - id: isort
-        types: [python]
+        name: isort (import sorting)
+        args: ['--settings-path', 'backend/pyproject.toml']
+        files: ^backend/
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 6.1.0
+  # Flake8 - линтинг Python кода
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
     hooks:
       - id: flake8
-        types: [python]
-        additional_dependencies:
-          - flake8-bugbear==23.12.2
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.1
-    hooks:
-      - id: mypy
-        name: mypy (backend)
+        name: Flake8 linting
+        args: ['--config', 'backend/.flake8']
         files: ^backend/
         additional_dependencies:
-          - pydantic>=2.5
-          - sqlalchemy>=2.0
-          - types-requests
+          - flake8-docstrings
+          - flake8-bugbear
+          - flake8-comprehensions
+
+  # MyPy - статическая типизация
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: MyPy type checking
+        args: ['--config-file', 'backend/pyproject.toml', '--ignore-missing-imports']
+        files: ^backend/app/
+        additional_dependencies:
+          - pydantic>=2.0.0
+          - types-redis
           - types-python-dateutil
+        exclude: ^backend/(alembic|migrations|tests)/
+
+  # Bandit - проверка безопасности
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        name: Bandit security checker
+        args: ['-c', 'backend/pyproject.toml', '-r', 'backend/app']
+        files: ^backend/
+        exclude: ^backend/(tests|alembic)/
+
+# Настройки по умолчанию
+default_language_version:
+  python: python3.11
+
+# Запуск на всех файлах (для первого раза)
+# pre-commit run --all-files
