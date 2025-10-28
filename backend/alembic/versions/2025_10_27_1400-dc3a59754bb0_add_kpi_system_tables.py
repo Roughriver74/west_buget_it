@@ -1,7 +1,7 @@
 """add KPI system tables
 
-Revision ID: b2c3d4e5f6a7
-Revises: a1b2c3d4e5f6
+Revision ID: dc3a59754bb0
+Revises: 69c1c52fa5c5
 Create Date: 2025-10-27 14:00:00.000000
 
 Description:
@@ -23,8 +23,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'b2c3d4e5f6a7'
-down_revision = 'a1b2c3d4e5f6'
+revision = 'dc3a59754bb0'
+down_revision = '69c1c52fa5c5'
 branch_labels = None
 depends_on = None
 

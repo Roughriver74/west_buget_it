@@ -673,7 +673,13 @@ class PayrollActual(Base):
     annual_bonus_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Годовая премия (факт)
 
     other_payments_paid = Column(Numeric(15, 2), default=0, nullable=False)  # Прочие фактические выплаты
-    total_paid = Column(Numeric(15, 2), nullable=False)  # Итого факт (вычисляется)
+    total_paid = Column(Numeric(15, 2), nullable=False)  # Итого факт (gross amount, до вычета налогов)
+
+    # Tax calculations (расчет налогов)
+    income_tax_rate = Column(Numeric(5, 4), default=0.13, nullable=False)  # Ставка НДФЛ (по умолчанию 13%)
+    income_tax_amount = Column(Numeric(15, 2), default=0, nullable=False)  # Сумма НДФЛ (вычисляется: total_paid * income_tax_rate)
+    social_tax_amount = Column(Numeric(15, 2), default=0, nullable=False)  # Социальные отчисления (опционально)
+    # net_amount = total_paid - income_tax_amount - social_tax_amount (вычисляется в приложении)
 
     # Payment details
     payment_date = Column(Date, nullable=True)  # Дата выплаты

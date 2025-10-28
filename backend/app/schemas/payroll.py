@@ -169,7 +169,11 @@ class PayrollActualBase(BaseModel):
     quarterly_bonus_paid: Decimal = Field(0, ge=0, description="Квартальная премия (факт)")
     annual_bonus_paid: Decimal = Field(0, ge=0, description="Годовая премия (факт)")
     other_payments_paid: Decimal = Field(0, ge=0)
-    total_paid: Decimal = Field(..., ge=0)
+    total_paid: Decimal = Field(..., ge=0)  # Gross amount (до вычета налогов)
+    # Tax calculations (расчет налогов)
+    income_tax_rate: Decimal = Field(0.13, ge=0, le=1, description="Ставка НДФЛ (по умолчанию 13%)")
+    income_tax_amount: Decimal = Field(0, ge=0, description="Сумма НДФЛ")
+    social_tax_amount: Decimal = Field(0, ge=0, description="Социальные отчисления")
     payment_date: Optional[date] = None
     expense_id: Optional[int] = None
     notes: Optional[str] = None
@@ -186,6 +190,10 @@ class PayrollActualCreate(BaseModel):
     quarterly_bonus_paid: Decimal = Field(0, ge=0)
     annual_bonus_paid: Decimal = Field(0, ge=0)
     other_payments_paid: Decimal = Field(0, ge=0)
+    # Tax calculations (optional for create, defaults will be applied)
+    income_tax_rate: Decimal = Field(0.13, ge=0, le=1)
+    income_tax_amount: Decimal = Field(0, ge=0)
+    social_tax_amount: Decimal = Field(0, ge=0)
     payment_date: Optional[date] = None
     expense_id: Optional[int] = None
     notes: Optional[str] = None
@@ -199,6 +207,10 @@ class PayrollActualUpdate(BaseModel):
     quarterly_bonus_paid: Optional[Decimal] = Field(None, ge=0)
     annual_bonus_paid: Optional[Decimal] = Field(None, ge=0)
     other_payments_paid: Optional[Decimal] = Field(None, ge=0)
+    # Tax calculations (optional for update)
+    income_tax_rate: Optional[Decimal] = Field(None, ge=0, le=1)
+    income_tax_amount: Optional[Decimal] = Field(None, ge=0)
+    social_tax_amount: Optional[Decimal] = Field(None, ge=0)
     payment_date: Optional[date] = None
     expense_id: Optional[int] = None
     notes: Optional[str] = None

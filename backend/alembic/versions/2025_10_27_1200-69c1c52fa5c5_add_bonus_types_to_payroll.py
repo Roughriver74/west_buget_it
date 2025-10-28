@@ -1,6 +1,6 @@
 """add bonus types to payroll
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 69c1c52fa5c5
 Revises: 39fcb0613cd9
 Create Date: 2025-10-27 12:00:00.000000
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'a1b2c3d4e5f6'
+revision = '69c1c52fa5c5'
 down_revision = '39fcb0613cd9'
 branch_labels = None
 depends_on = None

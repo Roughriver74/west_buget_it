@@ -69,7 +69,11 @@ export interface PayrollActual {
   quarterly_bonus_paid: number;
   annual_bonus_paid: number;
   other_payments_paid: number;
-  total_paid: number;
+  total_paid: number;  // Gross amount (до вычета налогов)
+  // Tax calculations
+  income_tax_rate: number;  // Ставка НДФЛ (default 13%)
+  income_tax_amount: number;  // Сумма НДФЛ
+  social_tax_amount: number;  // Социальные отчисления
   payment_date?: string;
   expense_id?: number;
   notes?: string;
@@ -251,6 +255,10 @@ export interface PayrollActualCreate {
   quarterly_bonus_paid?: number;
   annual_bonus_paid?: number;
   other_payments_paid?: number;
+  // Tax calculations (optional, defaults will be applied)
+  income_tax_rate?: number;
+  income_tax_amount?: number;
+  social_tax_amount?: number;
   payment_date?: string;
   expense_id?: number;
   notes?: string;
@@ -262,6 +270,10 @@ export interface PayrollActualUpdate {
   quarterly_bonus_paid?: number;
   annual_bonus_paid?: number;
   other_payments_paid?: number;
+  // Tax calculations (optional for update)
+  income_tax_rate?: number;
+  income_tax_amount?: number;
+  social_tax_amount?: number;
   payment_date?: string;
   expense_id?: number;
   notes?: string;
