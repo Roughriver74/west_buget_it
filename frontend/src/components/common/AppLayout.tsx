@@ -84,6 +84,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <DollarOutlined />,
 					label: <Link to='/budget/plan'>Год в целом</Link>,
 				},
+				{
+					key: '/budget/plan-vs-actual',
+					icon: <BarChartOutlined />,
+					label: <Link to='/budget/plan-vs-actual'>План vs Факт</Link>,
+				},
 			],
 		},
 		{

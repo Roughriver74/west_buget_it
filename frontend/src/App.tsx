@@ -29,6 +29,7 @@ import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
 import KpiManagementPage from './pages/KpiManagementPage'
 import KPIAnalyticsPage from './pages/KPIAnalyticsPage'
 import BudgetPlanningPage from './pages/BudgetPlanningPage'
+import BudgetPlanVsActualPage from './pages/BudgetPlanVsActualPage'
 
 function App() {
   return (
@@ -70,6 +71,16 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
                           <BudgetPlanningPage />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Budget plan vs actual - Admin, Manager, and Accountant */}
+                    <Route
+                      path="/budget/plan-vs-actual"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                          <BudgetPlanVsActualPage />
                         </ProtectedRoute>
                       }
                     />

@@ -103,6 +103,7 @@ export interface BudgetVersion {
   department_id: number
   scenario_id?: number
   status: BudgetVersionStatus
+  is_baseline: boolean
   created_by?: string
   created_at: string
   updated_at: string
@@ -139,6 +140,7 @@ export interface BudgetVersionUpdate {
   version_name?: string
   scenario_id?: number
   status?: BudgetVersionStatus
+  is_baseline?: boolean
   comments?: string
   change_log?: string
   submitted_at?: string
@@ -318,6 +320,77 @@ export interface VersionComparison {
   category_comparisons: VersionComparisonCategory[]
   total_difference_amount: NumericValue
   total_difference_percent: NumericValue
+}
+
+// ============================================================================
+// Plan vs Actual Types
+// ============================================================================
+
+export interface CategoryPlanVsActual {
+  category_id: number
+  category_name: string
+  category_type: ExpenseType
+  planned_amount: NumericValue
+  actual_amount: NumericValue
+  variance_amount: NumericValue  // actual - planned
+  variance_percent: NumericValue  // (variance / planned) * 100
+  execution_percent: NumericValue  // (actual / planned) * 100
+  is_over_budget: boolean
+}
+
+export interface MonthlyPlanVsActual {
+  month: number  // 1-12
+  month_name: string  // "Январь", "Февраль", etc.
+  planned_amount: NumericValue
+  actual_amount: NumericValue
+  variance_amount: NumericValue
+  variance_percent: NumericValue
+  execution_percent: NumericValue
+  is_over_budget: boolean
+  categories: CategoryPlanVsActual[]
+}
+
+export interface PlanVsActualSummary {
+  year: number
+  department_id: number
+  department_name?: string
+  baseline_version_id?: number
+  baseline_version_name?: string
+
+  // Totals
+  total_planned: NumericValue
+  total_actual: NumericValue
+  total_variance: NumericValue
+  total_variance_percent: NumericValue
+  total_execution_percent: NumericValue
+
+  // CAPEX/OPEX breakdown
+  capex_planned: NumericValue
+  capex_actual: NumericValue
+  opex_planned: NumericValue
+  opex_actual: NumericValue
+
+  // Monthly breakdown
+  monthly_data: MonthlyPlanVsActual[]
+
+  // Category breakdown
+  category_data: CategoryPlanVsActual[]
+
+  // Alerts
+  over_budget_categories: string[]  // List of category names
+  over_budget_months: number[]  // List of month numbers
+}
+
+export interface BudgetAlert {
+  alert_type: 'category' | 'month' | 'total'
+  severity: 'warning' | 'critical'
+  entity_id?: number  // category_id or month number
+  entity_name: string
+  planned_amount: NumericValue
+  actual_amount: NumericValue
+  variance_amount: NumericValue
+  variance_percent: NumericValue
+  message: string
 }
 
 // ============================================================================

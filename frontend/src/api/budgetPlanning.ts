@@ -23,6 +23,8 @@ import type {
   CalculationResult,
   BaselineSummary,
   VersionComparison,
+  PlanVsActualSummary,
+  BudgetAlert,
 } from '@/types/budgetPlanning'
 import {
   getCachedBaseline,
@@ -377,6 +379,83 @@ export const compareVersions = async (
   return response.data
 }
 
+// ============================================================================
+// Baseline Management API
+// ============================================================================
+
+export const baselineApi = {
+  /**
+   * Set a version as baseline for its year
+   */
+  setBaseline: async (versionId: number): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/set-baseline`
+    )
+    return response.data
+  },
+
+  /**
+   * Get baseline version for a year
+   */
+  getBaseline: async (year: number, departmentId?: number): Promise<BudgetVersion> => {
+    const params = new URLSearchParams()
+    if (departmentId) params.append('department_id', departmentId.toString())
+
+    const response = await apiClient.get<BudgetVersion>(
+      `${BASE_PATH}/versions/baseline/${year}?${params.toString()}`
+    )
+    return response.data
+  },
+}
+
+// ============================================================================
+// Plan vs Actual API
+// ============================================================================
+
+export interface PlanVsActualFilters {
+  year: number
+  department_id?: number
+  month_start?: number
+  month_end?: number
+}
+
+export const planVsActualApi = {
+  /**
+   * Get plan vs actual report
+   */
+  get: async (filters: PlanVsActualFilters): Promise<PlanVsActualSummary> => {
+    const params = new URLSearchParams()
+    params.append('year', filters.year.toString())
+    if (filters.department_id) params.append('department_id', filters.department_id.toString())
+    if (filters.month_start) params.append('month_start', filters.month_start.toString())
+    if (filters.month_end) params.append('month_end', filters.month_end.toString())
+
+    const response = await apiClient.get<PlanVsActualSummary>(
+      `${BASE_PATH}/plan-vs-actual?${params.toString()}`
+    )
+    return response.data
+  },
+
+  /**
+   * Get budget alerts
+   */
+  getAlerts: async (
+    year: number,
+    departmentId?: number,
+    thresholdPercent: number = 10.0
+  ): Promise<BudgetAlert[]> => {
+    const params = new URLSearchParams()
+    params.append('year', year.toString())
+    params.append('threshold_percent', thresholdPercent.toString())
+    if (departmentId) params.append('department_id', departmentId.toString())
+
+    const response = await apiClient.get<BudgetAlert[]>(
+      `${BASE_PATH}/budget-alerts?${params.toString()}`
+    )
+    return response.data
+  },
+}
+
 // Export all APIs as default
 export default {
   scenarios: scenariosApi,
@@ -384,6 +463,8 @@ export default {
   planDetails: planDetailsApi,
   approvalLog: approvalLogApi,
   calculator: calculatorApi,
+  baseline: baselineApi,
+  planVsActual: planVsActualApi,
   getScenariosByYear,
   getVersionsByYear,
   getLatestVersionByScenario,
