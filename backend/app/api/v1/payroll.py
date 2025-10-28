@@ -1578,13 +1578,6 @@ async def register_payroll_payment(
             skipped_count += 1
             continue  # Skip if already registered
 
-        # Get KPI data for the same period
-        kpi_data = db.query(EmployeeKPI).filter(
-            EmployeeKPI.employee_id == plan.employee_id,
-            EmployeeKPI.year == year,
-            EmployeeKPI.month == month
-        ).first()
-
         # Calculate amounts based on payment_type
         # Advance (25th): 50% of base salary only
         # Final (10th): 50% of base salary + 100% of bonuses
@@ -1597,6 +1590,13 @@ async def register_payroll_payment(
         else:
             # Окончательный расчет: 50% оклада + все премии
             base_salary = (plan.base_salary or Decimal(0)) * Decimal('0.5')
+
+            # Get KPI data for the same period (only for final payment)
+            kpi_data = db.query(EmployeeKPI).filter(
+                EmployeeKPI.employee_id == plan.employee_id,
+                EmployeeKPI.year == year,
+                EmployeeKPI.month == month
+            ).first()
 
             if kpi_data:
                 # Месячные премии: всегда начисляются
