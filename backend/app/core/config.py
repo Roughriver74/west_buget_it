@@ -106,20 +106,48 @@ class Settings(BaseSettings):
 
         return v
 
-    @field_validator('CORS_ORIGINS')
+    @field_validator('CORS_ORIGINS', mode='before')
     @classmethod
-    def validate_cors_origins(cls, v: List[str]) -> List[str]:
+    def validate_cors_origins(cls, v) -> List[str]:
         """
-        Validate CORS origins to warn about wildcards in production
+        Parse and validate CORS origins from environment variable or list
+        Supports both JSON string and Python list formats
         """
+        import json
         import os
-        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
+        # If it's already a list, use it directly
+        if isinstance(v, list):
+            origins = v
+        # If it's a string, try to parse it as JSON
+        elif isinstance(v, str):
+            try:
+                # Remove outer quotes if present
+                v = v.strip()
+                if v.startswith("'") and v.endswith("'"):
+                    v = v[1:-1]
+                if v.startswith('"') and v.endswith('"'):
+                    v = v[1:-1]
+
+                origins = json.loads(v)
+                if not isinstance(origins, list):
+                    raise ValueError("CORS_ORIGINS must be a list")
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Failed to parse CORS_ORIGINS as JSON: {e}\n"
+                    f"Expected format: '[\"http://example.com\",\"http://example.org\"]'\n"
+                    f"Received: {v}"
+                )
+        else:
+            raise ValueError(f"CORS_ORIGINS must be a list or JSON string, got {type(v)}")
+
+        # Validate in production
+        debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
         if not debug:
-            if '*' in v or 'http://localhost' in str(v):
+            if '*' in origins or any('localhost' in origin for origin in origins):
                 print("⚠️  WARNING: CORS origins contains wildcards or localhost in production mode!")
 
-        return v
+        return origins
 
     @field_validator('DB_POOL_SIZE', 'DB_MAX_OVERFLOW', 'DB_POOL_TIMEOUT', 'DB_POOL_RECYCLE')
     @classmethod
