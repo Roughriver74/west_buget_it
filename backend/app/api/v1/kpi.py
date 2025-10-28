@@ -14,7 +14,7 @@ import pandas as pd
 from app.db.session import get_db
 from app.db.models import (
     KPIGoal, EmployeeKPI, EmployeeKPIGoal, Employee, User, UserRoleEnum, Department,
-    BonusTypeEnum, KPIGoalStatusEnum
+    BonusTypeEnum, KPIGoalStatusEnum, EmployeeStatusEnum
 )
 from app.schemas.kpi import (
     KPIGoalCreate,
@@ -1255,3 +1255,259 @@ async def get_bonus_distribution(
         }
         for r in results
     ]
+
+
+@router.post("/import", status_code=status.HTTP_200_OK)
+async def import_kpi_from_excel(
+    file: UploadFile = File(...),
+    year: int = Query(..., description="Year for KPI data"),
+    month: int = Query(..., ge=1, le=12, description="Month for KPI data (1-12)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Import KPI data from Excel file (KPI_Manager_2025.xlsx format)
+
+    Expected structure:
+    - Sheet "УПРАВЛЕНИЕ КПИ" with table starting at row 6:
+        - Column A: Сотрудник (Employee full name)
+        - Column B: Оклад (Base salary)
+        - Column C: Должность (Position)
+        - Column E: Базовая премия (Monthly bonus base)
+        - Column F: Вариант премии (Bonus type: Результативный/Фиксированный/Смешанный)
+        - Column G: КПИ Общий % (KPI percentage)
+
+    Only ADMIN and MANAGER can import KPI data
+    """
+    # Only ADMIN and MANAGER can import
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can import KPI data"
+        )
+
+    # Get user's department
+    if not current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no assigned department"
+        )
+    department_id = current_user.department_id
+
+    # Validate file extension
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an Excel file (.xlsx or .xls)"
+        )
+
+    try:
+        # Read file content
+        content = await file.read()
+
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File too large. Maximum size is 10MB"
+            )
+
+        # Parse Excel file - read "УПРАВЛЕНИЕ КПИ" sheet
+        try:
+            df = pd.read_excel(io.BytesIO(content), sheet_name='УПРАВЛЕНИЕ КПИ', header=None)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid Excel file format or missing 'УПРАВЛЕНИЕ КПИ' sheet: {str(e)}"
+            )
+
+        # Check if dataframe is empty
+        if df.empty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file is empty"
+            )
+
+        # Find the header row (row 6, index 5)
+        # Expected columns at row 6: Сотрудник, Оклад, Должность, ЗП Год, Базовая премия, Вариант премии, КПИ Общий %
+        header_row_idx = 5  # Row 6 in Excel = index 5
+
+        if len(df) <= header_row_idx:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file structure is invalid. Expected header at row 6"
+            )
+
+        # Parse data starting from row 7 (index 6)
+        employees_created = 0
+        employees_updated = 0
+        kpi_records_created = 0
+        kpi_records_updated = 0
+        errors = []
+
+        # Mapping of bonus type names to enum
+        bonus_type_mapping = {
+            'результативный': BonusTypeEnum.PERFORMANCE_BASED,
+            'фиксированный': BonusTypeEnum.FIXED,
+            'смешанный': BonusTypeEnum.MIXED
+        }
+
+        for idx in range(header_row_idx + 1, len(df)):
+            row = df.iloc[idx]
+
+            # Column indices (0-based)
+            employee_name = row[0]  # Column A
+            base_salary = row[1]     # Column B
+            position = row[2]        # Column C
+            # Skip column D (ЗП Год - formula)
+            bonus_base = row[4]      # Column E
+            bonus_type_str = row[5]  # Column F
+            kpi_percentage = row[6]  # Column G
+
+            # Skip empty rows or totals
+            if pd.isna(employee_name) or str(employee_name).strip().upper() in ['', 'ИТОГО:', 'ИТОГО']:
+                continue
+
+            try:
+                # Validate required fields
+                if pd.isna(base_salary) or pd.isna(position):
+                    errors.append(f"Строка {idx + 1}: Пропущены обязательные поля (оклад или должность) для {employee_name}")
+                    continue
+
+                # Convert and validate numeric fields
+                try:
+                    base_salary = Decimal(str(base_salary))
+                except (ValueError, InvalidOperation):
+                    errors.append(f"Строка {idx + 1}: Некорректное значение оклада для {employee_name}")
+                    continue
+
+                # Handle optional bonus base
+                if pd.isna(bonus_base):
+                    bonus_base = Decimal(0)
+                else:
+                    try:
+                        bonus_base = Decimal(str(bonus_base))
+                    except (ValueError, InvalidOperation):
+                        errors.append(f"Строка {idx + 1}: Некорректное значение базовой премии для {employee_name}")
+                        continue
+
+                # Handle optional KPI percentage
+                if pd.isna(kpi_percentage):
+                    kpi_percentage = None
+                else:
+                    try:
+                        kpi_percentage = Decimal(str(kpi_percentage))
+                    except (ValueError, InvalidOperation):
+                        errors.append(f"Строка {idx + 1}: Некорректное значение КПИ% для {employee_name}")
+                        continue
+
+                # Map bonus type
+                bonus_type = BonusTypeEnum.PERFORMANCE_BASED  # Default
+                if not pd.isna(bonus_type_str):
+                    bonus_type_lower = str(bonus_type_str).strip().lower()
+                    bonus_type = bonus_type_mapping.get(bonus_type_lower, BonusTypeEnum.PERFORMANCE_BASED)
+
+                # Find or create employee
+                employee = db.query(Employee).filter(
+                    and_(
+                        Employee.full_name == str(employee_name).strip(),
+                        Employee.department_id == department_id
+                    )
+                ).first()
+
+                if employee:
+                    # Update existing employee
+                    employee.base_salary = base_salary
+                    employee.position = str(position).strip()
+                    employee.monthly_bonus_base = bonus_base
+                    employee.updated_at = datetime.utcnow()
+                    employees_updated += 1
+                else:
+                    # Create new employee
+                    employee = Employee(
+                        full_name=str(employee_name).strip(),
+                        position=str(position).strip(),
+                        base_salary=base_salary,
+                        monthly_bonus_base=bonus_base,
+                        department_id=department_id,
+                        status=EmployeeStatusEnum.ACTIVE
+                    )
+                    db.add(employee)
+                    db.flush()  # Get employee.id
+                    employees_created += 1
+
+                # Create or update EmployeeKPI record for the specified period
+                employee_kpi = db.query(EmployeeKPI).filter(
+                    and_(
+                        EmployeeKPI.employee_id == employee.id,
+                        EmployeeKPI.year == year,
+                        EmployeeKPI.month == month
+                    )
+                ).first()
+
+                # Calculate bonus based on type and KPI percentage
+                monthly_bonus_calculated = None
+                if kpi_percentage is not None:
+                    monthly_bonus_calculated = calculate_bonus(
+                        bonus_base,
+                        bonus_type,
+                        kpi_percentage
+                    )
+
+                if employee_kpi:
+                    # Update existing KPI record
+                    employee_kpi.kpi_percentage = kpi_percentage
+                    employee_kpi.monthly_bonus_type = bonus_type
+                    employee_kpi.monthly_bonus_base = bonus_base
+                    employee_kpi.monthly_bonus_calculated = monthly_bonus_calculated
+                    employee_kpi.updated_at = datetime.utcnow()
+                    kpi_records_updated += 1
+                else:
+                    # Create new KPI record
+                    employee_kpi = EmployeeKPI(
+                        employee_id=employee.id,
+                        year=year,
+                        month=month,
+                        kpi_percentage=kpi_percentage,
+                        monthly_bonus_type=bonus_type,
+                        monthly_bonus_base=bonus_base,
+                        monthly_bonus_calculated=monthly_bonus_calculated,
+                        quarterly_bonus_type=BonusTypeEnum.PERFORMANCE_BASED,
+                        quarterly_bonus_base=Decimal(0),
+                        annual_bonus_type=BonusTypeEnum.PERFORMANCE_BASED,
+                        annual_bonus_base=Decimal(0),
+                        department_id=department_id
+                    )
+                    db.add(employee_kpi)
+                    kpi_records_created += 1
+
+            except Exception as e:
+                errors.append(f"Строка {idx + 1}: Ошибка обработки {employee_name}: {str(e)}")
+                continue
+
+        # Commit all changes
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "KPI data imported successfully",
+            "statistics": {
+                "employees_created": employees_created,
+                "employees_updated": employees_updated,
+                "kpi_records_created": kpi_records_created,
+                "kpi_records_updated": kpi_records_updated,
+                "total_processed": employees_created + employees_updated,
+                "errors": len(errors)
+            },
+            "errors": errors if errors else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to import KPI data: {str(e)}"
+        )
