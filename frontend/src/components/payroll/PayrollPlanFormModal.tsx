@@ -251,12 +251,12 @@ export default function PayrollPlanFormModal({
           label="Оклад"
           rules={[
             { required: true, message: 'Введите оклад' },
-            { type: 'number', min: 0, message: 'Оклад не может быть отрицательным' },
           ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             placeholder="50000"
+            min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
@@ -266,13 +266,11 @@ export default function PayrollPlanFormModal({
         <Form.Item
           name="monthly_bonus"
           label="Месячная премия"
-          rules={[
-            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
-          ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
+            min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
@@ -282,13 +280,11 @@ export default function PayrollPlanFormModal({
         <Form.Item
           name="quarterly_bonus"
           label="Квартальная премия"
-          rules={[
-            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
-          ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
+            min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
@@ -298,13 +294,11 @@ export default function PayrollPlanFormModal({
         <Form.Item
           name="annual_bonus"
           label="Годовая премия"
-          rules={[
-            { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
-          ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             placeholder="0"
+            min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
@@ -314,13 +308,11 @@ export default function PayrollPlanFormModal({
         <Form.Item
           name="other_payments"
           label="Прочие выплаты"
-          rules={[
-            { type: 'number', min: 0, message: 'Прочие выплаты не могут быть отрицательными' },
-          ]}
         >
           <InputNumber
             style={{ width: '100%' }}
             placeholder="5000"
+            min={0}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value ?? '').replace(/\s?/g, ''))}
             addonAfter="₽"
