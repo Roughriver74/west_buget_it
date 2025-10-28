@@ -74,6 +74,17 @@ const OrganizationsPage = () => {
     message.success('Экспорт начат. Файл скоро будет загружен.')
   }
 
+  const handleDownloadTemplate = () => {
+    const url = `${API_BASE}/templates/download/organizations`
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'Шаблон_Организации.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    message.success('Скачивание шаблона начато')
+  }
+
   const uploadProps: UploadProps = {
     name: 'file',
     action: `${API_BASE}/organizations/import`,
@@ -307,6 +318,9 @@ const OrganizationsPage = () => {
         <Space style={{ marginBottom: 16 }} wrap>
           <Button icon={<DownloadOutlined />} onClick={handleExport}>
             Экспорт в Excel
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate} type="dashed">
+            Скачать шаблон
           </Button>
           <Upload {...uploadProps}>
             <Button icon={<UploadOutlined />}>Импорт из Excel</Button>
