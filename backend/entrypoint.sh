@@ -85,10 +85,11 @@ echo "======================================"
 echo ""
 
 # Start the application with Gunicorn
+# Note: Always bind to 8000 inside container, external port mapping is handled by Docker
 exec gunicorn app.main:app \
     --workers "${GUNICORN_WORKERS:-4}" \
     --worker-class uvicorn.workers.UvicornWorker \
-    --bind "0.0.0.0:${BACKEND_PORT:-8000}" \
+    --bind "0.0.0.0:8000" \
     --timeout "${GUNICORN_TIMEOUT:-120}" \
     --keep-alive "${GUNICORN_KEEPALIVE:-5}" \
     --access-logfile - \
