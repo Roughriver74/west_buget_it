@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -19,8 +20,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create BudgetStatusEnum type
-    op.execute("CREATE TYPE budgetstatusenum AS ENUM ('Черновик', 'Утвержден')")
+    # Create BudgetStatusEnum type with exception handling
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE budgetstatusenum AS ENUM ('Черновик', 'Утвержден');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
+    # Create enum object with create_type=False
+    budget_status_enum = postgresql.ENUM('Черновик', 'Утвержден', name='budgetstatusenum', create_type=False)
 
     # Add parent_id to budget_categories for subcategories support
     op.add_column('budget_categories', sa.Column('parent_id', sa.Integer(), nullable=True))
@@ -28,7 +38,7 @@ def upgrade() -> None:
     op.create_foreign_key('fk_budget_categories_parent_id', 'budget_categories', 'budget_categories', ['parent_id'], ['id'])
 
     # Add status to budget_plans
-    op.add_column('budget_plans', sa.Column('status', sa.Enum('Черновик', 'Утвержден', name='budgetstatusenum'), nullable=False, server_default='Черновик'))
+    op.add_column('budget_plans', sa.Column('status', budget_status_enum, nullable=False, server_default='Черновик'))
     op.create_index(op.f('ix_budget_plans_status'), 'budget_plans', ['status'], unique=False)
 
 

@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -51,11 +52,17 @@ def upgrade() -> None:
         END $$;
     """)
 
+    # Create enum objects with create_type=False to use existing types
+    budget_scenario_type_enum = postgresql.ENUM('BASE', 'OPTIMISTIC', 'PESSIMISTIC', name='budgetscenariotypeenum', create_type=False)
+    budget_version_status_enum = postgresql.ENUM('DRAFT', 'IN_REVIEW', 'REVISION_REQUESTED', 'APPROVED', 'REJECTED', 'ARCHIVED', name='budgetversionstatusenum', create_type=False)
+    approval_action_enum = postgresql.ENUM('APPROVED', 'REJECTED', 'REVISION_REQUESTED', name='approvalactionenum', create_type=False)
+    calculation_method_enum = postgresql.ENUM('AVERAGE', 'GROWTH', 'DRIVER_BASED', 'SEASONAL', 'MANUAL', name='calculationmethodenum', create_type=False)
+
     op.create_table('budget_scenarios',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('year', sa.Integer(), nullable=False),
     sa.Column('scenario_name', sa.String(length=100), nullable=False),
-    sa.Column('scenario_type', sa.Enum('BASE', 'OPTIMISTIC', 'PESSIMISTIC', name='budgetscenariotypeenum'), nullable=False),
+    sa.Column('scenario_type', budget_scenario_type_enum, nullable=False),
     sa.Column('department_id', sa.Integer(), nullable=False),
     sa.Column('global_growth_rate', sa.Numeric(precision=5, scale=2), nullable=False),
     sa.Column('inflation_rate', sa.Numeric(precision=5, scale=2), nullable=False),
@@ -80,7 +87,7 @@ def upgrade() -> None:
     sa.Column('version_name', sa.String(length=100), nullable=True),
     sa.Column('department_id', sa.Integer(), nullable=False),
     sa.Column('scenario_id', sa.Integer(), nullable=True),
-    sa.Column('status', sa.Enum('DRAFT', 'IN_REVIEW', 'REVISION_REQUESTED', 'APPROVED', 'REJECTED', 'ARCHIVED', name='budgetversionstatusenum'), nullable=False),
+    sa.Column('status', budget_version_status_enum, nullable=False),
     sa.Column('created_by', sa.String(length=100), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.Column('submitted_at', sa.DateTime(), nullable=True),
@@ -109,7 +116,7 @@ def upgrade() -> None:
     sa.Column('iteration_number', sa.Integer(), nullable=False),
     sa.Column('reviewer_name', sa.String(length=100), nullable=False),
     sa.Column('reviewer_role', sa.String(length=50), nullable=False),
-    sa.Column('action', sa.Enum('APPROVED', 'REJECTED', 'REVISION_REQUESTED', name='approvalactionenum'), nullable=False),
+    sa.Column('action', approval_action_enum, nullable=False),
     sa.Column('decision_date', sa.DateTime(), nullable=False),
     sa.Column('comments', sa.Text(), nullable=True),
     sa.Column('requested_changes', sa.JSON(), nullable=True),
@@ -123,6 +130,9 @@ def upgrade() -> None:
     op.create_index(op.f('ix_budget_approval_log_decision_date'), 'budget_approval_log', ['decision_date'], unique=False)
     op.create_index(op.f('ix_budget_approval_log_id'), 'budget_approval_log', ['id'], unique=False)
     op.create_index(op.f('ix_budget_approval_log_version_id'), 'budget_approval_log', ['version_id'], unique=False)
+    # Create ExpenseTypeEnum object (if not already created elsewhere)
+    expense_type_enum = postgresql.ENUM('OPEX', 'CAPEX', name='expensetypeenum', create_type=False)
+
     op.create_table('budget_plan_details',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('version_id', sa.Integer(), nullable=False),
@@ -130,8 +140,8 @@ def upgrade() -> None:
     sa.Column('category_id', sa.Integer(), nullable=False),
     sa.Column('subcategory', sa.String(length=100), nullable=True),
     sa.Column('planned_amount', sa.Numeric(precision=15, scale=2), nullable=False),
-    sa.Column('type', sa.Enum('OPEX', 'CAPEX', name='expensetypeenum'), nullable=False),
-    sa.Column('calculation_method', sa.Enum('AVERAGE', 'GROWTH', 'DRIVER_BASED', 'SEASONAL', 'MANUAL', name='calculationmethodenum'), nullable=True),
+    sa.Column('type', expense_type_enum, nullable=False),
+    sa.Column('calculation_method', calculation_method_enum, nullable=True),
     sa.Column('calculation_params', sa.JSON(), nullable=True),
     sa.Column('business_driver', sa.String(length=100), nullable=True),
     sa.Column('justification', sa.Text(), nullable=True),
