@@ -237,6 +237,15 @@ class CalculateByDriverRequest(BaseModel):
     target_year: int
 
 
+class CalculateBySeasonalRequest(BaseModel):
+    """Request schema for calculate by seasonal method - department_id auto-assigned from current_user"""
+    category_id: int
+    base_year: int = Field(..., description="Base year for seasonal pattern (e.g., 2025)")
+    annual_budget: Decimal = Field(..., description="Target annual budget amount")
+    adjustment_percent: Decimal = Field(default=Decimal("0"), description="Additional adjustment % (inflation, growth)")
+    target_year: int = Field(..., description="Target year (e.g., 2026)")
+
+
 class CalculationResult(BaseModel):
     """Response schema for calculation results"""
     category_id: int

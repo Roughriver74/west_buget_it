@@ -42,6 +42,7 @@ from app.schemas import (
     CalculateByAverageRequest,
     CalculateByGrowthRequest,
     CalculateByDriverRequest,
+    CalculateBySeasonalRequest,
     CalculationResult,
     BaselineSummary,
     VersionComparison,
@@ -1089,6 +1090,26 @@ def calculate_by_driver(
         base_driver_value=request.base_driver_value,
         planned_driver_value=request.planned_driver_value,
         cost_per_unit=request.cost_per_unit,
+        adjustment_percent=request.adjustment_percent,
+        target_year=request.target_year,
+    )
+
+    return CalculationResult(**result)
+
+
+@router.post("/calculate/seasonal", response_model=CalculationResult)
+def calculate_by_seasonal(
+    request: CalculateBySeasonalRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Calculate budget using seasonal patterns from historical data"""
+    calculator = BudgetCalculator(db)
+    result = calculator.calculate_by_seasonal(
+        category_id=request.category_id,
+        base_year=request.base_year,
+        department_id=current_user.department_id,
+        annual_budget=request.annual_budget,
         adjustment_percent=request.adjustment_percent,
         target_year=request.target_year,
     )

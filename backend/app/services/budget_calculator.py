@@ -328,3 +328,89 @@ class BudgetCalculator:
             indices.append(index)
 
         return indices
+
+    def calculate_by_seasonal(
+        self,
+        category_id: int,
+        base_year: int,
+        department_id: int,
+        annual_budget: Decimal,
+        adjustment_percent: Decimal = Decimal("0"),
+        target_year: int = 2026,
+    ) -> Dict[str, Any]:
+        """
+        Calculate budget using seasonal patterns from historical data
+
+        Args:
+            category_id: Budget category ID
+            base_year: Year to use for seasonal pattern (typically 2025)
+            department_id: Department ID for multi-tenancy
+            annual_budget: Target annual budget amount
+            adjustment_percent: Additional adjustment percentage (e.g., 5 for +5%)
+            target_year: Target year for budget (typically 2026)
+
+        Returns:
+            Dict containing calculation results with monthly breakdown following seasonal pattern
+        """
+        baseline = self.get_baseline_data(category_id, base_year, department_id)
+        seasonal_indices = self.calculate_seasonal_indices(category_id, base_year, department_id)
+
+        # Apply adjustment to annual budget
+        adjustment_factor = Decimal("1") + (adjustment_percent / Decimal("100"))
+        adjusted_annual_budget = annual_budget * adjustment_factor
+
+        # Calculate monthly amounts using seasonal indices
+        # Step 1: Sum of all indices
+        total_indices = sum(seasonal_indices)
+
+        # Step 2: Normalize and apply to annual budget
+        monthly_breakdown = []
+        total_allocated = Decimal("0")
+
+        for month in range(1, 13):
+            index = seasonal_indices[month - 1]
+            if total_indices > 0:
+                # Distribute annual budget proportionally to seasonal index
+                month_amount = (index / total_indices) * adjusted_annual_budget
+            else:
+                # Fallback to equal distribution if no historical pattern
+                month_amount = adjusted_annual_budget / 12
+
+            monthly_breakdown.append({
+                "month": month,
+                "amount": month_amount,
+                "seasonal_index": index,
+            })
+            total_allocated += month_amount
+
+        # Adjust last month to ensure total equals annual budget exactly
+        # (to compensate for rounding differences)
+        if total_allocated != adjusted_annual_budget and len(monthly_breakdown) > 0:
+            difference = adjusted_annual_budget - total_allocated
+            monthly_breakdown[-1]["amount"] += difference
+
+        monthly_avg = adjusted_annual_budget / 12
+
+        # Calculate growth percentage
+        if baseline["total_amount"] > 0:
+            growth_percent = ((adjusted_annual_budget - baseline["total_amount"]) / baseline["total_amount"]) * 100
+        else:
+            growth_percent = Decimal("0")
+
+        return {
+            "category_id": category_id,
+            "annual_total": adjusted_annual_budget,
+            "monthly_avg": monthly_avg,
+            "growth_percent": growth_percent,
+            "monthly_breakdown": monthly_breakdown,
+            "calculation_method": "seasonal",
+            "calculation_params": {
+                "base_year": base_year,
+                "target_year": target_year,
+                "annual_budget": float(annual_budget),
+                "adjustment_percent": float(adjustment_percent),
+                "seasonal_indices": [float(idx) for idx in seasonal_indices],
+            },
+            "based_on_total": baseline["total_amount"],
+            "based_on_avg": baseline["monthly_avg"],
+        }

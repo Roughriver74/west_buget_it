@@ -28,6 +28,7 @@ import { BudgetVersionTable } from '@/components/budget/BudgetVersionTable'
 import { BudgetCalculatorForm } from '@/components/budget/BudgetCalculatorForm'
 import { BudgetVersionDetailDrawer } from '@/components/budget/BudgetVersionDetailDrawer'
 import { BudgetVersionComparisonModal } from '@/components/budget/BudgetVersionComparisonModal'
+import BudgetScenarioComparisonChart from '@/components/budget/BudgetScenarioComparisonChart'
 import {
   useBudgetScenarios,
   useBudgetVersions,
@@ -109,6 +110,22 @@ const BudgetPlanningPage: React.FC = () => {
       })),
     [categories]
   )
+
+  // Get scenario IDs for comparison chart
+  const scenarioIds = useMemo(() => {
+    const base = scenarios.find((s) => s.scenario_type === BudgetScenarioType.BASE)
+    const optimistic = scenarios.find((s) => s.scenario_type === BudgetScenarioType.OPTIMISTIC)
+    const pessimistic = scenarios.find((s) => s.scenario_type === BudgetScenarioType.PESSIMISTIC)
+
+    return {
+      base: base?.id,
+      optimistic: optimistic?.id,
+      pessimistic: pessimistic?.id,
+    }
+  }, [scenarios])
+
+  // Check if we have at least 2 scenarios for comparison
+  const hasEnoughScenariosForComparison = Object.values(scenarioIds).filter(Boolean).length >= 2
 
   // Mutations
   const createScenario = useCreateScenario()
@@ -358,6 +375,13 @@ const BudgetPlanningPage: React.FC = () => {
           />
         )}
       </Card>
+
+      {/* Scenario Comparison Chart */}
+      {hasEnoughScenariosForComparison && (
+        <div style={{ marginTop: 24 }}>
+          <BudgetScenarioComparisonChart year={selectedYear} scenarioIds={scenarioIds} />
+        </div>
+      )}
 
       {/* Create Scenario Modal */}
       <Modal
