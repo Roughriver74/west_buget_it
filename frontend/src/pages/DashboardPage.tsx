@@ -11,6 +11,8 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import BudgetPlanVsActualWidget from '@/components/dashboard/widgets/BudgetPlanVsActualWidget'
+import BudgetExecutionProgressWidget from '@/components/dashboard/widgets/BudgetExecutionProgressWidget'
+import BudgetDeviationHeatmap from '@/components/dashboard/widgets/BudgetDeviationHeatmap'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -250,6 +252,16 @@ const DashboardPage = () => {
       <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
         <Col xs={24}>
           <BudgetPlanVsActualWidget year={year} height={400} showStats={true} />
+        </Col>
+      </Row>
+
+      {/* Прогресс-бары исполнения по категориям */}
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        <Col xs={24} lg={12}>
+          <BudgetExecutionProgressWidget year={year} height={500} />
+        </Col>
+        <Col xs={24} lg={12}>
+          <BudgetDeviationHeatmap year={year} height={500} />
         </Col>
       </Row>
     </div>
