@@ -35,6 +35,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 # Prepare directories for nginx
 # Master process runs as root, workers run as nginx (configured in nginx.conf)
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
@@ -47,9 +50,9 @@ RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
 # Expose port
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+# Health check - use curl instead of wget (wget not included in nginx:alpine by default)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://127.0.0.1/ || exit 1
 
 # Use custom entrypoint to inject runtime env vars
 ENTRYPOINT ["/docker-entrypoint.sh"]
