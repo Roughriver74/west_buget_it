@@ -105,6 +105,8 @@ from .budget_planning import (
     # Approval Log
     BudgetApprovalLogCreate,
     BudgetApprovalLogInDB,
+    # Approval
+    SetApprovalsRequest,
     # Calculator
     CalculateByAverageRequest,
     CalculateByGrowthRequest,
@@ -263,6 +265,8 @@ __all__ = [
     # Budget 2026 - Approval Log
     "BudgetApprovalLogCreate",
     "BudgetApprovalLogInDB",
+    # Budget 2026 - Approval
+    "SetApprovalsRequest",
     # Budget 2026 - Calculator
     "CalculateByAverageRequest",
     "CalculateByGrowthRequest",

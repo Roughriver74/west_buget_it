@@ -80,9 +80,9 @@ app.add_middleware(
 log_info(f"Security headers enabled (production mode: {not settings.DEBUG})", "Startup")
 
 # Configure rate limiting
-# 100 requests per minute, 1000 requests per hour per IP
-app.add_middleware(create_rate_limiter(requests_per_minute=100, requests_per_hour=1000))
-log_info("Rate limiting enabled: 100 req/min, 1000 req/hour per IP", "Startup")
+# 500 requests per minute, 5000 requests per hour per IP
+app.add_middleware(create_rate_limiter(requests_per_minute=500, requests_per_hour=5000))
+log_info("Rate limiting enabled: 500 req/min, 5000 req/hour per IP", "Startup")
 
 
 # Request logging middleware

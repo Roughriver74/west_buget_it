@@ -2,8 +2,9 @@
  * Budget Version Detail Drawer
  * Displays version metadata, plan editor, and approval history
  */
-import React, { useMemo } from 'react'
-import { Drawer, Descriptions, Divider, Spin, Typography } from 'antd'
+import React, { useMemo, useRef } from 'react'
+import { Drawer, Descriptions, Divider, Spin, Typography, Button } from 'antd'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { useBudgetVersionWithDetails } from '@/hooks/useBudgetPlanning'
 import { BudgetVersionStatus, ExpenseType } from '@/types/budgetPlanning'
 import { BudgetVersionStatusBadge } from './BudgetVersionStatusBadge'
@@ -37,6 +38,7 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
   onClose,
   onVersionUpdated,
 }) => {
+  const tableRef = useRef<{ scrollBy: (direction: 'left' | 'right') => void } | null>(null)
   const shouldFetch = open && !!versionId
   const {
     data: version,
@@ -152,9 +154,53 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
                 {isEditable ? ' (редактирование включено)' : ''}
               </Text>
             </div>
-            <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'auto', minHeight: 0, position: 'relative' }}>
+              {/* Floating scroll buttons */}
+              <div
+                style={{
+                  position: 'sticky',
+                  top: 64,
+                  zIndex: 100,
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '0 12px',
+                  height: 0,
+                  marginBottom: 0,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    shape="circle"
+                    size="large"
+                    icon={<LeftOutlined />}
+                    onClick={() => tableRef.current?.scrollBy('left')}
+                    style={{
+                      pointerEvents: 'auto',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Button
+                    shape="circle"
+                    size="large"
+                    icon={<RightOutlined />}
+                    onClick={() => tableRef.current?.scrollBy('right')}
+                    style={{
+                      pointerEvents: 'auto',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                    }}
+                  />
+                </div>
+              </div>
+
               <BudgetPlanDetailsTable
+                ref={tableRef}
                 versionId={version.id}
+                year={version.year}
                 categories={categories}
                 isEditable={isEditable}
                 onAfterSave={handleAfterAction}

@@ -1,5 +1,11 @@
 # Настройка Coolify для развертывания IT Budget Manager
 
+## ⚠️ ВАЖНОЕ ПРИМЕЧАНИЕ
+
+**OAuth callback URL (`/api/oauth/github/callback`) НЕ НУЖЕН!**
+
+В современном Coolify (v4+) GitHub подключается через **Personal Access Token** или **GitHub App**, а НЕ через OAuth callback. Если вы видите ошибку 404 на `/api/oauth/github/callback` - это нормально и НЕ является проблемой.
+
 ## Предварительные требования
 
 - Установленный и запущенный Coolify на вашем сервере
@@ -7,103 +13,66 @@
 - GitHub аккаунт с доступом к репозиторию проекта
 - SSH доступ к серверу (если требуется)
 
-## Шаг 1: Создание GitHub OAuth App
+## Шаг 1: Создание GitHub Personal Access Token
 
-### 1.1. Перейдите в настройки GitHub
+**ВАЖНО**: В современном Coolify используется Personal Access Token, а НЕ OAuth App!
 
-1. Откройте https://github.com/settings/developers
-2. Нажмите **"OAuth Apps"** → **"New OAuth App"**
+### 1.1. Создайте Personal Access Token
 
-### 1.2. Заполните форму создания OAuth App
+1. Откройте: https://github.com/settings/tokens
+2. Нажмите **"Generate new token"** → **"Generate new token (classic)"**
+
+### 1.2. Настройте токен
 
 ```
-Application name: Coolify - west-it.ru
-Homepage URL: https://west-it.ru
-Authorization callback URL: https://west-it.ru/api/oauth/github/callback
+Note: Coolify - west-it.ru
+Expiration: No expiration (или выберите срок)
+
+Scopes (галочки):
+✅ repo (полный доступ к репозиториям)
+✅ admin:repo_hook (управление webhooks)
+✅ admin:public_key (управление deploy keys)
+✅ read:user (чтение профиля)
 ```
 
-**ВАЖНО**: URL должен быть ТОЧНО `https://west-it.ru/api/oauth/github/callback` (с https://)
+### 1.3. Сохраните токен
 
-### 1.3. Получите учетные данные
+Нажмите **"Generate token"** и **СОХРАНИТЕ ТОКЕН** - он будет показан только один раз!
 
-После создания приложения вы увидите:
-- **Client ID** (например: `Iv1.a629f14a22f03b49`)
-- **Client Secret** (нажмите "Generate a new client secret")
+Пример токена: `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
-**СОХРАНИТЕ ОБА ЗНАЧЕНИЯ** - они понадобятся для Coolify!
+## Шаг 2: Подключение GitHub к Coolify
 
-## Шаг 2: Настройка Coolify
+### 2.1. Откройте веб-интерфейс Coolify
 
-### 2.1. Проверьте доступность Coolify
+Откройте в браузере: **https://west-it.ru** (или http://93.189.228.52:8000)
 
-Откройте в браузере: https://west-it.ru
+Войдите используя ваши учетные данные Coolify.
 
-Если видите интерфейс Coolify - все ок. Если нет - проверьте:
-- Запущен ли Coolify на сервере
-- Правильно ли настроен nginx/reverse proxy
-- Есть ли SSL сертификат
+### 2.2. Добавьте GitHub Source
 
-### 2.2. Настройте переменные окружения в Coolify
+1. В левом меню найдите **"Sources"** (Источники)
+2. Нажмите **"+ New Source"** или **"Add Source"**
+3. Выберите **"GitHub"** или **"Private Repository"**
+4. Выберите тип: **"GitHub via Personal Access Token"**
 
-**Вариант A: Через веб-интерфейс Coolify**
+### 2.3. Введите данные GitHub
 
-1. Войдите в Coolify (https://west-it.ru)
-2. Перейдите в **Settings** → **Configuration**
-3. Найдите секцию **GitHub OAuth**
-4. Введите:
-   - **GitHub Client ID**: `ваш_client_id`
-   - **GitHub Client Secret**: `ваш_client_secret`
-5. Сохраните настройки
-6. Перезапустите Coolify
+1. **Name**: `GitHub - My Projects` (любое имя)
+2. **Type**: `GitHub`
+3. **Personal Access Token**: вставьте токен из Шага 1
+4. Нажмите **"Save"** или **"Connect"**
 
-**Вариант B: Через SSH на сервере**
+### 2.4. Проверьте подключение
 
-Подключитесь к серверу:
-```bash
-ssh root@93.189.228.52
-```
+Coolify автоматически проверит токен и подключится к GitHub. Вы увидите список ваших репозиториев.
 
-Найдите `.env` файл Coolify (обычно в `/data/coolify/.env`):
-```bash
-cd /data/coolify
-nano .env
-```
+## Шаг 3: Выбор репозитория для деплоя
 
-Добавьте или обновите:
-```bash
-GITHUB_APP_CLIENT_ID=ваш_client_id
-GITHUB_APP_CLIENT_SECRET=ваш_client_secret
-APP_URL=https://west-it.ru
-```
+После подключения GitHub Source, вы увидите список ваших репозиториев:
 
-Перезапустите Coolify:
-```bash
-docker restart coolify
-```
-
-### 2.3. Проверьте callback URL
-
-После настройки проверьте:
-```bash
-curl https://west-it.ru/api/oauth/github/callback
-```
-
-Теперь вместо `{"message":"Not found."}` должен быть редирект или другой ответ.
-
-## Шаг 3: Подключение GitHub репозитория
-
-### 3.1. Добавьте Source в Coolify
-
-1. В Coolify перейдите в **Sources** → **Add Source**
-2. Выберите **GitHub**
-3. Авторизуйтесь через GitHub OAuth (это использует настроенный выше OAuth App)
-4. Дайте доступ Coolify к вашим репозиториям
-
-### 3.2. Выберите репозиторий
-
-После подключения GitHub:
-1. Найдите ваш репозиторий с IT Budget Manager
-2. Выберите его для деплоя
+1. Найдите репозиторий **west_buget_it** (или ваше имя репозитория)
+2. Нажмите на него или выберите для деплоя
 
 ## Шаг 4: Создание приложения в Coolify
 
@@ -241,29 +210,23 @@ Coolify автоматически создаст GitHub webhook для авто
 
 ## Решение проблем
 
-### Ошибка 404 на callback
+### GitHub не подключается
 
-Если все еще видите ошибку на `/api/oauth/github/callback`:
+Если не можете подключить GitHub:
 
-1. **Проверьте переменные окружения Coolify**:
+1. **Проверьте токен**:
+   - Токен должен быть Classic (не Fine-grained)
+   - Должны быть выбраны нужные scopes (repo, admin:repo_hook, etc.)
+   - Токен не должен быть истекшим
+
+2. **Проверьте доступ к репозиториям**:
+   - Убедитесь что у вас есть доступ к нужному репозиторию
+   - Для приватных репозиториев токен должен иметь полный доступ
+
+3. **Проверьте логи Coolify**:
 ```bash
-docker exec coolify env | grep GITHUB
-```
-
-2. **Проверьте логи Coolify**:
-```bash
+ssh root@93.189.228.52
 docker logs coolify -f
-```
-
-3. **Убедитесь, что APP_URL настроен**:
-```bash
-# В .env файле Coolify
-APP_URL=https://west-it.ru
-```
-
-4. **Перезапустите Coolify**:
-```bash
-docker restart coolify
 ```
 
 ### CORS ошибки

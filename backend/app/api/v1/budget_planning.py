@@ -47,6 +47,8 @@ from app.schemas import (
     BaselineSummary,
     VersionComparison,
     VersionComparisonResult,
+    # Approval
+    SetApprovalsRequest,
 )
 from app.utils.auth import get_current_active_user
 from app.services.budget_calculator import BudgetCalculator
@@ -888,6 +890,77 @@ def request_changes(
     )
     db.add(log_entry)
     db.commit()
+
+    return version
+
+
+@router.post("/versions/{version_id}/set-approvals", response_model=BudgetVersionInDB)
+def set_custom_approvals(
+    version_id: int,
+    approvals: SetApprovalsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Set custom approval checkboxes for presentation (Manager, CFO, 3 Founders)"""
+    # Only ADMIN and MANAGER can update approvals
+    from app.db.models import UserRoleEnum
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER users can set approvals"
+        )
+
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Update approval checkboxes with timestamps
+    now = datetime.utcnow()
+
+    if approvals.manager_approved is not None:
+        version.manager_approved = approvals.manager_approved
+        if approvals.manager_approved:
+            version.manager_approved_at = now
+        else:
+            version.manager_approved_at = None
+
+    if approvals.cfo_approved is not None:
+        version.cfo_approved = approvals.cfo_approved
+        if approvals.cfo_approved:
+            version.cfo_approved_at = now
+        else:
+            version.cfo_approved_at = None
+
+    if approvals.founder1_approved is not None:
+        version.founder1_approved = approvals.founder1_approved
+        if approvals.founder1_approved:
+            version.founder1_approved_at = now
+        else:
+            version.founder1_approved_at = None
+
+    if approvals.founder2_approved is not None:
+        version.founder2_approved = approvals.founder2_approved
+        if approvals.founder2_approved:
+            version.founder2_approved_at = now
+        else:
+            version.founder2_approved_at = None
+
+    if approvals.founder3_approved is not None:
+        version.founder3_approved = approvals.founder3_approved
+        if approvals.founder3_approved:
+            version.founder3_approved_at = now
+        else:
+            version.founder3_approved_at = None
+
+    db.commit()
+    db.refresh(version)
 
     return version
 

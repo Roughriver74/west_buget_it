@@ -23,6 +23,7 @@ import type {
   CalculationResult,
   BaselineSummary,
   VersionComparison,
+  SetApprovalsRequest,
 } from '@/types/budgetPlanning'
 import {
   getCachedBaseline,
@@ -198,6 +199,17 @@ export const versionsApi = {
     const response = await apiClient.post<BudgetVersion>(
       `${BASE_PATH}/versions/${versionId}/request-changes`,
       { comments }
+    )
+    return response.data
+  },
+
+  /**
+   * Set custom approval checkboxes for presentation
+   */
+  setApprovals: async (versionId: number, approvals: SetApprovalsRequest): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/set-approvals`,
+      approvals
     )
     return response.data
   },

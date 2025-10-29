@@ -784,6 +784,18 @@ class BudgetVersion(Base):
     approved_at = Column(DateTime, nullable=True)
     approved_by = Column(String(100), nullable=True)
 
+    # Custom approval checkboxes for presentation
+    manager_approved = Column(Boolean, default=False, nullable=False)
+    manager_approved_at = Column(DateTime, nullable=True)
+    cfo_approved = Column(Boolean, default=False, nullable=False)
+    cfo_approved_at = Column(DateTime, nullable=True)
+    founder1_approved = Column(Boolean, default=False, nullable=False)
+    founder1_approved_at = Column(DateTime, nullable=True)
+    founder2_approved = Column(Boolean, default=False, nullable=False)
+    founder2_approved_at = Column(DateTime, nullable=True)
+    founder3_approved = Column(Boolean, default=False, nullable=False)
+    founder3_approved_at = Column(DateTime, nullable=True)
+
     # Комментарии процесса
     comments = Column(Text, nullable=True)
     change_log = Column(Text, nullable=True)  # Что изменилось от предыдущей версии

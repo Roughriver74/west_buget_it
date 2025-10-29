@@ -3,12 +3,13 @@
  * Handles approval workflow actions (submit, approve, reject, request changes)
  */
 import React, { useState } from 'react'
-import { Button, Space, Modal, Input, message } from 'antd'
+import { Button, Space, Modal, Input, message, Badge } from 'antd'
 import {
   CheckOutlined,
   CloseOutlined,
   EditOutlined,
   SendOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -19,6 +20,7 @@ import {
 } from '@/hooks/useBudgetPlanning'
 import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
+import { ApprovalChecklistModal } from './ApprovalChecklistModal'
 
 const { TextArea } = Input
 
@@ -35,6 +37,7 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
   const [commentsModalVisible, setCommentsModalVisible] = useState(false)
   const [comments, setComments] = useState('')
   const [currentAction, setCurrentAction] = useState<'approve' | 'reject' | 'request-changes' | null>(null)
+  const [presentationModalOpen, setPresentationModalOpen] = useState(false)
 
   const submitMutation = useSubmitVersion()
   const approveMutation = useApproveVersion()
@@ -44,6 +47,16 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
   const isAdmin = user?.role === 'ADMIN'
   const isAccountant = user?.role === 'ACCOUNTANT'
   const canApprove = isAdmin || isAccountant
+
+  // Calculate approval progress
+  const approvalCount = [
+    version.manager_approved,
+    version.cfo_approved,
+    version.founder1_approved,
+    version.founder2_approved,
+    version.founder3_approved,
+  ].filter(Boolean).length
+  const totalApprovals = 5
 
   const handleSubmit = async () => {
     Modal.confirm({
@@ -204,7 +217,19 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
 
   return (
     <>
-      {renderActions()}
+      <Space>
+        {renderActions()}
+
+        {/* Presentation Mode Button - always available */}
+        <Badge count={`${approvalCount}/${totalApprovals}`} showZero>
+          <Button
+            icon={<TeamOutlined />}
+            onClick={() => setPresentationModalOpen(true)}
+          >
+            Презентация
+          </Button>
+        </Badge>
+      </Space>
 
       <Modal
         title={getModalTitle()}
@@ -238,6 +263,15 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
           style={{ marginTop: 16 }}
         />
       </Modal>
+
+      <ApprovalChecklistModal
+        open={presentationModalOpen}
+        version={version}
+        onClose={() => {
+          setPresentationModalOpen(false)
+          onActionComplete?.()
+        }}
+      />
     </>
   )
 }

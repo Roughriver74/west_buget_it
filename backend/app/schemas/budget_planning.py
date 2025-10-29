@@ -108,6 +108,18 @@ class BudgetVersionInDB(BudgetVersionBase):
     total_capex: Decimal
     total_opex: Decimal
 
+    # Custom approval checkboxes
+    manager_approved: bool
+    manager_approved_at: Optional[datetime]
+    cfo_approved: bool
+    cfo_approved_at: Optional[datetime]
+    founder1_approved: bool
+    founder1_approved_at: Optional[datetime]
+    founder2_approved: bool
+    founder2_approved_at: Optional[datetime]
+    founder3_approved: bool
+    founder3_approved_at: Optional[datetime]
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -292,6 +304,15 @@ class VersionComparison(BaseModel):
     total_v2: Decimal
     total_difference: Decimal
     total_difference_percent: Decimal
+
+
+class SetApprovalsRequest(BaseModel):
+    """Request schema for setting custom approval checkboxes"""
+    manager_approved: Optional[bool] = None
+    cfo_approved: Optional[bool] = None
+    founder1_approved: Optional[bool] = None
+    founder2_approved: Optional[bool] = None
+    founder3_approved: Optional[bool] = None
 
 
 # Update forward references

@@ -114,6 +114,18 @@ export interface BudgetVersion {
   total_amount: NumericValue
   total_capex: NumericValue
   total_opex: NumericValue
+
+  // Custom approval checkboxes for presentation
+  manager_approved: boolean
+  manager_approved_at?: string
+  cfo_approved: boolean
+  cfo_approved_at?: string
+  founder1_approved: boolean
+  founder1_approved_at?: string
+  founder2_approved: boolean
+  founder2_approved_at?: string
+  founder3_approved: boolean
+  founder3_approved_at?: string
 }
 
 export interface BudgetVersionWithDetails extends BudgetVersion {
@@ -144,6 +156,14 @@ export interface BudgetVersionUpdate {
   submitted_at?: string
   approved_at?: string
   approved_by?: string
+}
+
+export interface SetApprovalsRequest {
+  manager_approved?: boolean
+  cfo_approved?: boolean
+  founder1_approved?: boolean
+  founder2_approved?: boolean
+  founder3_approved?: boolean
 }
 
 // ============================================================================

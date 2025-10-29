@@ -2,9 +2,11 @@
  * Budget Plan Details Table Component
  * Editable table for monthly budget planning by category
  */
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { Table, InputNumber, Button, Space, message, Typography } from 'antd'
-import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined } from '@ant-design/icons'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag } from 'antd'
+import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined } from '@ant-design/icons'
+import { LoadBaselineModal } from './LoadBaselineModal'
+import { ManageCategoriesModal } from './ManageCategoriesModal'
 import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
 import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
@@ -15,6 +17,8 @@ const { Text } = Typography
 const CATEGORY_COLUMN_WIDTH = 320
 const MONTH_COLUMN_WIDTH = 140
 const TOTAL_COLUMN_WIDTH = 180
+const STICKY_HEADER_OFFSET = 64
+const CONTROL_PANEL_HEIGHT = 100
 
 const currencyFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
@@ -44,6 +48,9 @@ const MONTHS = [
   { key: 12, label: 'Декабрь' },
 ]
 
+const MONTH_SHORT_NAMES = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
+const MONTH_SEGMENT_OPTIONS = MONTH_SHORT_NAMES.map((label, index) => ({ label, value: index + 1 }))
+
 interface Category {
   id: number
   name: string
@@ -53,6 +60,7 @@ interface Category {
 
 interface BudgetPlanDetailsTableProps {
   versionId: number
+  year: number
   categories: Category[]
   isEditable: boolean
   onAfterSave?: () => void
@@ -69,12 +77,16 @@ interface CategoryRow {
   [key: string]: any // For month values (month_1, month_2, etc.)
 }
 
-export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
+export const BudgetPlanDetailsTable = React.forwardRef<
+  { scrollBy: (direction: 'left' | 'right') => void },
+  BudgetPlanDetailsTableProps
+>(({
   versionId,
+  year,
   categories,
   isEditable,
   onAfterSave,
-}) => {
+}, ref) => {
   const { data: planDetails = [], isLoading } = usePlanDetails(versionId)
   const createMutation = useCreatePlanDetail()
   const updateMutation = useUpdatePlanDetail()
@@ -82,6 +94,22 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
   const [data, setData] = useState<CategoryRow[]>([])
   const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+
+  // Scroll state and refs
+  const currentMonth = new Date().getMonth() + 1
+  const [activeMonth, setActiveMonth] = useState<number>(currentMonth)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollTargetRef = useRef<HTMLDivElement | null>(null)
+  const isInitialMount = useRef(true)
+
+  // Risk premium state
+  const [riskEnabled, setRiskEnabled] = useState<boolean>(false)
+
+  // Load baseline modal state
+  const [baselineModalOpen, setBaselineModalOpen] = useState<boolean>(false)
+
+  // Manage categories modal state
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState<boolean>(false)
 
   const { orderedCategories, descendantsMap } = useMemo(() => {
     if (!categories.length) {
@@ -333,17 +361,24 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       }
 
       // For parent categories, sum values of all leaf descendants
-      return row.descendantIds.reduce((sum, id) => {
+      let sum = row.descendantIds.reduce((acc, id) => {
         const child = dataById.get(id)
-        if (!child) return sum
+        if (!child) return acc
         // Only sum leaf nodes (non-parent categories)
         if (!child.hasChildren) {
-          return sum + Number(child[`month_${monthKey}`] || 0)
+          return acc + Number(child[`month_${monthKey}`] || 0)
         }
-        return sum
+        return acc
       }, 0)
+
+      // Apply 10% risk premium if enabled for parent categories
+      if (riskEnabled) {
+        sum = sum * 1.1
+      }
+
+      return sum
     },
-    [dataById]
+    [dataById, riskEnabled]
   )
 
   // Calculate row total (memoized)
@@ -373,6 +408,97 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       .reduce((sum, row) => sum + getRowTotal(row), 0)
   }, [data, getRowTotal])
 
+  // Scroll functions (similar to BudgetPlanTable)
+  const resolveScrollTarget = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return null
+    const content = container.querySelector<HTMLDivElement>('.ant-table-content')
+    const body = container.querySelector<HTMLDivElement>('.ant-table-body')
+    return content ?? body ?? container
+  }, [])
+
+  const scrollToMonth = useCallback((month: number, behavior: ScrollBehavior = 'smooth', retryCount: number = 0) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const target = scrollTargetRef.current ?? scrollContainerRef.current
+          if (!target) {
+            console.warn('Scroll target not found')
+            return
+          }
+
+          const tableBody = target.querySelector('.ant-table-body')
+          if (!tableBody && retryCount < 5) {
+            console.warn(`Table body not found, retrying... (${retryCount + 1}/5)`)
+            setTimeout(() => {
+              scrollToMonth(month, behavior, retryCount + 1)
+            }, 100)
+            return
+          }
+
+          const approximateCenterOffset = target.clientWidth * 0.25
+          const columnOffset = Math.max(0, (month - 1) * MONTH_COLUMN_WIDTH - approximateCenterOffset)
+          target.scrollTo({ left: columnOffset, behavior })
+        }, 200)
+      })
+    })
+  }, [])
+
+  const handleMonthSelect = useCallback(
+    (month: number) => {
+      setActiveMonth(month)
+      scrollToMonth(month)
+    },
+    [scrollToMonth]
+  )
+
+  const handleResetMonth = useCallback(() => {
+    setActiveMonth(currentMonth)
+    scrollToMonth(currentMonth)
+  }, [currentMonth, scrollToMonth])
+
+  // Scroll left/right by viewport width
+  const scrollBy = useCallback((direction: 'left' | 'right') => {
+    const target = scrollTargetRef.current ?? scrollContainerRef.current
+    if (!target) return
+    const step = target.clientWidth * 0.6
+    const delta = direction === 'left' ? -step : step
+    target.scrollBy({ left: delta, behavior: 'smooth' })
+  }, [])
+
+  // Expose scrollBy method to parent via ref
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      scrollBy,
+    }),
+    [scrollBy]
+  )
+
+  // Initialize scroll target and scroll to active month on mount
+  useEffect(() => {
+    const target = resolveScrollTarget()
+    if (!target) return
+
+    scrollTargetRef.current = target
+
+    if (isInitialMount.current && planDetails.length > 0) {
+      scrollToMonth(activeMonth, 'auto')
+      isInitialMount.current = false
+    }
+  }, [planDetails, resolveScrollTarget, scrollToMonth, activeMonth])
+
+  // Smooth scroll when active month changes
+  useEffect(() => {
+    if (!planDetails.length || isInitialMount.current) return
+
+    const timer = setTimeout(() => {
+      scrollToMonth(activeMonth, 'smooth')
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [activeMonth, planDetails, scrollToMonth])
+
   const columns: ColumnsType<CategoryRow> = [
     {
       title: 'Категория',
@@ -401,8 +527,13 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
               </span>
             )}
             {!record.hasChildren && <span style={{ width: 14 }} />}
-            <div>
-              <div>{record.categoryName}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>{record.categoryName}</span>
+                {record.hasChildren && riskEnabled && (
+                  <Tag color="orange" style={{ fontSize: 11 }}>Риск +10%</Tag>
+                )}
+              </div>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {record.categoryType}
               </Text>
@@ -417,6 +548,13 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
       key: `month_${month.key}`,
       width: MONTH_COLUMN_WIDTH,
       align: 'right' as const,
+      className: activeMonth === month.key ? 'active-month-header' : undefined,
+      onHeaderCell: () => ({
+        className: activeMonth === month.key ? 'active-month-header' : undefined,
+      }),
+      onCell: () => ({
+        className: activeMonth === month.key ? 'active-month-cell' : undefined,
+      }),
       render: (_value: number, record: CategoryRow) => {
         const displayValue = getMonthValue(record, month.key)
         const formatted = formatNumber(Number(displayValue ?? 0))
@@ -478,35 +616,157 @@ export const BudgetPlanDetailsTable: React.FC<BudgetPlanDetailsTableProps> = ({
     CATEGORY_COLUMN_WIDTH + MONTHS.length * MONTH_COLUMN_WIDTH + TOTAL_COLUMN_WIDTH + 120
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      {isEditable && changedCells.size > 0 && (
-        <Space style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            onClick={handleSave}
-            loading={createMutation.isPending || updateMutation.isPending}
-          >
-            Сохранить ({changedCells.size})
-          </Button>
-          <Button icon={<UndoOutlined />} onClick={handleReset}>
-            Отменить
-          </Button>
-        </Space>
-      )}
+    <div>
+      {/* Sticky Control Panel */}
+      <div
+        style={{
+          position: 'sticky',
+          top: STICKY_HEADER_OFFSET,
+          zIndex: 10,
+          backgroundColor: '#fff',
+          paddingTop: 12,
+          paddingBottom: 12,
+          marginBottom: 0,
+          borderBottom: '2px solid #f0f0f0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap',
+            marginBottom: 12,
+          }}
+        >
+          <Space size="middle" align="center" wrap>
+            <span style={{ fontWeight: 500 }}>Месяц:</span>
+            <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+              <Segmented
+                options={MONTH_SEGMENT_OPTIONS}
+                value={activeMonth}
+                onChange={(value) => handleMonthSelect(Number(value))}
+              />
+            </div>
+          </Space>
 
-      <Table
-        columns={columns}
-        dataSource={visibleData}
-        rowKey="categoryId"
-        loading={isLoading}
-        pagination={false}
-        scroll={{ x: tableScrollX }}
-        summary={() => summaryRow}
-        bordered
-        size="small"
-        tableLayout="fixed"
+          <Space size="middle">
+            <Checkbox
+              checked={riskEnabled}
+              onChange={(e) => setRiskEnabled(e.target.checked)}
+            >
+              <span style={{ fontWeight: 500 }}>Риск +10%</span>
+            </Checkbox>
+
+            <Button
+              type="link"
+              icon={<CalendarOutlined />}
+              onClick={handleResetMonth}
+              style={{ padding: 0 }}
+            >
+              К текущему месяцу
+            </Button>
+          </Space>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <Space>
+            {isEditable && (
+              <>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={() => setBaselineModalOpen(true)}
+                >
+                  Загрузить из {year - 1} года
+                </Button>
+                <Button
+                  icon={<AppstoreAddOutlined />}
+                  onClick={() => setManageCategoriesOpen(true)}
+                >
+                  Управление категориями
+                </Button>
+              </>
+            )}
+          </Space>
+
+          {isEditable && changedCells.size > 0 && (
+            <Space>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                onClick={handleSave}
+                loading={createMutation.isPending || updateMutation.isPending}
+              >
+                Сохранить ({changedCells.size})
+              </Button>
+              <Button icon={<UndoOutlined />} onClick={handleReset}>
+                Отменить
+              </Button>
+            </Space>
+          )}
+        </div>
+      </div>
+
+      {/* Table Container with Scroll Ref */}
+      <div
+        ref={scrollContainerRef}
+        style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
+      >
+        <Table
+          sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
+          columns={columns}
+          dataSource={visibleData}
+          rowKey="categoryId"
+          loading={isLoading}
+          pagination={false}
+          scroll={{ x: tableScrollX }}
+          summary={() => summaryRow}
+          bordered
+          size="small"
+          tableLayout="fixed"
+        />
+      </div>
+
+      {/* CSS for Active Month Highlighting */}
+      <style>{`
+        .active-month-header {
+          background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
+          color: #0958d9 !important;
+          font-weight: 600 !important;
+        }
+        .active-month-cell {
+          background-color: rgba(222, 242, 255, 0.7) !important;
+          transition: background-color 0.2s ease;
+        }
+        .active-month-cell:hover {
+          background-color: rgba(184, 218, 255, 0.8) !important;
+        }
+      `}</style>
+
+      {/* Load Baseline Modal */}
+      <LoadBaselineModal
+        open={baselineModalOpen}
+        versionId={versionId}
+        year={year}
+        categories={categories}
+        onClose={() => setBaselineModalOpen(false)}
+        onSuccess={() => {
+          onAfterSave?.()
+        }}
+      />
+
+      {/* Manage Categories Modal */}
+      <ManageCategoriesModal
+        open={manageCategoriesOpen}
+        categories={categories}
+        planDetails={planDetails}
+        onClose={() => setManageCategoriesOpen(false)}
+        onSuccess={() => {
+          onAfterSave?.()
+        }}
       />
     </div>
   )
-}
+})
