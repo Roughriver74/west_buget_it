@@ -367,7 +367,7 @@ def get_payment_calendar(
 ):
     """
     Get payment calendar view for a specific month
-    Returns daily aggregated payment data
+    Returns daily aggregated payment data with baseline plan
     """
     # Use current year/month if not provided
     if not year:
@@ -375,6 +375,15 @@ def get_payment_calendar(
     if not month:
         month = datetime.now().month
 
+    # Determine department
+    if current_user.role.value == "USER":
+        dept_id = current_user.department_id
+    elif department_id:
+        dept_id = department_id
+    else:
+        dept_id = current_user.department_id
+
+    # Get calendar data from forecast service
     forecast_service = PaymentForecastService(db)
     calendar_data = forecast_service.get_payment_calendar(
         year=year,
@@ -384,10 +393,62 @@ def get_payment_calendar(
         organization_id=organization_id,
     )
 
+    # Get baseline budget data
+    baseline = db.query(BudgetVersion).filter(
+        BudgetVersion.year == year,
+        BudgetVersion.department_id == dept_id,
+        BudgetVersion.is_baseline == True
+    ).first()
+
+    has_baseline = baseline is not None
+    baseline_version_name = baseline.version_name if baseline else None
+
+    # Get baseline plan details for the month
+    baseline_amounts = {}
+    if baseline:
+        query = db.query(BudgetPlanDetail).filter(
+            BudgetPlanDetail.version_id == baseline.id,
+            BudgetPlanDetail.month == month
+        )
+
+        if category_id:
+            query = query.filter(BudgetPlanDetail.category_id == category_id)
+
+        plan_details = query.all()
+
+        # Calculate total monthly baseline
+        total_baseline = sum(float(detail.planned_amount) for detail in plan_details)
+
+        # Distribute evenly across days in month
+        import calendar as cal
+        days_in_month = cal.monthrange(year, month)[1]
+        daily_baseline = total_baseline / days_in_month if days_in_month > 0 else 0
+
+        # Store baseline amount for each day
+        for day in range(1, days_in_month + 1):
+            day_date = datetime(year, month, day).date()
+            baseline_amounts[day_date] = daily_baseline
+
+    # Enhance calendar data with baseline amounts
+    enhanced_days = []
+    for day_data in calendar_data:
+        day_date = day_data['date']
+        baseline_amt = baseline_amounts.get(day_date, 0) if has_baseline else None
+
+        enhanced_days.append(PaymentCalendarDay(
+            date=day_data['date'],
+            total_amount=day_data['total_amount'],
+            payment_count=day_data['payment_count'],
+            baseline_amount=baseline_amt,
+            forecast_amount=None  # Can be populated with forecast data if needed
+        ))
+
     return PaymentCalendar(
         year=year,
         month=month,
-        days=[PaymentCalendarDay(**item) for item in calendar_data],
+        days=enhanced_days,
+        has_baseline=has_baseline,
+        baseline_version_name=baseline_version_name
     )
 
 

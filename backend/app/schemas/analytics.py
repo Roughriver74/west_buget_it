@@ -105,12 +105,16 @@ class PaymentCalendarDay(BaseModel):
     date: date
     total_amount: float
     payment_count: int
+    baseline_amount: Optional[float] = None  # Planned amount from baseline budget
+    forecast_amount: Optional[float] = None   # Forecasted amount
 
 
 class PaymentCalendar(BaseModel):
     year: int
     month: int
     days: List[PaymentCalendarDay]
+    has_baseline: bool = False
+    baseline_version_name: Optional[str] = None
 
 
 class PaymentDetail(BaseModel):
