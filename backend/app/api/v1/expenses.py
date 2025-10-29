@@ -272,11 +272,12 @@ def get_expense(
         )
 
     # Check department access for USER role
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if expense.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: You can only view expenses from your own department"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Expense with id {expense_id} not found"
             )
 
     return expense
@@ -640,17 +641,27 @@ class FTPImportRequest(BaseModel):
 @router.post("/import/ftp")
 async def import_expenses_from_ftp(
     request: FTPImportRequest,
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Import expenses from FTP server
+    Import expenses from FTP server (ADMIN only)
 
     This endpoint will:
     1. Download Excel file from FTP
     2. Delete expenses from specified month onwards (default: July 2025)
     3. Import new expenses from the file
     4. Skip duplicates based on expense number
+
+    Note: Only ADMIN can import expenses from FTP
     """
+    # Only ADMIN can import from FTP
+    if current_user.role != UserRoleEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can import expenses from FTP"
+        )
+
     # Get FTP credentials from environment variables
     ftp_host = os.getenv("FTP_HOST", "floppisw.beget.tech")
     ftp_user = os.getenv("FTP_USER", "floppisw_zrds")

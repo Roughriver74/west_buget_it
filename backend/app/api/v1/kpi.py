@@ -180,10 +180,11 @@ async def get_kpi_goal(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, goal.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to access this goal"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"KPI Goal with id {goal_id} not found"
         )
 
     return goal
@@ -228,10 +229,11 @@ async def update_kpi_goal(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, goal.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to update this goal"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"KPI Goal with id {goal_id} not found"
         )
 
     # Update fields
@@ -262,10 +264,11 @@ async def delete_kpi_goal(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, goal.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to delete this goal"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"KPI Goal with id {goal_id} not found"
         )
 
     db.delete(goal)
@@ -327,10 +330,11 @@ async def get_employee_kpi(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, kpi.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to access this KPI"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee KPI with id {kpi_id} not found"
         )
 
     return kpi
@@ -427,10 +431,11 @@ async def update_employee_kpi(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, kpi.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to update this KPI"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee KPI with id {kpi_id} not found"
         )
 
     # Update fields
@@ -482,10 +487,11 @@ async def delete_employee_kpi(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, kpi.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to delete this KPI"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee KPI with id {kpi_id} not found"
         )
 
     db.delete(kpi)
@@ -902,11 +908,12 @@ async def update_employee_kpi_goal(
         )
 
     # Check access through employee
+    # Return 404 instead of 403 to prevent information disclosure
     employee = db.query(Employee).filter(Employee.id == assignment.employee_id).first()
     if not employee or not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to update this assignment"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee KPI goal assignment with id {assignment_id} not found"
         )
 
     # Update fields
@@ -943,11 +950,12 @@ async def delete_employee_kpi_goal(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     employee = db.query(Employee).filter(Employee.id == assignment.employee_id).first()
     if not employee or not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to delete this assignment"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee KPI goal assignment with id {assignment_id} not found"
         )
 
     db.delete(assignment)

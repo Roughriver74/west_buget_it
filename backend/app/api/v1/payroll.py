@@ -107,10 +107,11 @@ async def get_payroll_plan(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, plan.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this payroll plan"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll plan not found"
         )
 
     return plan
@@ -208,10 +209,11 @@ async def update_payroll_plan(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, plan.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this payroll plan"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll plan not found"
         )
 
     # Update plan fields
@@ -258,10 +260,11 @@ async def delete_payroll_plan(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, plan.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this payroll plan"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll plan not found"
         )
 
     db.delete(plan)
@@ -430,10 +433,11 @@ async def update_payroll_actual(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, actual.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this payroll actual"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll actual not found"
         )
 
     # Update actual fields
@@ -508,10 +512,11 @@ async def delete_payroll_actual(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, actual.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this payroll actual"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payroll actual not found"
         )
 
     db.delete(actual)

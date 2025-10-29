@@ -108,11 +108,12 @@ def get_contractor(
         )
 
     # USER can only view contractors from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if contractor.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to view this contractor"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Contractor with id {contractor_id} not found"
             )
 
     return contractor
@@ -193,11 +194,12 @@ def update_contractor(
         )
 
     # USER can only update contractors from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_contractor.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to update this contractor"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Contractor with id {contractor_id} not found"
             )
 
     # Update fields
@@ -226,11 +228,12 @@ def delete_contractor(
         )
 
     # USER can only delete contractors from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_contractor.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to delete this contractor"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Contractor with id {contractor_id} not found"
             )
 
     # Hard delete - permanently remove from database
