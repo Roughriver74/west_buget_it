@@ -4,6 +4,7 @@ import TotalAmountWidget from './TotalAmountWidget'
 import CategoryChartWidget from './CategoryChartWidget'
 import MonthlyTrendWidget from './MonthlyTrendWidget'
 import RecentExpensesWidget from './RecentExpensesWidget'
+import BudgetPlanVsActualWidget from './BudgetPlanVsActualWidget'
 
 interface WidgetRendererProps {
   widget: Widget
@@ -19,6 +20,8 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ widget }) => {
       return <MonthlyTrendWidget title={widget.title} config={widget.config} />
     case 'recent_expenses':
       return <RecentExpensesWidget title={widget.title} config={widget.config} />
+    case 'budget_plan_vs_actual':
+      return <BudgetPlanVsActualWidget year={widget.config.year} height={widget.config.height} showStats={widget.config.showStats} />
     default:
       return <div>Неизвестный тип виджета: {widget.type}</div>
   }

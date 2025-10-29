@@ -10,6 +10,7 @@ import dayjs from 'dayjs'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
+import BudgetPlanVsActualWidget from '@/components/dashboard/widgets/BudgetPlanVsActualWidget'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -242,6 +243,13 @@ const DashboardPage = () => {
               </BarChart>
             </ResponsiveContainer>
           </Card>
+        </Col>
+      </Row>
+
+      {/* План vs Факт - годовой обзор */}
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        <Col xs={24}>
+          <BudgetPlanVsActualWidget year={year} height={400} showStats={true} />
         </Col>
       </Row>
     </div>

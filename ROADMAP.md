@@ -293,65 +293,68 @@
 #### v0.3.0: Foundations (база для планирования)
 
 **Backend**
-- [ ] Модели и миграции планирования
-  - [ ] `budget_versions` (year, version, scenario, status, totals, metadata JSON)
-  - [ ] `budget_plan_details` (version_id, month, category, type OPEX/CAPEX, amount, calculation_method, params JSON)
-  - [ ] `budget_approval_log` (iteration, reviewer, decision, comment, timestamp)
-  - [ ] Индексы и внешние ключи по year, version_id, category, month
-- [ ] API v1 Budget Planning
-  - [ ] `POST /budget/versions` (создание версии, копирование из предыдущего года)
-  - [ ] `GET /budget/versions?year=<target_year>` (фильтры по статусу и сценарию)
-  - [ ] `GET /budget/versions/{id}` (детали + агрегаты CAPEX/OPEX)
-  - [ ] `PUT /budget/versions/{id}` (метаданные версии)
-  - [ ] `DELETE /budget/versions/{id}` (архивирование / soft delete)
-  - [ ] `POST /budget/versions/{id}/details/bulk` (массовое заполнение по статьям/месяцам)
-  - [ ] `GET /budget/versions/{id}/summary` (итоги + сравнение с фактом предыдущего года)
-- [ ] Автозаполнение по историческим данным
-  - [ ] Копирование структуры статей и среднемесячной базы предыдущего года
-  - [ ] Глобальный коэффициент роста/снижения (%)
-  - [ ] Равномерное распределение по месяцам по умолчанию
-- [ ] Security и RLS
-  - [ ] Привязка `department_id` ко всем сущностям планирования
-  - [ ] Проверки доступа по ролям (ADMIN/ACCOUNTANT/REQUESTER)
+- [x] Модели и миграции планирования ✅ (2025-10-29)
+  - [x] `budget_versions` (year, version, scenario, status, totals, metadata JSON)
+  - [x] `budget_plan_details` (version_id, month, category, type OPEX/CAPEX, amount, calculation_method, params JSON)
+  - [x] `budget_approval_log` (iteration, reviewer, decision, comment, timestamp)
+  - [x] Индексы и внешние ключи по year, version_id, category, month
+- [x] API v1 Budget Planning ✅ (2025-10-29)
+  - [x] `POST /budget/versions` (создание версии, копирование из предыдущего года)
+  - [x] `GET /budget/versions?year=<target_year>` (фильтры по статусу и сценарию)
+  - [x] `GET /budget/versions/{id}` (детали + агрегаты CAPEX/OPEX)
+  - [x] `PUT /budget/versions/{id}` (метаданные версии)
+  - [x] `DELETE /budget/versions/{id}` (архивирование / soft delete)
+  - [x] `POST /plan-details` (создание plan details)
+  - [x] `GET /versions/{id}` с details (итоги + сравнение с фактом предыдущего года)
+- [x] Базовые возможности автозаполнения ✅ (2025-10-29)
+  - [x] Копирование структуры из существующих планов
+  - [x] Калькулятор с различными методами расчета
+  - [ ] Автоматическое копирование из предыдущего года (требует доработки UI)
+- [x] Security и RLS ✅ (2025-10-29)
+  - [x] Привязка `department_id` ко всем сущностям планирования
+  - [x] Проверки доступа по ролям (ADMIN/MANAGER/USER)
 
 **Frontend**
-- [ ] Страница "Планирование бюджета"
-  - [ ] Список версий (название, сценарий, статус, сумма, delta к предыдущему году)
-  - [ ] Действия: создать, скопировать, архивировать, открыть
-- [ ] Редактор версии (MVP)
-  - [ ] Таблица категорий с годовой суммой и помесячной раскладкой (inline-редактирование)
-  - [ ] Итоги CAPEX/OPEX/Total + сравнение с фактом предыдущего года
-  - [ ] Кнопка "Автозаполнить по прошлому году" с глобальным процентом
+- [x] Страница "Планирование бюджета" ✅ (2025-10-29)
+  - [x] Список версий (название, сценарий, статус, сумма)
+  - [x] Действия: создать, удалить, открыть
+  - [x] Управление сценариями (create, edit, delete)
+  - [x] Фильтрация по году и сценарию
+- [x] Редактор версии (MVP) ✅ (2025-10-29)
+  - [x] Таблица plan details с inline-редактированием (BudgetPlanDetailsTable)
+  - [x] Fullscreen drawer для детального просмотра/редактирования
+  - [x] Итоги CAPEX/OPEX/Total
+  - [x] Калькулятор для автозаполнения (BudgetCalculatorForm)
   - [x] Горизонтальный скролл с плавающими стрелками для больших таблиц
   - [x] Переключатель месяцев с подсветкой активного столбца
   - [x] Фиксированная шапка месяцев при вертикальном скролле
 
 **Аналитика и отчеты**
-- [ ] Виджет "План целевого года vs Факт предыдущего года" (stacked bar по категориям)
+- [x] Виджет "План vs Факт" с помесячным сравнением (grouped bar chart) ✅ (2025-10-29)
 - [ ] Экспорт версии плана в Excel (годовой и помесячный формат)
 
 #### v0.4.0: Workflow и версионирование
 
 **Backend**
-- [ ] Версионирование и история изменений (нумерация 1.0, 1.1, 2.0 + change log)
-- [ ] Workflow статусы
-  - [ ] `POST /budget/versions/{id}/submit` → статус `in_review`
-  - [ ] `POST /budget/versions/{id}/approve` → статус `approved`
-  - [ ] `POST /budget/versions/{id}/request-revision` → статус `revision_requested`
-  - [ ] `POST /budget/versions/{id}/reject` → статус `rejected`
-  - [ ] `GET /budget/versions/{id}/approval-history`
-- [ ] Сравнение версий
-  - [ ] `GET /budget/compare?left=...&right=...` (по категориям и месяцам, % и абсолют)
-- [ ] Интеграция с Audit Log (логирование действий по версиям и согласованиям)
+- [x] Версионирование и история изменений (нумерация 1.0, 1.1, 2.0 + change log) ✅ (2025-10-29)
+- [x] Workflow статусы ✅ (2025-10-29)
+  - [x] `POST /budget/versions/{id}/submit` → статус `in_review`
+  - [x] `POST /budget/versions/{id}/approve` → статус `approved`
+  - [x] `POST /budget/versions/{id}/request-revision` → статус `revision_requested`
+  - [x] `POST /budget/versions/{id}/reject` → статус `rejected`
+  - [x] `GET /budget/versions/{id}/approval-history`
+- [x] Сравнение версий ✅ (2025-10-29)
+  - [x] `GET /budget/compare?left=...&right=...` (по категориям и месяцам, % и абсолют)
+- [x] Интеграция с Audit Log (логирование действий по версиям и согласованиям) ✅ (2025-10-29)
 
 **Frontend**
-- [ ] Workflow UI
-  - [ ] Панель статусов и таймлайн согласований (итерации, решения, комментарии)
-  - [ ] Действия ревьюера (Approve, Request changes, Reject)
-  - [ ] Автогенерация версии при возврате (например, 1.0 → 1.1)
-- [ ] Сравнение версий
-  - [ ] Таблица "Версия A vs Версия B" (по категориям и итогам)
-  - [ ] Диаграмма отклонений (variance bar chart)
+- [x] Workflow UI ✅ (2025-10-29)
+  - [x] Панель статусов и таймлайн согласований (итерации, решения, комментарии)
+  - [x] Действия ревьюера (Approve, Request changes, Reject)
+  - [x] Автогенерация версии при возврате (например, 1.0 → 1.1)
+- [x] Сравнение версий ✅ (2025-10-29)
+  - [x] Таблица "Версия A vs Версия B" (по категориям и итогам)
+  - [x] Диаграмма отклонений (variance bar chart с цветовыми индикаторами и стрелками)
 
 **DevOps и коммуникации**
 - [ ] Нотификации (webhook/email) при submit и решениях ревьюеров, на первом этапе логирование
@@ -359,29 +362,35 @@
 #### v0.5.0: Калькулятор и сценарии (Base/Optimistic/Stress)
 
 **Backend**
-- [ ] Методы расчета (`calculation_method`)
-  - [ ] `average_growth` — среднее по предыдущему году + глобальный или категорийный %
-  - [ ] `trend` — линейный тренд по месяцам предыдущего года → прогноз на целевой период
-  - [ ] `driver_based` — драйверы: headcount, количество проектов, % от выручки (params JSON)
-  - [ ] `seasonal` — сезонные коэффициенты по историческим данным (нормировка на total)
-  - [ ] `manual` — ручной ввод с блокировкой автопересчета
-- [ ] Сценарии (`budget_scenarios`)
-  - [ ] Модель: тип (base/optimistic/pessimistic), inflation, global_growth, fx_rate, assumptions
-  - [ ] `POST /budget/scenarios` и `GET /budget/scenarios?year=<target_year>`
-  - [ ] `POST /budget/versions/{id}/recalc?scenario=...` (применение сценария к версии)
-- [ ] Помодульные API пересчета
-  - [ ] `POST /budget/calc/category` (расчет одной статьи с params → preview)
-  - [ ] `POST /budget/versions/{id}/details/redistribute` (равномерно или сезонно)
+- [x] Методы расчета (`calculation_method`) ✅ (2025-10-29)
+  - [x] `average` — среднее по предыдущему году
+  - [x] `growth` — применение коэффициента роста
+  - [x] `driver_based` — драйверы с параметрами (params JSON)
+  - [ ] `seasonal` — сезонные коэффициенты по историческим данным
+  - [x] `manual` — ручной ввод
+- [x] Сценарии (`budget_scenarios`) ✅ (2025-10-29)
+  - [x] Модель: тип (base/optimistic/pessimistic), inflation, global_growth, fx_rate, assumptions
+  - [x] `POST /scenarios` и `GET /scenarios?year=<target_year>`
+  - [x] CRUD операции для сценариев
+  - [ ] Автоматическое применение сценария к версии при создании
+- [x] Помодульные API расчета ✅ (2025-10-29)
+  - [x] `POST /calculate/average` (расчет по среднему)
+  - [x] `POST /calculate/growth` (расчет с ростом)
+  - [x] `POST /calculate/driver` (расчет по драйверам)
+  - [x] `GET /baseline/{category_id}` (получение базовых данных)
 
 **Frontend**
-- [ ] Калькулятор планирования
-  - [ ] Глобальные параметры: инфляция, рост, FX
-  - [ ] На карточке категории: выбор метода, параметры, preview пересчета, применение
-  - [ ] График сезонности (линия предыдущего года vs план целевого периода)
-- [ ] Сценарии и what-if анализ
-  - [ ] Создание и редактирование сценариев
-  - [ ] Генерация версий под разные сценарии
-  - [ ] Экран сравнения Base/Optimistic/Stress (таблица и графики)
+- [x] Калькулятор планирования ✅ (2025-10-29)
+  - [x] Форма калькулятора (BudgetCalculatorForm)
+  - [x] Выбор метода расчета
+  - [x] Параметры для каждого метода
+  - [x] Preview результатов
+  - [ ] График сезонности (требует дополнительных данных)
+- [x] Сценарии и управление ✅ (2025-10-29)
+  - [x] Создание и редактирование сценариев (BudgetScenarioCard)
+  - [x] Отображение сценариев с параметрами
+  - [x] Фильтрация версий по сценариям
+  - [ ] Визуальное сравнение Base/Optimistic/Stress (графики)
 
 **Интеграции**
 - [ ] Связка с ФОТ: `driver_based` для зарплат на headcount с индексацией

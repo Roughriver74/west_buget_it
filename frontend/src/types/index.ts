@@ -182,6 +182,7 @@ export type WidgetType =
   | 'budget_execution'
   | 'top_contractors'
   | 'capex_opex_ratio'
+  | 'budget_plan_vs_actual'
 
 export interface WidgetLayout {
   x: number
