@@ -105,10 +105,11 @@ async def get_employee(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     return employee
@@ -203,10 +204,11 @@ async def update_employee(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     # Track salary change
@@ -263,10 +265,11 @@ async def delete_employee(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     # Check for related records
@@ -335,10 +338,11 @@ async def get_salary_history(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     salary_history = db.query(SalaryHistory).filter(
@@ -373,10 +377,11 @@ async def add_salary_history(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     # Create salary history record

@@ -103,11 +103,12 @@ def get_category(
         )
 
     # USER can only view categories from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if category.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to view this category"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category with id {category_id} not found"
             )
 
     return category
@@ -187,11 +188,12 @@ def update_category(
         )
 
     # USER can only update categories from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_category.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to update this category"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category with id {category_id} not found"
             )
 
     # Update fields
@@ -228,11 +230,12 @@ def delete_category(
         )
 
     # USER can only delete categories from their department
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_category.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to delete this category"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category with id {category_id} not found"
             )
 
     # Hard delete - permanently remove from database

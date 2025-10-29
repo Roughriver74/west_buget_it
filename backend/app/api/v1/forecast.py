@@ -34,9 +34,10 @@ def check_department_access(current_user: User, department_id: int) -> None:
                 detail="User has no assigned department"
             )
         if department_id != current_user.department_id:
+            # Return 404 instead of 403 to prevent information disclosure
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: You can only access your own department's data"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found"
             )
     # MANAGER and ADMIN can access any department
 

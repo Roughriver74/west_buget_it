@@ -94,11 +94,12 @@ def get_budget_plan(
         )
 
     # Check department access for USER role
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if plan.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: You can only view budget plans from your own department"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Budget plan with id {plan_id} not found"
             )
 
     return plan
@@ -176,11 +177,12 @@ def update_budget_plan(
         )
 
     # Check department access for USER role
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_plan.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: You can only update budget plans from your own department"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Budget plan with id {plan_id} not found"
             )
 
     # Update fields
@@ -213,11 +215,12 @@ def delete_budget_plan(
         )
 
     # Check department access for USER role
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if db_plan.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: You can only delete budget plans from your own department"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Budget plan with id {plan_id} not found"
             )
 
     db.delete(db_plan)
