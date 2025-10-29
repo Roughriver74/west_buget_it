@@ -43,12 +43,21 @@ def upgrade() -> None:
                      'idx_employee_kpi_goals_goal_id', 'idx_employee_kpi_goals_month', 'idx_employee_kpi_goals_year']:
         if idx_name in employee_kpi_goals_indexes:
             op.drop_index(idx_name, table_name='employee_kpi_goals')
-    op.create_index(op.f('ix_employee_kpi_goals_employee_id'), 'employee_kpi_goals', ['employee_id'], unique=False)
-    op.create_index(op.f('ix_employee_kpi_goals_employee_kpi_id'), 'employee_kpi_goals', ['employee_kpi_id'], unique=False)
-    op.create_index(op.f('ix_employee_kpi_goals_goal_id'), 'employee_kpi_goals', ['goal_id'], unique=False)
-    op.create_index(op.f('ix_employee_kpi_goals_id'), 'employee_kpi_goals', ['id'], unique=False)
-    op.create_index(op.f('ix_employee_kpi_goals_month'), 'employee_kpi_goals', ['month'], unique=False)
-    op.create_index(op.f('ix_employee_kpi_goals_year'), 'employee_kpi_goals', ['year'], unique=False)
+
+    # Create new indexes only if they don't exist
+    employee_kpi_goals_indexes = [idx['name'] for idx in inspector.get_indexes('employee_kpi_goals')]
+    if 'ix_employee_kpi_goals_employee_id' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_employee_id'), 'employee_kpi_goals', ['employee_id'], unique=False)
+    if 'ix_employee_kpi_goals_employee_kpi_id' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_employee_kpi_id'), 'employee_kpi_goals', ['employee_kpi_id'], unique=False)
+    if 'ix_employee_kpi_goals_goal_id' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_goal_id'), 'employee_kpi_goals', ['goal_id'], unique=False)
+    if 'ix_employee_kpi_goals_id' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_id'), 'employee_kpi_goals', ['id'], unique=False)
+    if 'ix_employee_kpi_goals_month' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_month'), 'employee_kpi_goals', ['month'], unique=False)
+    if 'ix_employee_kpi_goals_year' not in employee_kpi_goals_indexes:
+        op.create_index(op.f('ix_employee_kpi_goals_year'), 'employee_kpi_goals', ['year'], unique=False)
     op.execute("ALTER TABLE employee_kpis ALTER COLUMN monthly_bonus_type DROP DEFAULT")
     op.execute("ALTER TABLE employee_kpis ALTER COLUMN monthly_bonus_type TYPE bonustypeenum USING monthly_bonus_type::text::bonustypeenum")
     op.execute("ALTER TABLE employee_kpis ALTER COLUMN monthly_bonus_type SET DEFAULT 'PERFORMANCE_BASED'::bonustypeenum")
@@ -63,11 +72,19 @@ def upgrade() -> None:
     employee_kpis_indexes = [idx['name'] for idx in inspector.get_indexes('employee_kpis')]
     if 'idx_employee_kpis_employee_id' in employee_kpis_indexes:
         op.drop_index('idx_employee_kpis_employee_id', table_name='employee_kpis')
-    op.create_index(op.f('ix_employee_kpis_department_id'), 'employee_kpis', ['department_id'], unique=False)
-    op.create_index(op.f('ix_employee_kpis_employee_id'), 'employee_kpis', ['employee_id'], unique=False)
-    op.create_index(op.f('ix_employee_kpis_id'), 'employee_kpis', ['id'], unique=False)
-    op.create_index(op.f('ix_employee_kpis_month'), 'employee_kpis', ['month'], unique=False)
-    op.create_index(op.f('ix_employee_kpis_year'), 'employee_kpis', ['year'], unique=False)
+
+    # Create new indexes only if they don't exist
+    employee_kpis_indexes = [idx['name'] for idx in inspector.get_indexes('employee_kpis')]
+    if 'ix_employee_kpis_department_id' not in employee_kpis_indexes:
+        op.create_index(op.f('ix_employee_kpis_department_id'), 'employee_kpis', ['department_id'], unique=False)
+    if 'ix_employee_kpis_employee_id' not in employee_kpis_indexes:
+        op.create_index(op.f('ix_employee_kpis_employee_id'), 'employee_kpis', ['employee_id'], unique=False)
+    if 'ix_employee_kpis_id' not in employee_kpis_indexes:
+        op.create_index(op.f('ix_employee_kpis_id'), 'employee_kpis', ['id'], unique=False)
+    if 'ix_employee_kpis_month' not in employee_kpis_indexes:
+        op.create_index(op.f('ix_employee_kpis_month'), 'employee_kpis', ['month'], unique=False)
+    if 'ix_employee_kpis_year' not in employee_kpis_indexes:
+        op.create_index(op.f('ix_employee_kpis_year'), 'employee_kpis', ['year'], unique=False)
     op.execute("ALTER TABLE kpi_goals ALTER COLUMN status DROP DEFAULT")
     op.execute("ALTER TABLE kpi_goals ALTER COLUMN status TYPE kpigoalstatusenum USING status::text::kpigoalstatusenum")
     op.execute("ALTER TABLE kpi_goals ALTER COLUMN status SET DEFAULT 'DRAFT'::kpigoalstatusenum")
@@ -77,12 +94,21 @@ def upgrade() -> None:
     for idx_name in ['idx_kpi_goals_category', 'idx_kpi_goals_name', 'idx_kpi_goals_year']:
         if idx_name in kpi_goals_indexes:
             op.drop_index(idx_name, table_name='kpi_goals')
-    op.create_index(op.f('ix_kpi_goals_category'), 'kpi_goals', ['category'], unique=False)
-    op.create_index(op.f('ix_kpi_goals_department_id'), 'kpi_goals', ['department_id'], unique=False)
-    op.create_index(op.f('ix_kpi_goals_id'), 'kpi_goals', ['id'], unique=False)
-    op.create_index(op.f('ix_kpi_goals_name'), 'kpi_goals', ['name'], unique=False)
-    op.create_index(op.f('ix_kpi_goals_status'), 'kpi_goals', ['status'], unique=False)
-    op.create_index(op.f('ix_kpi_goals_year'), 'kpi_goals', ['year'], unique=False)
+
+    # Create new indexes only if they don't exist
+    kpi_goals_indexes = [idx['name'] for idx in inspector.get_indexes('kpi_goals')]
+    if 'ix_kpi_goals_category' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_category'), 'kpi_goals', ['category'], unique=False)
+    if 'ix_kpi_goals_department_id' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_department_id'), 'kpi_goals', ['department_id'], unique=False)
+    if 'ix_kpi_goals_id' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_id'), 'kpi_goals', ['id'], unique=False)
+    if 'ix_kpi_goals_name' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_name'), 'kpi_goals', ['name'], unique=False)
+    if 'ix_kpi_goals_status' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_status'), 'kpi_goals', ['status'], unique=False)
+    if 'ix_kpi_goals_year' not in kpi_goals_indexes:
+        op.create_index(op.f('ix_kpi_goals_year'), 'kpi_goals', ['year'], unique=False)
     op.add_column('payroll_actuals', sa.Column('income_tax_rate', sa.Numeric(precision=5, scale=4), nullable=False, server_default='0.13'))
     op.add_column('payroll_actuals', sa.Column('income_tax_amount', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0'))
     op.add_column('payroll_actuals', sa.Column('social_tax_amount', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0'))
