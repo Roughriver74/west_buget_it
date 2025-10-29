@@ -135,6 +135,12 @@ from .kpi import (
     KPIDepartmentSummary,
     KPIGoalProgress,
 )
+from .budget_validation import (
+    BudgetInfo,
+    ExpenseValidationResponse,
+    CategoryBudgetAlert,
+    BudgetStatusResponse,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -284,4 +290,9 @@ __all__ = [
     "KPIEmployeeSummary",
     "KPIDepartmentSummary",
     "KPIGoalProgress",
+    # Budget Validation
+    "BudgetInfo",
+    "ExpenseValidationResponse",
+    "CategoryBudgetAlert",
+    "BudgetStatusResponse",
 ]

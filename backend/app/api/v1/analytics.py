@@ -36,6 +36,12 @@ from app.schemas.analytics import (
     PlanVsActualMonthly,
     PlanVsActualCategory,
 )
+from app.schemas.budget_validation import (
+    BudgetStatusResponse,
+    ExpenseValidationResponse,
+    BudgetInfo,
+)
+from app.services.budget_validator import BudgetValidator
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -751,4 +757,65 @@ def get_plan_vs_actual(
         execution_percent=round(total_execution_percent, 2),
         by_month=by_month,
         by_category=by_category
+    )
+
+
+@router.get("/budget-status", response_model=BudgetStatusResponse)
+def get_budget_status(
+    year: int = Query(..., description="Year to check"),
+    category_id: Optional[int] = Query(None, description="Filter by category"),
+    department_id: Optional[int] = Query(None, description="Filter by department"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get current budget status with alerts for overruns and at-risk categories.
+    Returns categories that have exceeded budget or are approaching limits (>=90%).
+    """
+    # Determine department to check
+    if current_user.role.value == "USER":
+        dept_id = current_user.department_id
+    elif department_id:
+        dept_id = department_id
+    else:
+        dept_id = current_user.department_id
+
+    validator = BudgetValidator(db)
+    status = validator.get_budget_status(year, dept_id, category_id)
+
+    return BudgetStatusResponse(**status)
+
+
+@router.post("/validate-expense", response_model=ExpenseValidationResponse)
+def validate_expense(
+    amount: float = Query(..., description="Expense amount"),
+    category_id: int = Query(..., description="Budget category ID"),
+    request_date: str = Query(..., description="Request date (YYYY-MM-DD)"),
+    expense_id: Optional[int] = Query(None, description="Expense ID (for updates)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Validate an expense against budget baseline before creating/updating.
+    Returns warnings and errors if budget limits would be exceeded.
+    """
+    try:
+        date = datetime.fromisoformat(request_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+    validator = BudgetValidator(db)
+    result = validator.validate_expense(
+        amount=amount,
+        category_id=category_id,
+        request_date=date,
+        department_id=current_user.department_id,
+        expense_id=expense_id
+    )
+
+    return ExpenseValidationResponse(
+        is_valid=result.is_valid,
+        warnings=result.warnings,
+        errors=result.errors,
+        budget_info=BudgetInfo(**result.budget_info) if result.budget_info else None
     )
