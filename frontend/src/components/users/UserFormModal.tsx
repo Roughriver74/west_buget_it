@@ -77,6 +77,19 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
     },
   })
 
+  // Password reset mutation (for edit mode)
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: number; password: string }) =>
+      usersApi.resetPassword(id, { new_password: password }),
+    onSuccess: () => {
+      message.success('Пароль успешно изменен')
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || error.message
+      message.error(`Ошибка при изменении пароля: ${errorMessage}`)
+    },
+  })
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
@@ -86,7 +99,14 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       } else if (mode === 'edit' && user) {
         // Don't send username and password on update
         const { username, password, ...updateValues } = values
-        updateMutation.mutate({ id: user.id, values: updateValues })
+
+        // First update user data
+        await updateMutation.mutateAsync({ id: user.id, values: updateValues })
+
+        // If password was provided, reset it separately
+        if (password && password.trim()) {
+          await resetPasswordMutation.mutateAsync({ id: user.id, password })
+        }
       }
     } catch (error) {
       console.error('Validation failed:', error)
@@ -107,7 +127,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
       okText={mode === 'create' ? 'Создать' : 'Сохранить'}
       cancelText="Отмена"
       width={700}
-      confirmLoading={createMutation.isPending || updateMutation.isPending}
+      confirmLoading={createMutation.isPending || updateMutation.isPending || resetPasswordMutation.isPending}
     >
       <Form
         form={form}
@@ -133,22 +153,20 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
           <Input placeholder="username" disabled={mode === 'edit'} />
         </Form.Item>
 
-        {mode === 'create' && (
-          <Form.Item
-            name="password"
-            label="Пароль"
-            rules={[
-              { required: true, message: 'Введите пароль' },
-              { min: 6, message: 'Минимум 6 символов' },
-              {
-                pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
-                message: 'Пароль должен содержать буквы и цифры'
-              },
-            ]}
-          >
-            <Input.Password placeholder="Минимум 6 символов" />
-          </Form.Item>
-        )}
+        <Form.Item
+          name="password"
+          label={mode === 'create' ? 'Пароль' : 'Новый пароль (оставьте пустым, чтобы не менять)'}
+          rules={[
+            { required: mode === 'create', message: 'Введите пароль' },
+            { min: 6, message: 'Минимум 6 символов' },
+            {
+              pattern: /^(?=.*[A-Za-z])(?=.*\d)/,
+              message: 'Пароль должен содержать буквы и цифры'
+            },
+          ]}
+        >
+          <Input.Password placeholder={mode === 'create' ? 'Минимум 6 символов' : 'Введите новый пароль или оставьте пустым'} />
+        </Form.Item>
 
         <Form.Item
           name="email"

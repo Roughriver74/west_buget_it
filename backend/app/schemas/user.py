@@ -67,6 +67,23 @@ class UserPasswordChange(BaseModel):
         return v
 
 
+# Admin password reset schema (no old password required)
+class UserPasswordReset(BaseModel):
+    """Schema for admin to reset user password"""
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+    @validator('new_password')
+    def validate_password(cls, v):
+        """Validate password strength"""
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters long')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        if not any(c.isalpha() for c in v):
+            raise ValueError('Password must contain at least one letter')
+        return v
+
+
 # User response schema
 class User(UserBase):
     """Schema for user response (without password)"""

@@ -37,6 +37,10 @@ export interface UserUpdate {
   is_active?: boolean
 }
 
+export interface UserPasswordReset {
+  new_password: string
+}
+
 export interface UserListItem {
   id: number
   username: string
@@ -70,5 +74,10 @@ export const usersApi = {
 
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`auth/users/${id}`)
+  },
+
+  resetPassword: async (id: number, passwordData: UserPasswordReset): Promise<{ message: string }> => {
+    const { data } = await apiClient.post(`auth/users/${id}/reset-password`, passwordData)
+    return data
   },
 }

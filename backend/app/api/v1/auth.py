@@ -13,6 +13,7 @@ from app.schemas.user import (
     UserCreate,
     UserUpdate,
     UserPasswordChange,
+    UserPasswordReset,
     UserListItem,
     UserLogin,
     UserLoginResponse,
@@ -322,3 +323,36 @@ async def delete_user(
     db.commit()
 
     return None
+
+
+@router.post("/users/{user_id}/reset-password", response_model=dict)
+async def reset_user_password(
+    user_id: int,
+    password_data: UserPasswordReset,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset user password by ID (Admin only)
+
+    Admin can reset any user's password without knowing the old password.
+    This is useful for password recovery and user management.
+    """
+    if current_user.role != UserRoleEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Update password
+    user.hashed_password = get_password_hash(password_data.new_password)
+    db.commit()
+
+    return {"message": "Password reset successfully"}
