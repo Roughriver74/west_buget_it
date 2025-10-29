@@ -19,31 +19,37 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Step 1: Add department_id column as nullable
-    op.add_column('forecast_expenses',
-        sa.Column('department_id', sa.Integer(), nullable=True)
-    )
+    # Check if department_id column already exists
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [c['name'] for c in inspector.get_columns('forecast_expenses')]
 
-    # Step 2: Set default department_id for existing records (department_id=2 is IT Отдел WEST)
-    op.execute('UPDATE forecast_expenses SET department_id = 2 WHERE department_id IS NULL')
+    if 'department_id' not in columns:
+        # Step 1: Add department_id column as nullable
+        op.add_column('forecast_expenses',
+            sa.Column('department_id', sa.Integer(), nullable=True)
+        )
 
-    # Step 3: Make the column NOT NULL
-    op.alter_column('forecast_expenses', 'department_id', nullable=False)
+        # Step 2: Set default department_id for existing records (department_id=2 is IT Отдел WEST)
+        op.execute('UPDATE forecast_expenses SET department_id = 2 WHERE department_id IS NULL')
 
-    # Step 4: Add foreign key constraint
-    op.create_foreign_key(
-        'fk_forecast_expenses_department_id',
-        'forecast_expenses', 'departments',
-        ['department_id'], ['id']
-    )
+        # Step 3: Make the column NOT NULL
+        op.alter_column('forecast_expenses', 'department_id', nullable=False)
 
-    # Step 5: Add index for performance
-    op.create_index(
-        op.f('ix_forecast_expenses_department_id'),
-        'forecast_expenses',
-        ['department_id'],
-        unique=False
-    )
+        # Step 4: Add foreign key constraint
+        op.create_foreign_key(
+            'fk_forecast_expenses_department_id',
+            'forecast_expenses', 'departments',
+            ['department_id'], ['id']
+        )
+
+        # Step 5: Add index for performance
+        op.create_index(
+            op.f('ix_forecast_expenses_department_id'),
+            'forecast_expenses',
+            ['department_id'],
+            unique=False
+        )
 
 
 def downgrade() -> None:
