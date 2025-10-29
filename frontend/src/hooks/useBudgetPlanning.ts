@@ -9,6 +9,7 @@ import {
   planDetailsApi,
   calculatorApi,
   approvalLogApi,
+  compareVersions,
 } from '@/api/budgetPlanning'
 import type {
   BudgetScenarioCreate,
@@ -39,6 +40,7 @@ export const budgetPlanningKeys = {
   versionsList: (filters?: BudgetVersionFilters) => [...budgetPlanningKeys.versions(), { filters }] as const,
   version: (id: number) => [...budgetPlanningKeys.versions(), id] as const,
   versionWithDetails: (id: number) => [...budgetPlanningKeys.versions(), id, 'details'] as const,
+  versionComparison: (v1: number, v2: number) => [...budgetPlanningKeys.versions(), 'compare', v1, v2] as const,
   planDetails: (versionId: number) => [...budgetPlanningKeys.all, 'planDetails', versionId] as const,
   approvalLogs: (versionId: number) => [...budgetPlanningKeys.all, 'approvalLogs', versionId] as const,
   baseline: (categoryId: number, year: number, departmentId: number) =>
@@ -400,5 +402,21 @@ export const useCreateApprovalLog = () => {
     onError: () => {
       message.error('Ошибка при сохранении решения')
     },
+  })
+}
+
+// ============================================================================
+// Version Comparison Hook
+// ============================================================================
+
+export const useVersionComparison = (
+  version1Id: number,
+  version2Id: number,
+  options?: { enabled?: boolean }
+) => {
+  return useQuery({
+    queryKey: budgetPlanningKeys.versionComparison(version1Id, version2Id),
+    queryFn: () => compareVersions(version1Id, version2Id),
+    enabled: options?.enabled ?? (!!version1Id && !!version2Id),
   })
 }

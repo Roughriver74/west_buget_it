@@ -24,6 +24,8 @@ interface BudgetVersionTableProps {
   onDelete?: (id: number) => void
   onSubmit?: (id: number) => void
   onCopy?: (version: BudgetVersion) => void
+  selectedRowKeys?: number[]
+  onSelectionChange?: (selectedRowKeys: number[]) => void
 }
 
 const statusColors: Record<BudgetVersionStatus, string> = {
@@ -52,6 +54,8 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   onDelete,
   onSubmit,
   onCopy,
+  selectedRowKeys,
+  onSelectionChange,
 }) => {
   const columns: ColumnsType<BudgetVersion> = [
     {
@@ -193,6 +197,18 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
     },
   ]
 
+  const rowSelection = onSelectionChange
+    ? {
+        selectedRowKeys: selectedRowKeys || [],
+        onChange: onSelectionChange,
+        type: 'checkbox' as const,
+        getCheckboxProps: () => ({
+          // Можно ограничить выбор только двумя версиями
+          disabled: (selectedRowKeys?.length || 0) >= 2 && !(selectedRowKeys || []).includes,
+        }),
+      }
+    : undefined
+
   return (
     <Table
       columns={columns}
@@ -200,6 +216,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
       rowKey="id"
       loading={loading}
       scroll={{ x: 1400 }}
+      rowSelection={rowSelection}
       pagination={{
         pageSize: 10,
         showSizeChanger: true,

@@ -18,7 +18,7 @@ import {
   InputNumber,
   Result,
 } from 'antd'
-import { PlusOutlined, CalculatorOutlined } from '@ant-design/icons'
+import { PlusOutlined, CalculatorOutlined, SwapOutlined } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useQuery } from '@tanstack/react-query'
@@ -27,6 +27,7 @@ import { BudgetScenarioCard } from '@/components/budget/BudgetScenarioCard'
 import { BudgetVersionTable } from '@/components/budget/BudgetVersionTable'
 import { BudgetCalculatorForm } from '@/components/budget/BudgetCalculatorForm'
 import { BudgetVersionDetailDrawer } from '@/components/budget/BudgetVersionDetailDrawer'
+import { BudgetVersionComparisonModal } from '@/components/budget/BudgetVersionComparisonModal'
 import {
   useBudgetScenarios,
   useBudgetVersions,
@@ -54,6 +55,8 @@ const BudgetPlanningPage: React.FC = () => {
   const [isVersionDetailOpen, setIsVersionDetailOpen] = useState(false)
   const [versionDetailMode, setVersionDetailMode] = useState<'view' | 'edit'>('view')
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null)
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false)
+  const [selectedVersionsForComparison, setSelectedVersionsForComparison] = useState<number[]>([])
   const [scenarioForm] = Form.useForm()
   const [versionForm] = Form.useForm()
 
@@ -191,6 +194,16 @@ const BudgetPlanningPage: React.FC = () => {
     setActiveVersionId(null)
   }
 
+  const handleCompareVersions = () => {
+    if (selectedVersionsForComparison.length === 2) {
+      setIsComparisonModalOpen(true)
+    }
+  }
+
+  const handleComparisonModalClose = () => {
+    setIsComparisonModalOpen(false)
+  }
+
   // Generate year options (current year - 2 to current year + 5)
   const currentYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: 8 }, (_, i) => currentYear - 2 + i)
@@ -293,6 +306,13 @@ const BudgetPlanningPage: React.FC = () => {
         extra={
           <Space>
             <Button
+              icon={<SwapOutlined />}
+              onClick={handleCompareVersions}
+              disabled={selectedVersionsForComparison.length !== 2}
+            >
+              Сравнить ({selectedVersionsForComparison.length}/2)
+            </Button>
+            <Button
               icon={<CalculatorOutlined />}
               onClick={() => setIsCalculatorOpen(true)}
               disabled={!selectedScenario || categoriesLoading || categoriesError}
@@ -333,6 +353,8 @@ const BudgetPlanningPage: React.FC = () => {
             onDelete={handleDeleteVersion}
             onSubmit={handleSubmitVersion}
             onCopy={handleCopyVersion}
+            selectedRowKeys={selectedVersionsForComparison}
+            onSelectionChange={setSelectedVersionsForComparison}
           />
         )}
       </Card>
@@ -454,6 +476,13 @@ const BudgetPlanningPage: React.FC = () => {
         categories={categoryOptions}
         onClose={handleVersionDrawerClose}
         onVersionUpdated={refetchVersions}
+      />
+
+      <BudgetVersionComparisonModal
+        open={isComparisonModalOpen}
+        version1Id={selectedVersionsForComparison[0] || null}
+        version2Id={selectedVersionsForComparison[1] || null}
+        onClose={handleComparisonModalClose}
       />
     </div>
   )
