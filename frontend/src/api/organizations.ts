@@ -2,7 +2,7 @@ import apiClient from './client'
 import type { Organization } from '@/types'
 
 export const organizationsApi = {
-  getAll: async (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean; department_id?: number }): Promise<Organization[]> => {
+  getAll: async (params?: { skip?: number; limit?: number; search?: string; is_active?: boolean }): Promise<Organization[]> => {
     const { data } = await apiClient.get('organizations/', { params })
     return data
   },

@@ -8,7 +8,6 @@ import type { Organization } from '@/types'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import OrganizationFormModal from '@/components/organizations/OrganizationFormModal'
-import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -25,19 +24,18 @@ const OrganizationsPage = () => {
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
-  const { selectedDepartment } = useDepartment()
 
   const queryClient = useQueryClient()
 
+  // Organizations are SHARED across all departments - no department filtering
   const { data: organizations, isLoading } = useQuery({
-    queryKey: ['organizations', page, pageSize, search, activeFilter, selectedDepartment?.id],
+    queryKey: ['organizations', page, pageSize, search, activeFilter],
     queryFn: () =>
       organizationsApi.getAll({
         skip: (page - 1) * pageSize,
         limit: pageSize,
         search: search || undefined,
         is_active: activeFilter,
-        department_id: selectedDepartment?.id,
       }),
   })
 

@@ -125,7 +125,6 @@ class Department(Base):
     users = relationship("User", back_populates="department_rel")
     budget_categories = relationship("BudgetCategory", back_populates="department_rel")
     contractors = relationship("Contractor", back_populates="department_rel")
-    organizations = relationship("Organization", back_populates="department_rel")
     expenses = relationship("Expense", back_populates="department_rel")
     budget_plans = relationship("BudgetPlan", back_populates="department_rel")
     forecast_expenses = relationship("ForecastExpense", back_populates="department_rel")
@@ -200,25 +199,18 @@ class Contractor(Base):
 
 
 class Organization(Base):
-    """Organizations (ВЕСТ ООО, ВЕСТ ГРУПП ООО)"""
+    """Organizations (ВЕСТ ООО, ВЕСТ ГРУПП ООО) - SHARED across all departments"""
     __tablename__ = "organizations"
-    __table_args__ = (
-        Index('idx_organization_dept_active', 'department_id', 'is_active'),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False, index=True)  # Removed unique constraint for multi-tenancy
+    name = Column(String(255), unique=True, nullable=False, index=True)  # Unique constraint restored - shared entity
     legal_name = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
-
-    # Department association (multi-tenancy)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    department_rel = relationship("Department", back_populates="organizations")
     expenses = relationship("Expense", back_populates="organization")
 
     def __repr__(self):
