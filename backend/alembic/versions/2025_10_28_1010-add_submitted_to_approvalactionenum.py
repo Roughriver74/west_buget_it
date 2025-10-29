@@ -15,7 +15,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TYPE approvalactionenum ADD VALUE IF NOT EXISTS 'SUBMITTED'")
+    # Create enum type if it doesn't exist
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE approvalactionenum AS ENUM ('APPROVED', 'REJECTED', 'REVISION_REQUESTED');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+
+    # Add SUBMITTED value if it doesn't exist
+    # Note: ADD VALUE IF NOT EXISTS requires PostgreSQL 9.1+
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TYPE approvalactionenum ADD VALUE IF NOT EXISTS 'SUBMITTED';
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
