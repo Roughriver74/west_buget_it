@@ -66,13 +66,13 @@ class Settings(BaseSettings):
     DB_POOL_PRE_PING: bool = True
 
     # DATABASE_URL - can be provided directly or built from individual params
-    _database_url: str | None = Field(default=None, validation_alias='DATABASE_URL')
+    database_url_override: str | None = Field(default=None, validation_alias='DATABASE_URL')
 
     @property
     def DATABASE_URL(self) -> str:
         """Build DATABASE_URL from individual components or use provided value"""
-        if self._database_url:
-            return self._database_url
+        if self.database_url_override:
+            return self.database_url_override
         # Build from individual components
         return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
@@ -143,7 +143,7 @@ class Settings(BaseSettings):
 
         return v
 
-    @field_validator('_database_url')
+    @field_validator('database_url_override')
     @classmethod
     def validate_database_url(cls, v: str | None) -> str | None:
         """
