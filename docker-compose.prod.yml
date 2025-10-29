@@ -50,8 +50,7 @@ services:
     container_name: it_budget_backend_prod
     restart: always
     environment:
-      # Database
-      DATABASE_URL: postgresql://${DB_USER:-budget_user}:${DB_PASSWORD:-budget_pass}@db:5432/${DB_NAME:-it_budget_db}
+      # Database - using individual vars instead of DATABASE_URL for better compatibility
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-it_budget_db}

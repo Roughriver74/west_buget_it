@@ -53,8 +53,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_PREFIX: str = "/api/v1"
 
-    # Database
-    DATABASE_URL: str = "postgresql://budget_user:budget_pass@localhost:54329/it_budget_db"
+    # Database - individual connection parameters
     DB_HOST: str = "localhost"
     DB_PORT: int = 54329
     DB_NAME: str = "it_budget_db"
@@ -65,6 +64,17 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+
+    # DATABASE_URL - can be provided directly or built from individual params
+    _database_url: str | None = Field(default=None, validation_alias='DATABASE_URL')
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Build DATABASE_URL from individual components or use provided value"""
+        if self._database_url:
+            return self._database_url
+        # Build from individual components
+        return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     # CORS - stored as string to avoid Pydantic auto-parsing, then converted to list
     cors_origins_raw: Union[str, List[str]] = Field(
@@ -133,14 +143,17 @@ class Settings(BaseSettings):
 
         return v
 
-    @field_validator('DATABASE_URL')
+    @field_validator('_database_url')
     @classmethod
-    def validate_database_url(cls, v: str) -> str:
+    def validate_database_url(cls, v: str | None) -> str | None:
         """
         Validate DATABASE_URL to warn about weak passwords
 
         This is a warning, not an error, as it might be intentional in dev
         """
+        if v is None:
+            return v
+
         import os
         debug = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
