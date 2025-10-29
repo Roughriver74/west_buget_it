@@ -50,13 +50,31 @@ router = APIRouter(dependencies=[Depends(get_current_active_user)])
 def get_dashboard_data(
     year: Optional[int] = None,
     month: Optional[int] = None,
-    department_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get dashboard data with key metrics"""
+    """
+    Get dashboard data with key metrics
+
+    - USER: Can only see dashboard data for their own department
+    - MANAGER/ADMIN: Can see dashboard data for all departments or filter by department
+    """
     if not year:
         year = datetime.now().year
+
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
 
     # Get total planned from BudgetPlan
     plan_query = db.query(func.sum(BudgetPlan.planned_amount)).filter(BudgetPlan.year == year)
@@ -173,6 +191,8 @@ def get_dashboard_data(
     )
     if month:
         capex_query = capex_query.filter(extract('month', Expense.request_date) == month)
+    if department_id:
+        capex_query = capex_query.filter(Expense.department_id == department_id)
 
     opex_query = db.query(func.sum(Expense.amount)).join(BudgetCategory).filter(
         BudgetCategory.type == ExpenseTypeEnum.OPEX,
@@ -180,6 +200,8 @@ def get_dashboard_data(
     )
     if month:
         opex_query = opex_query.filter(extract('month', Expense.request_date) == month)
+    if department_id:
+        opex_query = opex_query.filter(Expense.department_id == department_id)
 
     capex_actual = capex_query.scalar() or 0
     opex_actual = opex_query.scalar() or 0
@@ -210,10 +232,29 @@ def get_dashboard_data(
 @router.get("/budget-execution")
 def get_budget_execution(
     year: int,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get monthly budget execution for the year"""
+    """
+    Get monthly budget execution for the year
+
+    - USER: Can only see budget execution for their own department
+    - MANAGER/ADMIN: Can see budget execution for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     result = []
 
     for month in range(1, 13):
@@ -222,6 +263,8 @@ def get_budget_execution(
             BudgetPlan.year == year,
             BudgetPlan.month == month
         )
+        if department_id:
+            plan_query = plan_query.filter(BudgetPlan.department_id == department_id)
         planned = plan_query.scalar() or 0
 
         # Get actual
@@ -229,6 +272,8 @@ def get_budget_execution(
             extract('year', Expense.request_date) == year,
             extract('month', Expense.request_date) == month
         )
+        if department_id:
+            actual_query = actual_query.filter(Expense.department_id == department_id)
         actual = actual_query.scalar() or 0
 
         result.append({
@@ -250,11 +295,29 @@ def get_budget_execution(
 def get_analytics_by_category(
     year: int,
     month: Optional[int] = None,
-    department_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get detailed analytics by category"""
+    """
+    Get detailed analytics by category
+
+    - USER: Can only see analytics for their own department
+    - MANAGER/ADMIN: Can see analytics for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     # Get all categories ordered by parent_id and name for proper hierarchy display
     categories_query = db.query(BudgetCategory).filter(
         BudgetCategory.is_active == True
