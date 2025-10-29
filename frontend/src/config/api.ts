@@ -3,7 +3,9 @@
  * Uses relative URLs to leverage Vite proxy in development
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+// Build API base URL with /api/v1 prefix
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+export const API_BASE_URL = rawApiUrl ? `${rawApiUrl}/api/v1` : '/api/v1';
 export const API_ROOT = import.meta.env.VITE_API_ROOT || '';
 
 // Helper to build API URLs
