@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     libpq5 \
     curl \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
@@ -55,12 +56,17 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh && \
     chown appuser:appuser /app/entrypoint.sh
 
+# Copy crontab file for automated FTP import
+COPY crontab /etc/cron.d/ftp-import
+RUN chmod 0644 /etc/cron.d/ftp-import && \
+    crontab /etc/cron.d/ftp-import
+
 # Create necessary directories and set permissions
 RUN mkdir -p /app/uploads /app/logs /app/templates && \
     chown -R appuser:appuser /app
 
-# Switch to non-root user
-USER appuser
+# Note: Container runs as root to support cron service
+# Application processes (Gunicorn) can still run as appuser if needed
 
 # Expose port
 EXPOSE 8000

@@ -80,6 +80,25 @@ fi
 
 echo ""
 echo "======================================"
+echo "Starting Cron service for FTP import"
+echo "======================================"
+echo ""
+
+# Create log directory for cron
+mkdir -p /app/logs
+
+# Start cron service
+service cron start
+if [ $? -eq 0 ]; then
+    echo "✅ Cron service started successfully"
+    echo "   FTP import will run every 2 hours"
+    echo "   Logs: /app/logs/cron_ftp_import.log"
+else
+    echo "⚠️  Cron service failed to start, but continuing..."
+fi
+
+echo ""
+echo "======================================"
 echo "Starting Gunicorn application server"
 echo "======================================"
 echo ""

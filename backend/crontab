@@ -1,0 +1,6 @@
+# Automated FTP import every 2 hours
+# Runs at 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00
+0 */2 * * * root cd /app && /opt/venv/bin/python /app/cron_ftp_import.py >> /app/logs/cron_ftp_import.log 2>&1
+
+# Keep cron alive (runs every minute to prevent cron from stopping)
+* * * * * root echo "cron is running at $(date)" >> /app/logs/cron_keepalive.log 2>&1
