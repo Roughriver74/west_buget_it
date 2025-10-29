@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from decimal import Decimal
 
 from app.db import get_db
-from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
+from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum, UserRoleEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
 from app.utils.excel_export import ExcelExporter
 from app.utils.auth import get_current_active_user
@@ -428,8 +428,18 @@ def initialize_budget_plan(
     current_user: User = Depends(get_current_active_user)
 ):
     """Initialize budget plan for the year (create empty entries for all categories and months)"""
-    # Get department_id from query params or use user's department
-    target_department_id = department_id if department_id is not None else current_user.department_id
+    # SECURITY: Role-based department access control
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only initialize their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = department_id if department_id is not None else current_user.department_id
 
     if not target_department_id:
         raise HTTPException(
@@ -486,8 +496,18 @@ def copy_budget_plan(
     current_user: User = Depends(get_current_active_user)
 ):
     """Copy budget plan from source year to target year with optional coefficient"""
-    # Get department_id from query params or use user's department
-    target_department_id = department_id if department_id is not None else current_user.department_id
+    # SECURITY: Role-based department access control
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only copy budget for their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = department_id if department_id is not None else current_user.department_id
 
     if not target_department_id:
         raise HTTPException(

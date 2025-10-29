@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 
 from app.db import get_db
-from app.db.models import User,  Attachment, Expense
+from app.db.models import User, Attachment, Expense, UserRoleEnum
 from app.schemas.attachment import AttachmentCreate, AttachmentUpdate, AttachmentInDB, AttachmentList
 from app.utils.auth import get_current_active_user
 
@@ -38,6 +38,28 @@ def is_allowed_file(filename: str) -> bool:
     return get_file_extension(filename) in ALLOWED_EXTENSIONS
 
 
+def check_expense_department_access(expense: Expense, current_user: User) -> None:
+    """
+    Check if current user has access to this expense's department.
+
+    - USER: Can only access expenses from their own department
+    - MANAGER/ADMIN: Can access expenses from any department
+
+    Raises HTTPException if access denied.
+    """
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        if expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only access attachments from your own department"
+            )
+
+
 @router.post("/{expense_id}/attachments", response_model=AttachmentInDB, status_code=status.HTTP_201_CREATED)
 async def upload_attachment(
     expense_id: int,
@@ -56,6 +78,9 @@ async def upload_attachment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access (SECURITY: prevent cross-department file uploads)
+    check_expense_department_access(expense, current_user)
 
     # Validate file
     if not file.filename:
@@ -123,6 +148,9 @@ def get_expense_attachments(
             detail=f"Expense with id {expense_id} not found"
         )
 
+    # Check department access (SECURITY: prevent viewing attachments from other departments)
+    check_expense_department_access(expense, current_user)
+
     attachments = db.query(Attachment).filter(Attachment.expense_id == expense_id).all()
 
     return AttachmentList(
@@ -146,6 +174,15 @@ def get_attachment(
             detail=f"Attachment with id {attachment_id} not found"
         )
 
+    # Check department access through parent expense (SECURITY: critical data leak prevention)
+    expense = db.query(Expense).filter(Expense.id == attachment.expense_id).first()
+    if not expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated expense not found"
+        )
+    check_expense_department_access(expense, current_user)
+
     return attachment
 
 
@@ -163,6 +200,15 @@ def download_attachment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Attachment with id {attachment_id} not found"
         )
+
+    # Check department access through parent expense (SECURITY: prevent downloading confidential files from other departments)
+    expense = db.query(Expense).filter(Expense.id == attachment.expense_id).first()
+    if not expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated expense not found"
+        )
+    check_expense_department_access(expense, current_user)
 
     file_path = Path(attachment.file_path)
     if not file_path.exists():
@@ -194,6 +240,15 @@ def update_attachment(
             detail=f"Attachment with id {attachment_id} not found"
         )
 
+    # Check department access through parent expense (SECURITY: prevent modifying attachments from other departments)
+    expense = db.query(Expense).filter(Expense.id == attachment.expense_id).first()
+    if not expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated expense not found"
+        )
+    check_expense_department_access(expense, current_user)
+
     # Update fields
     update_data = attachment_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -219,6 +274,15 @@ def delete_attachment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Attachment with id {attachment_id} not found"
         )
+
+    # Check department access through parent expense (SECURITY: prevent deleting attachments from other departments)
+    expense = db.query(Expense).filter(Expense.id == attachment.expense_id).first()
+    if not expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated expense not found"
+        )
+    check_expense_department_access(expense, current_user)
 
     # Delete file from disk
     file_path = Path(attachment.file_path)
