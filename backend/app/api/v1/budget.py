@@ -33,13 +33,33 @@ def get_budget_plans(
     year: Optional[int] = None,
     month: Optional[int] = None,
     category_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget plans"""
+    """
+    Get budget plans
+
+    - USER: Can only see budget plans from their own department
+    - MANAGER/ADMIN: Can see budget plans from all departments or filter by department
+    """
     query = db.query(BudgetPlan)
+
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetPlan.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(BudgetPlan.department_id == department_id)
 
     if year:
         query = query.filter(BudgetPlan.year == year)
@@ -55,20 +75,47 @@ def get_budget_plans(
 
 
 @router.get("/plans/{plan_id}", response_model=BudgetPlanInDB)
-def get_budget_plan(plan_id: int, db: Session = Depends(get_db)):
-    """Get budget plan by ID"""
+def get_budget_plan(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get budget plan by ID
+
+    - USER: Can only view budget plans from their own department
+    - MANAGER/ADMIN: Can view budget plans from any department
+    """
     plan = db.query(BudgetPlan).filter(BudgetPlan.id == plan_id).first()
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Budget plan with id {plan_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if plan.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only view budget plans from your own department"
+            )
+
     return plan
 
 
 @router.post("/plans", response_model=BudgetPlanInDB, status_code=status.HTTP_201_CREATED)
-def create_budget_plan(plan: BudgetPlanCreate, db: Session = Depends(get_db)):
-    """Create new budget plan"""
+def create_budget_plan(
+    plan: BudgetPlanCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Create new budget plan
+
+    - USER: Can only create budget plans in their own department
+    - MANAGER/ADMIN: Can create budget plans in any department
+    """
     # Validate category exists
     category = db.query(BudgetCategory).filter(BudgetCategory.id == plan.category_id).first()
     if not category:
@@ -76,6 +123,14 @@ def create_budget_plan(plan: BudgetPlanCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Category with id {plan.category_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if category.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only create budget plans for categories in your own department"
+            )
 
     # Check if plan for this period already exists
     existing = db.query(BudgetPlan).filter(
@@ -90,7 +145,10 @@ def create_budget_plan(plan: BudgetPlanCreate, db: Session = Depends(get_db)):
             detail=f"Budget plan for {plan.year}-{plan.month:02d} and category {plan.category_id} already exists"
         )
 
-    db_plan = BudgetPlan(**plan.model_dump())
+    # Create plan with department_id from category
+    plan_data = plan.model_dump()
+    plan_data['department_id'] = category.department_id
+    db_plan = BudgetPlan(**plan_data)
     db.add(db_plan)
     db.commit()
     db.refresh(db_plan)
@@ -104,13 +162,26 @@ def update_budget_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Update budget plan"""
+    """
+    Update budget plan
+
+    - USER: Can only update budget plans from their own department
+    - MANAGER/ADMIN: Can update budget plans from any department
+    """
     db_plan = db.query(BudgetPlan).filter(BudgetPlan.id == plan_id).first()
     if not db_plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Budget plan with id {plan_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_plan.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only update budget plans from your own department"
+            )
 
     # Update fields
     update_data = plan.model_dump(exclude_unset=True)
@@ -123,14 +194,31 @@ def update_budget_plan(
 
 
 @router.delete("/plans/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_budget_plan(plan_id: int, db: Session = Depends(get_db)):
-    """Delete budget plan"""
+def delete_budget_plan(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Delete budget plan
+
+    - USER: Can only delete budget plans from their own department
+    - MANAGER/ADMIN: Can delete budget plans from any department
+    """
     db_plan = db.query(BudgetPlan).filter(BudgetPlan.id == plan_id).first()
     if not db_plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Budget plan with id {plan_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_plan.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only delete budget plans from your own department"
+            )
 
     db.delete(db_plan)
     db.commit()
@@ -141,10 +229,29 @@ def delete_budget_plan(plan_id: int, db: Session = Depends(get_db)):
 def get_budget_summary(
     year: int,
     month: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget summary (plan vs actual)"""
+    """
+    Get budget summary (plan vs actual)
+
+    - USER: Can only see budget summary for their own department
+    - MANAGER/ADMIN: Can see budget summary for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     # Get planned amounts
     plan_query = db.query(
         BudgetPlan.category_id,
@@ -155,6 +262,9 @@ def get_budget_summary(
 
     if month:
         plan_query = plan_query.filter(BudgetPlan.month == month)
+
+    if department_id:
+        plan_query = plan_query.filter(BudgetPlan.department_id == department_id)
 
     plan_query = plan_query.group_by(BudgetPlan.category_id)
     plans = plan_query.all()
@@ -167,6 +277,9 @@ def get_budget_summary(
 
     if month:
         actual_query = actual_query.filter(func.extract('month', Expense.request_date) == month)
+
+    if department_id:
+        actual_query = actual_query.filter(Expense.department_id == department_id)
 
     actual_query = actual_query.group_by(Expense.category_id)
     actuals = {item.category_id: float(item.actual) for item in actual_query.all()}
@@ -210,11 +323,29 @@ def get_budget_summary(
 @router.get("/plans/year/{year}")
 def get_budget_plan_for_year(
     year: int,
-    department_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget plan for entire year in pivot format (categories x months)"""
+    """
+    Get budget plan for entire year in pivot format (categories x months)
+
+    - USER: Can only see budget plan for their own department
+    - MANAGER/ADMIN: Can see budget plan for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     # Get all active categories
     categories_query = db.query(BudgetCategory).filter(BudgetCategory.is_active == True)
     if department_id:
@@ -505,11 +636,29 @@ def update_budget_cell(
 def get_budget_overview(
     year: int,
     month: int,
-    department_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget overview (plan vs actual) for specific month"""
+    """
+    Get budget overview (plan vs actual) for specific month
+
+    - USER: Can only see budget overview for their own department
+    - MANAGER/ADMIN: Can see budget overview for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     # Get all active categories
     categories_query = db.query(BudgetCategory).filter(
         BudgetCategory.is_active == True
@@ -616,11 +765,41 @@ def get_budget_overview(
 
 
 @router.get("/plans/year/{year}/export")
-def export_budget_plan_to_excel(year: int, db: Session = Depends(get_db)):
-    """Export budget plan for year to Excel file"""
+def export_budget_plan_to_excel(
+    year: int,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Export budget plan for year to Excel file
+
+    - USER: Can only export budget plan for their own department
+    - MANAGER/ADMIN: Can export budget plan for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only export their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     # Get budget plan data
-    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).order_by(BudgetCategory.name).all()
-    plans = db.query(BudgetPlan).filter(BudgetPlan.year == year).all()
+    categories_query = db.query(BudgetCategory).filter(BudgetCategory.is_active == True)
+    if department_id:
+        categories_query = categories_query.filter(BudgetCategory.department_id == department_id)
+    categories = categories_query.order_by(BudgetCategory.name).all()
+
+    plans_query = db.query(BudgetPlan).filter(BudgetPlan.year == year)
+    if department_id:
+        plans_query = plans_query.filter(BudgetPlan.department_id == department_id)
+    plans = plans_query.all()
 
     # Create a lookup dictionary for plans
     plan_lookup = {}

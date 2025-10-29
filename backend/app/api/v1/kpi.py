@@ -54,12 +54,19 @@ MONTH_NAME_TO_NUMBER: Dict[str, int] = {
 
 
 def check_department_access(user: User, department_id: int) -> bool:
-    """Check if user has access to the department"""
+    """
+    Check if user has access to the department
+
+    - ADMIN: Can access all departments
+    - MANAGER: Can only access their own department
+    - USER: Can only access their own department
+    """
     if user.role == UserRoleEnum.ADMIN:
         return True
-    if user.role == UserRoleEnum.MANAGER:
-        return True
-    if user.role == UserRoleEnum.USER:
+    # MANAGER and USER can only access their own department
+    if user.role in [UserRoleEnum.MANAGER, UserRoleEnum.USER]:
+        if not user.department_id:
+            return False
         return user.department_id == department_id
     return False
 
@@ -780,6 +787,7 @@ async def import_employee_kpis(
 async def list_employee_kpi_goals(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    department_id: Optional[int] = None,
     employee_id: Optional[int] = None,
     goal_id: Optional[int] = None,
     year: Optional[int] = None,
@@ -788,7 +796,13 @@ async def list_employee_kpi_goals(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all employee KPI goal assignments"""
+    """
+    List all employee KPI goal assignments
+
+    - USER: Can only see assignments for their own department
+    - MANAGER: Can filter by department_id, defaults to own department
+    - ADMIN: Can see all departments or filter by department_id
+    """
     query = db.query(EmployeeKPIGoal)
 
     # Apply filters
@@ -810,8 +824,23 @@ async def list_employee_kpi_goals(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User has no assigned department"
             )
-        # Filter by employee's department
+        # USER must only see their own department
         query = query.join(Employee).filter(Employee.department_id == current_user.department_id)
+    elif current_user.role == UserRoleEnum.MANAGER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Manager has no assigned department"
+            )
+        # MANAGER can only see their own department
+        query = query.join(Employee).filter(Employee.department_id == current_user.department_id)
+    elif current_user.role == UserRoleEnum.ADMIN:
+        # ADMIN can optionally filter by department
+        if department_id:
+            query = query.join(Employee).filter(Employee.department_id == department_id)
+        else:
+            # Need to join Employee for proper querying
+            query = query.join(Employee)
 
     goal_assignments = query.offset(skip).limit(limit).all()
     return goal_assignments
@@ -1207,10 +1236,17 @@ async def get_kpi_trends(
 async def get_bonus_distribution(
     year: int,
     month: Optional[int] = None,
+    department_id: Optional[int] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get bonus distribution by department and type"""
+    """
+    Get bonus distribution by department and type
+
+    - USER: Can only see their own department
+    - MANAGER: Can only see their own department
+    - ADMIN: Can see all departments or filter by department_id
+    """
     query = db.query(
         Department.id.label('department_id'),
         Department.name.label('department_name'),
@@ -1230,7 +1266,7 @@ async def get_bonus_distribution(
     if month is not None:
         query = query.filter(EmployeeKPI.month == month)
 
-    # Department filter
+    # Department filter based on role
     if current_user.role == UserRoleEnum.USER:
         if not current_user.department_id:
             raise HTTPException(
@@ -1238,6 +1274,18 @@ async def get_bonus_distribution(
                 detail="User has no assigned department"
             )
         query = query.filter(Department.id == current_user.department_id)
+    elif current_user.role == UserRoleEnum.MANAGER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Manager has no assigned department"
+            )
+        # MANAGER can only see their own department
+        query = query.filter(Department.id == current_user.department_id)
+    elif current_user.role == UserRoleEnum.ADMIN:
+        # ADMIN can optionally filter by department
+        if department_id:
+            query = query.filter(Department.id == department_id)
 
     query = query.group_by(Department.id, Department.name)
 

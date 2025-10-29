@@ -12,11 +12,33 @@ from sqlalchemy import func, extract, and_, or_
 from pydantic import BaseModel, Field
 
 from app.db import get_db
-from app.db.models import User,  ForecastExpense, Expense, BudgetCategory, Contractor, Organization
+from app.db.models import User, UserRoleEnum, ForecastExpense, Expense, BudgetCategory, Contractor, Organization
 from app.utils.excel_export import ExcelExporter
 from app.utils.auth import get_current_active_user
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
+
+
+def check_department_access(current_user: User, department_id: int) -> None:
+    """
+    Check if user has access to the specified department.
+    Raises HTTPException if access is denied.
+
+    - USER: Can only access their own department
+    - MANAGER/ADMIN: Can access any department
+    """
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        if department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only access your own department's data"
+            )
+    # MANAGER and ADMIN can access any department
 
 
 # Helper functions for working days
@@ -114,7 +136,13 @@ def generate_forecast(
     Generate forecast for next month based on:
     1. Regular expenses (repeating monthly)
     2. Average of non-regular expenses
+
+    - USER: Can only generate forecasts for their own department
+    - MANAGER/ADMIN: Can generate forecasts for any department
     """
+    # Check department access
+    check_department_access(current_user, request.department_id)
+
     target_date = date(request.target_year, request.target_month, 1)
 
     # Удаляем существующий прогноз на этот месяц для этого отдела
@@ -295,7 +323,15 @@ def get_forecasts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get all forecasts for specified month and department"""
+    """
+    Get all forecasts for specified month and department
+
+    - USER: Can only view forecasts for their own department
+    - MANAGER/ADMIN: Can view forecasts for any department
+    """
+    # Check department access
+    check_department_access(current_user, department_id)
+
     forecasts = db.query(ForecastExpense).filter(
         ForecastExpense.department_id == department_id,
         extract('year', ForecastExpense.forecast_date) == year,
@@ -333,7 +369,15 @@ def create_forecast(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Create new forecast expense"""
+    """
+    Create new forecast expense
+
+    - USER: Can only create forecasts for their own department
+    - MANAGER/ADMIN: Can create forecasts for any department
+    """
+    # Check department access
+    check_department_access(current_user, forecast.department_id)
+
     db_forecast = ForecastExpense(**forecast.model_dump())
     db.add(db_forecast)
     db.commit()
@@ -366,13 +410,21 @@ def update_forecast(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Update forecast expense"""
+    """
+    Update forecast expense
+
+    - USER: Can only update forecasts from their own department
+    - MANAGER/ADMIN: Can update forecasts from any department
+    """
     db_forecast = db.query(ForecastExpense).filter(ForecastExpense.id == forecast_id).first()
     if not db_forecast:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Forecast with id {forecast_id} not found"
         )
+
+    # Check department access
+    check_department_access(current_user, db_forecast.department_id)
 
     update_data = forecast.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -402,8 +454,17 @@ def update_forecast(
 
 
 @router.delete("/{forecast_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_forecast(forecast_id: int, db: Session = Depends(get_db)):
-    """Delete forecast expense"""
+def delete_forecast(
+    forecast_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Delete forecast expense
+
+    - USER: Can only delete forecasts from their own department
+    - MANAGER/ADMIN: Can delete forecasts from any department
+    """
     db_forecast = db.query(ForecastExpense).filter(ForecastExpense.id == forecast_id).first()
     if not db_forecast:
         raise HTTPException(
@@ -411,14 +472,31 @@ def delete_forecast(forecast_id: int, db: Session = Depends(get_db)):
             detail=f"Forecast with id {forecast_id} not found"
         )
 
+    # Check department access
+    check_department_access(current_user, db_forecast.department_id)
+
     db.delete(db_forecast)
     db.commit()
     return None
 
 
 @router.delete("/clear/{year}/{month}", status_code=status.HTTP_204_NO_CONTENT)
-def clear_forecasts(year: int, month: int, department_id: int, db: Session = Depends(get_db)):
-    """Clear all forecasts for specified month and department"""
+def clear_forecasts(
+    year: int,
+    month: int,
+    department_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Clear all forecasts for specified month and department
+
+    - USER: Can only clear forecasts for their own department
+    - MANAGER/ADMIN: Can clear forecasts for any department
+    """
+    # Check department access
+    check_department_access(current_user, department_id)
+
     db.query(ForecastExpense).filter(
         ForecastExpense.department_id == department_id,
         extract('year', ForecastExpense.forecast_date) == year,
@@ -432,22 +510,47 @@ def clear_forecasts(year: int, month: int, department_id: int, db: Session = Dep
 def export_forecast_calendar(
     year: int,
     month: int,
-    department_id: Optional[int] = Query(default=None, description="Filter by department"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department (MANAGER/ADMIN only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Export forecast data as Excel calendar format using template
     Dates in columns, categories/contractors in rows
+
+    - USER: Can only export forecasts for their own department
+    - MANAGER/ADMIN: Can export forecasts for any department
     """
+    # Determine department filter based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only export their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        dept_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            dept_id = department_id
+        else:
+            # If no department specified, require it for security
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required for export"
+            )
+    else:
+        dept_id = None
+
     # Get forecasts for the month and department
     query = db.query(ForecastExpense).filter(
         extract('year', ForecastExpense.forecast_date) == year,
         extract('month', ForecastExpense.forecast_date) == month
     )
 
-    if department_id:
-        query = query.filter(ForecastExpense.department_id == department_id)
+    if dept_id:
+        query = query.filter(ForecastExpense.department_id == dept_id)
 
     forecasts = query.all()
 
@@ -471,9 +574,9 @@ def export_forecast_calendar(
 
     # Get department name for template sheet selection
     department_name = "Шикунов"  # Default to IT department
-    if department_id:
+    if dept_id:
         from app.db.models import Department
-        dept = db.query(Department).filter(Department.id == department_id).first()
+        dept = db.query(Department).filter(Department.id == dept_id).first()
         if dept and dept.code:
             # Use department code or name for sheet selection
             department_name = dept.code if dept.code else dept.name

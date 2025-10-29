@@ -1211,8 +1211,12 @@ async def import_payroll_plans(
                     skipped_count += 1
                     continue
 
-                # Check department access
-                if current_user.role == UserRoleEnum.USER:
+                # Check department access - USER and MANAGER can only import to their own department
+                if current_user.role in [UserRoleEnum.USER, UserRoleEnum.MANAGER]:
+                    if not current_user.department_id:
+                        errors.append(f"Row {index + 2}: User has no assigned department")
+                        skipped_count += 1
+                        continue
                     if employee.department_id != current_user.department_id:
                         errors.append(f"Row {index + 2}: No access to employee from another department")
                         skipped_count += 1

@@ -315,6 +315,13 @@ def bulk_delete_categories(
 
     categories = query.all()
 
+    # Validate all requested categories were found and accessible
+    if len(categories) != len(request.ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Some categories not found or not accessible"
+        )
+
     deleted_count = 0
     for category in categories:
         db.delete(category)
