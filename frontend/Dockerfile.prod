@@ -35,21 +35,14 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Install su-exec for safe user switching
-RUN apk add --no-cache su-exec
-
-# Create non-root user for nginx and prepare directories
-# Note: We run entrypoint as root to allow file generation, then switch to nginx
+# Prepare directories for nginx
+# Master process runs as root, workers run as nginx (configured in nginx.conf)
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+    chown -R nginx:nginx /var/cache/nginx
 
-# Link nginx logs to stdout/stderr for Docker
+# Link nginx logs to stdout/stderr for Docker logging
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
     ln -sf /dev/stderr /var/log/nginx/error.log
-
-# Keep as root for entrypoint (will switch to nginx inside script)
 
 # Expose port
 EXPOSE 80

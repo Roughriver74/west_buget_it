@@ -37,5 +37,6 @@ echo "======================================"
 echo "Starting Nginx web server"
 echo "======================================"
 
-# Switch to nginx user and start nginx
-exec su-exec nginx nginx -g 'daemon off;'
+# Start nginx as root (master process)
+# Nginx will automatically run worker processes as 'nginx' user
+exec nginx -g 'daemon off;'
