@@ -290,10 +290,27 @@ def get_budget_plan_for_year(
 
 
 @router.post("/plans/year/{year}/init")
-def initialize_budget_plan(year: int, db: Session = Depends(get_db)):
+def initialize_budget_plan(
+    year: int,
+    department_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Initialize budget plan for the year (create empty entries for all categories and months)"""
-    # Get all active categories
-    categories = db.query(BudgetCategory).filter(BudgetCategory.is_active == True).all()
+    # Get department_id from query params or use user's department
+    target_department_id = department_id if department_id is not None else current_user.department_id
+
+    if not target_department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department ID is required. Please specify department_id parameter or ensure user has a department."
+        )
+
+    # Get all active categories for this department
+    categories = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True,
+        BudgetCategory.department_id == target_department_id
+    ).all()
 
     created_count = 0
     for category in categories:
@@ -302,7 +319,8 @@ def initialize_budget_plan(year: int, db: Session = Depends(get_db)):
             existing = db.query(BudgetPlan).filter(
                 BudgetPlan.year == year,
                 BudgetPlan.month == month,
-                BudgetPlan.category_id == category.id
+                BudgetPlan.category_id == category.id,
+                BudgetPlan.department_id == target_department_id
             ).first()
 
             if not existing:
@@ -310,6 +328,7 @@ def initialize_budget_plan(year: int, db: Session = Depends(get_db)):
                     year=year,
                     month=month,
                     category_id=category.id,
+                    department_id=target_department_id,
                     planned_amount=0,
                     capex_planned=0 if category.type == ExpenseTypeEnum.OPEX else 0,
                     opex_planned=0 if category.type == ExpenseTypeEnum.CAPEX else 0
@@ -320,8 +339,9 @@ def initialize_budget_plan(year: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {
-        "message": f"Initialized budget plan for {year}",
-        "created_entries": created_count
+        "message": f"Initialized budget plan for {year} (department #{target_department_id})",
+        "created_entries": created_count,
+        "department_id": target_department_id
     }
 
 
@@ -330,17 +350,30 @@ def copy_budget_plan(
     year: int,
     source_year: int,
     request: CopyPlanRequest,
+    department_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Copy budget plan from source year to target year with optional coefficient"""
-    # Get source plans
-    source_plans = db.query(BudgetPlan).filter(BudgetPlan.year == source_year).all()
+    # Get department_id from query params or use user's department
+    target_department_id = department_id if department_id is not None else current_user.department_id
+
+    if not target_department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department ID is required. Please specify department_id parameter or ensure user has a department."
+        )
+
+    # Get source plans for this department only
+    source_plans = db.query(BudgetPlan).filter(
+        BudgetPlan.year == source_year,
+        BudgetPlan.department_id == target_department_id
+    ).all()
 
     if not source_plans:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No budget plans found for year {source_year}"
+            detail=f"No budget plans found for year {source_year} in department #{target_department_id}"
         )
 
     created_count = 0
@@ -351,7 +384,8 @@ def copy_budget_plan(
         existing = db.query(BudgetPlan).filter(
             BudgetPlan.year == year,
             BudgetPlan.month == source_plan.month,
-            BudgetPlan.category_id == source_plan.category_id
+            BudgetPlan.category_id == source_plan.category_id,
+            BudgetPlan.department_id == target_department_id
         ).first()
 
         new_amount = float(source_plan.planned_amount) * request.coefficient
@@ -370,6 +404,7 @@ def copy_budget_plan(
                 year=year,
                 month=source_plan.month,
                 category_id=source_plan.category_id,
+                department_id=target_department_id,
                 planned_amount=Decimal(str(round(new_amount, 2))),
                 capex_planned=Decimal(str(round(new_capex, 2))),
                 opex_planned=Decimal(str(round(new_opex, 2)))
@@ -380,14 +415,19 @@ def copy_budget_plan(
     db.commit()
 
     return {
-        "message": f"Copied budget plan from {source_year} to {year} with coefficient {request.coefficient}",
+        "message": f"Copied budget plan from {source_year} to {year} with coefficient {request.coefficient} (department #{target_department_id})",
         "created_entries": created_count,
-        "updated_entries": updated_count
+        "updated_entries": updated_count,
+        "department_id": target_department_id
     }
 
 
 @router.patch("/plans/cell")
-def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)):
+def update_budget_cell(
+    request: CellUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Update a single budget plan cell (upsert)"""
     # Check if category exists
     category = db.query(BudgetCategory).filter(BudgetCategory.id == request.category_id).first()
@@ -397,11 +437,15 @@ def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)
             detail=f"Category with id {request.category_id} not found"
         )
 
-    # Try to find existing plan
+    # Get department_id from category (since category belongs to department)
+    department_id = category.department_id
+
+    # Try to find existing plan (must match department too!)
     existing = db.query(BudgetPlan).filter(
         BudgetPlan.year == request.year,
         BudgetPlan.month == request.month,
-        BudgetPlan.category_id == request.category_id
+        BudgetPlan.category_id == request.category_id,
+        BudgetPlan.department_id == department_id
     ).first()
 
     # Calculate capex/opex based on category type
@@ -426,15 +470,17 @@ def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)
                 "year": existing.year,
                 "month": existing.month,
                 "category_id": existing.category_id,
+                "department_id": existing.department_id,
                 "planned_amount": float(existing.planned_amount)
             }
         }
     else:
-        # Create new plan
+        # Create new plan (WITH department_id from category!)
         new_plan = BudgetPlan(
             year=request.year,
             month=request.month,
             category_id=request.category_id,
+            department_id=department_id,
             planned_amount=request.planned_amount,
             capex_planned=capex_amount,
             opex_planned=opex_amount
@@ -449,6 +495,7 @@ def update_budget_cell(request: CellUpdateRequest, db: Session = Depends(get_db)
                 "year": new_plan.year,
                 "month": new_plan.month,
                 "category_id": new_plan.category_id,
+                "department_id": new_plan.department_id,
                 "planned_amount": float(new_plan.planned_amount)
             }
         }

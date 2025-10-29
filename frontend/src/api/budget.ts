@@ -77,8 +77,10 @@ export const budgetApi = {
   },
 
   // Инициализировать план на год (создать пустые записи)
-  initializePlan: async (year: number): Promise<{ message: string; created_entries: number }> => {
-    const { data } = await apiClient.post(`budget/plans/year/${year}/init`)
+  initializePlan: async (year: number, department_id?: number): Promise<{ message: string; created_entries: number; department_id: number }> => {
+    const params: any = {}
+    if (department_id) params.department_id = department_id
+    const { data } = await apiClient.post(`budget/plans/year/${year}/init`, null, { params })
     return data
   },
 
@@ -86,11 +88,16 @@ export const budgetApi = {
   copyPlan: async (
     targetYear: number,
     sourceYear: number,
-    coefficient: number = 1.0
-  ): Promise<{ message: string; created_entries: number; updated_entries: number }> => {
-    const { data } = await apiClient.post(`budget/plans/year/${targetYear}/copy-from/${sourceYear}`, {
-      coefficient,
-    })
+    coefficient: number = 1.0,
+    department_id?: number
+  ): Promise<{ message: string; created_entries: number; updated_entries: number; department_id: number }> => {
+    const params: any = {}
+    if (department_id) params.department_id = department_id
+    const { data } = await apiClient.post(
+      `budget/plans/year/${targetYear}/copy-from/${sourceYear}`,
+      { coefficient },
+      { params }
+    )
     return data
   },
 

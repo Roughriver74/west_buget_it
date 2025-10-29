@@ -37,13 +37,15 @@ const BudgetPlanTable = React.forwardRef<
   const { data: planData, isLoading } = useQuery({
     queryKey: ['budget-plan', year, selectedDepartment?.id],
     queryFn: () => budgetApi.getPlanForYear(year, selectedDepartment?.id),
+    enabled: !!selectedDepartment?.id, // Не загружать пока не выбран департамент
+    staleTime: 0, // Всегда считать данные устаревшими при смене департамента
   })
 
   // Инициализация плана
   const initMutation = useMutation({
-    mutationFn: () => budgetApi.initializePlan(year),
+    mutationFn: () => budgetApi.initializePlan(year, selectedDepartment?.id),
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['budget-plan', year] })
+      queryClient.invalidateQueries({ queryKey: ['budget-plan', year, selectedDepartment?.id] })
       message.success(`План инициализирован! Создано записей: ${response.created_entries}`)
     },
     onError: (error: any) => {
@@ -681,9 +683,10 @@ const BudgetPlanTable = React.forwardRef<
       <CopyPlanModal
         open={copyModalOpen}
         targetYear={year}
+        departmentId={selectedDepartment?.id}
         onClose={() => setCopyModalOpen(false)}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['budget-plan', year] })
+          queryClient.invalidateQueries({ queryKey: ['budget-plan', year, selectedDepartment?.id] })
         }}
       />
 

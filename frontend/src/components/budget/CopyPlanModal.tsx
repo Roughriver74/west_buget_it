@@ -8,16 +8,17 @@ const { Option } = Select
 interface CopyPlanModalProps {
   open: boolean
   targetYear: number
+  departmentId?: number
   onClose: () => void
   onSuccess: () => void
 }
 
-const CopyPlanModal: React.FC<CopyPlanModalProps> = ({ open, targetYear, onClose, onSuccess }) => {
+const CopyPlanModal: React.FC<CopyPlanModalProps> = ({ open, targetYear, departmentId, onClose, onSuccess }) => {
   const [form] = Form.useForm()
 
   const copyMutation = useMutation({
     mutationFn: ({ sourceYear, coefficient }: { sourceYear: number; coefficient: number }) =>
-      budgetApi.copyPlan(targetYear, sourceYear, coefficient),
+      budgetApi.copyPlan(targetYear, sourceYear, coefficient, departmentId),
     onSuccess: (data) => {
       message.success(`План скопирован! Создано: ${data.created_entries}, обновлено: ${data.updated_entries}`)
       onSuccess()
