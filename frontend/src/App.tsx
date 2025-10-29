@@ -18,6 +18,7 @@ import ContractorDetailPage from './pages/ContractorDetailPage'
 import OrganizationDetailPage from './pages/OrganizationDetailPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import BalanceAnalyticsPage from './pages/BalanceAnalyticsPage'
+import ExtendedAnalyticsPage from './pages/ExtendedAnalyticsPage'
 import PaymentCalendarPage from './pages/PaymentCalendarPage'
 import ForecastPage from './pages/ForecastPage'
 import DepartmentsPage from './pages/DepartmentsPage'
@@ -207,6 +208,7 @@ function App() {
                     {/* Analytics - all authenticated users */}
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/analytics/balance" element={<BalanceAnalyticsPage />} />
+                    <Route path="/analytics/extended" element={<ExtendedAnalyticsPage />} />
                     <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                     <Route path="/forecast" element={<ForecastPage />} />
                     </Routes>
