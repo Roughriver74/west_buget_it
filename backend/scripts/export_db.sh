@@ -42,16 +42,42 @@ echo ""
 
 # Экспорт БД
 echo "Экспортирую данные..."
-PGPASSWORD="$DB_PASS" pg_dump \
-    -h "$DB_HOST" \
-    -p "$DB_PORT" \
-    -U "$DB_USER" \
-    -d "$DB_NAME" \
-    --no-owner \
-    --no-acl \
-    --clean \
-    --if-exists \
-    -f "$FULL_PATH"
+
+# Проверить наличие pg_dump
+if command -v pg_dump &> /dev/null; then
+    # Использовать локальный pg_dump
+    PGPASSWORD="$DB_PASS" pg_dump \
+        -h "$DB_HOST" \
+        -p "$DB_PORT" \
+        -U "$DB_USER" \
+        -d "$DB_NAME" \
+        --no-owner \
+        --no-acl \
+        --clean \
+        --if-exists \
+        -f "$FULL_PATH"
+else
+    # Использовать Docker контейнер PostgreSQL
+    echo -e "${YELLOW}pg_dump не найден, использую Docker...${NC}"
+
+    # Найти Docker контейнер с PostgreSQL
+    CONTAINER_NAME="it_budget_db"
+
+    if ! docker ps --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
+        echo -e "${RED}✗ Docker контейнер '$CONTAINER_NAME' не найден!${NC}"
+        echo "Запустите: docker-compose up -d"
+        exit 1
+    fi
+
+    docker exec "$CONTAINER_NAME" pg_dump \
+        -U "$DB_USER" \
+        -d "$DB_NAME" \
+        --no-owner \
+        --no-acl \
+        --clean \
+        --if-exists \
+        > "$FULL_PATH"
+fi
 
 # Проверка успешности
 if [ $? -eq 0 ]; then

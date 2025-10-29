@@ -10,6 +10,7 @@ def parse_cors_origins(v: Any) -> List[str]:
     """
     Parse CORS origins from environment variable or list
     Supports both JSON string and Python list formats
+    Handles escaped quotes from Coolify and other deployment platforms
     """
     # If it's already a list, use it directly
     if isinstance(v, list):
@@ -24,6 +25,10 @@ def parse_cors_origins(v: Any) -> List[str]:
                 v = v[1:-1]
             if v.startswith('"') and v.endswith('"'):
                 v = v[1:-1]
+
+            # Unescape escaped quotes from deployment platforms (Coolify, etc.)
+            # Example: [\"http://...\"] -> ["http://..."]
+            v = v.replace('\\"', '"')
 
             origins = json.loads(v)
             if not isinstance(origins, list):
