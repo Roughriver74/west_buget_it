@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from decimal import Decimal
 
 from app.db import get_db
-from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum
+from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum, UserRoleEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
 from app.utils.excel_export import ExcelExporter
 from app.utils.auth import get_current_active_user

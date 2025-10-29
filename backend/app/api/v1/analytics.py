@@ -5,7 +5,7 @@ from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, PayrollPlan
+from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum, PayrollPlan
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (

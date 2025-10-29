@@ -12,7 +12,7 @@ from calendar import month_name as calendar_month_names
 
 from app.db.session import get_db
 from app.db.models import (
-    Expense, BudgetCategory, Contractor, Department, Employee,
+    BudgetPlanDetail, Expense, BudgetCategory, Contractor, Department, Employee,
     BudgetPlan, BudgetVersion, User, UserRoleEnum, ExpenseStatusEnum,
     ExpenseTypeEnum
 )
@@ -74,8 +74,8 @@ def get_expense_trends(
 
     # Base query
     query = db.query(
-        extract('year', Expense.expense_date).label('year'),
-        extract('month', Expense.expense_date).label('month'),
+        extract('year', Expense.request_date).label('year'),
+        extract('month', Expense.request_date).label('month'),
         BudgetCategory.id.label('category_id'),
         BudgetCategory.name.label('category_name'),
         func.sum(Expense.amount).label('total_amount'),
@@ -85,8 +85,8 @@ def get_expense_trends(
         BudgetCategory, Expense.category_id == BudgetCategory.id
     ).filter(
         and_(
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.request_date >= start_date,
+            Expense.request_date <= end_date
         )
     )
 
@@ -220,20 +220,20 @@ def get_contractor_analysis(
         func.sum(Expense.amount).label('total_amount'),
         func.count(Expense.id).label('expense_count'),
         func.avg(Expense.amount).label('average_expense'),
-        func.min(Expense.expense_date).label('first_expense_date'),
-        func.max(Expense.expense_date).label('last_expense_date'),
+        func.min(Expense.request_date).label('first_expense_date'),
+        func.max(Expense.request_date).label('last_expense_date'),
         func.count(distinct(func.concat(
-            extract('year', Expense.expense_date),
+            extract('year', Expense.request_date),
             '-',
-            extract('month', Expense.expense_date)
+            extract('month', Expense.request_date)
         ))).label('active_months'),
         func.count(distinct(Expense.category_id)).label('categories_count')
     ).join(
         Expense, Contractor.id == Expense.contractor_id
     ).filter(
         and_(
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
+            Expense.request_date >= start_date,
+            Expense.request_date <= end_date
         )
     )
 
@@ -262,8 +262,8 @@ def get_contractor_analysis(
         ).filter(
             and_(
                 Expense.contractor_id == r.contractor_id,
-                Expense.expense_date >= start_date,
-                Expense.expense_date <= end_date
+                Expense.request_date >= start_date,
+                Expense.request_date <= end_date
             )
         ).group_by(
             BudgetCategory.name
@@ -279,8 +279,8 @@ def get_contractor_analysis(
             total_amount=r.total_amount,
             expense_count=r.expense_count,
             average_expense=r.average_expense,
-            first_expense_date=r.first_expense_date,
-            last_expense_date=r.last_expense_date,
+            first_expense_date=r.first_expense_date.date() if r.first_expense_date else None,
+            last_expense_date=r.last_expense_date.date() if r.last_expense_date else None,
             active_months=r.active_months,
             categories_count=r.categories_count,
             top_category=top_cat[0] if top_cat else "N/A",
@@ -296,7 +296,7 @@ def get_contractor_analysis(
 
     # Count inactive contractors (had expenses before but not in period)
     all_contractors = db.query(func.count(distinct(Expense.contractor_id))).filter(
-        Expense.expense_date < start_date
+        Expense.request_date < start_date
     )
     if department_id:
         all_contractors = all_contractors.filter(Expense.department_id == department_id)
@@ -352,7 +352,7 @@ def get_department_comparison(
     for dept in departments:
         # Get budget (from baseline version)
         budget_query = db.query(
-            func.sum(BudgetPlanDetail.amount).label('total_budget')
+            func.sum(BudgetPlanDetail.planned_amount).label('total_budget')
         ).join(
             BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
         ).filter(
@@ -377,12 +377,12 @@ def get_department_comparison(
         ).filter(
             and_(
                 Expense.department_id == dept.id,
-                extract('year', Expense.expense_date) == year
+                extract('year', Expense.request_date) == year
             )
         )
 
         if month:
-            actual_query = actual_query.filter(extract('month', Expense.expense_date) == month)
+            actual_query = actual_query.filter(extract('month', Expense.request_date) == month)
 
         actual_result = actual_query.first()
         dept_actual = actual_result.total_actual if actual_result and actual_result.total_actual else Decimal(0)
@@ -395,7 +395,7 @@ def get_department_comparison(
         ).filter(
             and_(
                 Expense.department_id == dept.id,
-                extract('year', Expense.expense_date) == year,
+                extract('year', Expense.request_date) == year,
                 BudgetCategory.type == ExpenseTypeEnum.CAPEX
             )
         ).scalar() or Decimal(0)
@@ -416,7 +416,7 @@ def get_department_comparison(
         ).filter(
             and_(
                 Expense.department_id == dept.id,
-                extract('year', Expense.expense_date) == year
+                extract('year', Expense.request_date) == year
             )
         ).group_by(BudgetCategory.name).order_by(func.sum(Expense.amount).desc()).first()
 
@@ -507,14 +507,14 @@ def get_seasonal_patterns(
 
     # Query monthly aggregates
     query = db.query(
-        extract('year', Expense.expense_date).label('year'),
-        extract('month', Expense.expense_date).label('month'),
+        extract('year', Expense.request_date).label('year'),
+        extract('month', Expense.request_date).label('month'),
         func.sum(Expense.amount).label('total_amount'),
         func.count(Expense.id).label('expense_count')
     ).filter(
         and_(
-            extract('year', Expense.expense_date) >= start_year,
-            extract('year', Expense.expense_date) <= end_year
+            extract('year', Expense.request_date) >= start_year,
+            extract('year', Expense.request_date) <= end_year
         )
     )
 
@@ -670,7 +670,7 @@ def get_cost_efficiency(
     for cat in categories:
         # Get budget from baseline version
         budget_query = db.query(
-            func.sum(BudgetPlanDetail.amount).label('budget')
+            func.sum(BudgetPlanDetail.planned_amount).label('budget')
         ).join(
             BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
         ).filter(
@@ -698,14 +698,14 @@ def get_cost_efficiency(
         ).filter(
             and_(
                 Expense.category_id == cat.category_id,
-                extract('year', Expense.expense_date) == year
+                extract('year', Expense.request_date) == year
             )
         )
 
         if department_id:
             actual_query = actual_query.filter(Expense.department_id == department_id)
         if month:
-            actual_query = actual_query.filter(extract('month', Expense.expense_date) == month)
+            actual_query = actual_query.filter(extract('month', Expense.request_date) == month)
 
         actual_result = actual_query.first()
         cat_actual = actual_result.actual if actual_result and actual_result.actual else Decimal(0)

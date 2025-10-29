@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Row,
@@ -14,12 +14,11 @@ import {
   Alert,
   Typography,
   Tag,
-  Divider,
   Empty
 } from 'antd';
 import {
-  TrendingUpOutlined,
-  TrendingDownOutlined,
+  RiseOutlined,
+  FallOutlined,
   DollarOutlined,
   UserOutlined,
   CalendarOutlined,
@@ -30,7 +29,7 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
-import { Line, Column, Pie, Heatmap, Treemap, Sankey, Scatter, Waterfall } from '@ant-design/plots';
+import { Line, Column, Pie, Heatmap, Treemap, Waterfall } from '@ant-design/plots';
 import type { TabsProps } from 'antd';
 
 import { useDepartment } from '../contexts/DepartmentContext';
@@ -181,7 +180,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
     dayjs().subtract(6, 'months').startOf('month'),
     dayjs().endOf('month')
   ]);
-  const [selectedCategory, setSelectedCategory] = useState<number | undefined>();
+  const [selectedCategory] = useState<number | undefined>();
   const [period, setPeriod] = useState<'month' | 'quarter'>('month');
   const [year, setYear] = useState(dayjs().year());
   const [startYear, setStartYear] = useState(dayjs().year() - 2);
@@ -348,7 +347,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
             }}
             legend={{ position: 'top' }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: datum.category,
                 value: `${Number(datum.amount).toLocaleString('ru-RU')} ₽`
               })
@@ -363,14 +362,14 @@ const ExtendedAnalyticsPage: React.FC = () => {
             xField="category"
             yField="growth"
             seriesField="type"
-            color={({ type }) => type === 'Рост' ? '#52c41a' : '#f5222d'}
+            color={({ type }: any) => type === 'Рост' ? '#52c41a' : '#f5222d'}
             label={{
               position: 'top',
-              formatter: (datum) => `${datum.growth.toFixed(1)}%`
+              formatter: (datum: any) => `${datum.growth.toFixed(1)}%`
             }}
             legend={{ position: 'top' }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: datum.category,
                 value: `${datum.growth.toFixed(2)}%`
               })
@@ -425,11 +424,14 @@ const ExtendedAnalyticsPage: React.FC = () => {
         title: 'Доля от общего',
         dataIndex: 'share_of_total',
         key: 'share_of_total',
-        render: (val: number) => (
-          <Tag color={val > 10 ? 'red' : val > 5 ? 'orange' : 'default'}>
-            {val.toFixed(2)}%
-          </Tag>
-        ),
+        render: (val: number) => {
+          const share = Number(val) || 0;
+          return (
+            <Tag color={share > 10 ? 'red' : share > 5 ? 'orange' : 'default'}>
+              {share.toFixed(2)}%
+            </Tag>
+          );
+        },
         sorter: (a: ContractorStats, b: ContractorStats) => a.share_of_total - b.share_of_total
       },
       {
@@ -471,7 +473,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
                 precision={1}
                 suffix="%"
                 valueStyle={{ color: contractorData.concentration_ratio > 50 ? '#cf1322' : '#3f8600' }}
-                prefix={contractorData.concentration_ratio > 50 ? <TrendingUpOutlined /> : <TrendingDownOutlined />}
+                prefix={contractorData.concentration_ratio > 50 ? <RiseOutlined /> : <FallOutlined />}
               />
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Топ-10 контрагентов
@@ -496,10 +498,10 @@ const ExtendedAnalyticsPage: React.FC = () => {
             colorField="name"
             legend={false}
             label={{
-              formatter: (datum) => `${datum.name}\n${Number(datum.value).toLocaleString('ru-RU')} ₽`
+              formatter: (datum: any) => `${datum.name}\n${Number(datum.value).toLocaleString('ru-RU')} ₽`
             }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: datum.name,
                 value: `${Number(datum.value).toLocaleString('ru-RU')} ₽`
               })
@@ -559,22 +561,28 @@ const ExtendedAnalyticsPage: React.FC = () => {
         title: 'Исполнение',
         dataIndex: 'execution_rate',
         key: 'execution_rate',
-        render: (val: number) => (
-          <Tag color={val > 100 ? 'red' : val > 90 ? 'orange' : 'green'}>
-            {val.toFixed(1)}%
-          </Tag>
-        ),
+        render: (val: number) => {
+          const rate = Number(val) || 0;
+          return (
+            <Tag color={rate > 100 ? 'red' : rate > 90 ? 'orange' : 'green'}>
+              {rate.toFixed(1)}%
+            </Tag>
+          );
+        },
         sorter: (a: DepartmentMetrics, b: DepartmentMetrics) => a.execution_rate - b.execution_rate
       },
       {
         title: 'Отклонение',
         dataIndex: 'variance',
         key: 'variance',
-        render: (val: number) => (
-          <Text type={val > 0 ? 'danger' : 'success'}>
-            {val > 0 ? '+' : ''}{val.toLocaleString('ru-RU')} ₽
-          </Text>
-        ),
+        render: (val: number) => {
+          const variance = Number(val) || 0;
+          return (
+            <Text type={variance > 0 ? 'danger' : 'success'}>
+              {variance > 0 ? '+' : ''}{variance.toLocaleString('ru-RU')} ₽
+            </Text>
+          );
+        },
         sorter: (a: DepartmentMetrics, b: DepartmentMetrics) => a.variance - b.variance
       },
       {
@@ -621,7 +629,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
               <Statistic
                 title="Лучший отдел"
                 value={deptData.best_performing_dept || 'N/A'}
-                prefix={<TrendingUpOutlined />}
+                prefix={<RiseOutlined />}
                 valueStyle={{ fontSize: 16 }}
               />
             </Card>
@@ -631,20 +639,21 @@ const ExtendedAnalyticsPage: React.FC = () => {
         {/* Waterfall Chart */}
         <Card title="Водопадная диаграмма исполнения бюджета">
           <Waterfall
-            data={waterfallData}
+            data={[
+              ...waterfallData,
+              {
+                type: 'Итого',
+                value: deptData.total_budget - deptData.total_actual,
+                isTotal: true
+              }
+            ]}
             xField="type"
             yField="value"
-            total={{
-              label: 'Итого',
-              style: {
-                fill: deptData.total_budget - deptData.total_actual >= 0 ? '#52c41a' : '#f5222d'
-              }
-            }}
             label={{
-              formatter: (datum) => `${Math.abs(Number(datum.value)).toLocaleString('ru-RU')} ₽`
+              formatter: (datum: any) => `${Math.abs(Number(datum.value)).toLocaleString('ru-RU')} ₽`
             }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: datum.type,
                 value: `${Math.abs(Number(datum.value)).toLocaleString('ru-RU')} ₽`
               })
@@ -694,7 +703,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
               <Statistic
                 title="Пиковый месяц"
                 value={seasonalData.peak_month}
-                prefix={<TrendingUpOutlined />}
+                prefix={<RiseOutlined />}
                 valueStyle={{ fontSize: 16, color: '#cf1322' }}
               />
             </Card>
@@ -704,7 +713,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
               <Statistic
                 title="Низший месяц"
                 value={seasonalData.lowest_month}
-                prefix={<TrendingDownOutlined />}
+                prefix={<FallOutlined />}
                 valueStyle={{ fontSize: 16, color: '#3f8600' }}
               />
             </Card>
@@ -741,10 +750,10 @@ const ExtendedAnalyticsPage: React.FC = () => {
             yField="average"
             label={{
               position: 'top',
-              formatter: (datum) => `${(Number(datum.average) / 1000).toFixed(0)}K ₽`
+              formatter: (datum: any) => `${(Number(datum.average) / 1000).toFixed(0)}K ₽`
             }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: 'Средняя сумма',
                 value: `${Number(datum.average).toLocaleString('ru-RU')} ₽`
               })
@@ -762,10 +771,10 @@ const ExtendedAnalyticsPage: React.FC = () => {
             colorField="value"
             color={['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']}
             label={{
-              formatter: (datum) => datum.value.toFixed(2)
+              formatter: (datum: any) => datum.value.toFixed(2)
             }}
             tooltip={{
-              formatter: (datum) => ({
+              formatter: (datum: any) => ({
                 name: datum.month,
                 value: `Индекс: ${datum.value.toFixed(2)}`
               })
@@ -821,34 +830,43 @@ const ExtendedAnalyticsPage: React.FC = () => {
         title: 'Экономия',
         dataIndex: 'savings',
         key: 'savings',
-        render: (val: number) => (
-          <Text type={val < 0 ? 'danger' : 'success'}>
-            {val > 0 ? '+' : ''}{val.toLocaleString('ru-RU')} ₽
-          </Text>
-        ),
+        render: (val: number) => {
+          const savings = Number(val) || 0;
+          return (
+            <Text type={savings < 0 ? 'danger' : 'success'}>
+              {savings > 0 ? '+' : ''}{savings.toLocaleString('ru-RU')} ₽
+            </Text>
+          );
+        },
         sorter: (a: CategoryEfficiency, b: CategoryEfficiency) => a.savings - b.savings
       },
       {
         title: 'Процент экономии',
         dataIndex: 'savings_rate',
         key: 'savings_rate',
-        render: (val: number) => (
-          <Tag color={val < 0 ? 'red' : 'green'}>
-            {val > 0 ? '+' : ''}{val.toFixed(1)}%
-          </Tag>
-        ),
+        render: (val: number) => {
+          const rate = Number(val) || 0;
+          return (
+            <Tag color={rate < 0 ? 'red' : 'green'}>
+              {rate > 0 ? '+' : ''}{rate.toFixed(1)}%
+            </Tag>
+          );
+        },
         sorter: (a: CategoryEfficiency, b: CategoryEfficiency) => a.savings_rate - b.savings_rate
       },
       {
         title: 'Оценка эффективности',
         dataIndex: 'efficiency_score',
         key: 'efficiency_score',
-        render: (val: number) => (
-          <Tag color={val > 80 ? 'green' : val > 60 ? 'orange' : 'red'}>
-            {val.toFixed(0)}
-          </Tag>
-        ),
-        sorter: (a: CategoryEfficiency, b: CategoryEfficiency) => a.efficiency_score - b.efficiency_score
+        render: (val: number) => {
+          const score = Number(val) || 0;
+          return (
+            <Tag color={score > 80 ? 'green' : score > 60 ? 'orange' : 'red'}>
+              {score.toFixed(0)}
+            </Tag>
+          );
+        },
+        sorter: (a: CategoryEfficiency, b: CategoryEfficiency) => (a.efficiency_score ?? 0) - (b.efficiency_score ?? 0)
       },
     ];
 
@@ -864,7 +882,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
                 precision={2}
                 suffix="₽"
                 valueStyle={{ color: efficiencyData.metrics.total_savings >= 0 ? '#3f8600' : '#cf1322' }}
-                prefix={efficiencyData.metrics.total_savings >= 0 ? <TrendingUpOutlined /> : <TrendingDownOutlined />}
+                prefix={efficiencyData.metrics.total_savings >= 0 ? <RiseOutlined /> : <FallOutlined />}
               />
             </Card>
           </Col>
@@ -965,7 +983,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
       key: 'trends',
       label: 'Тренды расходов',
       children: renderTrendsTab(),
-      icon: <TrendingUpOutlined />
+      icon: <RiseOutlined />
     },
     {
       key: 'contractors',
