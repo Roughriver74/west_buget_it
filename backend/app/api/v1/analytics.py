@@ -386,10 +386,29 @@ def get_analytics_by_category(
 def get_trends(
     year: int,
     category_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get spending trends over time"""
+    """
+    Get spending trends over time
+
+    - USER: Can only see trends for their own department
+    - MANAGER/ADMIN: Can see trends for all departments or filter by department
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     query = db.query(
         extract('month', Expense.request_date).label('month'),
         func.sum(Expense.amount).label('amount'),
@@ -398,6 +417,9 @@ def get_trends(
 
     if category_id:
         query = query.filter(Expense.category_id == category_id)
+
+    if department_id:
+        query = query.filter(Expense.department_id == department_id)
 
     query = query.group_by(extract('month', Expense.request_date)).order_by(extract('month', Expense.request_date))
 
@@ -431,6 +453,9 @@ def get_payment_calendar(
     """
     Get payment calendar view for a specific month
     Returns daily aggregated payment data with baseline plan
+
+    - USER: Can only see payment calendar for their own department
+    - MANAGER/ADMIN: Can see payment calendar for all departments or filter by department
     """
     # Use current year/month if not provided
     if not year:
@@ -438,20 +463,27 @@ def get_payment_calendar(
     if not month:
         month = datetime.now().month
 
-    # Determine department
-    if current_user.role.value == "USER":
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
         dept_id = current_user.department_id
-    elif department_id:
-        dept_id = department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        dept_id = department_id if department_id else None
     else:
-        dept_id = current_user.department_id
+        dept_id = None
 
     # Get calendar data from forecast service
     forecast_service = PaymentForecastService(db)
     calendar_data = forecast_service.get_payment_calendar(
         year=year,
         month=month,
-        department_id=department_id,
+        department_id=dept_id,  # Use dept_id instead of department_id
         category_id=category_id,
         organization_id=organization_id,
     )
@@ -527,11 +559,27 @@ def get_payments_by_day(
     """
     Get all payments for a specific day
     Returns detailed list of expenses
+
+    - USER: Can only see payments for their own department
+    - MANAGER/ADMIN: Can see payments for all departments or filter by department
     """
     try:
         payment_date = datetime.fromisoformat(date)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
 
     forecast_service = PaymentForecastService(db)
     result = forecast_service.get_payments_by_day(
@@ -600,6 +648,7 @@ def get_payment_forecast(
     end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
     method: ForecastMethod = Query(default="simple_average", description="Forecast method"),
     lookback_days: int = Query(default=90, ge=30, le=365, description="Days to look back for historical data"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department (ADMIN/MANAGER only)"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
     db: Session = Depends(get_db),
@@ -608,6 +657,9 @@ def get_payment_forecast(
     """
     Generate payment forecast for future period
     Methods: simple_average, moving_average, seasonal
+
+    - USER: Can only generate forecast for their own department
+    - MANAGER/ADMIN: Can generate forecast for all departments or filter by department
     """
     try:
         start = datetime.fromisoformat(start_date)
@@ -618,12 +670,26 @@ def get_payment_forecast(
     if end <= start:
         raise HTTPException(status_code=400, detail="End date must be after start date")
 
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     forecast_service = PaymentForecastService(db)
     forecast_data = forecast_service.generate_forecast(
         start_date=start,
         end_date=end,
         method=method,
         lookback_days=lookback_days,
+        department_id=department_id,
         category_id=category_id,
         organization_id=organization_id,
     )
@@ -660,6 +726,7 @@ def get_payment_forecast(
 def get_payment_forecast_summary(
     start_date: str = Query(description="Start date in ISO format (YYYY-MM-DD)"),
     end_date: str = Query(description="End date in ISO format (YYYY-MM-DD)"),
+    department_id: Optional[int] = Query(default=None, description="Filter by department (ADMIN/MANAGER only)"),
     category_id: Optional[int] = Query(default=None, description="Filter by category"),
     organization_id: Optional[int] = Query(default=None, description="Filter by organization"),
     db: Session = Depends(get_db),
@@ -667,6 +734,9 @@ def get_payment_forecast_summary(
 ):
     """
     Get forecast summary comparing different methods
+
+    - USER: Can only see forecast summary for their own department
+    - MANAGER/ADMIN: Can see forecast summary for all departments or filter by department
     """
     try:
         start = datetime.fromisoformat(start_date)
@@ -674,10 +744,24 @@ def get_payment_forecast_summary(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        pass
+
     forecast_service = PaymentForecastService(db)
     summary = forecast_service.get_forecast_summary(
         start_date=start,
         end_date=end,
+        department_id=department_id,
         category_id=category_id,
         organization_id=organization_id,
     )

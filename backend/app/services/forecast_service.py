@@ -164,6 +164,7 @@ class PaymentForecastService:
         end_date: datetime,
         method: ForecastMethod = "simple_average",
         lookback_days: int = 90,
+        department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
     ) -> List[Dict]:
@@ -175,6 +176,7 @@ class PaymentForecastService:
             end_date: End of forecast period
             method: Forecasting method to use
             lookback_days: Number of days to look back for historical data
+            department_id: Optional department filter
             category_id: Optional category filter
             organization_id: Optional organization filter
         """
@@ -183,6 +185,7 @@ class PaymentForecastService:
         historical_payments = self._get_historical_payments(
             historical_start,
             start_date,
+            department_id,
             category_id,
             organization_id,
         )
@@ -214,6 +217,7 @@ class PaymentForecastService:
         self,
         start_date: datetime,
         end_date: datetime,
+        department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
     ) -> List[Dict]:
@@ -224,6 +228,8 @@ class PaymentForecastService:
             Expense.is_paid == True,
         ]
 
+        if department_id:
+            filters.append(Expense.department_id == department_id)
         if category_id:
             filters.append(Expense.category_id == category_id)
         if organization_id:
@@ -421,6 +427,7 @@ class PaymentForecastService:
         self,
         start_date: datetime,
         end_date: datetime,
+        department_id: Optional[int] = None,
         category_id: Optional[int] = None,
         organization_id: Optional[int] = None,
     ) -> Dict:
@@ -430,6 +437,7 @@ class PaymentForecastService:
             start_date,
             end_date,
             method="simple_average",
+            department_id=department_id,
             category_id=category_id,
             organization_id=organization_id,
         )
@@ -438,6 +446,7 @@ class PaymentForecastService:
             start_date,
             end_date,
             method="moving_average",
+            department_id=department_id,
             category_id=category_id,
             organization_id=organization_id,
         )
@@ -446,6 +455,7 @@ class PaymentForecastService:
             start_date,
             end_date,
             method="seasonal",
+            department_id=department_id,
             category_id=category_id,
             organization_id=organization_id,
         )
