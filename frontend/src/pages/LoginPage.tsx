@@ -103,14 +103,6 @@ const LoginPage: React.FC = () => {
               </Text>
             </div>
           </Form>
-
-          <div style={{ marginTop: 24, padding: 16, background: '#f5f5f5', borderRadius: 4 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              <strong>Default Admin Credentials:</strong><br />
-              Username: <code>admin</code><br />
-              Password: <code>admin</code>
-            </Text>
-          </div>
         </Card>
       </Col>
     </Row>
