@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Descriptions,
@@ -12,6 +12,8 @@ import {
   Col,
   Statistic,
   Tabs,
+  message,
+  Popconfirm,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -20,11 +22,14 @@ import {
   DollarOutlined,
   CalendarOutlined,
   HistoryOutlined,
+  DeleteOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import { employeeAPI, payrollPlanAPI, payrollActualAPI } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
+import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'green',
@@ -48,7 +53,10 @@ const MONTHS = [
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
+  const [planModalVisible, setPlanModalVisible] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<any>(null);
 
   // Fetch employee details with salary history
   const { data: employee, isLoading } = useQuery({
@@ -67,6 +75,32 @@ export default function EmployeeDetailPage() {
     queryKey: ['payroll-actuals', id],
     queryFn: () => payrollActualAPI.list({ employee_id: Number(id) }),
   });
+
+  // Delete plan mutation
+  const deletePlanMutation = useMutation({
+    mutationFn: (planId: number) => payrollPlanAPI.delete(planId),
+    onSuccess: () => {
+      message.success('План удален');
+      queryClient.invalidateQueries({ queryKey: ['payroll-plans', id] });
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.detail || 'Ошибка при удалении плана');
+    },
+  });
+
+  const handleEditPlan = (plan: any) => {
+    setEditingPlan(plan);
+    setPlanModalVisible(true);
+  };
+
+  const handleAddPlan = () => {
+    setEditingPlan(null);
+    setPlanModalVisible(true);
+  };
+
+  const handleDeletePlan = (planId: number) => {
+    deletePlanMutation.mutate(planId);
+  };
 
   if (isLoading) {
     return (
@@ -173,6 +207,34 @@ export default function EmployeeDetailPage() {
       key: 'total_planned',
       render: (value: number) => <strong>{formatCurrency(value)}</strong>,
     },
+    {
+      title: 'Действия',
+      key: 'actions',
+      width: 120,
+      render: (_: any, record: any) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEditPlan(record)}
+          >
+            Изменить
+          </Button>
+          <Popconfirm
+            title="Удалить план?"
+            description="Вы уверены, что хотите удалить этот план?"
+            onConfirm={() => handleDeletePlan(record.id)}
+            okText="Да"
+            cancelText="Нет"
+          >
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+              Удалить
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   // Payroll actuals columns
@@ -189,40 +251,37 @@ export default function EmployeeDetailPage() {
       render: (date: string) => date ? new Date(date).toLocaleDateString('ru-RU') : '-',
     },
     {
-      title: 'Оклад',
-      dataIndex: 'base_salary_paid',
-      key: 'base_salary_paid',
-      render: (value: number) => formatCurrency(value),
-    },
-    {
-      title: 'Премия (мес)',
-      dataIndex: 'monthly_bonus_paid',
-      key: 'monthly_bonus_paid',
-      render: (value: number) => formatCurrency(value || 0),
-    },
-    {
-      title: 'Премия (квар)',
-      dataIndex: 'quarterly_bonus_paid',
-      key: 'quarterly_bonus_paid',
-      render: (value: number) => formatCurrency(value || 0),
-    },
-    {
-      title: 'Премия (год)',
-      dataIndex: 'annual_bonus_paid',
-      key: 'annual_bonus_paid',
-      render: (value: number) => formatCurrency(value || 0),
-    },
-    {
-      title: 'Прочие',
-      dataIndex: 'other_payments_paid',
-      key: 'other_payments_paid',
-      render: (value: number) => formatCurrency(value),
-    },
-    {
-      title: 'Итого',
+      title: 'Начислено (Gross)',
       dataIndex: 'total_paid',
       key: 'total_paid',
       render: (value: number) => <strong>{formatCurrency(value)}</strong>,
+    },
+    {
+      title: 'НДФЛ',
+      key: 'income_tax',
+      render: (_: any, record: any) => (
+        <span>
+          {formatCurrency(record.income_tax_amount || 0)}
+          {' '}
+          <span style={{ fontSize: '12px', color: '#666' }}>
+            ({((record.income_tax_rate || 0) * 100).toFixed(1)}%)
+          </span>
+        </span>
+      ),
+    },
+    {
+      title: 'На руки (Net)',
+      key: 'net_amount',
+      render: (_: any, record: any) => {
+        const netAmount = Number(record.total_paid) - Number(record.income_tax_amount || 0);
+        return <strong style={{ color: '#52c41a' }}>{formatCurrency(netAmount)}</strong>;
+      },
+    },
+    {
+      title: 'Страховые взносы',
+      dataIndex: 'social_tax_amount',
+      key: 'social_tax_amount',
+      render: (value: number) => <span style={{ color: '#fa8c16' }}>{formatCurrency(value || 0)}</span>,
     },
   ];
 
@@ -351,12 +410,23 @@ export default function EmployeeDetailPage() {
                 </span>
               ),
               children: (
-                <Table
-                  columns={plansColumns}
-                  dataSource={plans}
-                  rowKey="id"
-                  pagination={{ pageSize: 12 }}
-                />
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={handleAddPlan}
+                    >
+                      Добавить план
+                    </Button>
+                  </div>
+                  <Table
+                    columns={plansColumns}
+                    dataSource={plans}
+                    rowKey="id"
+                    pagination={{ pageSize: 12 }}
+                  />
+                </>
               ),
             },
             {
@@ -403,6 +473,18 @@ export default function EmployeeDetailPage() {
         visible={modalVisible}
         employee={employee}
         onCancel={() => setModalVisible(false)}
+      />
+
+      <PayrollPlanFormModal
+        visible={planModalVisible}
+        planId={editingPlan?.id}
+        defaultValues={{
+          employee_id: Number(id),
+        }}
+        onCancel={() => {
+          setPlanModalVisible(false);
+          setEditingPlan(null);
+        }}
       />
     </div>
   );

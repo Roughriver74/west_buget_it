@@ -364,9 +364,37 @@ async def create_payroll_actual(
         actual_data.other_payments_paid
     )
 
+    # Auto-calculate НДФЛ using progressive scale if not explicitly provided
+    # Get YTD income and tax before current month
+    from app.utils.ndfl_calculator import calculate_monthly_ndfl_withholding
+
+    ytd_before = db.query(
+        func.sum(PayrollActual.total_paid).label('ytd_income'),
+        func.sum(PayrollActual.income_tax_amount).label('ytd_tax')
+    ).filter(
+        PayrollActual.employee_id == actual_data.employee_id,
+        PayrollActual.year == actual_data.year,
+        PayrollActual.month < actual_data.month
+    ).first()
+
+    ytd_income_before = ytd_before.ytd_income if ytd_before.ytd_income else Decimal('0')
+    ytd_tax_before = ytd_before.ytd_tax if ytd_before.ytd_tax else Decimal('0')
+
+    # Calculate НДФЛ for current month
+    ndfl_calc = calculate_monthly_ndfl_withholding(
+        current_month_income=total_paid,
+        ytd_income_before_month=ytd_income_before,
+        ytd_tax_withheld=ytd_tax_before,
+        year=actual_data.year
+    )
+
+    # Override income_tax_amount with calculated value
+    income_tax_amount = Decimal(str(ndfl_calc['tax_to_withhold']))
+    income_tax_rate = Decimal(str(ndfl_calc['monthly_effective_rate'])) / Decimal('100')
+
     # Create new payroll actual
     new_actual = PayrollActual(
-        **actual_data.model_dump(),
+        **{**actual_data.model_dump(), 'income_tax_amount': income_tax_amount, 'income_tax_rate': income_tax_rate},
         department_id=employee.department_id,
         total_paid=total_paid
     )
@@ -421,6 +449,34 @@ async def update_payroll_actual(
         actual.annual_bonus_paid +
         actual.other_payments_paid
     )
+
+    # Auto-recalculate НДФЛ using progressive scale
+    # Get YTD income and tax before current month (excluding current month)
+    from app.utils.ndfl_calculator import calculate_monthly_ndfl_withholding
+
+    ytd_before = db.query(
+        func.sum(PayrollActual.total_paid).label('ytd_income'),
+        func.sum(PayrollActual.income_tax_amount).label('ytd_tax')
+    ).filter(
+        PayrollActual.employee_id == actual.employee_id,
+        PayrollActual.year == actual.year,
+        PayrollActual.month < actual.month
+    ).first()
+
+    ytd_income_before = ytd_before.ytd_income if ytd_before.ytd_income else Decimal('0')
+    ytd_tax_before = ytd_before.ytd_tax if ytd_before.ytd_tax else Decimal('0')
+
+    # Calculate НДФЛ for current month
+    ndfl_calc = calculate_monthly_ndfl_withholding(
+        current_month_income=actual.total_paid,
+        ytd_income_before_month=ytd_income_before,
+        ytd_tax_withheld=ytd_tax_before,
+        year=actual.year
+    )
+
+    # Update income_tax_amount and rate with calculated values
+    actual.income_tax_amount = Decimal(str(ndfl_calc['tax_to_withhold']))
+    actual.income_tax_rate = Decimal(str(ndfl_calc['monthly_effective_rate'])) / Decimal('100')
 
     db.commit()
     db.refresh(actual)
@@ -1981,4 +2037,203 @@ async def get_salary_distribution(
             "percentile_90": Decimal(str(round(percentile_90, 2))),
             "std_deviation": Decimal(str(round(std_deviation, 2)))
         }
+    }
+
+# ============================================
+# НДФЛ (Income Tax) Calculation Endpoints
+# ============================================
+
+from pydantic import BaseModel, Field
+from app.utils.ndfl_calculator import (
+    calculate_progressive_ndfl,
+    calculate_monthly_ndfl_withholding,
+    get_tax_brackets_info
+)
+
+
+class NDFLCalculationRequest(BaseModel):
+    """Request for NDFL calculation"""
+    annual_income: Decimal = Field(..., ge=0, description="Годовой доход (брутто)")
+    year: Optional[int] = Field(None, description="Год (по умолчанию текущий)")
+
+
+class MonthlyNDFLRequest(BaseModel):
+    """Request for monthly NDFL withholding calculation"""
+    current_month_income: Decimal = Field(..., ge=0, description="Доход за текущий месяц (брутто)")
+    ytd_income_before_month: Decimal = Field(0, ge=0, description="Доход с начала года до текущего месяца")
+    ytd_tax_withheld: Decimal = Field(0, ge=0, description="НДФЛ удержанный с начала года")
+    year: Optional[int] = Field(None, description="Год (по умолчанию текущий)")
+
+
+class EmployeeYTDIncomeRequest(BaseModel):
+    """Request to calculate YTD income for employee"""
+    employee_id: int
+    year: int
+    up_to_month: int = Field(..., ge=1, le=12, description="До какого месяца включительно")
+
+
+@router.post("/ndfl/calculate")
+def calculate_ndfl(
+    request: NDFLCalculationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Расчет НДФЛ по прогрессивной шкале для годового дохода.
+
+    Поддерживает:
+    - 2024: двухступенчатая шкала (13% / 15%)
+    - 2025+: пятиступенчатая шкала (13% / 15% / 18% / 20% / 22%)
+
+    Returns:
+        - total_tax: Сумма НДФЛ
+        - effective_rate: Эффективная ставка (%)
+        - net_income: Чистый доход (на руки)
+        - breakdown: Разбивка по ступеням
+        - details: Детальный расчет
+    """
+    result = calculate_progressive_ndfl(
+        annual_income=request.annual_income,
+        year=request.year
+    )
+
+    return {
+        "success": True,
+        "calculation": result,
+        "input": {
+            "annual_income": float(request.annual_income),
+            "year": result['year']
+        }
+    }
+
+
+@router.post("/ndfl/calculate-monthly")
+def calculate_monthly_ndfl(
+    request: MonthlyNDFLRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Расчет НДФЛ к удержанию за текущий месяц с учетом накопленного дохода.
+
+    Правильный расчет по формуле:
+    1. Рассчитать общий НДФЛ на доход с начала года (включая текущий месяц)
+    2. Вычесть НДФЛ, уже удержанный в предыдущих месяцах
+    3. Результат = НДФЛ к удержанию в текущем месяце
+
+    Returns:
+        - tax_to_withhold: НДФЛ к удержанию в этом месяце
+        - ytd_income_total: Доход с начала года (всего)
+        - ytd_tax_total: НДФЛ с начала года (всего)
+        - monthly_effective_rate: Эффективная ставка за месяц
+        - net_income_this_month: Чистый доход за месяц (на руки)
+        - calculation_details: Детали расчета
+        - breakdown: Разбивка по ступеням
+    """
+    result = calculate_monthly_ndfl_withholding(
+        current_month_income=request.current_month_income,
+        ytd_income_before_month=request.ytd_income_before_month,
+        ytd_tax_withheld=request.ytd_tax_withheld,
+        year=request.year
+    )
+
+    return {
+        "success": True,
+        "calculation": result,
+        "input": {
+            "current_month_income": float(request.current_month_income),
+            "ytd_income_before_month": float(request.ytd_income_before_month),
+            "ytd_tax_withheld": float(request.ytd_tax_withheld),
+            "year": result['year']
+        }
+    }
+
+
+@router.get("/ndfl/brackets")
+def get_ndfl_brackets(
+    year: Optional[int] = Query(None, description="Год (по умолчанию текущий)"),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Получить информацию о ступенях НДФЛ для заданного года.
+
+    Returns:
+        - year: Год
+        - system: Тип системы налогообложения
+        - brackets: Список ступеней с порогами и ставками
+        - description: Описание системы
+    """
+    result = get_tax_brackets_info(year=year)
+
+    return {
+        "success": True,
+        "brackets_info": result
+    }
+
+
+@router.post("/ndfl/employee-ytd")
+def get_employee_ytd_income(
+    request: EmployeeYTDIncomeRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить накопленный доход и удержанный НДФЛ для сотрудника с начала года.
+
+    Используется для автоматического расчета НДФЛ при вводе зарплаты.
+
+    Returns:
+        - employee_id: ID сотрудника
+        - year: Год
+        - up_to_month: До какого месяца (включительно)
+        - ytd_income: Доход с начала года
+        - ytd_tax_withheld: НДФЛ удержанный с начала года
+        - months_data: Детализация по месяцам
+    """
+    # Check employee exists and user has access
+    employee = db.query(Employee).filter(Employee.id == request.employee_id).first()
+    if not employee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
+        )
+
+    # Check department access (multi-tenancy)
+    if current_user.role == UserRoleEnum.USER:
+        if employee.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view employees from your department"
+            )
+
+    # Query payroll actuals for the year up to specified month
+    payroll_actuals = db.query(PayrollActual).filter(
+        PayrollActual.employee_id == request.employee_id,
+        PayrollActual.year == request.year,
+        PayrollActual.month <= request.up_to_month
+    ).order_by(PayrollActual.month).all()
+
+    ytd_income = Decimal('0')
+    ytd_tax_withheld = Decimal('0')
+    months_data = []
+
+    for actual in payroll_actuals:
+        ytd_income += actual.total_paid
+        ytd_tax_withheld += actual.income_tax_amount
+
+        months_data.append({
+            'month': actual.month,
+            'income': float(actual.total_paid),
+            'tax_withheld': float(actual.income_tax_amount),
+            'tax_rate': float(actual.income_tax_rate)
+        })
+
+    return {
+        "success": True,
+        "employee_id": request.employee_id,
+        "employee_name": employee.full_name,
+        "year": request.year,
+        "up_to_month": request.up_to_month,
+        "ytd_income": float(ytd_income),
+        "ytd_tax_withheld": float(ytd_tax_withheld),
+        "months_count": len(payroll_actuals),
+        "months_data": months_data
     }

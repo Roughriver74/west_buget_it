@@ -152,14 +152,64 @@ export default function EmployeesPage() {
   const totalPayroll = totalSalary * 12 + totalBonuses;
   const avgSalary = activeEmployees.length > 0 ? totalSalary / activeEmployees.length : 0;
 
-  // Tax calculations (расчет налогов)
-  const incomeTaxRate = 0.13; // 13% НДФЛ
+  // Helper function to calculate progressive NDFL for annual income
+  const calculateProgressiveNDFL = (annualIncome: number, year: number = 2025): number => {
+    // Tax brackets for 2025+ (5-tier progressive system)
+    const brackets2025 = [
+      { limit: 2400000, rate: 0.13 },
+      { limit: 5000000, rate: 0.15 },
+      { limit: 20000000, rate: 0.18 },
+      { limit: 50000000, rate: 0.20 },
+      { limit: Infinity, rate: 0.22 },
+    ];
+
+    // Tax brackets for 2024 (2-tier system)
+    const brackets2024 = [
+      { limit: 5000000, rate: 0.13 },
+      { limit: Infinity, rate: 0.15 },
+    ];
+
+    const brackets = year >= 2025 ? brackets2025 : brackets2024;
+    let totalTax = 0;
+    let remainingIncome = annualIncome;
+    let previousLimit = 0;
+
+    for (const bracket of brackets) {
+      const taxableInBracket = Math.min(remainingIncome, bracket.limit - previousLimit);
+      if (taxableInBracket <= 0) break;
+
+      totalTax += taxableInBracket * bracket.rate;
+      remainingIncome -= taxableInBracket;
+      previousLimit = bracket.limit;
+
+      if (remainingIncome <= 0) break;
+    }
+
+    return Math.round(totalTax);
+  };
+
+  // Tax calculations (расчет налогов по прогрессивной шкале)
+  const currentYear = new Date().getFullYear();
   const socialTaxRate = 0.302; // 30.2% страховые взносы (ПФР 22% + ОМС 5.1% + ФСС 2.9% + травматизм 0.2%)
+
+  // Calculate NDFL for each employee using progressive scale
+  const totalIncomeTax = activeEmployees.reduce((sum, employee) => {
+    const employeeAnnualIncome =
+      Number(employee.base_salary) * 12 +
+      Number(employee.monthly_bonus_base || 0) * 12 +
+      Number(employee.quarterly_bonus_base || 0) * 4 +
+      Number(employee.annual_bonus_base || 0);
+    const employeeNDFL = calculateProgressiveNDFL(employeeAnnualIncome, currentYear);
+    return sum + employeeNDFL;
+  }, 0);
+
   const totalGross = totalPayroll; // Общая начисленная сумма (gross)
-  const totalIncomeTax = Math.round(totalGross * incomeTaxRate); // НДФЛ
   const totalSocialTax = Math.round(totalGross * socialTaxRate); // Страховые взносы
   const totalEmployerCost = totalGross + totalSocialTax; // Полная стоимость для работодателя
   const totalNet = totalGross - totalIncomeTax; // Сумма на руки сотрудникам
+
+  // Calculate effective tax rate for display
+  const effectiveNDFLRate = totalGross > 0 ? (totalIncomeTax / totalGross) * 100 : 13;
 
   const columns = [
     {
@@ -314,7 +364,7 @@ export default function EmployeesPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="НДФЛ (13%)"
+              title={`НДФЛ (${effectiveNDFLRate.toFixed(2)}%)`}
               value={totalIncomeTax}
               precision={0}
               suffix="₽"

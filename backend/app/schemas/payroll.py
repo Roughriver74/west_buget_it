@@ -354,3 +354,26 @@ class SalaryDistribution(BaseModel):
     total_employees: int = Field(..., description="Общее количество сотрудников")
     buckets: List[SalaryDistributionBucket] = Field(..., description="Диапазоны распределения зарплат")
     statistics: SalaryStatistics = Field(..., description="Общая статистика зарплат")
+
+
+# ============ НДФЛ (Income Tax) Schemas ============
+
+class NDFLCalculationRequest(BaseModel):
+    """Request schema for НДФЛ calculation"""
+    annual_income: Decimal = Field(..., description="Годовой доход для расчета НДФЛ")
+    year: Optional[int] = Field(None, description="Год для расчета (2024 или 2025+). Если не указан, используется текущий год")
+
+
+class MonthlyNDFLRequest(BaseModel):
+    """Request schema for monthly НДФЛ calculation"""
+    current_month_income: Decimal = Field(..., description="Доход текущего месяца")
+    ytd_income_before_month: Decimal = Field(..., description="Доход с начала года до текущего месяца")
+    ytd_tax_withheld: Decimal = Field(..., description="НДФЛ удержанный с начала года")
+    year: Optional[int] = Field(None, description="Год для расчета (2024 или 2025+). Если не указан, используется текущий год")
+
+
+class EmployeeYTDIncomeRequest(BaseModel):
+    """Request schema for getting employee YTD income"""
+    employee_id: int = Field(..., description="ID сотрудника")
+    year: int = Field(..., description="Год")
+    month: int = Field(..., ge=1, le=12, description="Месяц (до которого считать YTD, не включая сам месяц)")

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, InputNumber, Select, DatePicker, message, Divider, Typography, Alert } from 'antd';
+import { Modal, Form, InputNumber, Select, DatePicker, message, Divider, Typography, Alert, Spin } from 'antd';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { payrollActualAPI, employeeAPI, payrollPlanAPI, PayrollActualCreate, PayrollActualUpdate } from '../../api/payroll';
+import { payrollActualAPI, employeeAPI, payrollPlanAPI, ndflAPI, PayrollActualCreate, PayrollActualUpdate } from '../../api/payroll';
 import dayjs from 'dayjs';
 import { shouldPayQuarterlyBonus, shouldPayAnnualBonus, calculateSocialTax } from '../../utils/payroll';
 
@@ -44,7 +44,7 @@ export default function PayrollActualFormModal({
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const isEdit = !!actualId;
-  const currentYear = new Date().getFullYear();
+  const defaultYear = new Date().getFullYear();
 
   // Watch form values for tax calculation
   const [baseSalary, setBaseSalary] = useState(0);
@@ -52,21 +52,29 @@ export default function PayrollActualFormModal({
   const [quarterlyBonus, setQuarterlyBonus] = useState(0);
   const [annualBonus, setAnnualBonus] = useState(0);
   const [otherPayments, setOtherPayments] = useState(0);
-  const [incomeTaxRate, setIncomeTaxRate] = useState(0.13);
   const [currentMonth, setCurrentMonth] = useState<number | undefined>(undefined);
+  const [currentYear, setCurrentYear] = useState<number>(defaultYear);
+  const [currentEmployeeId, setCurrentEmployeeId] = useState<number | undefined>(undefined);
 
-  // ВАЖНО: Введенные суммы - это то, что сотрудник получает НА РУКИ (net amount)
-  // Нужно рассчитать gross и НДФЛ сверху
+  // YTD (year-to-date) income data
+  const [ytdIncome, setYtdIncome] = useState(0);
+  const [ytdTax, setYtdTax] = useState(0);
+  const [loadingYtd, setLoadingYtd] = useState(false);
 
-  // Net amount (на руки) - сумма всех введенных значений
-  const netAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
+  // NDFL calculation result
+  const [ndflResult, setNdflResult] = useState<any>(null);
+  const [calculatingNdfl, setCalculatingNdfl] = useState(false);
 
-  // Calculate gross amount from net: gross = net / (1 - tax_rate)
-  // Например: если net = 100,000 и НДФЛ 13%, то gross = 100,000 / 0.87 = 114,942.53
-  const grossAmount = netAmount > 0 ? Math.round(netAmount / (1 - incomeTaxRate)) : 0;
+  // НОВАЯ ЛОГИКА: Введенные суммы - это НАЧИСЛЕННАЯ сумма (gross)
+  // Из неё автоматически рассчитывается НДФЛ по прогрессивной шкале
+  const grossAmount = baseSalary + monthlyBonus + quarterlyBonus + annualBonus + otherPayments;
 
-  // Calculate income tax amount: income_tax = gross - net
-  const incomeTaxAmount = grossAmount - netAmount;
+  // НДФЛ рассчитывается через API (прогрессивная шкала)
+  const incomeTaxAmount = ndflResult?.tax_to_withhold || 0;
+  const incomeTaxRate = ndflResult?.monthly_effective_rate ? ndflResult.monthly_effective_rate / 100 : 0.13;
+
+  // Net amount (на руки) = gross - НДФЛ
+  const netAmount = grossAmount - incomeTaxAmount;
 
   // Calculate social tax amount (30.2% - paid by employer, NOT deducted from employee)
   const socialTaxAmount = calculateSocialTax(grossAmount);
@@ -107,23 +115,90 @@ export default function PayrollActualFormModal({
     },
   });
 
+  // Fetch employee YTD income and tax
+  const fetchEmployeeYTD = async (employeeId: number, year: number, month: number) => {
+    if (!employeeId || !year || !month) return;
+
+    setLoadingYtd(true);
+    try {
+      const ytdData = await ndflAPI.getEmployeeYTDIncome({
+        employee_id: employeeId,
+        year,
+        month,
+      });
+      setYtdIncome(ytdData.ytd_income);
+      setYtdTax(ytdData.ytd_tax);
+    } catch (error) {
+      console.error('Failed to fetch YTD data:', error);
+      // На случай ошибки используем 0
+      setYtdIncome(0);
+      setYtdTax(0);
+    } finally {
+      setLoadingYtd(false);
+    }
+  };
+
+  // Calculate NDFL for current month
+  const calculateNDFL = async (currentMonthIncome: number) => {
+    if (!currentYear || !currentMonthIncome || currentMonthIncome <= 0) {
+      setNdflResult(null);
+      return;
+    }
+
+    setCalculatingNdfl(true);
+    try {
+      const result = await ndflAPI.calculateMonthlyNDFL({
+        current_month_income: currentMonthIncome,
+        ytd_income_before_month: ytdIncome,
+        ytd_tax_withheld: ytdTax,
+        year: currentYear,
+      });
+      setNdflResult(result);
+    } catch (error) {
+      console.error('Failed to calculate NDFL:', error);
+      message.error('Ошибка расчета НДФЛ');
+      setNdflResult(null);
+    } finally {
+      setCalculatingNdfl(false);
+    }
+  };
+
+  // Auto-calculate NDFL when gross amount or YTD changes
+  useEffect(() => {
+    if (grossAmount > 0 && currentEmployeeId && currentMonth && currentYear) {
+      calculateNDFL(grossAmount);
+    } else {
+      setNdflResult(null);
+    }
+  }, [grossAmount, ytdIncome, ytdTax, currentYear]);
+
   useEffect(() => {
     if (visible && defaultValues) {
+      const year = defaultValues.year || defaultYear;
+      const month = defaultValues.month;
+      const employeeId = defaultValues.employee_id;
+
       form.setFieldsValue({
-        year: defaultValues.year || currentYear,
-        month: defaultValues.month,
-        employee_id: defaultValues.employee_id,
+        year,
+        month,
+        employee_id: employeeId,
         monthly_bonus_paid: 0,
         quarterly_bonus_paid: 0,
         annual_bonus_paid: 0,
         other_payments_paid: 0,
-        income_tax_rate: 13,  // Default 13%
         payment_date: dayjs(),
       });
 
-      // Set current month for bonus alerts
-      if (defaultValues.month) {
-        setCurrentMonth(defaultValues.month);
+      // Set current context
+      setCurrentYear(year);
+      setCurrentEmployeeId(employeeId);
+      if (month) {
+        setCurrentMonth(month);
+      }
+
+      // Fetch YTD data for this employee/year/month
+      if (employeeId && year && month) {
+        fetchEmployeeYTD(employeeId, year, month);
       }
 
       // Try to get plan for this employee/year/month and pre-fill values
@@ -159,17 +234,21 @@ export default function PayrollActualFormModal({
     } else if (visible) {
       form.resetFields();
       form.setFieldsValue({
-        year: currentYear,
+        year: defaultYear,
         monthly_bonus_paid: 0,
         quarterly_bonus_paid: 0,
         annual_bonus_paid: 0,
         other_payments_paid: 0,
-        income_tax_rate: 13,  // Default 13%
         payment_date: dayjs(),
       });
+      setCurrentYear(defaultYear);
       setCurrentMonth(undefined);
+      setCurrentEmployeeId(undefined);
+      setYtdIncome(0);
+      setYtdTax(0);
+      setNdflResult(null);
     }
-  }, [visible, defaultValues, employees, form, currentYear]);
+  }, [visible, defaultValues, employees, form, defaultYear]);
 
   const handleClose = () => {
     form.resetFields();
@@ -177,8 +256,15 @@ export default function PayrollActualFormModal({
   };
 
   const handleEmployeeChange = async (employeeId: number) => {
+    setCurrentEmployeeId(employeeId);
+
     const year = form.getFieldValue('year');
     const month = form.getFieldValue('month');
+
+    // Fetch YTD data if we have all required parameters
+    if (year && month) {
+      fetchEmployeeYTD(employeeId, year, month);
+    }
 
     if (year && month) {
       try {
@@ -192,6 +278,12 @@ export default function PayrollActualFormModal({
             annual_bonus_paid: plan.annual_bonus,
             other_payments_paid: plan.other_payments,
           });
+          // Update local state для автоматического расчета НДФЛ
+          setBaseSalary(plan.base_salary);
+          setMonthlyBonus(plan.monthly_bonus);
+          setQuarterlyBonus(plan.quarterly_bonus);
+          setAnnualBonus(plan.annual_bonus);
+          setOtherPayments(plan.other_payments);
           return;
         }
       } catch (error) {
@@ -208,6 +300,29 @@ export default function PayrollActualFormModal({
         quarterly_bonus_paid: employee.quarterly_bonus_base || 0,
         annual_bonus_paid: employee.annual_bonus_base || 0,
       });
+      // Update local state
+      setBaseSalary(employee.base_salary);
+      setMonthlyBonus(employee.monthly_bonus_base || 0);
+      setQuarterlyBonus(employee.quarterly_bonus_base || 0);
+      setAnnualBonus(employee.annual_bonus_base || 0);
+    }
+  };
+
+  const handleYearChange = (year: number) => {
+    setCurrentYear(year);
+    const employeeId = form.getFieldValue('employee_id');
+    const month = form.getFieldValue('month');
+    if (employeeId && month) {
+      fetchEmployeeYTD(employeeId, year, month);
+    }
+  };
+
+  const handleMonthChange = (month: number) => {
+    setCurrentMonth(month);
+    const employeeId = form.getFieldValue('employee_id');
+    const year = form.getFieldValue('year');
+    if (employeeId && year) {
+      fetchEmployeeYTD(employeeId, year, month);
     }
   };
 
@@ -294,8 +409,8 @@ export default function PayrollActualFormModal({
           label="Год"
           rules={[{ required: true, message: 'Выберите год' }]}
         >
-          <Select placeholder="Выберите год" disabled={isEdit}>
-            {[currentYear - 1, currentYear, currentYear + 1].map((year) => (
+          <Select placeholder="Выберите год" disabled={isEdit} onChange={handleYearChange}>
+            {[defaultYear - 1, defaultYear, defaultYear + 1].map((year) => (
               <Option key={year} value={year}>
                 {year}
               </Option>
@@ -311,7 +426,7 @@ export default function PayrollActualFormModal({
           <Select
             placeholder="Выберите месяц"
             disabled={isEdit}
-            onChange={(value) => setCurrentMonth(value)}
+            onChange={handleMonthChange}
           >
             {MONTHS.map((month) => (
               <Option key={month.value} value={month.value}>
@@ -357,8 +472,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="base_salary_paid"
-          label="Оклад (на руки)"
-          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
+          label="Оклад (начислено)"
+          tooltip="НАЧИСЛЕННАЯ сумма (до вычета НДФЛ). НДФЛ рассчитывается автоматически по прогрессивной шкале."
           rules={[
             { required: true, message: 'Введите выплаченный оклад' },
             { type: 'number', min: 0, message: 'Оклад не может быть отрицательным' },
@@ -376,8 +491,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="monthly_bonus_paid"
-          label="Месячная премия (на руки)"
-          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
+          label="Месячная премия (начислено)"
+          tooltip="НАЧИСЛЕННАЯ сумма (до вычета НДФЛ). НДФЛ рассчитывается автоматически по прогрессивной шкале."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -394,8 +509,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="quarterly_bonus_paid"
-          label="Квартальная премия (на руки)"
-          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
+          label="Квартальная премия (начислено)"
+          tooltip="НАЧИСЛЕННАЯ сумма (до вычета НДФЛ). НДФЛ рассчитывается автоматически по прогрессивной шкале."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -412,8 +527,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="annual_bonus_paid"
-          label="Годовая премия (на руки)"
-          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
+          label="Годовая премия (начислено)"
+          tooltip="НАЧИСЛЕННАЯ сумма (до вычета НДФЛ). НДФЛ рассчитывается автоматически по прогрессивной шкале."
           rules={[
             { type: 'number', min: 0, message: 'Премия не может быть отрицательной' },
           ]}
@@ -430,8 +545,8 @@ export default function PayrollActualFormModal({
 
         <Form.Item
           name="other_payments_paid"
-          label="Прочие выплаты (на руки)"
-          tooltip="Сумма которую сотрудник получает на руки. НДФЛ рассчитывается автоматически."
+          label="Прочие выплаты (начислено)"
+          tooltip="НАЧИСЛЕННАЯ сумма (до вычета НДФЛ). НДФЛ рассчитывается автоматически по прогрессивной шкале."
           rules={[
             { type: 'number', min: 0, message: 'Прочие выплаты не могут быть отрицательными' },
           ]}
@@ -449,59 +564,75 @@ export default function PayrollActualFormModal({
         <Divider orientation="left">Расчет выплаты и налогов</Divider>
 
         <Alert
-          message="Расчет налогов"
-          description="Введенные суммы (оклад, премии) - это то, что сотрудник получает НА РУКИ. НДФЛ и страховые взносы рассчитываются автоматически."
+          message="Прогрессивный НДФЛ"
+          description="Введенные суммы (оклад, премии) - это НАЧИСЛЕННЫЕ суммы. НДФЛ рассчитывается автоматически по прогрессивной шкале с учетом дохода с начала года."
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
         />
 
-        <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text strong style={{ color: '#52c41a' }}>Сумма на руки (введенные значения):</Text>
-            <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
-              {netAmount.toLocaleString('ru-RU')} ₽
-            </Text>
+        {loadingYtd && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <Spin tip="Загрузка данных о доходе сотрудника..." />
           </div>
-          <Divider style={{ margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(0)}%) - удержан из начислений:</Text>
-            <Text type="danger">+{incomeTaxAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>Начислено сотруднику (Gross):</Text>
-            <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
-          <Divider style={{ margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <Text>Страховые взносы работодателя (30.2%):</Text>
-            <Text style={{ color: '#fa8c16' }}>+{socialTaxAmount.toLocaleString('ru-RU')} ₽</Text>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Text strong style={{ color: '#fa8c16' }}>Полная стоимость для компании:</Text>
-            <Text strong style={{ fontSize: 18, color: '#fa8c16' }}>
-              {employerCost.toLocaleString('ru-RU')} ₽
-            </Text>
-          </div>
-        </div>
+        )}
 
-        <Form.Item
-          name="income_tax_rate"
-          label="Ставка НДФЛ (%)"
-          rules={[
-            { required: true, message: 'Введите ставку НДФЛ' },
-            { type: 'number', min: 0, max: 100, message: 'Ставка должна быть от 0 до 100%' },
-          ]}
-        >
-          <InputNumber
-            style={{ width: '100%' }}
-            placeholder="13"
-            min={0}
-            max={100}
-            onChange={(value) => setIncomeTaxRate((value || 13) / 100)}
-            addonAfter="%"
-          />
-        </Form.Item>
+        {!loadingYtd && currentEmployeeId && currentMonth && currentYear && (
+          <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#e6f7ff', borderRadius: '4px' }}>
+            <Text strong>Доход с начала года (до текущего месяца):</Text>
+            <div style={{ marginTop: 8 }}>
+              <Text>• Начислено с начала года: {ytdIncome.toLocaleString('ru-RU')} ₽</Text><br/>
+              <Text>• НДФЛ удержан с начала года: {ytdTax.toLocaleString('ru-RU')} ₽</Text>
+            </div>
+          </div>
+        )}
+
+        {calculatingNdfl && (
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            <Spin tip="Расчет НДФЛ по прогрессивной шкале..." />
+          </div>
+        )}
+
+        {!calculatingNdfl && grossAmount > 0 && (
+          <div style={{ marginBottom: 16, padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text>Начислено в текущем месяце (Gross):</Text>
+              <Text strong style={{ fontSize: 16 }}>{grossAmount.toLocaleString('ru-RU')} ₽</Text>
+            </div>
+            <Divider style={{ margin: '8px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text>НДФЛ ({(incomeTaxRate * 100).toFixed(2)}%) - по прогрессивной шкале:</Text>
+              <Text type="danger" strong>-{Math.round(incomeTaxAmount).toLocaleString('ru-RU')} ₽</Text>
+            </div>
+            {ndflResult && (
+              <div style={{ fontSize: '12px', color: '#666', marginLeft: 8, marginBottom: 8 }}>
+                <Text type="secondary">
+                  Система: {ndflResult.system === '5-tier' ? '5 ступеней (2025+)' : '2 ступени (2024)'}
+                </Text><br/>
+                <Text type="secondary">
+                  YTD доход: {ndflResult.ytd_income_total.toLocaleString('ru-RU')} ₽
+                </Text>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text strong style={{ color: '#52c41a' }}>Сумма на руки:</Text>
+              <Text strong style={{ fontSize: 18, color: '#52c41a' }}>
+                {Math.round(netAmount).toLocaleString('ru-RU')} ₽
+              </Text>
+            </div>
+            <Divider style={{ margin: '8px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text>Страховые взносы работодателя (30.2%):</Text>
+              <Text style={{ color: '#fa8c16' }}>+{socialTaxAmount.toLocaleString('ru-RU')} ₽</Text>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Text strong style={{ color: '#fa8c16' }}>Полная стоимость для компании:</Text>
+              <Text strong style={{ fontSize: 18, color: '#fa8c16' }}>
+                {employerCost.toLocaleString('ru-RU')} ₽
+              </Text>
+            </div>
+          </div>
+        )}
 
         <Alert
           message="Страховые взносы рассчитываются автоматически"

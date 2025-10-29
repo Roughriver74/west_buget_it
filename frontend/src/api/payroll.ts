@@ -578,3 +578,109 @@ export const payrollAnalyticsAPI = {
     return response.data;
   },
 };
+
+// ==================== НДФЛ (Income Tax) API ====================
+
+export interface NDFLCalculationRequest {
+  annual_income: number;
+  year?: number;
+}
+
+export interface MonthlyNDFLRequest {
+  current_month_income: number;
+  ytd_income_before_month: number;
+  ytd_tax_withheld: number;
+  year?: number;
+}
+
+export interface EmployeeYTDIncomeRequest {
+  employee_id: number;
+  year: number;
+  month: number;
+}
+
+export interface BracketInfo {
+  from: number;
+  to: number | null;
+  rate: number;
+  rate_percent?: string;
+  description?: string;
+  taxable_amount?: number;
+  tax_amount?: number;
+}
+
+export interface NDFLCalculationResult {
+  total_tax: number;
+  effective_rate: number;
+  net_income: number;
+  breakdown: BracketInfo[];
+  details: string[];
+  year: number;
+  system: string;
+}
+
+export interface MonthlyNDFLResult {
+  tax_to_withhold: number;
+  ytd_income_total: number;
+  ytd_tax_total: number;
+  monthly_effective_rate: number;
+  net_income_this_month: number;
+  calculation_details: {
+    step1_ytd_income: number;
+    step2_total_tax_on_ytd: number;
+    step3_tax_already_withheld: number;
+    step4_tax_to_withhold: number;
+  };
+  breakdown: BracketInfo[];
+  year: number;
+  system: string;
+}
+
+export interface TaxBracketsInfo {
+  year: number;
+  system: string;
+  description: string;
+  brackets: BracketInfo[];
+}
+
+export interface EmployeeYTDIncome {
+  employee_id: number;
+  year: number;
+  month: number;
+  ytd_income: number;
+  ytd_tax: number;
+  payments_count: number;
+  details: Array<{
+    month: number;
+    income: number;
+    tax: number;
+  }>;
+}
+
+export const ndflAPI = {
+  // Рассчитать НДФЛ для годового дохода
+  calculateNDFL: async (request: NDFLCalculationRequest) => {
+    const response = await apiClient.post<NDFLCalculationResult>('payroll/ndfl/calculate', request);
+    return response.data;
+  },
+
+  // Рассчитать НДФЛ для текущего месяца с учетом YTD
+  calculateMonthlyNDFL: async (request: MonthlyNDFLRequest) => {
+    const response = await apiClient.post<MonthlyNDFLResult>('payroll/ndfl/calculate-monthly', request);
+    return response.data;
+  },
+
+  // Получить информацию о ступенях НДФЛ
+  getTaxBrackets: async (year?: number) => {
+    const response = await apiClient.get<TaxBracketsInfo>('payroll/ndfl/brackets', {
+      params: { year },
+    });
+    return response.data;
+  },
+
+  // Получить накопленный доход и налог сотрудника с начала года
+  getEmployeeYTDIncome: async (request: EmployeeYTDIncomeRequest) => {
+    const response = await apiClient.post<EmployeeYTDIncome>('payroll/ndfl/employee-ytd', request);
+    return response.data;
+  },
+};

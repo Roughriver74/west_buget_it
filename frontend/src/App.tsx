@@ -30,6 +30,7 @@ import KpiManagementPage from './pages/KpiManagementPage'
 import KPIAnalyticsPage from './pages/KPIAnalyticsPage'
 import BudgetPlanningPage from './pages/BudgetPlanningPage'
 import PayrollActualsPage from './pages/PayrollActualsPage'
+import NDFLCalculatorPage from './pages/NDFLCalculatorPage'
 
 function App() {
   return (
@@ -183,6 +184,14 @@ function App() {
                       element={
                         <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
                           <PayrollAnalyticsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/payroll/ndfl"
+                      element={
+                        <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                          <NDFLCalculatorPage />
                         </ProtectedRoute>
                       }
                     />
