@@ -2,7 +2,7 @@
  * Budget Version Table Component
  * Displays budget versions with status and actions
  */
-import React from 'react'
+import React, { Key } from 'react'
 import { Table, Tag, Button, Space, Popconfirm, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -24,8 +24,8 @@ interface BudgetVersionTableProps {
   onDelete?: (id: number) => void
   onSubmit?: (id: number) => void
   onCopy?: (version: BudgetVersion) => void
-  selectedRowKeys?: number[]
-  onSelectionChange?: (selectedRowKeys: number[]) => void
+  selectedRowKeys?: Key[]
+  onSelectionChange?: (selectedRowKeys: Key[]) => void
 }
 
 const statusColors: Record<BudgetVersionStatus, string> = {
@@ -200,7 +200,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   const rowSelection = onSelectionChange
     ? {
         selectedRowKeys: selectedRowKeys || [],
-        onChange: onSelectionChange,
+        onChange: (keys: Key[]) => onSelectionChange(keys),
         type: 'checkbox' as const,
         getCheckboxProps: () => ({
           // Можно ограничить выбор только двумя версиями

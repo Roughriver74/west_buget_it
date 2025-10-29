@@ -3,7 +3,7 @@
  * Displays version metadata, plan editor, and approval history
  */
 import React, { useMemo } from 'react'
-import { Drawer, Space, Descriptions, Divider, Spin, Typography } from 'antd'
+import { Drawer, Descriptions, Divider, Spin, Typography } from 'antd'
 import { useBudgetVersionWithDetails } from '@/hooks/useBudgetPlanning'
 import { BudgetVersionStatus, ExpenseType } from '@/types/budgetPlanning'
 import { BudgetVersionStatusBadge } from './BudgetVersionStatusBadge'

@@ -2,7 +2,7 @@
  * Budget Planning Page
  * Main page for budget planning module with scenarios and versions
  */
-import React, { useMemo, useState } from 'react'
+import React, { Key, useMemo, useState } from 'react'
 import {
   Typography,
   Row,
@@ -56,7 +56,7 @@ const BudgetPlanningPage: React.FC = () => {
   const [versionDetailMode, setVersionDetailMode] = useState<'view' | 'edit'>('view')
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null)
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false)
-  const [selectedVersionsForComparison, setSelectedVersionsForComparison] = useState<number[]>([])
+  const [selectedVersionsForComparison, setSelectedVersionsForComparison] = useState<Key[]>([])
   const [scenarioForm] = Form.useForm()
   const [versionForm] = Form.useForm()
 
@@ -480,8 +480,8 @@ const BudgetPlanningPage: React.FC = () => {
 
       <BudgetVersionComparisonModal
         open={isComparisonModalOpen}
-        version1Id={selectedVersionsForComparison[0] || null}
-        version2Id={selectedVersionsForComparison[1] || null}
+        version1Id={selectedVersionsForComparison[0] ? Number(selectedVersionsForComparison[0]) : null}
+        version2Id={selectedVersionsForComparison[1] ? Number(selectedVersionsForComparison[1]) : null}
         onClose={handleComparisonModalClose}
       />
     </div>
