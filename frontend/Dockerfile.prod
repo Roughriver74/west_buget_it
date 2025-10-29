@@ -39,12 +39,15 @@ RUN chmod +x /docker-entrypoint.sh
 RUN apk add --no-cache su-exec
 
 # Create non-root user for nginx and prepare directories
-# Note: We run entrypoint as root to allow sed, then switch to nginx
+# Note: We run entrypoint as root to allow file generation, then switch to nginx
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
     touch /var/run/nginx.pid && \
     chown -R nginx:nginx /var/run/nginx.pid
+
+# Link nginx logs to stdout/stderr for Docker
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
+    ln -sf /dev/stderr /var/log/nginx/error.log
 
 # Keep as root for entrypoint (will switch to nginx inside script)
 

@@ -7,7 +7,11 @@
     <title>IT Budget Manager</title>
 
     <!-- Runtime environment configuration - loaded before app -->
-    <script src="/env-config.js"></script>
+    <!-- Fallback to empty config if file doesn't exist -->
+    <script>
+      window.ENV_CONFIG = window.ENV_CONFIG || {};
+    </script>
+    <script src="/env-config.js" onerror="console.warn('env-config.js not loaded, using build-time config')"></script>
   </head>
   <body>
     <div id="root"></div>
