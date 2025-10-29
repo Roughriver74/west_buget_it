@@ -48,6 +48,10 @@ def upgrade() -> None:
         END $$;
     """)
 
+    # Create enum objects with create_type=False to use existing types
+    bonus_type_enum = postgresql.ENUM('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum', create_type=False)
+    kpi_goal_status_enum = postgresql.ENUM('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED', name='kpigoalstatusenum', create_type=False)
+
     # ### Create kpi_goals table ###
     op.create_table(
         'kpi_goals',
@@ -61,7 +65,7 @@ def upgrade() -> None:
         sa.Column('weight', sa.Numeric(precision=5, scale=2), nullable=False, server_default='100'),
         sa.Column('year', sa.Integer(), nullable=False),
         sa.Column('is_annual', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('status', sa.Enum('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED', name='kpigoalstatusenum'), nullable=False, server_default='DRAFT'),
+        sa.Column('status', kpi_goal_status_enum, nullable=False, server_default='DRAFT'),
         sa.Column('department_id', sa.Integer(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
@@ -84,9 +88,9 @@ def upgrade() -> None:
         sa.Column('year', sa.Integer(), nullable=False),
         sa.Column('month', sa.Integer(), nullable=False),
         sa.Column('kpi_percentage', sa.Numeric(precision=5, scale=2), nullable=True),
-        sa.Column('monthly_bonus_type', sa.Enum('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum'), nullable=False, server_default='PERFORMANCE_BASED'),
-        sa.Column('quarterly_bonus_type', sa.Enum('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum'), nullable=False, server_default='PERFORMANCE_BASED'),
-        sa.Column('annual_bonus_type', sa.Enum('PERFORMANCE_BASED', 'FIXED', 'MIXED', name='bonustypeenum'), nullable=False, server_default='PERFORMANCE_BASED'),
+        sa.Column('monthly_bonus_type', bonus_type_enum, nullable=False, server_default='PERFORMANCE_BASED'),
+        sa.Column('quarterly_bonus_type', bonus_type_enum, nullable=False, server_default='PERFORMANCE_BASED'),
+        sa.Column('annual_bonus_type', bonus_type_enum, nullable=False, server_default='PERFORMANCE_BASED'),
         sa.Column('monthly_bonus_base', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0'),
         sa.Column('quarterly_bonus_base', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0'),
         sa.Column('annual_bonus_base', sa.Numeric(precision=15, scale=2), nullable=False, server_default='0'),
@@ -125,7 +129,7 @@ def upgrade() -> None:
         sa.Column('actual_value', sa.Numeric(precision=15, scale=2), nullable=True),
         sa.Column('achievement_percentage', sa.Numeric(precision=5, scale=2), nullable=True),
         sa.Column('weight', sa.Numeric(precision=5, scale=2), nullable=True),
-        sa.Column('status', sa.Enum('DRAFT', 'ACTIVE', 'ACHIEVED', 'NOT_ACHIEVED', 'CANCELLED', name='kpigoalstatusenum'), nullable=False, server_default='ACTIVE'),
+        sa.Column('status', kpi_goal_status_enum, nullable=False, server_default='ACTIVE'),
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
