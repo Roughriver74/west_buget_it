@@ -186,3 +186,38 @@ class ForecastSummaryMethods(BaseModel):
 class ForecastSummary(BaseModel):
     period: ForecastSummaryPeriod
     forecasts: ForecastSummaryMethods
+
+
+# ============================================================================
+# Plan vs Actual Schemas
+# ============================================================================
+
+class PlanVsActualMonthly(BaseModel):
+    month: int
+    month_name: str
+    planned: float
+    actual: float
+    difference: float
+    execution_percent: float
+
+
+class PlanVsActualCategory(BaseModel):
+    category_id: int
+    category_name: str
+    planned: float
+    actual: float
+    difference: float
+    execution_percent: float
+    monthly: list[PlanVsActualMonthly]
+
+
+class PlanVsActualSummary(BaseModel):
+    year: int
+    baseline_version_id: Optional[int]
+    baseline_version_name: Optional[str]
+    total_planned: float
+    total_actual: float
+    total_difference: float
+    execution_percent: float
+    by_month: list[PlanVsActualMonthly]
+    by_category: list[PlanVsActualCategory]

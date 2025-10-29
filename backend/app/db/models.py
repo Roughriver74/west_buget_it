@@ -774,6 +774,9 @@ class BudgetVersion(Base):
         index=True
     )
 
+    # Baseline flag (only one approved version per year can be baseline)
+    is_baseline = Column(Boolean, default=False, nullable=False, index=True)
+
     # Метаданные
     created_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

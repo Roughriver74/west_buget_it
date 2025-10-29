@@ -1115,3 +1115,76 @@ def calculate_by_seasonal(
     )
 
     return CalculationResult(**result)
+
+
+# ============================================================================
+# Baseline Management
+# ============================================================================
+
+@router.post("/versions/{version_id}/set-as-baseline", response_model=BudgetVersionInDB)
+def set_version_as_baseline(
+    version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Set an approved budget version as baseline for the year.
+    Only one version per year can be baseline.
+    """
+    # Get the version
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only APPROVED versions can be set as baseline
+    if version.status != BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only APPROVED versions can be set as baseline"
+        )
+
+    # Unset any existing baseline for the same year and department
+    db.query(BudgetVersion).filter(
+        BudgetVersion.year == version.year,
+        BudgetVersion.department_id == current_user.department_id,
+        BudgetVersion.is_baseline == True
+    ).update({"is_baseline": False})
+
+    # Set this version as baseline
+    version.is_baseline = True
+    db.commit()
+    db.refresh(version)
+
+    return version
+
+
+@router.delete("/versions/{version_id}/unset-baseline", response_model=BudgetVersionInDB)
+def unset_version_baseline(
+    version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Remove baseline flag from a budget version"""
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    version.is_baseline = False
+    db.commit()
+    db.refresh(version)
+
+    return version

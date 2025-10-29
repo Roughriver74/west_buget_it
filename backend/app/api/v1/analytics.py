@@ -5,7 +5,7 @@ from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, ExpenseStatusEnum, ExpenseTypeEnum, User, PayrollPlan
+from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, PayrollPlan
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (
@@ -32,6 +32,9 @@ from app.schemas.analytics import (
     ForecastSummaryMethods,
     ForecastSummaryMethodStats,
     ForecastMethodEnum,
+    PlanVsActualSummary,
+    PlanVsActualMonthly,
+    PlanVsActualCategory,
 )
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
@@ -565,4 +568,187 @@ def get_payment_forecast_summary(
                 daily_avg=summary["forecasts"]["seasonal"]["daily_avg"],
             ),
         ),
+    )
+
+
+@router.get("/plan-vs-actual", response_model=PlanVsActualSummary)
+def get_plan_vs_actual(
+    year: int = Query(..., description="Target year for comparison"),
+    department_id: Optional[int] = Query(None, description="Filter by department"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Compare baseline budget plan against actual expenses.
+    Returns monthly and category-level breakdown of planned vs actual spending.
+    """
+    # Find baseline version for the year
+    baseline_query = db.query(BudgetVersion).filter(
+        BudgetVersion.year == year,
+        BudgetVersion.is_baseline == True
+    )
+
+    # Filter by department for USERs
+    if current_user.role.value == "USER":
+        baseline_query = baseline_query.filter(
+            BudgetVersion.department_id == current_user.department_id
+        )
+    elif department_id:
+        baseline_query = baseline_query.filter(
+            BudgetVersion.department_id == department_id
+        )
+
+    baseline_version = baseline_query.first()
+
+    if not baseline_version:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No baseline budget version found for year {year}"
+        )
+
+    # Get all plan details for this version
+    plan_details = db.query(BudgetPlanDetail).filter(
+        BudgetPlanDetail.version_id == baseline_version.id
+    ).all()
+
+    # Get all actuals for the year
+    actual_query = db.query(
+        Expense.category_id,
+        extract('month', Expense.request_date).label('month'),
+        func.sum(Expense.amount).label('total')
+    ).filter(
+        extract('year', Expense.request_date) == year,
+        Expense.status.in_([ExpenseStatusEnum.PAID, ExpenseStatusEnum.PENDING])
+    )
+
+    # Filter by department if needed
+    if current_user.role.value == "USER":
+        actual_query = actual_query.filter(
+            Expense.department_id == current_user.department_id
+        )
+    elif department_id:
+        actual_query = actual_query.filter(
+            Expense.department_id == department_id
+        )
+
+    actuals_raw = actual_query.group_by(
+        Expense.category_id,
+        extract('month', Expense.request_date)
+    ).all()
+
+    # Build actuals lookup
+    actuals_dict = {}
+    for row in actuals_raw:
+        key = (row.category_id, int(row.month))
+        actuals_dict[key] = float(row.total)
+
+    # Build monthly aggregates
+    monthly_planned = {}
+    monthly_actual = {}
+
+    for detail in plan_details:
+        month = detail.month
+        planned = float(detail.planned_amount)
+
+        # Aggregate planned
+        monthly_planned[month] = monthly_planned.get(month, 0) + planned
+
+        # Get actual for this category/month
+        actual = actuals_dict.get((detail.category_id, month), 0)
+        monthly_actual[month] = monthly_actual.get(month, 0) + actual
+
+    # Build by_month list
+    by_month = []
+    for month in range(1, 13):
+        planned = monthly_planned.get(month, 0)
+        actual = monthly_actual.get(month, 0)
+        difference = actual - planned
+        execution_percent = (actual / planned * 100) if planned > 0 else 0
+
+        by_month.append(PlanVsActualMonthly(
+            month=month,
+            month_name=datetime(year, month, 1).strftime("%B"),
+            planned=planned,
+            actual=actual,
+            difference=difference,
+            execution_percent=round(execution_percent, 2)
+        ))
+
+    # Build by_category list
+    category_aggregates = {}
+    for detail in plan_details:
+        cat_id = detail.category_id
+        if cat_id not in category_aggregates:
+            category_aggregates[cat_id] = {
+                "planned": 0,
+                "actual": 0,
+                "monthly": {}
+            }
+
+        planned = float(detail.planned_amount)
+        actual = actuals_dict.get((cat_id, detail.month), 0)
+
+        category_aggregates[cat_id]["planned"] += planned
+        category_aggregates[cat_id]["actual"] += actual
+        category_aggregates[cat_id]["monthly"][detail.month] = {
+            "planned": planned,
+            "actual": actual
+        }
+
+    by_category = []
+    for cat_id, data in category_aggregates.items():
+        # Get category name
+        category = db.query(BudgetCategory).filter(
+            BudgetCategory.id == cat_id
+        ).first()
+
+        planned_total = data["planned"]
+        actual_total = data["actual"]
+        difference = actual_total - planned_total
+        execution_percent = (actual_total / planned_total * 100) if planned_total > 0 else 0
+
+        # Build monthly breakdown for category
+        monthly_breakdown = []
+        for month in range(1, 13):
+            month_data = data["monthly"].get(month, {"planned": 0, "actual": 0})
+            m_planned = month_data["planned"]
+            m_actual = month_data["actual"]
+            m_diff = m_actual - m_planned
+            m_exec = (m_actual / m_planned * 100) if m_planned > 0 else 0
+
+            monthly_breakdown.append(PlanVsActualMonthly(
+                month=month,
+                month_name=datetime(year, month, 1).strftime("%B"),
+                planned=m_planned,
+                actual=m_actual,
+                difference=m_diff,
+                execution_percent=round(m_exec, 2)
+            ))
+
+        by_category.append(PlanVsActualCategory(
+            category_id=cat_id,
+            category_name=category.name if category else f"Category {cat_id}",
+            planned=planned_total,
+            actual=actual_total,
+            difference=difference,
+            execution_percent=round(execution_percent, 2),
+            monthly=monthly_breakdown
+        ))
+
+    # Calculate totals
+    total_planned = sum(monthly_planned.values())
+    total_actual = sum(monthly_actual.values())
+    total_difference = total_actual - total_planned
+    total_execution_percent = (total_actual / total_planned * 100) if total_planned > 0 else 0
+
+    return PlanVsActualSummary(
+        year=year,
+        baseline_version_id=baseline_version.id,
+        baseline_version_name=baseline_version.version_name,
+        total_planned=total_planned,
+        total_actual=total_actual,
+        total_difference=total_difference,
+        execution_percent=round(total_execution_percent, 2),
+        by_month=by_month,
+        by_category=by_category
     )

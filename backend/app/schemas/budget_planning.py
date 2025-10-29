@@ -97,6 +97,7 @@ class BudgetVersionInDB(BudgetVersionBase):
     id: int
     version_number: int
     department_id: int
+    is_baseline: bool
     created_by: Optional[str]
     created_at: datetime
     updated_at: datetime

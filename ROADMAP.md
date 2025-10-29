@@ -399,8 +399,14 @@
 #### v0.6.0: План-факт, календарь оплат и ограничения
 
 **Backend**
-- [ ] Binding утвержденной версии (baseline для целевого года)
-- [ ] `GET /budget/plan-vs-actual?year=<target_year>` (агрегаты + по категориям и месяцам)
+- [x] Binding утвержденной версии (baseline для целевого года) ✅ (2025-10-29)
+  - `POST /budget/versions/{version_id}/set-as-baseline` — установить утверж версию базовой линией
+  - `DELETE /budget/versions/{version_id}/unset-baseline` — снять флаг baseline
+  - Поле `is_baseline` в модели BudgetVersion
+- [x] `GET /analytics/plan-vs-actual?year=<target_year>` (агрегаты + по категориям и месяцам) ✅ (2025-10-29)
+  - Сравнение baseline версии с фактическими расходами
+  - Помесячная и категорийная детализация
+  - Процент исполнения и отклонения
 - [ ] Ограничения и алерты
   - [ ] Валидации превышений (категория, месяц, итого)
   - [ ] Правила переносов (off-days, сдвиги дат)
