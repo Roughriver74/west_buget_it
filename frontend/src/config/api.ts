@@ -5,7 +5,13 @@
 
 // Build API base URL with /api/v1 prefix
 const rawApiUrl = import.meta.env.VITE_API_URL || '';
-export const API_BASE_URL = rawApiUrl ? `${rawApiUrl}/api/v1` : '/api/v1';
+
+// If rawApiUrl already contains /api/v1, use it as is
+// Otherwise, append /api/v1
+export const API_BASE_URL = rawApiUrl
+  ? (rawApiUrl.includes('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`)
+  : '/api/v1';
+
 export const API_ROOT = import.meta.env.VITE_API_ROOT || '';
 
 // Helper to build API URLs
