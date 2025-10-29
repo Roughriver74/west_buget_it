@@ -253,14 +253,32 @@ def get_expenses(
 
 
 @router.get("/{expense_id}", response_model=ExpenseInDB)
-def get_expense(expense_id: int, db: Session = Depends(get_db)):
-    """Get expense by ID"""
+def get_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get expense by ID
+
+    - USER: Can only view expenses from their own department
+    - MANAGER/ADMIN: Can view expenses from any department
+    """
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only view expenses from your own department"
+            )
+
     return expense
 
 
@@ -354,15 +372,29 @@ def create_expense(
 def update_expense(
     expense_id: int,
     expense: ExpenseUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Update expense"""
+    """
+    Update expense
+
+    - USER: Can only update expenses from their own department
+    - MANAGER/ADMIN: Can update expenses from any department
+    """
     db_expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only update expenses from your own department"
+            )
 
     original_category_id = db_expense.category_id
     original_department_id = db_expense.department_id
@@ -392,15 +424,29 @@ def update_expense(
 def update_expense_status(
     expense_id: int,
     status_update: ExpenseStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Update expense status"""
+    """
+    Update expense status
+
+    - USER: Can only update status of expenses from their own department
+    - MANAGER/ADMIN: Can update status of expenses from any department
+    """
     db_expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only update expenses from your own department"
+            )
 
     db_expense.status = status_update.status
 
@@ -420,15 +466,29 @@ def update_expense_status(
 @router.patch("/{expense_id}/mark-reviewed", response_model=ExpenseInDB)
 def mark_expense_reviewed(
     expense_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
-    """Mark expense as reviewed (снимает пометку 'needs_review')"""
+    """
+    Mark expense as reviewed (снимает пометку 'needs_review')
+
+    - USER: Can only mark expenses from their own department
+    - MANAGER/ADMIN: Can mark expenses from any department
+    """
     db_expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only review expenses from your own department"
+            )
 
     db_expense.needs_review = False
     db.commit()
@@ -437,14 +497,31 @@ def mark_expense_reviewed(
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_expense(expense_id: int, db: Session = Depends(get_db)):
-    """Delete expense"""
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Delete expense
+
+    - USER: Can only delete expenses from their own department
+    - MANAGER/ADMIN: Can delete expenses from any department
+    """
     db_expense = db.query(Expense).filter(Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Expense with id {expense_id} not found"
         )
+
+    # Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if db_expense.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only delete expenses from your own department"
+            )
 
     category_id = db_expense.category_id
     department_id = db_expense.department_id
@@ -511,10 +588,31 @@ def get_expense_totals(
     year: Optional[int] = None,
     month: Optional[int] = None,
     category_id: Optional[int] = None,
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get expense totals with filters"""
+    """
+    Get expense totals with filters
+
+    - USER: Can only see totals from their own department
+    - MANAGER/ADMIN: Can see totals from all departments or filter by department
+    """
     query = db.query(func.sum(Expense.amount).label("total"))
+
+    # Department filtering based on user role (Row Level Security)
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Expense.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # MANAGER and ADMIN can filter by department or see all
+        if department_id is not None:
+            query = query.filter(Expense.department_id == department_id)
 
     if year:
         query = query.filter(func.extract('year', Expense.request_date) == year)
