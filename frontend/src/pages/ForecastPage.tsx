@@ -20,10 +20,11 @@ import {
 } from 'antd'
 import {
   PlusOutlined, DeleteOutlined, EditOutlined,
-  CheckOutlined, CloseOutlined, ThunderboltOutlined, DownloadOutlined
+  CheckOutlined, CloseOutlined, ThunderboltOutlined, DownloadOutlined, RobotOutlined
 } from '@ant-design/icons'
 import { forecastApi, categoriesApi, contractorsApi, organizationsApi } from '@/api'
 import type { ForecastExpense } from '@/types'
+import type { AIForecastResponse } from '@/api/forecast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
@@ -45,6 +46,8 @@ const ForecastPage = () => {
   const [editingData, setEditingData] = useState<Partial<ForecastExpense> | null>(null)
   const [addModalVisible, setAddModalVisible] = useState(false)
   const [addForm] = Form.useForm()
+  const [aiResultModalVisible, setAiResultModalVisible] = useState(false)
+  const [aiResult, setAiResult] = useState<AIForecastResponse | null>(null)
 
   const queryClient = useQueryClient()
 
@@ -158,6 +161,32 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка генерации: ${error.message}`)
+    },
+  })
+
+  const generateAIMutation = useMutation({
+    mutationFn: () => {
+      if (!departmentId) {
+        throw new Error('Отдел не выбран')
+      }
+      return forecastApi.generateAI({
+        target_year: selectedYear,
+        target_month: selectedMonth,
+        department_id: departmentId,
+      })
+    },
+    onSuccess: (data) => {
+      setAiResult(data)
+      setAiResultModalVisible(true)
+      queryClient.invalidateQueries({ queryKey: ['forecasts'] })
+      if (data.success) {
+        message.success(`AI прогноз создан! Добавлено: ${data.created_forecast_records} позиций`)
+      } else {
+        message.warning(`AI прогноз выполнен с предупреждениями`)
+      }
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка AI генерации: ${error.message}`)
     },
   })
 
@@ -551,7 +580,16 @@ const ForecastPage = () => {
               loading={generateMutation.isPending}
               type="primary"
             >
-              Сгенерировать прогноз
+              Статистический прогноз
+            </Button>
+            <Button
+              icon={<RobotOutlined />}
+              onClick={() => generateAIMutation.mutate()}
+              loading={generateAIMutation.isPending}
+              type="primary"
+              style={{ background: '#722ed1', borderColor: '#722ed1' }}
+            >
+              AI Прогноз
             </Button>
             <Button
               icon={<PlusOutlined />}
@@ -737,6 +775,104 @@ const ForecastPage = () => {
             <Input.TextArea rows={3} placeholder="Комментарий к прогнозу" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* AI Results Modal */}
+      <Modal
+        title={<Space><RobotOutlined /> Результаты AI прогноза</Space>}
+        open={aiResultModalVisible}
+        onCancel={() => setAiResultModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setAiResultModalVisible(false)}>
+            Закрыть
+          </Button>
+        ]}
+        width={800}
+      >
+        {aiResult && (
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* Status */}
+            <Card size="small">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span><strong>Статус:</strong></span>
+                  <Tag color={aiResult.success ? 'success' : 'warning'}>
+                    {aiResult.success ? 'Успешно' : 'С предупреждениями'}
+                  </Tag>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span><strong>Прогнозная сумма:</strong></span>
+                  <span style={{ fontSize: 16, fontWeight: 'bold', color: '#1890ff' }}>
+                    {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(aiResult.forecast_total)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span><strong>Уверенность AI:</strong></span>
+                  <Tag color={aiResult.confidence >= 70 ? 'success' : aiResult.confidence >= 50 ? 'warning' : 'error'}>
+                    {aiResult.confidence}%
+                  </Tag>
+                </div>
+                {aiResult.ai_model && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><strong>Модель:</strong></span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{aiResult.ai_model}</span>
+                  </div>
+                )}
+                {aiResult.created_forecast_records > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span><strong>Создано позиций:</strong></span>
+                    <Tag color="blue">{aiResult.created_forecast_records}</Tag>
+                  </div>
+                )}
+              </Space>
+            </Card>
+
+            {/* Summary */}
+            <Card size="small" title="Сводка">
+              <Paragraph style={{ marginBottom: 0 }}>{aiResult.summary}</Paragraph>
+            </Card>
+
+            {/* Items */}
+            {aiResult.items && aiResult.items.length > 0 && (
+              <Card size="small" title="Детализация прогноза">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {aiResult.items.map((item, index) => (
+                    <Card
+                      key={index}
+                      size="small"
+                      type="inner"
+                      title={<Space><Tag color="purple">{index + 1}</Tag>{item.description}</Space>}
+                    >
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span><strong>Сумма:</strong></span>
+                          <span style={{ fontSize: 15, fontWeight: 'bold' }}>
+                            {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(item.amount)}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Обоснование:</strong>
+                          <Paragraph style={{ marginTop: 8, marginBottom: 0, fontSize: 13 }}>
+                            {item.reasoning}
+                          </Paragraph>
+                        </div>
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
+            {/* Error message if exists */}
+            {aiResult.error && (
+              <Card size="small" title="Предупреждение" type="inner">
+                <Paragraph type="warning" style={{ marginBottom: 0 }}>
+                  {aiResult.error}
+                </Paragraph>
+              </Card>
+            )}
+          </Space>
+        )}
       </Modal>
     </div>
   )

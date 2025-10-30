@@ -15,6 +15,7 @@ const { Text } = Typography
 
 interface BudgetPlanVsActualWidgetProps {
   year?: number
+  departmentId?: number
   height?: number
   showStats?: boolean
 }
@@ -30,6 +31,7 @@ interface MonthData {
 
 const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
   year = new Date().getFullYear(),
+  departmentId,
   height = 400,
   showStats = true,
 }) => {
@@ -39,8 +41,8 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
     isError,
     error,
   } = useQuery({
-    queryKey: ['budget-execution', year],
-    queryFn: () => analyticsApi.getBudgetExecution(year),
+    queryKey: ['budget-execution', year, departmentId],
+    queryFn: () => analyticsApi.getBudgetExecution({ year, department_id: departmentId }),
   })
 
   // Calculate totals and statistics

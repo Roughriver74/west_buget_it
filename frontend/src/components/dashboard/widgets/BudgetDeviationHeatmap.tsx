@@ -14,6 +14,7 @@ const { Text } = Typography
 
 interface BudgetDeviationHeatmapProps {
   year: number
+  departmentId?: number
   height?: number
 }
 
@@ -40,13 +41,14 @@ const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'И�
 
 const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   year,
+  departmentId,
   height = 600,
 }) => {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['plan-vs-actual', year],
+    queryKey: ['plan-vs-actual', year, departmentId],
     queryFn: async () => {
       const response = await axios.get(`${API_BASE}/analytics/plan-vs-actual`, {
-        params: { year },
+        params: { year, department_id: departmentId },
       })
       return response.data
     },

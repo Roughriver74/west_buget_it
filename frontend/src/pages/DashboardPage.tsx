@@ -251,17 +251,17 @@ const DashboardPage = () => {
       {/* План vs Факт - годовой обзор */}
       <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
         <Col xs={24}>
-          <BudgetPlanVsActualWidget year={year} height={400} showStats={true} />
+          <BudgetPlanVsActualWidget year={year} departmentId={selectedDepartment?.id} height={400} showStats={true} />
         </Col>
       </Row>
 
       {/* Прогресс-бары исполнения по категориям */}
       <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
         <Col xs={24} lg={12}>
-          <BudgetExecutionProgressWidget year={year} height={500} />
+          <BudgetExecutionProgressWidget year={year} departmentId={selectedDepartment?.id} height={500} />
         </Col>
         <Col xs={24} lg={12}>
-          <BudgetDeviationHeatmap year={year} height={500} />
+          <BudgetDeviationHeatmap year={year} departmentId={selectedDepartment?.id} height={500} />
         </Col>
       </Row>
     </div>

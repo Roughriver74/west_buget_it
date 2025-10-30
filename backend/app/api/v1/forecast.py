@@ -15,6 +15,7 @@ from app.db import get_db
 from app.db.models import User, UserRoleEnum, ForecastExpense, Expense, BudgetCategory, Contractor, Organization
 from app.utils.excel_export import ExcelExporter
 from app.utils.auth import get_current_active_user
+from app.services.ai_forecast_service import AIForecastService
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -125,6 +126,14 @@ class GenerateForecastRequest(BaseModel):
     department_id: int  # Department to generate forecast for
     include_regular: bool = True  # Включить регулярные расходы
     include_average: bool = True  # Включить средние по нерегулярным
+
+
+class GenerateAIForecastRequest(BaseModel):
+    """Request for generating AI-powered forecast"""
+    target_month: int = Field(ge=1, le=12)
+    target_year: int
+    department_id: int
+    category_id: Optional[int] = None  # Optional category filter for AI context
 
 
 @router.post("/generate", response_model=dict)
@@ -603,3 +612,122 @@ def export_forecast_calendar(
             "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
         }
     )
+
+
+@router.post("/ai-generate", response_model=dict)
+async def generate_ai_forecast(
+    request: GenerateAIForecastRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Generate AI-powered forecast using external AI API
+
+    This endpoint uses AI to analyze historical expenses and generate
+    intelligent forecasts based on patterns, seasonality, and trends.
+
+    - USER: Can only generate forecasts for their own department
+    - MANAGER/ADMIN: Can generate forecasts for any department
+    """
+    # Check department access
+    check_department_access(current_user, request.department_id)
+
+    # Initialize AI forecast service
+    ai_service = AIForecastService(db)
+
+    # Generate AI forecast
+    ai_result = await ai_service.generate_ai_forecast(
+        department_id=request.department_id,
+        year=request.target_year,
+        month=request.target_month,
+        category_id=request.category_id,
+    )
+
+    # If AI forecast succeeded, create ForecastExpense records
+    created_count = 0
+    if ai_result.get("success") and ai_result.get("items"):
+        # Delete existing AI-generated forecasts for this month
+        db.query(ForecastExpense).filter(
+            ForecastExpense.department_id == request.department_id,
+            extract('year', ForecastExpense.forecast_date) == request.target_year,
+            extract('month', ForecastExpense.forecast_date) == request.target_month,
+            ForecastExpense.comment.like("%AI прогноз%")
+        ).delete(synchronize_session=False)
+
+        # Create forecast records from AI suggestions
+        for idx, item in enumerate(ai_result["items"], start=1):
+            # Determine forecast date (spread across month)
+            day_of_month = min(5 + (idx * 5), 28)  # 5, 10, 15, 20, 25
+            max_day = calendar.monthrange(request.target_year, request.target_month)[1]
+            if day_of_month > max_day:
+                day_of_month = max_day
+
+            # Apply workday rules
+            original_date = date(request.target_year, request.target_month, day_of_month)
+            adjusted_date = adjust_to_workday(original_date)
+
+            # Try to match category by description keywords
+            category_id = request.category_id
+            if not category_id:
+                # Simple category matching based on keywords
+                description_lower = item.get("description", "").lower()
+                if "лицензи" in description_lower or "подписк" in description_lower:
+                    category = db.query(BudgetCategory).filter(
+                        BudgetCategory.department_id == request.department_id,
+                        BudgetCategory.name.ilike("%лицензи%")
+                    ).first()
+                    if category:
+                        category_id = category.id
+                elif "серв" in description_lower or "облак" in description_lower or "хостинг" in description_lower:
+                    category = db.query(BudgetCategory).filter(
+                        BudgetCategory.department_id == request.department_id,
+                        BudgetCategory.name.ilike("%серв%")
+                    ).first()
+                    if category:
+                        category_id = category.id
+                elif "оборуд" in description_lower or "техник" in description_lower:
+                    category = db.query(BudgetCategory).filter(
+                        BudgetCategory.department_id == request.department_id,
+                        BudgetCategory.name.ilike("%оборудование%")
+                    ).first()
+                    if category:
+                        category_id = category.id
+
+                # Default to first category if no match
+                if not category_id:
+                    default_category = db.query(BudgetCategory).filter(
+                        BudgetCategory.department_id == request.department_id
+                    ).first()
+                    if default_category:
+                        category_id = default_category.id
+
+            # Get default organization
+            organization = db.query(Organization).filter(
+                Organization.department_id == request.department_id
+            ).first()
+            organization_id = organization.id if organization else 1  # Fallback to ID 1
+
+            # Create forecast expense
+            if category_id:
+                forecast = ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=category_id,
+                    contractor_id=None,
+                    organization_id=organization_id,
+                    forecast_date=adjusted_date,
+                    amount=Decimal(str(item.get("amount", 0))),
+                    is_regular=False,
+                    comment=f"AI прогноз: {item.get('description', '')} | Обоснование: {item.get('reasoning', '')}"
+                )
+                db.add(forecast)
+                created_count += 1
+
+        db.commit()
+
+    # Return AI result with created count
+    return {
+        **ai_result,
+        "created_forecast_records": created_count,
+        "target_month": request.target_month,
+        "target_year": request.target_year,
+    }

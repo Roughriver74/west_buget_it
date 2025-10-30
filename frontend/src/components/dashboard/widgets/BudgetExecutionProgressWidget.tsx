@@ -15,6 +15,7 @@ const { Text } = Typography
 
 interface BudgetExecutionProgressWidgetProps {
   year: number
+  departmentId?: number
   height?: number
 }
 
@@ -29,13 +30,14 @@ interface CategoryExecution {
 
 const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps> = ({
   year,
+  departmentId,
   height = 500,
 }) => {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['plan-vs-actual', year],
+    queryKey: ['plan-vs-actual', year, departmentId],
     queryFn: async () => {
       const response = await axios.get(`${API_BASE}/analytics/plan-vs-actual`, {
-        params: { year },
+        params: { year, department_id: departmentId },
       })
       return response.data
     },

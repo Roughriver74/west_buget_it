@@ -15,8 +15,8 @@ export const analyticsApi = {
     return data
   },
 
-  getBudgetExecution: async (year: number): Promise<BudgetExecution> => {
-    const { data } = await apiClient.get('analytics/budget-execution', { params: { year } })
+  getBudgetExecution: async (params: { year: number; department_id?: number }): Promise<BudgetExecution> => {
+    const { data } = await apiClient.get('analytics/budget-execution', { params })
     return data
   },
 

@@ -5,7 +5,7 @@ from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum, PayrollPlan
+from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum, PayrollPlan, PayrollActual
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (
@@ -95,7 +95,7 @@ def get_dashboard_data(
     # Combined total planned (BudgetPlan + PayrollPlan)
     total_planned = float(budget_planned) + float(payroll_planned)
 
-    # Get total actual
+    # Get total actual from Expenses
     actual_query = db.query(func.sum(Expense.amount)).filter(
         extract('year', Expense.request_date) == year
     )
@@ -103,7 +103,20 @@ def get_dashboard_data(
         actual_query = actual_query.filter(extract('month', Expense.request_date) == month)
     if department_id:
         actual_query = actual_query.filter(Expense.department_id == department_id)
-    total_actual = actual_query.scalar() or 0
+    expenses_actual = actual_query.scalar() or 0
+
+    # Get total actual from PayrollActual (FOT)
+    payroll_actual_query = db.query(func.sum(PayrollActual.total_paid)).filter(
+        PayrollActual.year == year
+    )
+    if month:
+        payroll_actual_query = payroll_actual_query.filter(PayrollActual.month == month)
+    if department_id:
+        payroll_actual_query = payroll_actual_query.filter(PayrollActual.department_id == department_id)
+    payroll_actual = payroll_actual_query.scalar() or 0
+
+    # Combined total actual (Expenses + PayrollActual)
+    total_actual = float(expenses_actual) + float(payroll_actual)
 
     # Calculate metrics
     remaining = float(total_planned) - float(total_actual)
