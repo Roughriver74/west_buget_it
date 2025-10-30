@@ -96,10 +96,18 @@ def get_scenarios(
     year: Optional[int] = Query(None, description="Filter by year"),
     scenario_type: Optional[BudgetScenarioTypeEnum] = Query(None, description="Filter by scenario type"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget scenarios"""
+    """
+    Get budget scenarios
+
+    - USER: Can only see scenarios from their own department
+    - MANAGER/ADMIN: Can see scenarios from all departments or filter by department
+    """
+    from app.db.models import UserRoleEnum
+
     query = db.query(BudgetScenario)
 
     # Apply filters
@@ -110,8 +118,17 @@ def get_scenarios(
     if is_active is not None:
         query = query.filter(BudgetScenario.is_active == is_active)
 
-    # Multi-tenancy: filter by department
-    query = query.filter(BudgetScenario.department_id == current_user.department_id)
+    # SECURITY: Multi-tenancy filter based on role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetScenario.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        if department_id is not None:
+            query = query.filter(BudgetScenario.department_id == department_id)
 
     scenarios = query.order_by(BudgetScenario.year.desc(), BudgetScenario.scenario_type).all()
     return scenarios
@@ -234,10 +251,18 @@ def get_versions(
     year: Optional[int] = Query(None, description="Filter by year"),
     status: Optional[BudgetVersionStatusEnum] = Query(None, description="Filter by status"),
     scenario_id: Optional[int] = Query(None, description="Filter by scenario"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get budget versions"""
+    """
+    Get budget versions
+
+    - USER: Can only see versions from their own department
+    - MANAGER/ADMIN: Can see versions from all departments or filter by department
+    """
+    from app.db.models import UserRoleEnum
+
     query = db.query(BudgetVersion)
 
     # Apply filters
@@ -248,8 +273,17 @@ def get_versions(
     if scenario_id:
         query = query.filter(BudgetVersion.scenario_id == scenario_id)
 
-    # Multi-tenancy
-    query = query.filter(BudgetVersion.department_id == current_user.department_id)
+    # SECURITY: Multi-tenancy filter based on role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(BudgetVersion.department_id == current_user.department_id)
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        if department_id is not None:
+            query = query.filter(BudgetVersion.department_id == department_id)
 
     versions = query.order_by(
         BudgetVersion.year.desc(),

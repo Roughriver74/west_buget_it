@@ -362,6 +362,13 @@ async def create_employee_kpi(
             detail=f"Employee with id {kpi_data.employee_id} not found"
         )
 
+    # SECURITY: Validate employee belongs to the specified department
+    if employee.department_id != kpi_data.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Employee does not belong to department {kpi_data.department_id}"
+        )
+
     # Check for duplicate (employee_id, year, month)
     existing = db.query(EmployeeKPI).filter(
         and_(
@@ -868,10 +875,11 @@ async def create_employee_kpi_goal(
         )
 
     # Check access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to assign goal to this employee"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee with id {goal_data.employee_id} not found"
         )
 
     # Check if goal exists
@@ -880,6 +888,13 @@ async def create_employee_kpi_goal(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"KPI Goal with id {goal_data.goal_id} not found"
+        )
+
+    # SECURITY: Validate goal belongs to same department as employee
+    if goal.department_id != employee.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot assign goal from different department to employee"
         )
 
     # Create assignment

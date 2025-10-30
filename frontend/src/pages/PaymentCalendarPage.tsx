@@ -15,8 +15,10 @@ import {
   Spin,
   Button,
   Tabs,
+  Tooltip,
+  Tag,
 } from 'antd'
-import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi, forecastApi } from '@/api'
 import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types'
@@ -134,31 +136,44 @@ const PaymentCalendarPage = () => {
       <div style={{ fontSize: '11px' }}>
         {/* Actual payments */}
         {payment && (
-          <>
-            {/* Determine badge status based on amount */}
-            {(() => {
-              let status: 'success' | 'processing' | 'error' = 'success'
-              if (payment.total_amount > 100000) {
-                status = 'error' // Red for large amounts
-              } else if (payment.total_amount > 50000) {
-                status = 'processing' // Blue for medium amounts
-              }
-              return <Badge status={status} text={`${payment.payment_count} пл.`} />
-            })()}
-            <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
-              {formatCurrency(payment.total_amount)}
+          <Tooltip title={`${payment.payment_count} фактических платежей на сумму ${formatCurrency(payment.total_amount)}`}>
+            <div>
+              {/* Determine badge status based on amount */}
+              {(() => {
+                let status: 'success' | 'processing' | 'error' = 'success'
+                if (payment.total_amount > 100000) {
+                  status = 'error' // Red for large amounts
+                } else if (payment.total_amount > 50000) {
+                  status = 'processing' // Blue for medium amounts
+                }
+                return <Badge status={status} text={`${payment.payment_count} пл.`} />
+              })()}
+              <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                {formatCurrency(payment.total_amount)}
+              </div>
             </div>
-          </>
+          </Tooltip>
         )}
 
-        {/* Forecast expenses (gray) */}
+        {/* Forecast expenses */}
         {forecast && (
-          <div style={{ marginTop: payment ? 4 : 0 }}>
-            <Badge status="default" text={`${forecast.count} прогн.`} />
-            <div style={{ fontWeight: 'bold', color: '#8c8c8c' }}>
-              {formatCurrency(forecast.total)}
+          <Tooltip title={`${forecast.count} прогнозных расходов на сумму ${formatCurrency(forecast.total)} (автоматический расчет)`}>
+            <div style={{
+              marginTop: payment ? 4 : 0,
+              padding: '2px 4px',
+              backgroundColor: '#e6f7ff',
+              borderRadius: '2px',
+              border: '1px dashed #91d5ff'
+            }}>
+              <Space size={4}>
+                <RiseOutlined style={{ color: '#1890ff', fontSize: '10px' }} />
+                <span style={{ fontSize: '10px', color: '#1890ff' }}>{forecast.count} прогн.</span>
+              </Space>
+              <div style={{ fontWeight: 'bold', color: '#1890ff', fontStyle: 'italic' }}>
+                {formatCurrency(forecast.total)}
+              </div>
             </div>
-          </div>
+          </Tooltip>
         )}
       </div>
     )
@@ -214,11 +229,18 @@ const PaymentCalendarPage = () => {
       title: 'Номер',
       dataIndex: 'number',
       key: 'number',
-      width: 120,
+      width: 150,
       render: (number: string, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit' }}>
-          {number}
-        </span>
+        <Space>
+          {record.is_forecast && (
+            <Tooltip title="Прогнозный расход">
+              <RiseOutlined style={{ color: '#1890ff' }} />
+            </Tooltip>
+          )}
+          <span style={{ color: record.is_forecast ? '#595959' : 'inherit', fontWeight: record.is_forecast ? 500 : 'normal' }}>
+            {number}
+          </span>
+        </Space>
       ),
     },
     {
@@ -227,7 +249,11 @@ const PaymentCalendarPage = () => {
       key: 'amount',
       width: 120,
       render: (amount: number, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit', fontWeight: 'bold' }}>
+        <span style={{
+          color: record.is_forecast ? '#595959' : 'inherit',
+          fontWeight: 'bold',
+          fontStyle: record.is_forecast ? 'italic' : 'normal'
+        }}>
           {formatCurrency(amount)}
         </span>
       ),
@@ -237,7 +263,7 @@ const PaymentCalendarPage = () => {
       dataIndex: 'category_name',
       key: 'category_name',
       render: (text: string, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit' }}>{text}</span>
+        <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
       ),
     },
     {
@@ -245,7 +271,7 @@ const PaymentCalendarPage = () => {
       dataIndex: 'contractor_name',
       key: 'contractor_name',
       render: (text: string, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit' }}>{text}</span>
+        <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
       ),
     },
     {
@@ -253,7 +279,7 @@ const PaymentCalendarPage = () => {
       dataIndex: 'organization_name',
       key: 'organization_name',
       render: (text: string, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit' }}>{text}</span>
+        <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
       ),
     },
     {
@@ -262,7 +288,7 @@ const PaymentCalendarPage = () => {
       key: 'comment',
       ellipsis: true,
       render: (text: string, record: any) => (
-        <span style={{ color: record.is_forecast ? '#8c8c8c' : 'inherit' }}>{text}</span>
+        <span style={{ color: record.is_forecast ? '#595959' : 'inherit', fontStyle: record.is_forecast ? 'italic' : 'normal' }}>{text}</span>
       ),
     },
   ]
@@ -346,10 +372,31 @@ const PaymentCalendarPage = () => {
 
           {/* Calendar */}
           <Card>
-            <div style={{ marginBottom: 16, fontSize: '12px', color: '#8c8c8c' }}>
-              <Space>
-                <Badge status="success" text="Фактические оплаты" />
-                <Badge status="default" text="Прогнозные расходы (серым)" />
+            <div style={{
+              marginBottom: 16,
+              padding: '12px 16px',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px',
+              border: '1px solid #d9d9d9'
+            }}>
+              <Space size="large">
+                <Tooltip title="Подтвержденные платежи с фактическими датами">
+                  <Space>
+                    <Badge status="success" />
+                    <Text strong style={{ fontSize: '14px', color: '#262626' }}>
+                      Фактические оплаты
+                    </Text>
+                  </Space>
+                </Tooltip>
+                <Tooltip title="Прогнозируемые расходы на основе исторических данных">
+                  <Space>
+                    <RiseOutlined style={{ color: '#1890ff', fontSize: '14px' }} />
+                    <Text strong style={{ fontSize: '14px', color: '#262626' }}>
+                      Прогнозные расходы
+                    </Text>
+                    <Tag color="blue" style={{ margin: 0 }}>Автоматический расчет</Tag>
+                  </Space>
+                </Tooltip>
               </Space>
             </div>
             <Spin spinning={calendarLoading || forecastLoading}>
@@ -414,6 +461,7 @@ const PaymentCalendarPage = () => {
               rowKey="id"
               pagination={{ pageSize: 10 }}
               size="small"
+              rowClassName={(record: any) => record.is_forecast ? 'forecast-row' : ''}
             />
           </>
         )}

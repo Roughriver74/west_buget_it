@@ -34,6 +34,11 @@ from app.schemas.payroll import (
     PayrollForecast,
 )
 from app.utils.auth import get_current_active_user
+from app.utils.ndfl_calculator import calculate_progressive_ndfl
+from app.utils.social_contributions_calculator import (
+    calculate_social_contributions,
+    calculate_total_tax_burden
+)
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -338,10 +343,11 @@ async def create_payroll_actual(
         )
 
     # Check department access
+    # Return 404 instead of 403 to prevent information disclosure
     if not check_department_access(current_user, employee.department_id):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this employee's department"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
         )
 
     # Check if actual already exists for this employee, year, and month
@@ -1807,8 +1813,9 @@ async def register_payroll_payment_bulk(
                 continue
 
             # Check department access
+            # Don't disclose which employees exist in other departments
             if not check_department_access(current_user, employee.department_id):
-                errors.append(f"Access denied to employee ID {payment.employee_id}")
+                errors.append(f"Employee ID {payment.employee_id} not found")
                 skipped_count += 1
                 continue
 
@@ -2206,11 +2213,12 @@ def get_employee_ytd_income(
         )
 
     # Check department access (multi-tenancy)
+    # Return 404 instead of 403 to prevent information disclosure
     if current_user.role == UserRoleEnum.USER:
         if employee.department_id != current_user.department_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only view employees from your department"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Employee not found"
             )
 
     # Query payroll actuals for the year up to specified month
@@ -2245,4 +2253,339 @@ def get_employee_ytd_income(
         "ytd_tax_withheld": float(ytd_tax_withheld),
         "months_count": len(payroll_actuals),
         "months_data": months_data
+    }
+
+
+# ============================================================================
+# TAX & SOCIAL CONTRIBUTIONS ANALYTICS
+# ============================================================================
+
+@router.get("/analytics/tax-burden")
+async def get_tax_burden_analytics(
+    year: int = Query(..., description="Year"),
+    month: Optional[int] = Query(None, description="Month (1-12), if None - year total"),
+    department_id: Optional[int] = Query(None, description="Department ID filter"),
+    employee_id: Optional[int] = Query(None, description="Employee ID filter"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get tax burden analytics: НДФЛ + social contributions.
+
+    Returns total tax burden for specified period.
+    """
+    # Build query filters
+    filters = [
+        PayrollActual.year == year,
+        PayrollActual.is_active == True
+    ]
+
+    if month:
+        filters.append(PayrollActual.month == month)
+
+    # Department access control
+    if current_user.role == UserRoleEnum.USER:
+        filters.append(PayrollActual.department_id == current_user.department_id)
+    elif department_id:
+        filters.append(PayrollActual.department_id == department_id)
+
+    if employee_id:
+        filters.append(PayrollActual.employee_id == employee_id)
+
+    # Get payroll actuals
+    payroll_actuals = db.query(PayrollActual).filter(and_(*filters)).all()
+
+    if not payroll_actuals:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No payroll data found for the specified period"
+        )
+
+    # Calculate totals
+    gross_payroll = sum(actual.total_paid for actual in payroll_actuals)
+
+    # Calculate НДФЛ
+    ndfl_result = calculate_progressive_ndfl(Decimal(gross_payroll), year)
+
+    # Calculate social contributions
+    contributions_result = calculate_social_contributions(Decimal(gross_payroll), year)
+
+    # Total tax burden
+    total_ndfl = Decimal(str(ndfl_result['total_tax']))
+    total_contributions = Decimal(str(contributions_result['total_contributions']))
+    total_taxes = total_ndfl + total_contributions
+
+    # Net payroll
+    net_payroll = gross_payroll - total_ndfl
+
+    # Employer cost
+    employer_cost = gross_payroll + total_contributions
+
+    # Effective rates
+    effective_burden_rate = float((total_taxes / Decimal(gross_payroll) * 100)) if gross_payroll > 0 else 0.0
+
+    return {
+        "period": f"{year}-{month:02d}" if month else f"{year}",
+        "gross_payroll": float(gross_payroll),
+        "ndfl": {
+            "total": float(total_ndfl),
+            "effective_rate": ndfl_result['effective_rate'],
+            "breakdown": ndfl_result.get('breakdown', [])
+        },
+        "social_contributions": contributions_result,
+        "net_payroll": float(net_payroll),
+        "total_tax_burden": float(total_taxes),
+        "effective_burden_rate": effective_burden_rate,
+        "employer_cost": float(employer_cost),
+        "employees_count": len(set(a.employee_id for a in payroll_actuals))
+    }
+
+
+@router.get("/analytics/tax-breakdown-by-month")
+async def get_tax_breakdown_by_month(
+    year: int = Query(..., description="Year"),
+    department_id: Optional[int] = Query(None, description="Department ID filter"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get monthly tax breakdown for the year.
+
+    Returns array of monthly data with НДФЛ and social contributions.
+    """
+    month_names = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    # Build base filters
+    base_filters = [
+        PayrollActual.year == year,
+        PayrollActual.is_active == True
+    ]
+
+    # Department access control
+    if current_user.role == UserRoleEnum.USER:
+        base_filters.append(PayrollActual.department_id == current_user.department_id)
+    elif department_id:
+        base_filters.append(PayrollActual.department_id == department_id)
+
+    result = []
+
+    for month in range(1, 13):
+        filters = base_filters + [PayrollActual.month == month]
+
+        # Get monthly payroll
+        monthly_actuals = db.query(PayrollActual).filter(and_(*filters)).all()
+
+        if not monthly_actuals:
+            # No data for this month - add zero values
+            result.append({
+                "month": month,
+                "month_name": month_names[month - 1],
+                "gross_payroll": 0.0,
+                "ndfl": 0.0,
+                "pfr": 0.0,
+                "foms": 0.0,
+                "fss": 0.0,
+                "total_taxes": 0.0,
+                "net_payroll": 0.0,
+                "employer_cost": 0.0
+            })
+            continue
+
+        # Calculate monthly gross
+        monthly_gross = sum(actual.total_paid for actual in monthly_actuals)
+
+        # Calculate НДФЛ
+        ndfl_result = calculate_progressive_ndfl(Decimal(monthly_gross), year)
+        monthly_ndfl = Decimal(str(ndfl_result['total_tax']))
+
+        # Calculate social contributions
+        contributions = calculate_social_contributions(Decimal(monthly_gross), year)
+        monthly_pfr = Decimal(str(contributions['pfr']['total']))
+        monthly_foms = Decimal(str(contributions['foms']['total']))
+        monthly_fss = Decimal(str(contributions['fss']['total']))
+        monthly_contributions = monthly_pfr + monthly_foms + monthly_fss
+
+        # Totals
+        monthly_taxes = monthly_ndfl + monthly_contributions
+        monthly_net = monthly_gross - monthly_ndfl
+        monthly_employer_cost = monthly_gross + monthly_contributions
+
+        result.append({
+            "month": month,
+            "month_name": month_names[month - 1],
+            "gross_payroll": float(monthly_gross),
+            "ndfl": float(monthly_ndfl),
+            "pfr": float(monthly_pfr),
+            "foms": float(monthly_foms),
+            "fss": float(monthly_fss),
+            "total_taxes": float(monthly_taxes),
+            "net_payroll": float(monthly_net),
+            "employer_cost": float(monthly_employer_cost)
+        })
+
+    return result
+
+
+@router.get("/analytics/tax-by-employee")
+async def get_tax_by_employee(
+    year: int = Query(..., description="Year"),
+    month: Optional[int] = Query(None, description="Month (1-12), if None - year total"),
+    department_id: Optional[int] = Query(None, description="Department ID filter"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get tax burden by employee.
+
+    Returns array of employee tax data.
+    """
+    # Build filters
+    filters = [
+        PayrollActual.year == year,
+        PayrollActual.is_active == True
+    ]
+
+    if month:
+        filters.append(PayrollActual.month == month)
+
+    # Department access control
+    if current_user.role == UserRoleEnum.USER:
+        filters.append(PayrollActual.department_id == current_user.department_id)
+    elif department_id:
+        filters.append(PayrollActual.department_id == department_id)
+
+    # Get payroll actuals
+    payroll_actuals = db.query(PayrollActual).filter(and_(*filters)).all()
+
+    if not payroll_actuals:
+        return []
+
+    # Group by employee
+    employee_data = {}
+    for actual in payroll_actuals:
+        emp_id = actual.employee_id
+        if emp_id not in employee_data:
+            employee_data[emp_id] = {
+                'employee_id': emp_id,
+                'gross_income': 0.0,
+            }
+        employee_data[emp_id]['gross_income'] += actual.total_paid
+
+    # Get employee details
+    employee_ids = list(employee_data.keys())
+    employees = db.query(Employee).filter(Employee.id.in_(employee_ids)).all()
+    employee_map = {e.id: e for e in employees}
+
+    result = []
+    for emp_id, data in employee_data.items():
+        employee = employee_map.get(emp_id)
+        if not employee:
+            continue
+
+        gross_income = Decimal(str(data['gross_income']))
+
+        # Calculate taxes
+        ndfl_result = calculate_progressive_ndfl(gross_income, year)
+        contributions = calculate_social_contributions(gross_income, year)
+
+        ndfl_total = Decimal(str(ndfl_result['total_tax']))
+        contributions_total = Decimal(str(contributions['total_contributions']))
+
+        net_income = gross_income - ndfl_total
+        total_taxes = ndfl_total + contributions_total
+
+        effective_tax_rate = float(ndfl_result['effective_rate'])
+        effective_burden_rate = float((total_taxes / gross_income * 100)) if gross_income > 0 else 0.0
+
+        result.append({
+            'employee_id': emp_id,
+            'employee_name': employee.full_name,
+            'position': employee.position,
+            'gross_income': float(gross_income),
+            'ndfl': float(ndfl_total),
+            'social_contributions': float(contributions_total),
+            'net_income': float(net_income),
+            'total_taxes': float(total_taxes),
+            'effective_tax_rate': effective_tax_rate,
+            'effective_burden_rate': effective_burden_rate
+        })
+
+    # Sort by gross_income descending
+    result.sort(key=lambda x: x['gross_income'], reverse=True)
+
+    return result
+
+
+@router.get("/analytics/cost-waterfall")
+async def get_cost_waterfall(
+    year: int = Query(..., description="Year"),
+    month: Optional[int] = Query(None, description="Month (1-12), if None - year total"),
+    department_id: Optional[int] = Query(None, description="Department ID filter"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get cost waterfall data for Waterfall chart.
+
+    Returns breakdown of: Base Salary → Bonuses → Taxes → Net
+    """
+    # Build filters
+    filters = [
+        PayrollActual.year == year,
+        PayrollActual.is_active == True
+    ]
+
+    if month:
+        filters.append(PayrollActual.month == month)
+
+    # Department access control
+    if current_user.role == UserRoleEnum.USER:
+        filters.append(PayrollActual.department_id == current_user.department_id)
+    elif department_id:
+        filters.append(PayrollActual.department_id == department_id)
+
+    # Get payroll actuals
+    payroll_actuals = db.query(PayrollActual).filter(and_(*filters)).all()
+
+    if not payroll_actuals:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No payroll data found for the specified period"
+        )
+
+    # Calculate components
+    base_salary = sum(actual.base_salary or 0 for actual in payroll_actuals)
+    monthly_bonus = sum(actual.monthly_bonus or 0 for actual in payroll_actuals)
+    quarterly_bonus = sum(actual.quarterly_bonus or 0 for actual in payroll_actuals)
+    annual_bonus = sum(actual.annual_bonus or 0 for actual in payroll_actuals)
+
+    gross_total = base_salary + monthly_bonus + quarterly_bonus + annual_bonus
+
+    # Calculate taxes
+    ndfl_result = calculate_progressive_ndfl(Decimal(gross_total), year)
+    contributions = calculate_social_contributions(Decimal(gross_total), year)
+
+    ndfl = Decimal(str(ndfl_result['total_tax']))
+    pfr = Decimal(str(contributions['pfr']['total']))
+    foms = Decimal(str(contributions['foms']['total']))
+    fss = Decimal(str(contributions['fss']['total']))
+
+    net_payroll = gross_total - ndfl
+    total_employer_cost = gross_total + pfr + foms + fss
+
+    return {
+        'base_salary': float(base_salary),
+        'monthly_bonus': float(monthly_bonus),
+        'quarterly_bonus': float(quarterly_bonus),
+        'annual_bonus': float(annual_bonus),
+        'gross_total': float(gross_total),
+        'ndfl': float(ndfl),
+        'pfr': float(pfr),
+        'foms': float(foms),
+        'fss': float(fss),
+        'net_payroll': float(net_payroll),
+        'total_employer_cost': float(total_employer_cost)
     }

@@ -332,13 +332,21 @@ def create_expense(
             detail=f"Expense with number '{expense.number}' already exists in this department"
         )
 
-    # Validate category exists
+    # Validate category exists and belongs to same department (if USER)
     category = db.query(BudgetCategory).filter(BudgetCategory.id == expense.category_id).first()
     if not category:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Category with id {expense.category_id} not found"
         )
+
+    # SECURITY: Check that category belongs to same department
+    if current_user.role == UserRoleEnum.USER:
+        if category.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category with id {expense.category_id} not found"
+            )
 
     # Validate organization exists
     organization = db.query(Organization).filter(Organization.id == expense.organization_id).first()
@@ -348,7 +356,7 @@ def create_expense(
             detail=f"Organization with id {expense.organization_id} not found"
         )
 
-    # Validate contractor if provided
+    # Validate contractor if provided and check department
     if expense.contractor_id:
         contractor = db.query(Contractor).filter(Contractor.id == expense.contractor_id).first()
         if not contractor:
@@ -356,6 +364,14 @@ def create_expense(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Contractor with id {expense.contractor_id} not found"
             )
+
+        # SECURITY: Check that contractor belongs to same department
+        if current_user.role == UserRoleEnum.USER:
+            if contractor.department_id != current_user.department_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Contractor with id {expense.contractor_id} not found"
+                )
 
     db_expense = Expense(**expense_data)
     db.add(db_expense)
@@ -403,6 +419,40 @@ def update_expense(
 
     # Update fields
     update_data = expense.model_dump(exclude_unset=True)
+
+    # SECURITY: Validate that new category/contractor belong to same department (for USER)
+    if current_user.role == UserRoleEnum.USER:
+        # Check category if being updated
+        if 'category_id' in update_data and update_data['category_id']:
+            category = db.query(BudgetCategory).filter(
+                BudgetCategory.id == update_data['category_id']
+            ).first()
+            if not category:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Category with id {update_data['category_id']} not found"
+                )
+            if category.department_id != current_user.department_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Category with id {update_data['category_id']} not found"
+                )
+
+        # Check contractor if being updated
+        if 'contractor_id' in update_data and update_data['contractor_id']:
+            contractor = db.query(Contractor).filter(
+                Contractor.id == update_data['contractor_id']
+            ).first()
+            if not contractor:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Contractor with id {update_data['contractor_id']} not found"
+                )
+            if contractor.department_id != current_user.department_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Contractor with id {update_data['contractor_id']} not found"
+                )
     for field, value in update_data.items():
         setattr(db_expense, field, value)
 

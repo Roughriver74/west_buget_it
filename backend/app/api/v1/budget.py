@@ -430,9 +430,24 @@ def initialize_budget_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Initialize budget plan for the year (create empty entries for all categories and months)"""
-    # Get department_id from query params or use user's department
-    target_department_id = department_id if department_id is not None else current_user.department_id
+    """
+    Initialize budget plan for the year (create empty entries for all categories and months)
+
+    - USER: Can only initialize budget plan for their own department
+    - MANAGER/ADMIN: Can initialize budget plan for any department
+    """
+    # SECURITY: Determine and validate department_id
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only initialize for their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = department_id if department_id is not None else current_user.department_id
 
     if not target_department_id:
         raise HTTPException(
@@ -488,9 +503,24 @@ def copy_budget_plan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Copy budget plan from source year to target year with optional coefficient"""
-    # Get department_id from query params or use user's department
-    target_department_id = department_id if department_id is not None else current_user.department_id
+    """
+    Copy budget plan from source year to target year with optional coefficient
+
+    - USER: Can only copy budget plan for their own department
+    - MANAGER/ADMIN: Can copy budget plan for any department
+    """
+    # SECURITY: Determine and validate department_id
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only copy for their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = department_id if department_id is not None else current_user.department_id
 
     if not target_department_id:
         raise HTTPException(
@@ -562,7 +592,12 @@ def update_budget_cell(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Update a single budget plan cell (upsert)"""
+    """
+    Update a single budget plan cell (upsert)
+
+    - USER: Can only update budget cells for their own department
+    - MANAGER/ADMIN: Can update budget cells for any department
+    """
     # Check if category exists
     category = db.query(BudgetCategory).filter(BudgetCategory.id == request.category_id).first()
     if not category:
@@ -570,6 +605,20 @@ def update_budget_cell(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Category with id {request.category_id} not found"
         )
+
+    # SECURITY: Check department access for USER role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        if category.department_id != current_user.department_id:
+            # Return 404 instead of 403 to prevent information disclosure
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Category with id {request.category_id} not found"
+            )
 
     # Get department_id from category (since category belongs to department)
     department_id = category.department_id

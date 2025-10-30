@@ -27,3 +27,12 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* Forecast row styling for payment calendar */
+.forecast-row {
+  background-color: #f0f8ff !important;
+}
+
+.forecast-row:hover {
+  background-color: #e6f4ff !important;
+}

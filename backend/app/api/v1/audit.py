@@ -30,17 +30,10 @@ def get_audit_logs(
     """
     Get audit logs
 
-    - **ADMIN**: Can view all audit logs
+    - **ADMIN**: Can view all audit logs (including system logs with NULL department_id)
     - **MANAGER**: Can view audit logs for all departments
     - **USER**: Can only view audit logs for their department
     """
-    # Check permissions
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to view audit logs"
-        )
-
     query = db.query(AuditLog)
 
     # Department filtering based on user role
@@ -109,13 +102,6 @@ def get_audit_log(
     db: Session = Depends(get_db)
 ):
     """Get audit log by ID"""
-    # Check permissions
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to view audit logs"
-        )
-
     audit_log = db.query(AuditLog).filter(AuditLog.id == audit_log_id).first()
     if not audit_log:
         raise HTTPException(
@@ -123,12 +109,14 @@ def get_audit_log(
             detail=f"Audit log with id {audit_log_id} not found"
         )
 
-    # Department check for non-ADMIN users
+    # SECURITY: Department check based on user role
     if current_user.role == UserRoleEnum.USER:
+        # USER can only see audit logs from their department
         if audit_log.department_id != current_user.department_id:
+            # Return 404 instead of 403 to avoid leaking information
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions to view this audit log"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Audit log with id {audit_log_id} not found"
             )
 
     # Enrich with user information
@@ -161,19 +149,12 @@ def get_entity_audit_logs(
 
     Useful for viewing history of changes to a particular record
     """
-    # Check permissions
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions to view audit logs"
-        )
-
     query = db.query(AuditLog).filter(
         AuditLog.entity_type == entity_type,
         AuditLog.entity_id == entity_id
     )
 
-    # Department filtering for USER role
+    # SECURITY: Department filtering based on user role
     if current_user.role == UserRoleEnum.USER:
         if not current_user.department_id:
             raise HTTPException(
