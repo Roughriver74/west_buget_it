@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Modal, Form, InputNumber, Select, message, Statistic, Row, Col, Card, Alert, Progress, Typography, Divider, Slider } from 'antd'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import { InfoCircleOutlined } from '@ant-design/icons'
 
 const { Option } = Select
-const { Text, Title } = Typography
+const { Text } = Typography
 
 interface CopyPlanModalProps {
   open: boolean
