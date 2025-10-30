@@ -36,6 +36,12 @@ interface CategoryData {
   monthly: MonthlyData[]
 }
 
+interface Category {
+  id: number
+  name: string
+  parent_id: number | null
+}
+
 const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
 
 const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
@@ -43,11 +49,23 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   departmentId,
   height = 600,
 }) => {
+  // Fetch budget execution data
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['budget-execution', year, departmentId],
     queryFn: async () => {
       const response = await apiClient.get('/analytics/budget-execution', {
         params: { year, department_id: departmentId },
+      })
+      return response.data
+    },
+  })
+
+  // Fetch categories for hierarchical grouping
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories', departmentId],
+    queryFn: async () => {
+      const response = await apiClient.get('/categories/', {
+        params: { department_id: departmentId, limit: 1000 },
       })
       return response.data
     },
@@ -76,14 +94,80 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   }
 
   const heatmapData = useMemo(() => {
-    if (!data?.by_category) return []
+    if (!data?.by_category || !categoriesData) return []
 
-    return data.by_category.map((category: CategoryData) => ({
-      category_id: category.category_id,
-      category_name: category.category_name,
-      monthly: category.monthly,
-    }))
-  }, [data])
+    // Build category map for quick lookup
+    const categoryMap = new Map<number, Category>()
+    categoriesData.forEach((cat: Category) => {
+      categoryMap.set(cat.id, cat)
+    })
+
+    // Group categories by parent
+    const parentCategories = new Map<number | null, CategoryData[]>()
+    data.by_category.forEach((category: CategoryData) => {
+      const catInfo = categoryMap.get(category.category_id)
+      const parentId = catInfo?.parent_id ?? null
+
+      if (!parentCategories.has(parentId)) {
+        parentCategories.set(parentId, [])
+      }
+      parentCategories.get(parentId)!.push(category)
+    })
+
+    // Build hierarchical rows
+    const rows: Array<{
+      category_id: number | string
+      category_name: string
+      monthly: MonthlyData[]
+      isParent: boolean
+      level: number
+    }> = []
+
+    // First add categories without parent (root level)
+    const rootCategories = parentCategories.get(null) || []
+    rootCategories.forEach((category) => {
+      rows.push({
+        category_id: category.category_id,
+        category_name: category.category_name,
+        monthly: category.monthly,
+        isParent: parentCategories.has(category.category_id),
+        level: 0,
+      })
+
+      // Add child categories
+      const children = parentCategories.get(category.category_id) || []
+      children.forEach((child) => {
+        rows.push({
+          category_id: child.category_id,
+          category_name: child.category_name,
+          monthly: child.monthly,
+          isParent: false,
+          level: 1,
+        })
+      })
+    })
+
+    // Add categories that have a parent but parent is not in the data
+    // (orphaned categories)
+    data.by_category.forEach((category: CategoryData) => {
+      const catInfo = categoryMap.get(category.category_id)
+      if (catInfo?.parent_id && !parentCategories.get(null)?.some(c => c.category_id === catInfo.parent_id)) {
+        // This is a child category but parent is not in root
+        const alreadyAdded = rows.some(r => r.category_id === category.category_id)
+        if (!alreadyAdded) {
+          rows.push({
+            category_id: category.category_id,
+            category_name: category.category_name,
+            monthly: category.monthly,
+            isParent: false,
+            level: 1,
+          })
+        }
+      }
+    })
+
+    return rows
+  }, [data, categoriesData])
 
   if (isLoading) {
     return (
@@ -236,14 +320,22 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
           </thead>
           <tbody>
             {heatmapData.map((category: any) => (
-              <tr key={category.category_id}>
+              <tr
+                key={category.category_id}
+                style={{
+                  backgroundColor: category.isParent ? '#fafafa' : 'transparent',
+                }}
+              >
                 <td
                   style={{
                     padding: '8px',
+                    paddingLeft: category.level === 1 ? '24px' : '8px',
                     borderBottom: '1px solid #f0f0f0',
-                    fontWeight: 500,
+                    fontWeight: category.isParent ? 600 : category.level === 0 ? 500 : 400,
+                    fontSize: category.isParent ? '13px' : '12px',
                   }}
                 >
+                  {category.level === 1 && '└ '}
                   {category.category_name}
                 </td>
                 {category.monthly.map((monthData: MonthlyData, idx: number) => {

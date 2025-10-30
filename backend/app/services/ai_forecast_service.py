@@ -2,6 +2,7 @@
 AI-powered forecast service using external AI API
 """
 import httpx
+import logging
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -10,6 +11,9 @@ from decimal import Decimal
 
 from app.db.models import Expense, BudgetCategory, Contractor, ExpenseStatusEnum
 from app.core.config import settings
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 class AIForecastService:
@@ -208,7 +212,7 @@ class AIForecastService:
             ]
         )
 
-        prompt = f"""Ты - эксперт по финансовому прогнозированию для IT отдела.
+        prompt = f"""Ты - эксперт по финансовому прогнозированию.
 
 ЗАДАЧА: Сгенерируй детальный прогноз расходов{category_context} на {month:02d}.{year} на основе исторических данных.
 
@@ -230,24 +234,32 @@ class AIForecastService:
 2. ОБЯЗАТЕЛЬНО учти данные за {month:02d}.{year-1} (если есть) - это показывает сезонность
 3. ОБЯЗАТЕЛЬНО учти текущий тренд последних месяцев
 4. Примени выявленные паттерны к прогнозу на {month:02d}.{year}
-5. Сгенерируй 3-7 конкретных статей расходов с обоснованием каждой
+5. Сгенерируй 7-10 конкретных статей расходов с обоснованием каждой
 6. В reasoning для каждой статьи укажи, на основе каких исторических данных сделан прогноз
+7. ⚠️ ВАЖНО: Округляй все суммы до сотен (например: 120000, 85300, а не 120456 или 85367)
 
 ФОРМАТ ОТВЕТА (JSON):
 {{
-  "forecast_total": <общая сумма прогноза, число без пробелов и подчеркиваний>,
-  "confidence": <уверенность в прогнозе от 0 до 100>,
+  "forecast_total": 1200000,
+  "confidence": 85,
   "items": [
     {{
-      "description": "<описание расхода>",
-      "amount": <сумма, число без пробелов и подчеркиваний>,
-      "reasoning": "<обоснование на основе исторических данных>"
+      "description": "Связь (телефон/интернет)",
+      "amount": 200000,
+      "reasoning": "На основе данных за {month:02d}.{year-1}: 195000 ₽, с учетом тренда +5%"
+    }},
+    {{
+      "description": "Лицензии и подписки",
+      "amount": 150000,
+      "reasoning": "Регулярный платеж, среднее за последние 6 месяцев: 148000 ₽"
     }}
   ],
-  "summary": "<краткая сводка: учтённые тренды, сезонность и ключевые факторы>"
+  "summary": "Прогноз учитывает сезонность и текущий тренд роста 5%"
 }}
 
-⚠️ ВАЖНО: Используй числа БЕЗ подчеркиваний и пробелов (например: 1200000, а не 1_200_000 или 1 200 000)
+⚠️ ВАЖНО:
+- Используй числа БЕЗ подчеркиваний и пробелов (например: 1200000, а не 1_200_000)
+- Округляй ВСЕ суммы до сотен (200000, 150000, а не 200456, 150123)
 Отвечай ТОЛЬКО валидным JSON без дополнительного текста."""
 
         return prompt
@@ -310,6 +322,8 @@ class AIForecastService:
         )
 
         # Call AI API
+        logger.info(f"Calling AI API for forecast: year={year}, month={month}, department_id={department_id}")
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
@@ -329,7 +343,10 @@ class AIForecastService:
                     },
                 )
 
+                logger.info(f"AI API response status: {response.status_code}")
+
                 if response.status_code != 200:
+                    logger.error(f"AI API error - Status {response.status_code}, Response: {response.text[:500]}")
                     return {
                         "success": False,
                         "error": f"AI API error: {response.status_code}",
@@ -345,9 +362,7 @@ class AIForecastService:
                 # Parse AI response (it should be JSON)
                 import json
                 import re
-                import logging
 
-                logger = logging.getLogger(__name__)
                 logger.info(f"AI raw response: {ai_content}")
 
                 # Try to extract JSON from markdown code blocks if present
@@ -385,6 +400,9 @@ class AIForecastService:
                 return forecast_data
 
         except Exception as e:
+            # Log the actual error for debugging
+            logger.error(f"AI forecast service error: {str(e)}", exc_info=True)
+
             # Fallback to statistical average on any error
             return {
                 "success": False,

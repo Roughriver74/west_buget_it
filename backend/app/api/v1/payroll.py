@@ -2360,8 +2360,7 @@ async def get_tax_breakdown_by_month(
 
     # Build base filters
     base_filters = [
-        PayrollActual.year == year,
-        PayrollActual.is_active == True
+        PayrollActual.year == year
     ]
 
     # Department access control

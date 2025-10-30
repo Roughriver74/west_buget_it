@@ -78,6 +78,15 @@ def adjust_to_workday(date_obj: date) -> date:
     return date_obj
 
 
+def round_to_hundreds(amount: Decimal) -> Decimal:
+    """
+    Округляет сумму до сотен (например: 12345 -> 12300, 12380 -> 12400)
+    """
+    amount_float = float(amount)
+    rounded = round(amount_float / 100) * 100
+    return Decimal(str(rounded))
+
+
 # Pydantic schemas
 class ForecastExpenseBase(BaseModel):
     department_id: int
@@ -220,13 +229,16 @@ def generate_forecast(
             original_date = date(request.target_year, request.target_month, day_of_month)
             adjusted_date = adjust_to_workday(original_date)
 
+            # Round amount to hundreds
+            rounded_amount = round_to_hundreds(reg.avg_amount)
+
             forecast = ForecastExpense(
                 department_id=request.department_id,
                 category_id=reg.category_id,
                 contractor_id=reg.contractor_id,
                 organization_id=reg.organization_id,
                 forecast_date=adjusted_date,
-                amount=reg.avg_amount,
+                amount=rounded_amount,
                 is_regular=True,
                 comment=f"Автоматически: регулярный расход (среднее за 3 месяца, обычно ~{day_of_month} числа)"
             )
@@ -303,13 +315,16 @@ def generate_forecast(
             original_date = date(request.target_year, request.target_month, day_of_month)
             adjusted_date = adjust_to_workday(original_date)
 
+            # Round amount to hundreds
+            rounded_amount = round_to_hundreds(avg.avg_amount)
+
             forecast = ForecastExpense(
                 department_id=request.department_id,
                 category_id=avg.category_id,
                 contractor_id=None,
                 organization_id=avg.organization_id,
                 forecast_date=adjusted_date,
-                amount=avg.avg_amount,
+                amount=rounded_amount,
                 is_regular=False,
                 comment=f"Автоматически: средний расход по категории ({avg.count} раз за 6 мес., обычно ~{day_of_month} числа)"
             )
@@ -621,10 +636,14 @@ async def generate_ai_forecast(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Generate AI-powered forecast using external AI API
+    Generate HYBRID forecast: Base statistical + AI enhancements
 
-    This endpoint uses AI to analyze historical expenses and generate
-    intelligent forecasts based on patterns, seasonality, and trends.
+    Process:
+    1. Delete all existing forecasts for the target month
+    2. Generate base forecast (regular + average expenses with proper categories/contractors)
+    3. AI analyzes patterns and suggests additional items
+    4. Round all amounts to hundreds
+    5. Match AI items to real categories and contractors from historical data
 
     - USER: Can only generate forecasts for their own department
     - MANAGER/ADMIN: Can generate forecasts for any department
@@ -632,10 +651,87 @@ async def generate_ai_forecast(
     # Check department access
     check_department_access(current_user, request.department_id)
 
-    # Initialize AI forecast service
+    # STEP 1: Delete ALL existing forecasts for this month
+    db.query(ForecastExpense).filter(
+        ForecastExpense.department_id == request.department_id,
+        extract('year', ForecastExpense.forecast_date) == request.target_year,
+        extract('month', ForecastExpense.forecast_date) == request.target_month
+    ).delete(synchronize_session=False)
+    db.commit()
+
+    # STEP 2: Generate BASE forecast using statistical method
+    target_date = date(request.target_year, request.target_month, 1)
+    base_created = 0
+
+    # 2a. Regular expenses (repeating monthly)
+    three_months_ago = target_date - timedelta(days=90)
+    regular_expenses = db.query(
+        Expense.category_id,
+        Expense.contractor_id,
+        Expense.organization_id,
+        func.avg(Expense.amount).label('avg_amount'),
+        func.count(Expense.id).label('count')
+    ).filter(
+        Expense.department_id == request.department_id,
+        Expense.category_id.is_not(None),
+        Expense.request_date >= three_months_ago,
+        Expense.request_date < target_date,
+        Expense.status.in_(['PAID', 'PENDING'])
+    ).group_by(
+        Expense.category_id,
+        Expense.contractor_id,
+        Expense.organization_id
+    ).having(
+        func.count(Expense.id) >= 3  # Минимум 3 раза за 3 месяца
+    ).all()
+
+    for reg in regular_expenses:
+        expenses = db.query(Expense).filter(
+            Expense.department_id == request.department_id,
+            Expense.category_id == reg.category_id,
+            Expense.contractor_id == reg.contractor_id,
+            Expense.organization_id == reg.organization_id,
+            Expense.request_date >= three_months_ago,
+            Expense.request_date < target_date
+        ).all()
+
+        if expenses:
+            avg_day = sum(e.request_date.day for e in expenses) / len(expenses)
+            day_of_month = round(avg_day)
+        else:
+            day_of_month = 15
+
+        max_day = calendar.monthrange(request.target_year, request.target_month)[1]
+        if day_of_month > max_day:
+            day_of_month = max_day
+        elif day_of_month < 1:
+            day_of_month = 1
+
+        original_date = date(request.target_year, request.target_month, day_of_month)
+        adjusted_date = adjust_to_workday(original_date)
+
+        # Round amount to hundreds
+        rounded_amount = round_to_hundreds(reg.avg_amount)
+
+        forecast = ForecastExpense(
+            department_id=request.department_id,
+            category_id=reg.category_id,
+            contractor_id=reg.contractor_id,
+            organization_id=reg.organization_id,
+            forecast_date=adjusted_date,
+            amount=rounded_amount,
+            is_regular=True,
+            comment=f"Регулярный расход (среднее за 3 месяца)"
+        )
+        db.add(forecast)
+        base_created += 1
+
+    db.commit()
+
+    # STEP 3: Initialize AI forecast service
     ai_service = AIForecastService(db)
 
-    # Generate AI forecast
+    # STEP 4: Generate AI forecast
     ai_result = await ai_service.generate_ai_forecast(
         department_id=request.department_id,
         year=request.target_year,
@@ -643,21 +739,24 @@ async def generate_ai_forecast(
         category_id=request.category_id,
     )
 
-    # If AI forecast succeeded, create ForecastExpense records
-    created_count = 0
+    # STEP 5: Add AI suggestions as ADDITIONAL items
+    ai_created = 0
     if ai_result.get("success") and ai_result.get("items"):
-        # Delete existing AI-generated forecasts for this month
-        db.query(ForecastExpense).filter(
-            ForecastExpense.department_id == request.department_id,
-            extract('year', ForecastExpense.forecast_date) == request.target_year,
-            extract('month', ForecastExpense.forecast_date) == request.target_month,
-            ForecastExpense.comment.like("%AI прогноз%")
-        ).delete(synchronize_session=False)
+        # Get existing categories for better matching
+        all_categories = db.query(BudgetCategory).filter(
+            BudgetCategory.department_id == request.department_id,
+            BudgetCategory.is_active == True
+        ).all()
+
+        category_map = {cat.name.lower(): cat.id for cat in all_categories}
 
         # Create forecast records from AI suggestions
         for idx, item in enumerate(ai_result["items"], start=1):
-            # Determine forecast date (spread across month)
-            day_of_month = min(5 + (idx * 5), 28)  # 5, 10, 15, 20, 25
+            description = item.get("description", "")
+            description_lower = description.lower()
+
+            # Determine forecast date (spread across month, avoiding base forecast dates)
+            day_of_month = min(12 + (idx * 3), 28)  # 12, 15, 18, 21, 24, 27
             max_day = calendar.monthrange(request.target_year, request.target_month)[1]
             if day_of_month > max_day:
                 day_of_month = max_day
@@ -666,68 +765,101 @@ async def generate_ai_forecast(
             original_date = date(request.target_year, request.target_month, day_of_month)
             adjusted_date = adjust_to_workday(original_date)
 
-            # Try to match category by description keywords
+            # Advanced category matching using historical data
             category_id = request.category_id
+            contractor_id = None
+
             if not category_id:
-                # Simple category matching based on keywords
-                description_lower = item.get("description", "").lower()
-                if "лицензи" in description_lower or "подписк" in description_lower:
-                    category = db.query(BudgetCategory).filter(
-                        BudgetCategory.department_id == request.department_id,
-                        BudgetCategory.name.ilike("%лицензи%")
-                    ).first()
-                    if category:
-                        category_id = category.id
-                elif "серв" in description_lower or "облак" in description_lower or "хостинг" in description_lower:
-                    category = db.query(BudgetCategory).filter(
-                        BudgetCategory.department_id == request.department_id,
-                        BudgetCategory.name.ilike("%серв%")
-                    ).first()
-                    if category:
-                        category_id = category.id
-                elif "оборуд" in description_lower or "техник" in description_lower:
-                    category = db.query(BudgetCategory).filter(
-                        BudgetCategory.department_id == request.department_id,
-                        BudgetCategory.name.ilike("%оборудование%")
-                    ).first()
-                    if category:
-                        category_id = category.id
+                # Try to find category from historical expenses matching description
+                keywords = description_lower.split()[:5]  # First 5 words
 
-                # Default to first category if no match
+                for keyword in keywords:
+                    if len(keyword) < 3:
+                        continue
+
+                    # Search for matching expense in history
+                    matching_expense = db.query(Expense).filter(
+                        Expense.department_id == request.department_id,
+                        Expense.category_id.is_not(None),
+                        or_(
+                            Expense.comment.ilike(f"%{keyword}%"),
+                            BudgetCategory.name.ilike(f"%{keyword}%")
+                        )
+                    ).join(BudgetCategory, Expense.category_id == BudgetCategory.id).first()
+
+                    if matching_expense:
+                        category_id = matching_expense.category_id
+                        contractor_id = matching_expense.contractor_id
+                        break
+
+                # Fallback: keyword-based category matching
                 if not category_id:
-                    default_category = db.query(BudgetCategory).filter(
-                        BudgetCategory.department_id == request.department_id
-                    ).first()
-                    if default_category:
-                        category_id = default_category.id
+                    category_keywords = {
+                        'связь': ['связь', 'телефон', 'интернет', 'сим'],
+                        'лицензи': ['лицензи', 'подписк', '1с', 'битрикс'],
+                        'разработ': ['разработ', 'програм', 'приложени'],
+                        'серв': ['серв', 'облак', 'хостинг', 'vps'],
+                        'оборудован': ['оборуд', 'техник', 'компьютер', 'ноутбук'],
+                    }
 
-            # Get default organization (Organization is shared across departments)
+                    for cat_key, keywords in category_keywords.items():
+                        if any(kw in description_lower for kw in keywords):
+                            # Find category matching this key
+                            for cat_name, cat_id in category_map.items():
+                                if cat_key in cat_name:
+                                    category_id = cat_id
+                                    break
+                            if category_id:
+                                break
+
+                # Ultimate fallback: most used category
+                if not category_id:
+                    most_used = db.query(
+                        Expense.category_id,
+                        func.count(Expense.id).label('count')
+                    ).filter(
+                        Expense.department_id == request.department_id,
+                        Expense.category_id.is_not(None)
+                    ).group_by(Expense.category_id).order_by(
+                        func.count(Expense.id).desc()
+                    ).first()
+
+                    if most_used:
+                        category_id = most_used.category_id
+
+            # Get default organization
             organization = db.query(Organization).filter(
                 Organization.is_active == True
             ).first()
-            organization_id = organization.id if organization else 1  # Fallback to ID 1
+            organization_id = organization.id if organization else 1
+
+            # Round amount to hundreds
+            amount = item.get("amount", 0)
+            rounded_amount = round_to_hundreds(Decimal(str(amount)))
 
             # Create forecast expense
-            if category_id:
+            if category_id and rounded_amount > 0:
                 forecast = ForecastExpense(
                     department_id=request.department_id,
                     category_id=category_id,
-                    contractor_id=None,
+                    contractor_id=contractor_id,
                     organization_id=organization_id,
                     forecast_date=adjusted_date,
-                    amount=Decimal(str(item.get("amount", 0))),
+                    amount=rounded_amount,
                     is_regular=False,
-                    comment=f"AI прогноз: {item.get('description', '')} | Обоснование: {item.get('reasoning', '')}"
+                    comment=f"AI: {description[:80]} | {item.get('reasoning', '')[:100]}"
                 )
                 db.add(forecast)
-                created_count += 1
+                ai_created += 1
 
         db.commit()
 
-    # Return AI result with created count
+    # Return comprehensive result
     return {
         **ai_result,
-        "created_forecast_records": created_count,
+        "base_forecast_records": base_created,
+        "ai_forecast_records": ai_created,
+        "total_forecast_records": base_created + ai_created,
         "target_month": request.target_month,
         "target_year": request.target_year,
     }
