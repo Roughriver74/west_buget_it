@@ -5,11 +5,10 @@
 import React, { useMemo } from 'react'
 import { Card, Typography, Tag, Space, Tooltip } from 'antd'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import { apiClient } from '@/api'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 const { Text } = Typography
 
 interface BudgetDeviationHeatmapProps {
@@ -47,7 +46,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['plan-vs-actual', year, departmentId],
     queryFn: async () => {
-      const response = await axios.get(`${API_BASE}/analytics/plan-vs-actual`, {
+      const response = await apiClient.get('/analytics/plan-vs-actual', {
         params: { year, department_id: departmentId },
       })
       return response.data
@@ -88,7 +87,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
 
   if (isLoading) {
     return (
-      <Card title={`Тепловая карта отклонений ${year}`}>
+      <Card title="Тепловая карта отклонений">
         <LoadingState />
       </Card>
     )
@@ -96,7 +95,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
 
   if (isError) {
     return (
-      <Card title={`Тепловая карта отклонений ${year}`}>
+      <Card title="Тепловая карта отклонений">
         <ErrorState
           description={error instanceof Error ? error.message : 'Не удалось загрузить данные'}
         />
@@ -106,7 +105,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
 
   if (!data || !heatmapData.length) {
     return (
-      <Card title={`Тепловая карта отклонений ${year}`}>
+      <Card title="Тепловая карта отклонений">
         <Text type="secondary">
           Нет базовой версии бюджета для {year} года. Установите утвержденную версию как baseline.
         </Text>
@@ -118,7 +117,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
     <Card
       title={
         <Space>
-          <span>{`Тепловая карта отклонений ${year}`}</span>
+          <span>Тепловая карта отклонений</span>
           {data.baseline_version_name && (
             <Tag color="blue">Baseline: {data.baseline_version_name}</Tag>
           )}

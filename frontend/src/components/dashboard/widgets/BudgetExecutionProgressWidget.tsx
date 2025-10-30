@@ -35,7 +35,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['plan-vs-actual', year, departmentId],
     queryFn: async () => {
-      const response = await axios.get(`${API_BASE}/analytics/plan-vs-actual`, {
+      const response = await apiClient.get('/analytics/plan-vs-actual', {
         params: { year, department_id: departmentId },
       })
       return response.data
@@ -66,7 +66,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
 
   if (isLoading) {
     return (
-      <Card title={`Исполнение бюджета ${year} по категориям`}>
+      <Card title="Исполнение бюджета по категориям">
         <LoadingState />
       </Card>
     )
@@ -74,7 +74,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
 
   if (isError) {
     return (
-      <Card title={`Исполнение бюджета ${year} по категориям`}>
+      <Card title="Исполнение бюджета по категориям">
         <ErrorState
           description={error instanceof Error ? error.message : 'Не удалось загрузить данные'}
         />
@@ -84,7 +84,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
 
   if (!data || !sortedCategories.length) {
     return (
-      <Card title={`Исполнение бюджета ${year} по категориям`}>
+      <Card title="Исполнение бюджета по категориям">
         <Text type="secondary">
           Нет базовой версии бюджета для {year} года. Установите утвержденную версию как baseline.
         </Text>
@@ -105,7 +105,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
     <Card
       title={
         <Space>
-          <span>{`Исполнение бюджета ${year} по категориям`}</span>
+          <span>Исполнение бюджета по категориям</span>
           {data.baseline_version_name && (
             <Tag color="blue">Baseline: {data.baseline_version_name}</Tag>
           )}

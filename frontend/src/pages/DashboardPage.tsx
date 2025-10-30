@@ -131,7 +131,7 @@ const DashboardPage = () => {
       {/* Основные метрики */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="План"
               value={data.totals.planned}
@@ -143,7 +143,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Факт"
               value={data.totals.actual}
@@ -155,7 +155,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Остаток"
               value={data.totals.remaining}
@@ -167,7 +167,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false}>
+          <Card variant="borderless">
             <Statistic
               title="Исполнение"
               value={data.totals.execution_percent}

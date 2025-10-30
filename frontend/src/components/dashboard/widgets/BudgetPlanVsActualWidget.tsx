@@ -97,7 +97,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
     columnStyle: {
       radius: [4, 4, 0, 0],
     },
-    color: ['#1890ff', '#52c41a'],
+    color: ['#1890ff', '#fa8c16'],
     legend: {
       position: 'top' as const,
     },
@@ -138,7 +138,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (isLoading) {
     return (
-      <Card title={`Исполнение бюджета ${year}`}>
+      <Card title="Исполнение бюджета">
         <LoadingState />
       </Card>
     )
@@ -146,7 +146,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (isError) {
     return (
-      <Card title={`Исполнение бюджета ${year}`}>
+      <Card title="Исполнение бюджета">
         <ErrorState
           description={error instanceof Error ? error.message : 'Не удалось загрузить данные'}
           onRetry={() => {}}
@@ -157,7 +157,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (!data || !stats) {
     return (
-      <Card title={`Исполнение бюджета ${year}`}>
+      <Card title="Исполнение бюджета">
         <Text type="secondary">Нет данных для отображения</Text>
       </Card>
     )
@@ -165,7 +165,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   return (
     <Card
-      title={`Исполнение бюджета ${year}`}
+      title="Исполнение бюджета"
       extra={
         <Tag color={stats.executionPercent > 100 ? 'red' : stats.executionPercent > 90 ? 'orange' : 'green'}>
           {stats.executionPercent.toFixed(1)}% исполнено
