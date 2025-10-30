@@ -26,7 +26,7 @@ class AIForecastService:
     def get_historical_expenses(
         self,
         department_id: int,
-        lookback_months: int = 12,
+        lookback_months: int = 18,
         category_id: Optional[int] = None,
     ) -> List[Dict]:
         """
@@ -34,7 +34,7 @@ class AIForecastService:
 
         Args:
             department_id: Department ID to filter by
-            lookback_months: Number of months to look back
+            lookback_months: Number of months to look back (default: 18)
             category_id: Optional category filter
 
         Returns:
@@ -93,9 +93,9 @@ class AIForecastService:
         Returns:
             Dict with monthly averages, trends, and patterns
         """
-        # Get expenses for the last 12 months
+        # Get expenses for the last 18 months
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=365)
+        start_date = end_date - timedelta(days=18 * 30)
 
         query = self.db.query(
             extract("year", Expense.request_date).label("year"),
@@ -212,7 +212,7 @@ class AIForecastService:
 
 ЗАДАЧА: Сгенерируй детальный прогноз расходов{category_context} на {month:02d}.{year} на основе исторических данных.
 
-📊 ИСТОРИЧЕСКИЕ ДАННЫЕ ЗА ГОД:
+📊 ИСТОРИЧЕСКИЕ ДАННЫЕ ЗА 18 МЕСЯЦЕВ:
 
 Помесячная статистика за весь период:
 {monthly_text}
@@ -235,18 +235,19 @@ class AIForecastService:
 
 ФОРМАТ ОТВЕТА (JSON):
 {{
-  "forecast_total": <общая сумма прогноза>,
+  "forecast_total": <общая сумма прогноза, число без пробелов и подчеркиваний>,
   "confidence": <уверенность в прогнозе от 0 до 100>,
   "items": [
     {{
       "description": "<описание расхода>",
-      "amount": <сумма>,
+      "amount": <сумма, число без пробелов и подчеркиваний>,
       "reasoning": "<обоснование на основе исторических данных>"
     }}
   ],
   "summary": "<краткая сводка: учтённые тренды, сезонность и ключевые факторы>"
 }}
 
+⚠️ ВАЖНО: Используй числа БЕЗ подчеркиваний и пробелов (например: 1200000, а не 1_200_000 или 1 200 000)
 Отвечай ТОЛЬКО валидным JSON без дополнительного текста."""
 
         return prompt
@@ -270,10 +271,10 @@ class AIForecastService:
         Returns:
             Dict with AI forecast data
         """
-        # Get historical data
+        # Get historical data (18 months for better trend analysis)
         historical_expenses = self.get_historical_expenses(
             department_id=department_id,
-            lookback_months=12,
+            lookback_months=18,
             category_id=category_id,
         )
 
@@ -354,6 +355,12 @@ class AIForecastService:
                 if json_match:
                     ai_content = json_match.group(1)
                     logger.info(f"Extracted JSON from markdown: {ai_content}")
+
+                # Remove underscores from numeric literals (e.g., 1_200_000 -> 1200000)
+                # This handles Python/JS style number formatting that AI might use
+                ai_content = re.sub(r'(\d)_(\d)', r'\1\2', ai_content)
+                ai_content = re.sub(r'(\d)_(\d)', r'\1\2', ai_content)  # Run twice for multiple underscores
+                logger.info(f"Cleaned JSON: {ai_content[:200]}...")
 
                 try:
                     forecast_data = json.loads(ai_content)
