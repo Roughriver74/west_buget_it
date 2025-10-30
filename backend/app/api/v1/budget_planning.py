@@ -2,11 +2,13 @@
 API endpoints for Budget Planning 2026 Module
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime
 from decimal import Decimal
+import pandas as pd
+import io
 
 from app.db import get_db
 from app.db.models import (
@@ -1295,3 +1297,212 @@ def unset_version_baseline(
     db.refresh(version)
 
     return version
+
+
+# ============================================================================
+# Budget Plan Import/Export
+# ============================================================================
+
+
+@router.post("/versions/{version_id}/import", status_code=status.HTTP_200_OK)
+async def import_budget_plan_details(
+    version_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Import budget plan details from Excel file
+
+    Expected Excel format:
+    - Категория (Category name)
+    - Тип (OPEX/CAPEX)
+    - Январь, Февраль, ..., Декабрь (12 month columns with amounts)
+    - Обоснование (optional justification)
+    """
+    from app.db.models import UserRoleEnum
+    from app.utils.logger import logger, log_info, log_error
+
+    # Verify version exists and user has access
+    version = db.query(BudgetVersion).filter(BudgetVersion.id == version_id).first()
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Security check - verify user has access to this version
+    if current_user.role == UserRoleEnum.USER:
+        if version.department_id != current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Version with id {version_id} not found"
+            )
+
+    # Check version status
+    if version.status not in [BudgetVersionStatusEnum.DRAFT, BudgetVersionStatusEnum.IN_REVIEW]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot import to version with status {version.status.value}. Only DRAFT or IN_REVIEW versions can be modified."
+        )
+
+    # Validate file type
+    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an Excel file (.xlsx or .xls)"
+        )
+
+    try:
+        # Read Excel file
+        log_info(f"Starting budget plan import from {file.filename} for version {version_id}", "Import")
+        content = await file.read()
+
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File too large. Maximum size is 10MB"
+            )
+
+        # Parse Excel
+        try:
+            df = pd.read_excel(io.BytesIO(content))
+        except Exception as e:
+            log_error(e, "Failed to parse Excel file")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid Excel file format: {str(e)}"
+            )
+
+        # Check if dataframe is empty
+        if df.empty:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file is empty"
+            )
+
+        # Validate required columns
+        required_columns = ['Категория', 'Тип']
+        month_columns = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Missing required columns: {', '.join(missing_columns)}. Found columns: {', '.join(df.columns)}"
+            )
+
+        # Get all categories for this department
+        categories_query = db.query(BudgetCategory).filter(
+            BudgetCategory.department_id == version.department_id,
+            BudgetCategory.is_active == True
+        )
+        categories = {cat.name: cat for cat in categories_query.all()}
+
+        created_count = 0
+        updated_count = 0
+        errors = []
+        total_rows = len(df)
+
+        for index, row in df.iterrows():
+            try:
+                category_name = str(row['Категория']).strip()
+                type_val = str(row['Тип']).strip().upper()
+
+                if not category_name or category_name == 'nan':
+                    errors.append(f"Строка {index + 2}: Не указана категория")
+                    continue
+
+                if type_val not in ['OPEX', 'CAPEX']:
+                    errors.append(f"Строка {index + 2}: Тип должен быть OPEX или CAPEX")
+                    continue
+
+                # Find category
+                category = categories.get(category_name)
+                if not category:
+                    errors.append(f"Строка {index + 2}: Категория '{category_name}' не найдена")
+                    continue
+
+                # Get justification if provided
+                justification = None
+                if 'Обоснование' in df.columns:
+                    just_val = row.get('Обоснование')
+                    if pd.notna(just_val):
+                        justification = str(just_val).strip()
+
+                # Process each month
+                for month_idx, month_name in enumerate(month_columns, start=1):
+                    if month_name not in df.columns:
+                        continue
+
+                    amount_val = row.get(month_name)
+                    if pd.isna(amount_val):
+                        amount = Decimal("0")
+                    else:
+                        try:
+                            amount = Decimal(str(amount_val))
+                        except:
+                            errors.append(f"Строка {index + 2}, {month_name}: Неверный формат суммы")
+                            continue
+
+                    # Check if detail already exists
+                    existing = db.query(BudgetPlanDetail).filter(
+                        BudgetPlanDetail.version_id == version_id,
+                        BudgetPlanDetail.month == month_idx,
+                        BudgetPlanDetail.category_id == category.id
+                    ).first()
+
+                    if existing:
+                        # Update existing
+                        existing.planned_amount = amount
+                        existing.type = type_val
+                        if justification:
+                            existing.justification = justification
+                        existing.calculation_method = "manual"
+                        updated_count += 1
+                    else:
+                        # Create new
+                        new_detail = BudgetPlanDetail(
+                            version_id=version_id,
+                            month=month_idx,
+                            category_id=category.id,
+                            planned_amount=amount,
+                            type=type_val,
+                            justification=justification,
+                            calculation_method="manual"
+                        )
+                        db.add(new_detail)
+                        created_count += 1
+
+            except Exception as e:
+                errors.append(f"Строка {index + 2}: {str(e)}")
+
+        db.commit()
+
+        # Recalculate version totals
+        recalculate_version_totals(db, version)
+        db.commit()
+
+        log_info(f"Import completed: created={created_count}, updated={updated_count}, errors={len(errors)}", "Import")
+
+        return {
+            "success": len(errors) == 0 or (created_count + updated_count) > 0,
+            "message": "Import completed" if len(errors) == 0 else "Import completed with errors",
+            "total_rows": total_rows,
+            "created": created_count,
+            "updated": updated_count,
+            "skipped": len(errors),
+            "errors": errors[:50] if errors else []  # Limit errors to first 50
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(e, "Budget plan import failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error importing file: {str(e)}"
+        )

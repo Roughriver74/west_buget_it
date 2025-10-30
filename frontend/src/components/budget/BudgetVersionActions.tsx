@@ -10,6 +10,7 @@ import {
   EditOutlined,
   SendOutlined,
   TeamOutlined,
+  UploadOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -21,6 +22,7 @@ import {
 import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
 import { ApprovalChecklistModal } from './ApprovalChecklistModal'
+import BudgetPlanImportModal from './BudgetPlanImportModal'
 
 const { TextArea } = Input
 
@@ -38,6 +40,7 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
   const [comments, setComments] = useState('')
   const [currentAction, setCurrentAction] = useState<'approve' | 'reject' | 'request-changes' | null>(null)
   const [presentationModalOpen, setPresentationModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
   const submitMutation = useSubmitVersion()
   const approveMutation = useApproveVersion()
@@ -215,10 +218,24 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
     }
   }
 
+  const isEditable = [BudgetVersionStatus.DRAFT, BudgetVersionStatus.REVISION_REQUESTED].includes(
+    version.status
+  )
+
   return (
     <>
       <Space>
         {renderActions()}
+
+        {/* Import Button - only for DRAFT and REVISION_REQUESTED */}
+        {isEditable && (
+          <Button
+            icon={<UploadOutlined />}
+            onClick={() => setImportModalOpen(true)}
+          >
+            Импорт из Excel
+          </Button>
+        )}
 
         {/* Presentation Mode Button - always available */}
         <Badge count={`${approvalCount}/${totalApprovals}`} showZero>
@@ -269,6 +286,15 @@ export const BudgetVersionActions: React.FC<BudgetVersionActionsProps> = ({
         version={version}
         onClose={() => {
           setPresentationModalOpen(false)
+          onActionComplete?.()
+        }}
+      />
+
+      <BudgetPlanImportModal
+        visible={importModalOpen}
+        versionId={version.id}
+        onCancel={() => {
+          setImportModalOpen(false)
           onActionComplete?.()
         }}
       />
