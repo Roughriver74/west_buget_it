@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+### Deploy server
+
+```bash
+ssh root@93.189.228.52        
+```
+
 ### Quick Start
 ```bash
 ./run.sh                    # Start all services (PostgreSQL, Backend, Frontend)

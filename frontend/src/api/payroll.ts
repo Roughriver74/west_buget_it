@@ -684,3 +684,142 @@ export const ndflAPI = {
     return response.data;
   },
 };
+
+// ==================== Tax Analytics Types ====================
+
+export interface TaxBurdenAnalytics {
+  period: string;
+  gross_payroll: number;
+  ndfl: {
+    total: number;
+    effective_rate: number;
+    breakdown: Array<{
+      from: number;
+      to: number | null;
+      rate: number;
+      taxable_amount: number;
+      tax_amount: number;
+    }>;
+  };
+  social_contributions: {
+    pfr: {
+      base_rate: number;
+      over_limit_rate: number;
+      limit: number;
+      base_amount: number;
+      over_amount: number;
+      total: number;
+    };
+    foms: {
+      rate: number;
+      limit: number;
+      taxable_amount: number;
+      total: number;
+    };
+    fss: {
+      rate: number;
+      limit: number;
+      taxable_amount: number;
+      total: number;
+    };
+    total_contributions: number;
+    effective_rate: number;
+  };
+  net_payroll: number;
+  total_tax_burden: number;
+  effective_burden_rate: number;
+  employer_cost: number;
+  employees_count: number;
+}
+
+export interface TaxBreakdownByMonth {
+  month: number;
+  month_name: string;
+  gross_payroll: number;
+  ndfl: number;
+  pfr: number;
+  foms: number;
+  fss: number;
+  total_taxes: number;
+  net_payroll: number;
+  employer_cost: number;
+}
+
+export interface TaxByEmployee {
+  employee_id: number;
+  employee_name: string;
+  position: string;
+  gross_income: number;
+  ndfl: number;
+  social_contributions: number;
+  net_income: number;
+  total_taxes: number;
+  effective_tax_rate: number;
+  effective_burden_rate: number;
+}
+
+export interface CostWaterfall {
+  base_salary: number;
+  monthly_bonus: number;
+  quarterly_bonus: number;
+  annual_bonus: number;
+  gross_total: number;
+  ndfl: number;
+  pfr: number;
+  foms: number;
+  fss: number;
+  net_payroll: number;
+  total_employer_cost: number;
+}
+
+// ==================== Tax Analytics API ====================
+
+export const payrollTaxAnalyticsAPI = {
+  // Получить общую налоговую нагрузку
+  getTaxBurden: async (params: {
+    year: number;
+    month?: number;
+    department_id?: number;
+    employee_id?: number;
+  }) => {
+    const response = await apiClient.get<TaxBurdenAnalytics>('payroll/analytics/tax-burden', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Получить помесячную детализацию налогов
+  getTaxBreakdownByMonth: async (params: {
+    year: number;
+    department_id?: number;
+  }) => {
+    const response = await apiClient.get<TaxBreakdownByMonth[]>('payroll/analytics/tax-breakdown-by-month', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Получить налоги по сотрудникам
+  getTaxByEmployee: async (params: {
+    year: number;
+    month?: number;
+    department_id?: number;
+  }) => {
+    const response = await apiClient.get<TaxByEmployee[]>('payroll/analytics/tax-by-employee', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Получить данные для Waterfall chart
+  getCostWaterfall: async (params: {
+    year: number;
+    month?: number;
+    department_id?: number;
+  }) => {
+    const response = await apiClient.get<CostWaterfall>('payroll/analytics/cost-waterfall', {
+      params,
+    });
+    return response.data;
+  },
+};
