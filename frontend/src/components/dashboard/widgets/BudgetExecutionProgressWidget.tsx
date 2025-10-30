@@ -5,12 +5,11 @@
 import React, { useMemo } from 'react'
 import { Card, Progress, Row, Col, Typography, Tag, Space, Statistic } from 'antd'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
+import { apiClient } from '@/api'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import { ArrowUpOutlined, ArrowDownOutlined, CheckCircleOutlined } from '@ant-design/icons'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 const { Text } = Typography
 
 interface BudgetExecutionProgressWidgetProps {
