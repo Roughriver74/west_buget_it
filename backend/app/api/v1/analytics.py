@@ -298,9 +298,87 @@ def get_budget_execution(
             "execution_percent": round((float(actual) / float(planned) * 100) if planned > 0 else 0, 2)
         })
 
+    # Get by_category with monthly breakdown
+    categories_query = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True
+    )
+    if department_id:
+        categories_query = categories_query.filter(BudgetCategory.department_id == department_id)
+    categories = categories_query.order_by(BudgetCategory.name).all()
+
+    by_category = []
+    for category in categories:
+        # Get total planned and actual for this category
+        plan_total_query = db.query(func.sum(BudgetPlan.planned_amount)).filter(
+            BudgetPlan.year == year,
+            BudgetPlan.category_id == category.id
+        )
+        if department_id:
+            plan_total_query = plan_total_query.filter(BudgetPlan.department_id == department_id)
+        planned_total = plan_total_query.scalar() or 0
+
+        actual_total_query = db.query(func.sum(Expense.amount)).filter(
+            Expense.category_id == category.id,
+            extract('year', Expense.request_date) == year
+        )
+        if department_id:
+            actual_total_query = actual_total_query.filter(Expense.department_id == department_id)
+        actual_total = actual_total_query.scalar() or 0
+
+        # Get monthly breakdown for this category
+        monthly_data = []
+        for month in range(1, 13):
+            plan_month_query = db.query(func.sum(BudgetPlan.planned_amount)).filter(
+                BudgetPlan.year == year,
+                BudgetPlan.month == month,
+                BudgetPlan.category_id == category.id
+            )
+            if department_id:
+                plan_month_query = plan_month_query.filter(BudgetPlan.department_id == department_id)
+            planned_month = plan_month_query.scalar() or 0
+
+            actual_month_query = db.query(func.sum(Expense.amount)).filter(
+                Expense.category_id == category.id,
+                extract('year', Expense.request_date) == year,
+                extract('month', Expense.request_date) == month
+            )
+            if department_id:
+                actual_month_query = actual_month_query.filter(Expense.department_id == department_id)
+            actual_month = actual_month_query.scalar() or 0
+
+            monthly_data.append({
+                "month": month,
+                "month_name": datetime(year, month, 1).strftime("%B"),
+                "planned": float(planned_month),
+                "actual": float(actual_month),
+                "difference": float(actual_month) - float(planned_month),
+                "execution_percent": round((float(actual_month) / float(planned_month) * 100) if planned_month > 0 else 0, 2)
+            })
+
+        by_category.append({
+            "category_id": category.id,
+            "category_name": category.name,
+            "planned": float(planned_total),
+            "actual": float(actual_total),
+            "difference": float(actual_total) - float(planned_total),
+            "execution_percent": round((float(actual_total) / float(planned_total) * 100) if planned_total > 0 else 0, 2),
+            "monthly": monthly_data
+        })
+
+    # Calculate totals
+    total_planned = sum(float(m["planned"]) for m in result)
+    total_actual = sum(float(m["actual"]) for m in result)
+    total_difference = total_actual - total_planned
+    execution_percent = round((total_actual / total_planned * 100) if total_planned > 0 else 0, 2)
+
     return {
         "year": year,
-        "months": result
+        "months": result,
+        "by_category": by_category,
+        "total_planned": total_planned,
+        "total_actual": total_actual,
+        "total_difference": total_difference,
+        "execution_percent": execution_percent
     }
 
 

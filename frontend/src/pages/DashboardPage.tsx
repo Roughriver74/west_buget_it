@@ -13,6 +13,7 @@ import ErrorState from '@/components/common/ErrorState'
 import BudgetPlanVsActualWidget from '@/components/dashboard/widgets/BudgetPlanVsActualWidget'
 import BudgetExecutionProgressWidget from '@/components/dashboard/widgets/BudgetExecutionProgressWidget'
 import BudgetDeviationHeatmap from '@/components/dashboard/widgets/BudgetDeviationHeatmap'
+import PayrollTaxWidget from '@/components/dashboard/widgets/PayrollTaxWidget'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
@@ -182,7 +183,7 @@ const DashboardPage = () => {
       {/* CAPEX vs OPEX */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12}>
-          <Card title="CAPEX vs OPEX" bordered={false}>
+          <Card title="CAPEX vs OPEX" variant="borderless">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
@@ -209,7 +210,7 @@ const DashboardPage = () => {
         </Col>
 
         <Col xs={24} sm={12}>
-          <Card title="Топ-5 категорий по расходам" bordered={false}>
+          <Card title="Топ-5 категорий по расходам" variant="borderless">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data.top_categories}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -226,7 +227,7 @@ const DashboardPage = () => {
       {/* Распределение по статусам */}
       <Row gutter={[16, 16]}>
         <Col xs={24}>
-          <Card title="Распределение заявок по статусам" bordered={false}>
+          <Card title="Распределение заявок по статусам" variant="borderless">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data.status_distribution.map(item => ({
                 ...item,
@@ -255,13 +256,20 @@ const DashboardPage = () => {
         </Col>
       </Row>
 
-      {/* Прогресс-бары исполнения по категориям */}
+      {/* Прогресс-бары исполнения по категориям и ФОТ */}
       <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
         <Col xs={24} lg={12}>
           <BudgetExecutionProgressWidget year={year} departmentId={selectedDepartment?.id} height={500} />
         </Col>
         <Col xs={24} lg={12}>
-          <BudgetDeviationHeatmap year={year} departmentId={selectedDepartment?.id} height={500} />
+          <PayrollTaxWidget year={year} departmentId={selectedDepartment?.id} height={500} />
+        </Col>
+      </Row>
+
+      {/* Тепловая карта отклонений - полная ширина */}
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        <Col xs={24}>
+          <BudgetDeviationHeatmap year={year} departmentId={selectedDepartment?.id} height={700} />
         </Col>
       </Row>
     </div>

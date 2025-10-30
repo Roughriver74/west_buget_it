@@ -40,7 +40,7 @@ const CategoryChartWidget: React.FC<CategoryChartWidgetProps> = ({ title, config
     radius: 0.8,
     label: {
       type: 'outer',
-      content: '{name} {percentage}',
+      content: (item: any) => `${item.type} ${(item.percent * 100).toFixed(1)}%`,
     },
     interactions: [{ type: 'element-active' }],
   }

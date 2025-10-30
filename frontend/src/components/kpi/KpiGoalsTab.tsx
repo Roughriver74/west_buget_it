@@ -366,7 +366,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       {importModalVisible && (
         <ImportKPIModal
           visible={importModalVisible}
-          onClose={() => setImportModalVisible(false)}
+          onCancel={() => setImportModalVisible(false)}
         />
       )}
     </>

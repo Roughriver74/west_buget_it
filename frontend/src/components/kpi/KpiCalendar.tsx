@@ -4,7 +4,6 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
-import type { EmployeeKPI } from '@/api/kpi'
 import { formatCurrency } from '@/utils/formatters'
 
 const { Option } = Select
@@ -106,7 +105,7 @@ export const KpiCalendar: React.FC<KpiCalendarProps> = ({ departmentId }) => {
   }
 
   // Custom date cell renderer (for day view - not used much, but required)
-  const dateCellRender = (value: Dayjs) => {
+  const dateCellRender = (_value: Dayjs) => {
     // We don't show daily data for KPI bonuses
     return null
   }
@@ -158,7 +157,7 @@ export const KpiCalendar: React.FC<KpiCalendarProps> = ({ departmentId }) => {
               return dateCellRender(current)
             }}
             onPanelChange={handlePanelChange}
-            headerRender={({ value, type, onChange, onTypeChange }) => {
+            headerRender={({ value }) => {
               return (
                 <div style={{ padding: 8 }}>
                   <Space>

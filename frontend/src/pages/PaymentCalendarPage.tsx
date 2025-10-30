@@ -18,7 +18,7 @@ import {
   Tooltip,
   Tag,
 } from 'antd'
-import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi, forecastApi } from '@/api'
 import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types'

@@ -7,7 +7,6 @@ import {
   Space,
   Modal,
   Form,
-  Input,
   InputNumber,
   Select,
   message,
@@ -438,7 +437,7 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
       {importModalVisible && (
         <ImportKPIModal
           visible={importModalVisible}
-          onClose={() => setImportModalVisible(false)}
+          onCancel={() => setImportModalVisible(false)}
         />
       )}
     </>

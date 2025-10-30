@@ -48,7 +48,7 @@ class AIForecastService:
         query = (
             self.db.query(
                 Expense.id,
-                Expense.description,
+                Expense.comment,
                 Expense.amount,
                 Expense.request_date,
                 Expense.payment_date,
@@ -73,7 +73,7 @@ class AIForecastService:
         return [
             {
                 "id": exp.id,
-                "description": exp.description,
+                "description": exp.comment or "Без комментария",
                 "amount": float(exp.amount),
                 "request_date": exp.request_date.isoformat() if exp.request_date else None,
                 "payment_date": exp.payment_date.isoformat() if exp.payment_date else None,
@@ -160,44 +160,78 @@ class AIForecastService:
         """
         category_context = f" для категории '{category_name}'" if category_name else ""
 
-        # Format recent expenses for context
-        recent_expenses = historical_data[-10:]  # Last 10 expenses
-        expenses_text = "\n".join(
-            [
-                f"- {exp['request_date']}: {exp['description']} - {exp['amount']:,.0f} ₽ ({exp['category']})"
-                for exp in recent_expenses
-            ]
-        )
-
-        # Format monthly statistics
+        # Format ALL monthly statistics (not just last 6)
         monthly_text = "\n".join(
             [
                 f"- {m['year']}-{m['month']:02d}: {m['count']} расходов, сумма {m['total']:,.0f} ₽, средний {m['average']:,.0f} ₽"
-                for m in statistics["monthly_data"][-6:]  # Last 6 months
+                for m in statistics["monthly_data"]
+            ]
+        )
+
+        # Find same month in previous year for seasonality analysis
+        same_month_last_year = None
+        for m in statistics["monthly_data"]:
+            if m['month'] == month and m['year'] == year - 1:
+                same_month_last_year = m
+                break
+
+        seasonality_text = ""
+        if same_month_last_year:
+            seasonality_text = f"\nДанные за {month:02d}.{year-1} (прошлый год, тот же месяц): {same_month_last_year['count']} расходов, сумма {same_month_last_year['total']:,.0f} ₽"
+
+        # Calculate trend (comparing last 3 months vs previous 3 months)
+        trend_text = ""
+        if len(statistics["monthly_data"]) >= 6:
+            recent_3 = statistics["monthly_data"][-3:]
+            previous_3 = statistics["monthly_data"][-6:-3]
+            recent_avg = sum(m['total'] for m in recent_3) / 3
+            previous_avg = sum(m['total'] for m in previous_3) / 3
+
+            if previous_avg > 0:
+                trend_percent = ((recent_avg - previous_avg) / previous_avg) * 100
+                trend_direction = "рост" if trend_percent > 0 else "снижение"
+                trend_text = f"\nТренд: {trend_direction} на {abs(trend_percent):.1f}% (последние 3 месяца vs предыдущие 3)"
+
+        # Group expenses by category for better context
+        category_breakdown = {}
+        for exp in historical_data:
+            cat = exp.get('category', 'Без категории')
+            if cat not in category_breakdown:
+                category_breakdown[cat] = {'count': 0, 'total': 0}
+            category_breakdown[cat]['count'] += 1
+            category_breakdown[cat]['total'] += exp['amount']
+
+        category_text = "\n".join(
+            [
+                f"- {cat}: {data['count']} расходов, {data['total']:,.0f} ₽"
+                for cat, data in sorted(category_breakdown.items(), key=lambda x: x[1]['total'], reverse=True)[:10]
             ]
         )
 
         prompt = f"""Ты - эксперт по финансовому прогнозированию для IT отдела.
 
-ЗАДАЧА: Сгенерируй прогноз расходов{category_context} на {month:02d}.{year}.
+ЗАДАЧА: Сгенерируй детальный прогноз расходов{category_context} на {month:02d}.{year} на основе исторических данных.
 
-ИСТОРИЧЕСКИЕ ДАННЫЕ:
+📊 ИСТОРИЧЕСКИЕ ДАННЫЕ ЗА ГОД:
 
-Последние расходы:
-{expenses_text}
-
-Помесячная статистика за последние 6 месяцев:
+Помесячная статистика за весь период:
 {monthly_text}
 
 Средний расход в месяц: {statistics['overall_average']:,.0f} ₽
-Всего расходов за год: {statistics['total_expenses']}
+Всего расходов за период: {statistics['total_expenses']}
+{seasonality_text}
+{trend_text}
 
-ИНСТРУКЦИИ:
-1. Проанализируй паттерны расходов (сезонность, тренды, частота)
-2. Учти типичные категории расходов IT отдела
-3. Сгенерируй реалистичный прогноз на {month:02d}.{year}
-4. Предложи 3-5 конкретных статей расходов с суммами
-5. Дай краткое обоснование каждой статьи
+Топ категорий расходов:
+{category_text}
+
+📋 ИНСТРУКЦИИ:
+1. ОБЯЗАТЕЛЬНО проанализируй месячную динамику выше - есть ли рост, падение или стабильность
+2. ОБЯЗАТЕЛЬНО учти данные за {month:02d}.{year-1} (если есть) - это показывает сезонность
+3. ОБЯЗАТЕЛЬНО учти текущий тренд последних месяцев
+4. Примени выявленные паттерны к прогнозу на {month:02d}.{year}
+5. Сгенерируй 3-7 конкретных статей расходов с обоснованием каждой
+6. В reasoning для каждой статьи укажи, на основе каких исторических данных сделан прогноз
 
 ФОРМАТ ОТВЕТА (JSON):
 {{
@@ -207,10 +241,10 @@ class AIForecastService:
     {{
       "description": "<описание расхода>",
       "amount": <сумма>,
-      "reasoning": "<обоснование>"
+      "reasoning": "<обоснование на основе исторических данных>"
     }}
   ],
-  "summary": "<краткая сводка прогноза и ключевые факторы>"
+  "summary": "<краткая сводка: учтённые тренды, сезонность и ключевые факторы>"
 }}
 
 Отвечай ТОЛЬКО валидным JSON без дополнительного текста."""
@@ -309,14 +343,26 @@ class AIForecastService:
 
                 # Parse AI response (it should be JSON)
                 import json
+                import re
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.info(f"AI raw response: {ai_content}")
+
+                # Try to extract JSON from markdown code blocks if present
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', ai_content, re.DOTALL)
+                if json_match:
+                    ai_content = json_match.group(1)
+                    logger.info(f"Extracted JSON from markdown: {ai_content}")
 
                 try:
                     forecast_data = json.loads(ai_content)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON parsing error: {e}, content: {ai_content}")
                     # Fallback: use statistical average
                     return {
                         "success": False,
-                        "error": "AI response parsing failed",
+                        "error": f"AI response parsing failed: {str(e)}",
                         "forecast_total": statistics["overall_average"],
                         "confidence": 50,
                         "items": [],

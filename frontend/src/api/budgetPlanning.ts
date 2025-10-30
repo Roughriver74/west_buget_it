@@ -213,6 +213,26 @@ export const versionsApi = {
     )
     return response.data
   },
+
+  /**
+   * Set version as baseline (for analytics comparison)
+   */
+  setAsBaseline: async (versionId: number): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/set-as-baseline`
+    )
+    return response.data
+  },
+
+  /**
+   * Unset version as baseline
+   */
+  unsetBaseline: async (versionId: number): Promise<BudgetVersion> => {
+    const response = await apiClient.delete<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/unset-baseline`
+    )
+    return response.data
+  },
 }
 
 // ============================================================================

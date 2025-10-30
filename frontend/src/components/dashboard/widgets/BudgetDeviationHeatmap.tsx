@@ -3,7 +3,7 @@
  * Heat map showing budget deviations by category and month
  */
 import React, { useMemo } from 'react'
-import { Card, Typography, Tag, Space, Tooltip } from 'antd'
+import { Card, Typography, Space, Tooltip } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/api'
 import LoadingState from '@/components/common/LoadingState'
@@ -44,9 +44,9 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   height = 600,
 }) => {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['plan-vs-actual', year, departmentId],
+    queryKey: ['budget-execution', year, departmentId],
     queryFn: async () => {
-      const response = await apiClient.get('/analytics/plan-vs-actual', {
+      const response = await apiClient.get('/analytics/budget-execution', {
         params: { year, department_id: departmentId },
       })
       return response.data
@@ -115,14 +115,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
 
   return (
     <Card
-      title={
-        <Space>
-          <span>Тепловая карта отклонений</span>
-          {data.baseline_version_name && (
-            <Tag color="blue">Baseline: {data.baseline_version_name}</Tag>
-          )}
-        </Space>
-      }
+      title="Тепловая карта отклонений"
     >
       {/* Legend */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -701,9 +701,9 @@ async def generate_ai_forecast(
                     if default_category:
                         category_id = default_category.id
 
-            # Get default organization
+            # Get default organization (Organization is shared across departments)
             organization = db.query(Organization).filter(
-                Organization.department_id == request.department_id
+                Organization.is_active == True
             ).first()
             organization_id = organization.id if organization else 1  # Fallback to ID 1
 

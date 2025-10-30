@@ -17,14 +17,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRoles
   if (loading) {
     console.log('[ProtectedRoute] Still loading auth...');
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh'
-      }}>
-        <Spin size="large" tip="Loading..." />
-      </div>
+      <Spin size="large" fullscreen tip="Loading..." />
     );
   }
 

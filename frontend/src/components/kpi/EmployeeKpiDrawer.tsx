@@ -122,7 +122,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
                 color={statusColor[achievement.status as keyof typeof statusColor]}
                 style={{ fontSize: 11 }}
               >
-                {achievement.goal?.name || `#${achievement.goal_id}`}
+                Цель #{achievement.goal_id}
               </Tag>
             ))}
           </Space>

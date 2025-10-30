@@ -33,9 +33,9 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
   height = 500,
 }) => {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['plan-vs-actual', year, departmentId],
+    queryKey: ['budget-execution', year, departmentId],
     queryFn: async () => {
-      const response = await apiClient.get('/analytics/plan-vs-actual', {
+      const response = await apiClient.get('/analytics/budget-execution', {
         params: { year, department_id: departmentId },
       })
       return response.data
@@ -103,14 +103,7 @@ const BudgetExecutionProgressWidget: React.FC<BudgetExecutionProgressWidgetProps
 
   return (
     <Card
-      title={
-        <Space>
-          <span>Исполнение бюджета по категориям</span>
-          {data.baseline_version_name && (
-            <Tag color="blue">Baseline: {data.baseline_version_name}</Tag>
-          )}
-        </Space>
-      }
+      title="Исполнение бюджета по категориям"
       extra={
         <Tag color={data.execution_percent > 100 ? 'red' : data.execution_percent > 90 ? 'orange' : 'green'}>
           {data.execution_percent.toFixed(1)}% исполнено

@@ -4,7 +4,18 @@
  */
 import React, { useMemo } from 'react'
 import { Card, Statistic, Row, Col, Typography, Space, Tag } from 'antd'
-import { Column } from '@ant-design/plots'
+import {
+  ResponsiveContainer,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  Legend,
+  Bar,
+  TooltipProps,
+} from 'recharts'
+import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent'
 import { useQuery } from '@tanstack/react-query'
 import { analyticsApi } from '@/api/analytics'
 import LoadingState from '@/components/common/LoadingState'
@@ -27,6 +38,20 @@ interface MonthData {
   actual: number
   remaining: number
   execution_percent: number
+}
+
+type CategoryKey = 'plan' | 'actual'
+
+interface ChartDatum {
+  month: string
+  monthNumber: number
+  plan: number
+  actual: number
+}
+
+const CATEGORY_CONFIG: Record<CategoryKey, { label: string; color: string }> = {
+  plan: { label: 'План', color: '#1890ff' },
+  actual: { label: 'Факт', color: '#fa8c16' },
 }
 
 const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
@@ -68,72 +93,84 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
   }, [data])
 
   // Prepare chart data
-  const chartData = useMemo(() => {
+  const chartData = useMemo<ChartDatum[]>(() => {
     if (!data?.months) return []
 
     // Transform to format expected by stacked column chart
-    return data.months.flatMap((m: MonthData) => [
-      {
-        month: m.month_name,
-        category: 'План',
-        amount: m.planned,
-        monthNumber: m.month,
-      },
-      {
-        month: m.month_name,
-        category: 'Факт',
-        amount: m.actual,
-        monthNumber: m.month,
-      },
-    ])
+    const months = [...data.months].sort((a, b) => a.month - b.month)
+
+    return months.map((m: MonthData) => ({
+      month: m.month_name,
+      monthNumber: m.month,
+      plan: m.planned ?? 0,
+      actual: m.actual ?? 0,
+    }))
   }, [data])
 
-  const chartConfig = {
-    data: chartData,
-    xField: 'month',
-    yField: 'amount',
-    seriesField: 'category',
-    isGroup: true,
-    columnStyle: {
-      radius: [4, 4, 0, 0],
-    },
-    color: ['#1890ff', '#fa8c16'],
-    legend: {
-      position: 'top' as const,
-    },
-    tooltip: {
-      formatter: (datum: any) => {
-        return {
-          name: datum.category,
-          value: new Intl.NumberFormat('ru-RU', {
-            style: 'currency',
-            currency: 'RUB',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          }).format(datum.amount),
-        }
-      },
-    },
-    xAxis: {
-      label: {
-        autoRotate: false,
-      },
-    },
-    yAxis: {
-      label: {
-        formatter: (v: string) => {
-          const num = parseFloat(v)
-          if (num >= 1000000) {
-            return `${(num / 1000000).toFixed(1)}M`
-          }
-          if (num >= 1000) {
-            return `${(num / 1000).toFixed(0)}K`
-          }
-          return v
-        },
-      },
-    },
-    height,
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
+    []
+  )
+
+  const formatAxisLabel = (value: number) => {
+    if (value >= 1_000_000) {
+      return `${(value / 1_000_000).toFixed(1)}M`
+    }
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(0)}K`
+    }
+    return value
+  }
+
+  const renderLegendText = (value: string) => {
+    const key = value as CategoryKey
+    return CATEGORY_CONFIG[key]?.label ?? value
+  }
+
+  const CustomTooltip: React.FC<TooltipProps<ValueType, NameType>> = ({ active, label, payload }) => {
+    if (!active || !payload || payload.length === 0) {
+      return null
+    }
+
+    return (
+      <div
+        style={{
+          background: 'rgba(255, 255, 255, 0.95)',
+          border: '1px solid #f0f0f0',
+          borderRadius: 8,
+          padding: '12px 16px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>{label}</div>
+        {payload.map((entry) => {
+          const key = entry.dataKey as CategoryKey
+          const config = CATEGORY_CONFIG[key]
+          return (
+            <div key={entry.dataKey as string} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <span
+                style={{
+                  backgroundColor: config?.color ?? '#1890ff',
+                  width: 10,
+                  height: 10,
+                  display: 'inline-block',
+                  borderRadius: 2,
+                  marginRight: 8,
+                }}
+              />
+              <span style={{ flex: 1 }}>{config?.label ?? entry.name}</span>
+              <strong>{currencyFormatter.format(Number(entry.value))}</strong>
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -247,7 +284,34 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
         </Space>
       )}
 
-      <Column {...chartConfig} />
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 8 }} barGap={12}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+          <XAxis dataKey="month" tickLine={false} axisLine={{ stroke: '#d9d9d9' }} />
+          <YAxis
+            tickLine={false}
+            axisLine={{ stroke: '#d9d9d9' }}
+            tickFormatter={(value: number) => formatAxisLabel(value).toString()}
+            width={80}
+          />
+          <RechartsTooltip content={<CustomTooltip />} />
+          <Legend formatter={renderLegendText} />
+          <Bar
+            dataKey="plan"
+            name="plan"
+            fill={CATEGORY_CONFIG.plan.color}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={40}
+          />
+          <Bar
+            dataKey="actual"
+            name="actual"
+            fill={CATEGORY_CONFIG.actual.color}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={40}
+          />
+        </BarChart>
+      </ResponsiveContainer>
     </Card>
   )
 }
