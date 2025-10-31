@@ -32,6 +32,10 @@ import KPIAnalyticsPage from './pages/KPIAnalyticsPage'
 import BudgetPlanningPage from './pages/BudgetPlanningPage'
 import PayrollActualsPage from './pages/PayrollActualsPage'
 import NDFLCalculatorPage from './pages/NDFLCalculatorPage'
+import RevenueDashboardPage from './pages/RevenueDashboardPage'
+import RevenueStreamsPage from './pages/RevenueStreamsPage'
+import RevenueCategoriesPage from './pages/RevenueCategoriesPage'
+import RevenueActualsPage from './pages/RevenueActualsPage'
 
 function App() {
   return (
@@ -204,6 +208,12 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
+
+                    {/* Revenue - all authenticated users */}
+                    <Route path="/revenue/dashboard" element={<RevenueDashboardPage />} />
+                    <Route path="/revenue/streams" element={<RevenueStreamsPage />} />
+                    <Route path="/revenue/categories" element={<RevenueCategoriesPage />} />
+                    <Route path="/revenue/actuals" element={<RevenueActualsPage />} />
 
                     {/* Analytics - all authenticated users */}
                     <Route path="/analytics" element={<AnalyticsPage />} />
