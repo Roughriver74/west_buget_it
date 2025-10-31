@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
 import time
 import logging
 
@@ -47,7 +48,59 @@ if settings.ENABLE_PROMETHEUS:
     Instrumentator().instrument(app).expose(app)
     log_info("Prometheus metrics exposed at /metrics", "Startup")
 
-# Configure CORS
+
+# ============================================
+# CRITICAL: Preflight OPTIONS Handler
+# ============================================
+# This middleware MUST be added FIRST (before CORS, security headers, rate limiting)
+# to handle OPTIONS requests immediately without going through other middleware.
+# This fixes 503 errors on CORS preflight when backend is behind Traefik.
+class OptionsMiddleware(BaseHTTPMiddleware):
+    """
+    Handle OPTIONS requests (CORS preflight) immediately.
+
+    This prevents OPTIONS from being blocked by rate limiting or other middleware
+    that might cause 503 errors when Traefik tries to forward preflight requests.
+    """
+    async def dispatch(self, request: Request, call_next):
+        # Handle OPTIONS request immediately
+        if request.method == "OPTIONS":
+            # Get origin from request
+            origin = request.headers.get("origin", "")
+
+            # Check if origin is allowed
+            allowed = False
+            for allowed_origin in settings.CORS_ORIGINS:
+                if origin == allowed_origin or allowed_origin == "*":
+                    allowed = True
+                    break
+
+            # Return preflight response
+            headers = {
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+                "Access-Control-Max-Age": "3600",
+            }
+
+            if allowed:
+                headers["Access-Control-Allow-Origin"] = origin
+                headers["Access-Control-Allow-Credentials"] = "true"
+
+            return Response(
+                status_code=200,
+                headers=headers,
+                content=""
+            )
+
+        # For non-OPTIONS requests, proceed normally
+        return await call_next(request)
+
+
+# Add OPTIONS middleware FIRST
+app.add_middleware(OptionsMiddleware)
+log_info("OPTIONS preflight middleware enabled (handles CORS preflight immediately)", "Startup")
+
+# Configure CORS (this will handle actual requests, not preflight)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
