@@ -143,6 +143,51 @@ from .budget_validation import (
     CategoryBudgetAlert,
     BudgetStatusResponse,
 )
+from .revenue_stream import (
+    RevenueStreamCreate,
+    RevenueStreamUpdate,
+    RevenueStreamInDB,
+    RevenueStreamTree,
+)
+from .revenue_category import (
+    RevenueCategoryCreate,
+    RevenueCategoryUpdate,
+    RevenueCategoryInDB,
+    RevenueCategoryTree,
+)
+from .revenue_plan import (
+    RevenuePlanCreate,
+    RevenuePlanUpdate,
+    RevenuePlanInDB,
+    RevenuePlanVersionCreate,
+    RevenuePlanVersionUpdate,
+    RevenuePlanVersionInDB,
+    RevenuePlanDetailCreate,
+    RevenuePlanDetailUpdate,
+    RevenuePlanDetailInDB,
+    RevenuePlanDetailBulkUpdate,
+)
+from .revenue_actual import (
+    RevenueActualCreate,
+    RevenueActualUpdate,
+    RevenueActualInDB,
+    RevenueActualWithPlan,
+)
+from .customer_metrics import (
+    CustomerMetricsCreate,
+    CustomerMetricsUpdate,
+    CustomerMetricsInDB,
+)
+from .seasonality import (
+    SeasonalityCoefficientCreate,
+    SeasonalityCoefficientUpdate,
+    SeasonalityCoefficientInDB,
+)
+from .revenue_forecast import (
+    RevenueForecastCreate,
+    RevenueForecastUpdate,
+    RevenueForecastInDB,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -150,6 +195,8 @@ ExpenseList.model_rebuild()
 EmployeeWithSalaryHistory.model_rebuild()
 EmployeeKPIWithGoals.model_rebuild()
 EmployeeKPIGoalWithDetails.model_rebuild()
+RevenueStreamTree.model_rebuild()
+RevenueCategoryTree.model_rebuild()
 
 __all__ = [
     # Expense
@@ -299,4 +346,42 @@ __all__ = [
     "ExpenseValidationResponse",
     "CategoryBudgetAlert",
     "BudgetStatusResponse",
+    # Revenue Stream
+    "RevenueStreamCreate",
+    "RevenueStreamUpdate",
+    "RevenueStreamInDB",
+    "RevenueStreamTree",
+    # Revenue Category
+    "RevenueCategoryCreate",
+    "RevenueCategoryUpdate",
+    "RevenueCategoryInDB",
+    "RevenueCategoryTree",
+    # Revenue Plan
+    "RevenuePlanCreate",
+    "RevenuePlanUpdate",
+    "RevenuePlanInDB",
+    "RevenuePlanVersionCreate",
+    "RevenuePlanVersionUpdate",
+    "RevenuePlanVersionInDB",
+    "RevenuePlanDetailCreate",
+    "RevenuePlanDetailUpdate",
+    "RevenuePlanDetailInDB",
+    "RevenuePlanDetailBulkUpdate",
+    # Revenue Actual
+    "RevenueActualCreate",
+    "RevenueActualUpdate",
+    "RevenueActualInDB",
+    "RevenueActualWithPlan",
+    # Customer Metrics
+    "CustomerMetricsCreate",
+    "CustomerMetricsUpdate",
+    "CustomerMetricsInDB",
+    # Seasonality
+    "SeasonalityCoefficientCreate",
+    "SeasonalityCoefficientUpdate",
+    "SeasonalityCoefficientInDB",
+    # Revenue Forecast
+    "RevenueForecastCreate",
+    "RevenueForecastUpdate",
+    "RevenueForecastInDB",
 ]
