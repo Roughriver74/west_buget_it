@@ -1,0 +1,67 @@
+========================================
+САЙТ НЕ РАБОТАЕТ - СРОЧНОЕ ИСПРАВЛЕНИЕ
+========================================
+
+На сервере выполните ЭТИ КОМАНДЫ ПО ПОРЯДКУ:
+
+1. Подключитесь к серверу:
+   ssh root@93.189.228.52
+
+2. Перейдите в директорию проекта:
+   cd /path/to/your/project
+
+3. Запустите быструю диагностику:
+   chmod +x quick_check.sh
+   ./quick_check.sh
+
+   ↓ Скрипт покажет ЧТО ИМЕННО не работает ↓
+
+4. САМОЕ ЧАСТОЕ - контейнеры не запущены:
+   docker-compose -f docker-compose.prod.yml ps
+
+   Если видите "Exited" или контейнеров нет:
+   docker-compose -f docker-compose.prod.yml up -d
+
+5. Проверить статус:
+   docker-compose -f docker-compose.prod.yml ps
+
+   Все должны быть "Up" и "healthy"
+
+6. Проверить API:
+   curl https://api.budget-west.shknv.ru/health
+
+   Должен вернуть: {"status":"healthy"}
+
+7. Если API не отвечает - проверить логи:
+   docker-compose -f docker-compose.prod.yml logs backend --tail=50
+
+8. Если видите ошибки - отправьте мне:
+   ./quick_check.sh > diagnostic.txt
+   (отправьте файл diagnostic.txt)
+
+========================================
+ВАЖНО: Применили ли вы мои изменения?
+========================================
+
+Проверьте:
+   git log --oneline -3
+
+Должны увидеть коммиты про "Traefik CORS"
+
+Если НЕТ - получите изменения:
+   git pull origin claude/fix-login-preflight-error-011CUf7ZUKWBMJkHRvpy7bKf
+   docker-compose -f docker-compose.prod.yml build --no-cache backend
+   docker-compose -f docker-compose.prod.yml up -d --force-recreate backend frontend
+
+========================================
+Если ничего не помогает - ПОЛНЫЙ ПЕРЕЗАПУСК:
+========================================
+
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml build --no-cache
+docker-compose -f docker-compose.prod.yml up -d
+sleep 120
+docker-compose -f docker-compose.prod.yml ps
+curl https://api.budget-west.shknv.ru/health
+
+========================================
