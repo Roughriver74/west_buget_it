@@ -17,6 +17,8 @@ import {
   IdcardOutlined,
   ProjectOutlined,
   MenuOutlined,
+  RiseOutlined,
+  DollarCircleOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import DepartmentSelector from './DepartmentSelector'
@@ -103,6 +105,33 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/budget/plan',
 					icon: <DollarOutlined />,
 					label: <Link to='/budget/plan'>Год в целом</Link>,
+				},
+			],
+		},
+		{
+			key: 'revenue-submenu',
+			icon: <RiseOutlined />,
+			label: 'Доходы',
+			children: [
+				{
+					key: '/revenue/dashboard',
+					icon: <DashboardOutlined />,
+					label: <Link to='/revenue/dashboard'>Дашборд</Link>,
+				},
+				{
+					key: '/revenue/streams',
+					icon: <FundOutlined />,
+					label: <Link to='/revenue/streams'>Потоки доходов</Link>,
+				},
+				{
+					key: '/revenue/categories',
+					icon: <DatabaseOutlined />,
+					label: <Link to='/revenue/categories'>Категории доходов</Link>,
+				},
+				{
+					key: '/revenue/actuals',
+					icon: <DollarCircleOutlined />,
+					label: <Link to='/revenue/actuals'>Фактические доходы</Link>,
 				},
 			],
 		},

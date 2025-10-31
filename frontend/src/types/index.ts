@@ -220,3 +220,6 @@ export interface DashboardConfig {
 export type PaymentForecast = components['schemas']['PaymentForecast']
 
 export type ForecastSummary = components['schemas']['ForecastSummary']
+
+// Revenue module types
+export * from './revenue'
