@@ -99,13 +99,33 @@ services:
     labels:
       # Traefik configuration for Coolify
       - "traefik.enable=true"
+
+      # Define service and port
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
+
+      # HTTPS Router configuration
+      - "traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN:-api.budget-west.shknv.ru}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.service=backend"
+      - "traefik.http.routers.backend.middlewares=backend-cors"
+
+      # HTTP to HTTPS redirect router
+      - "traefik.http.routers.backend-http.rule=Host(`${BACKEND_DOMAIN:-api.budget-west.shknv.ru}`)"
+      - "traefik.http.routers.backend-http.entrypoints=web"
+      - "traefik.http.routers.backend-http.middlewares=redirect-to-https"
+
       # CORS middleware for preflight requests
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://budget-west.shknv.ru"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-https://budget-west.shknv.ru}"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
       - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=3600"
+
+      # HTTPS redirect middleware
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
   # Frontend
   frontend:
@@ -124,7 +144,7 @@ services:
     networks:
       - budget_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -132,7 +152,21 @@ services:
     labels:
       # Traefik configuration for Coolify
       - "traefik.enable=true"
+
+      # Define service and port
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+      # HTTPS Router configuration
+      - "traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN:-budget-west.shknv.ru}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend.service=frontend"
+
+      # HTTP to HTTPS redirect router
+      - "traefik.http.routers.frontend-http.rule=Host(`${FRONTEND_DOMAIN:-budget-west.shknv.ru}`)"
+      - "traefik.http.routers.frontend-http.entrypoints=web"
+      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
 
 volumes:
   postgres_data:
