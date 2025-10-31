@@ -110,19 +110,31 @@ services:
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend.service=backend"
-      - "traefik.http.routers.backend.middlewares=backend-cors"
+      # REMOVED: backend-cors middleware - FastAPI handles CORS including OPTIONS preflight
+      # Traefik headers middleware doesn't properly create OPTIONS responses, only adds headers
+      # - "traefik.http.routers.backend.middlewares=backend-cors"
 
       # HTTP to HTTPS redirect router
       - "traefik.http.routers.backend-http.rule=Host(`${SERVICE_FQDN_BACKEND:-${BACKEND_DOMAIN:-api.budget-west.shknv.ru}}`)"
       - "traefik.http.routers.backend-http.entrypoints=web"
       - "traefik.http.routers.backend-http.middlewares=redirect-to-https"
 
-      # CORS middleware for preflight requests
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://${SERVICE_FQDN_FRONTEND:-${FRONTEND_DOMAIN:-budget-west.shknv.ru}}"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=3600"
+      # REMOVED: CORS middleware for preflight requests
+      # Traefik headers middleware only adds headers to existing responses.
+      # It DOES NOT create responses for OPTIONS requests!
+      #
+      # FastAPI CORSMiddleware properly handles:
+      # - OPTIONS preflight requests (creates 200 responses)
+      # - Access-Control-* headers (adds correct headers)
+      # - Origin validation (checks against CORS_ORIGINS)
+      # - Credentials support (allows cookies/auth)
+      #
+      # Old config (removed to fix 503 errors):
+      # - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS,PATCH"
+      # - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://${SERVICE_FQDN_FRONTEND:-${FRONTEND_DOMAIN:-budget-west.shknv.ru}}"
+      # - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization,X-Requested-With"
+      # - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowcredentials=true"
+      # - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=3600"
 
       # HTTPS redirect middleware
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
