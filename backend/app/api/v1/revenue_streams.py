@@ -125,7 +125,7 @@ def get_revenue_streams(
         [RevenueStreamInDB.model_validate(stream) for stream in streams],
     )
 
-    log_info(f"Retrieved {len(streams)} revenue streams", user_id=current_user.id)
+    log_info(f"Retrieved {len(streams)} revenue streams", context=f"User {current_user.id}")
     return streams
 
 
@@ -176,7 +176,7 @@ def get_revenue_streams_tree(
         )
 
     tree = [build_tree(stream) for stream in root_streams]
-    log_info(f"Retrieved revenue streams tree with {len(tree)} root nodes", user_id=current_user.id)
+    log_info(f"Retrieved revenue streams tree with {len(tree)} root nodes", context=f"User {current_user.id}")
     return tree
 
 
@@ -189,7 +189,7 @@ def get_revenue_stream(
     """Get a specific revenue stream by ID"""
     stream = check_department_access(db, stream_id, current_user)
 
-    log_info(f"Retrieved revenue stream {stream_id}", user_id=current_user.id)
+    log_info(f"Retrieved revenue stream {stream_id}", context=f"User {current_user.id}")
     return RevenueStreamInDB.model_validate(stream)
 
 
@@ -256,7 +256,7 @@ def create_revenue_stream(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Created revenue stream {db_stream.id}: {db_stream.name}", user_id=current_user.id)
+    log_info(f"Created revenue stream {db_stream.id}: {db_stream.name}", context=f"User {current_user.id}")
     return RevenueStreamInDB.model_validate(db_stream)
 
 
@@ -308,7 +308,7 @@ def update_revenue_stream(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Updated revenue stream {stream_id}", user_id=current_user.id)
+    log_info(f"Updated revenue stream {stream_id}", context=f"User {current_user.id}")
     return RevenueStreamInDB.model_validate(db_stream)
 
 
@@ -342,7 +342,7 @@ def delete_revenue_stream(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Deleted revenue stream {stream_id}", user_id=current_user.id)
+    log_info(f"Deleted revenue stream {stream_id}", context=f"User {current_user.id}")
     return None
 
 
@@ -384,7 +384,7 @@ def bulk_update_revenue_streams(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Bulk updated {len(streams)} revenue streams", user_id=current_user.id)
+    log_info(f"Bulk updated {len(streams)} revenue streams", context=f"User {current_user.id}")
     return [RevenueStreamInDB.model_validate(stream) for stream in streams]
 
 
@@ -422,5 +422,5 @@ def bulk_delete_revenue_streams(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Bulk deleted {len(streams)} revenue streams", user_id=current_user.id)
+    log_info(f"Bulk deleted {len(streams)} revenue streams", context=f"User {current_user.id}")
     return None

@@ -83,7 +83,7 @@ def get_revenue_actuals(
         RevenueActual.month.desc()
     ).offset(skip).limit(limit).all()
 
-    log_info(f"Retrieved {len(actuals)} revenue actuals", user_id=current_user.id)
+    log_info(f"Retrieved {len(actuals)} revenue actuals", context=f"User {current_user.id}")
     return actuals
 
 
@@ -95,7 +95,7 @@ def get_revenue_actual(
 ):
     """Get a specific revenue actual by ID"""
     actual = check_department_access(db, actual_id, current_user)
-    log_info(f"Retrieved revenue actual {actual_id}", user_id=current_user.id)
+    log_info(f"Retrieved revenue actual {actual_id}", context=f"User {current_user.id}")
     return RevenueActualInDB.model_validate(actual)
 
 
@@ -141,7 +141,7 @@ def create_revenue_actual(
 
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Created revenue actual {db_actual.id} for {db_actual.year}-{db_actual.month:02d}", user_id=current_user.id)
+    log_info(f"Created revenue actual {db_actual.id} for {db_actual.year}-{db_actual.month:02d}", context=f"User {current_user.id}")
     return RevenueActualInDB.model_validate(db_actual)
 
 
@@ -171,7 +171,7 @@ def update_revenue_actual(
 
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Updated revenue actual {actual_id}", user_id=current_user.id)
+    log_info(f"Updated revenue actual {actual_id}", context=f"User {current_user.id}")
     return RevenueActualInDB.model_validate(db_actual)
 
 
@@ -189,5 +189,5 @@ def delete_revenue_actual(
 
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Deleted revenue actual {actual_id}", user_id=current_user.id)
+    log_info(f"Deleted revenue actual {actual_id}", context=f"User {current_user.id}")
     return None

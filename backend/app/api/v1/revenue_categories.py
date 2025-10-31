@@ -124,7 +124,7 @@ def get_revenue_categories(
         [RevenueCategoryInDB.model_validate(cat) for cat in categories],
     )
 
-    log_info(f"Retrieved {len(categories)} revenue categories", user_id=current_user.id)
+    log_info(f"Retrieved {len(categories)} revenue categories", context=f"User {current_user.id}")
     return categories
 
 
@@ -175,7 +175,7 @@ def get_revenue_categories_tree(
         )
 
     tree = [build_tree(cat) for cat in root_categories]
-    log_info(f"Retrieved revenue categories tree with {len(tree)} root nodes", user_id=current_user.id)
+    log_info(f"Retrieved revenue categories tree with {len(tree)} root nodes", context=f"User {current_user.id}")
     return tree
 
 
@@ -188,7 +188,7 @@ def get_revenue_category(
     """Get a specific revenue category by ID"""
     category = check_department_access(db, category_id, current_user)
 
-    log_info(f"Retrieved revenue category {category_id}", user_id=current_user.id)
+    log_info(f"Retrieved revenue category {category_id}", context=f"User {current_user.id}")
     return RevenueCategoryInDB.model_validate(category)
 
 
@@ -254,7 +254,7 @@ def create_revenue_category(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Created revenue category {db_category.id}: {db_category.name}", user_id=current_user.id)
+    log_info(f"Created revenue category {db_category.id}: {db_category.name}", context=f"User {current_user.id}")
     return RevenueCategoryInDB.model_validate(db_category)
 
 
@@ -305,7 +305,7 @@ def update_revenue_category(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Updated revenue category {category_id}", user_id=current_user.id)
+    log_info(f"Updated revenue category {category_id}", context=f"User {current_user.id}")
     return RevenueCategoryInDB.model_validate(db_category)
 
 
@@ -339,7 +339,7 @@ def delete_revenue_category(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Deleted revenue category {category_id}", user_id=current_user.id)
+    log_info(f"Deleted revenue category {category_id}", context=f"User {current_user.id}")
     return None
 
 
@@ -385,7 +385,7 @@ def bulk_update_revenue_categories(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Bulk updated {len(categories)} revenue categories", user_id=current_user.id)
+    log_info(f"Bulk updated {len(categories)} revenue categories", context=f"User {current_user.id}")
     return [RevenueCategoryInDB.model_validate(cat) for cat in categories]
 
 
@@ -423,5 +423,5 @@ def bulk_delete_revenue_categories(
     # Invalidate cache
     cache_service.clear_namespace(CACHE_NAMESPACE)
 
-    log_info(f"Bulk deleted {len(categories)} revenue categories", user_id=current_user.id)
+    log_info(f"Bulk deleted {len(categories)} revenue categories", context=f"User {current_user.id}")
     return None
