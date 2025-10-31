@@ -108,8 +108,9 @@ export const useDeleteScenario = () => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.scenarios() })
       message.success('Сценарий успешно удален')
     },
-    onError: () => {
-      message.error('Ошибка при удалении сценария')
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || 'Ошибка при удалении сценария'
+      message.error(errorMessage)
     },
   })
 }
@@ -192,8 +193,9 @@ export const useDeleteVersion = () => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
       message.success('Версия бюджета удалена')
     },
-    onError: () => {
-      message.error('Ошибка при удалении версии')
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || 'Ошибка при удалении версии'
+      message.error(errorMessage)
     },
   })
 }
@@ -228,6 +230,25 @@ export const useApproveVersion = () => {
     },
     onError: () => {
       message.error('Ошибка при утверждении версии')
+    },
+  })
+}
+
+export const useApplyVersionToPlan = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => versionsApi.applyToPlan(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.version(id) })
+      // Also invalidate budget plans cache if it exists
+      queryClient.invalidateQueries({ queryKey: ['budgetPlans'] })
+      message.success('Бюджет успешно применен к плану')
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || 'Ошибка при применении бюджета к плану'
+      message.error(errorMessage)
     },
   })
 }
@@ -288,6 +309,7 @@ export const useCreatePlanDetail = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.planDetails(data.version_id) })
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versionWithDetails(data.version_id) })
       invalidateBaselineCache(typeof data.category_id === 'number' ? data.category_id : undefined)
       message.success('Строка бюджета добавлена')
     },
@@ -306,6 +328,7 @@ export const useUpdatePlanDetail = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.planDetails(data.version_id) })
       queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versionWithDetails(data.version_id) })
       invalidateBaselineCache(typeof data.category_id === 'number' ? data.category_id : undefined)
       message.success('Строка бюджета обновлена')
     },

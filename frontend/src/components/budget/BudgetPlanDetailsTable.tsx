@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag } from 'antd'
-import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined } from '@ant-design/icons'
+import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined } from '@ant-design/icons'
 import { LoadBaselineModal } from './LoadBaselineModal'
 import { ManageCategoriesModal } from './ManageCategoriesModal'
 import type { ColumnsType } from 'antd/es/table'
@@ -101,9 +101,13 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
   const isInitialMount = useRef(true)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   // Risk premium state
   const [riskEnabled, setRiskEnabled] = useState<boolean>(false)
+
+  // Sticky state
+  const [isSticky, setIsSticky] = useState<boolean>(false)
 
   // Load baseline modal state
   const [baselineModalOpen, setBaselineModalOpen] = useState<boolean>(false)
@@ -393,20 +397,33 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   const columnTotals = useMemo(() => {
     const totals = new Map<number, number>()
     MONTHS.forEach((month) => {
-      const total = data
+      let total = data
         .filter((row) => !row.hasChildren)
         .reduce((sum, row) => sum + Number(row[`month_${month.key}`] || 0), 0)
+
+      // Apply 10% risk premium if enabled
+      if (riskEnabled) {
+        total = total * 1.1
+      }
+
       totals.set(month.key, total)
     })
     return totals
-  }, [data])
+  }, [data, riskEnabled])
 
   // Calculate grand total (memoized)
   const grandTotal = useMemo(() => {
-    return data
+    let total = data
       .filter((row) => !row.hasChildren)
       .reduce((sum, row) => sum + getRowTotal(row), 0)
-  }, [data, getRowTotal])
+
+    // Apply 10% risk premium if enabled
+    if (riskEnabled) {
+      total = total * 1.1
+    }
+
+    return total
+  }, [data, getRowTotal, riskEnabled])
 
   // Scroll functions (similar to BudgetPlanTable)
   const resolveScrollTarget = useCallback(() => {
@@ -498,6 +515,31 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
     return () => clearTimeout(timer)
   }, [activeMonth, planDetails, scrollToMonth])
+
+  // IntersectionObserver for sticky behavior
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // When sentinel top crosses the sticky position threshold, make panel sticky
+        // entry.boundingClientRect.top <= STICKY_HEADER_OFFSET means we've scrolled past it
+        setIsSticky(entry.boundingClientRect.top <= STICKY_HEADER_OFFSET)
+      },
+      {
+        threshold: [0, 1],
+        // Check when sentinel crosses the sticky threshold (64px from top)
+        rootMargin: '0px 0px 0px 0px',
+      }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   const columns: ColumnsType<CategoryRow> = [
     {
@@ -617,18 +659,29 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
   return (
     <div>
+      {/* Sentinel element for IntersectionObserver - marks where sticky behavior should activate */}
+      <div
+        ref={sentinelRef}
+        style={{
+          height: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none',
+        }}
+      />
+
       {/* Sticky Control Panel */}
       <div
         style={{
-          position: 'sticky',
-          top: STICKY_HEADER_OFFSET,
-          zIndex: 10,
+          position: isSticky ? 'sticky' : 'relative',
+          top: isSticky ? STICKY_HEADER_OFFSET : undefined,
+          zIndex: isSticky ? 10 : 1,
           backgroundColor: '#fff',
-          paddingTop: 12,
+          paddingTop: 1,
           paddingBottom: 12,
-          marginBottom: 0,
+          marginTop: isSticky ? 0 : 60,
+          marginBottom: isSticky ? 16 : 0,
           borderBottom: '2px solid #f0f0f0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          boxShadow: isSticky ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
         }}
       >
         <div
@@ -643,13 +696,25 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         >
           <Space size="middle" align="center" wrap>
             <span style={{ fontWeight: 500 }}>Месяц:</span>
-            <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
-              <Segmented
-                options={MONTH_SEGMENT_OPTIONS}
-                value={activeMonth}
-                onChange={(value) => handleMonthSelect(Number(value))}
+            <Space.Compact>
+              <Button
+                icon={<LeftOutlined />}
+                onClick={() => scrollBy('left')}
+                title="Прокрутить влево"
               />
-            </div>
+              <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
+                <Segmented
+                  options={MONTH_SEGMENT_OPTIONS}
+                  value={activeMonth}
+                  onChange={(value) => handleMonthSelect(Number(value))}
+                />
+              </div>
+              <Button
+                icon={<RightOutlined />}
+                onClick={() => scrollBy('right')}
+                title="Прокрутить вправо"
+              />
+            </Space.Compact>
           </Space>
 
           <Space size="middle">

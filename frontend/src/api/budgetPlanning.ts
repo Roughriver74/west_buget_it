@@ -182,6 +182,16 @@ export const versionsApi = {
   },
 
   /**
+   * Apply APPROVED version to budget plan table
+   */
+  applyToPlan: async (versionId: number): Promise<BudgetVersion> => {
+    const response = await apiClient.post<BudgetVersion>(
+      `${BASE_PATH}/versions/${versionId}/apply-to-plan`
+    )
+    return response.data
+  },
+
+  /**
    * Reject a submitted version (SUBMITTED -> REJECTED)
    */
   reject: async (versionId: number, comments: string): Promise<BudgetVersion> => {

@@ -9,8 +9,8 @@ import { useBudgetVersionWithDetails } from '@/hooks/useBudgetPlanning'
 import { BudgetVersionStatus, ExpenseType } from '@/types/budgetPlanning'
 import { BudgetVersionStatusBadge } from './BudgetVersionStatusBadge'
 import { BudgetPlanDetailsTable } from './BudgetPlanDetailsTable'
-import { BudgetVersionActions } from './BudgetVersionActions'
-import { BudgetApprovalTimeline } from './BudgetApprovalTimeline'
+import { PayrollSummaryCard } from './PayrollSummaryCard'
+import type { PayrollYearlySummary } from '@/types/budgetPlanning'
 
 const { Text } = Typography
 
@@ -104,26 +104,17 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          {/* Header Section - Fixed */}
+          {/* Compact Header Section */}
           <div style={{ flexShrink: 0, marginBottom: 16 }}>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="Название" span={2}>
-                {version.version_name || `Версия ${version.version_number}`}
-              </Descriptions.Item>
+            <Descriptions bordered size="small" column={3}>
               <Descriptions.Item label="Статус">
                 <BudgetVersionStatusBadge status={version.status} />
               </Descriptions.Item>
-              <Descriptions.Item label="Сценарий">
-                {version.scenario?.scenario_name || '—'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Создана">
-                {new Date(version.created_at).toLocaleString('ru-RU')}
-              </Descriptions.Item>
-              <Descriptions.Item label="Автор">
-                {version.created_by || '—'}
-              </Descriptions.Item>
               <Descriptions.Item label="Сумма, ₽">
                 {currencyFormatter.format(Number(version.total_amount || 0))}
+              </Descriptions.Item>
+              <Descriptions.Item label="Сценарий">
+                {version.scenario?.scenario_name || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="CAPEX, ₽">
                 {currencyFormatter.format(Number(version.total_capex || 0))}
@@ -131,18 +122,18 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
               <Descriptions.Item label="OPEX, ₽">
                 {currencyFormatter.format(Number(version.total_opex || 0))}
               </Descriptions.Item>
-              {version.comments && (
-                <Descriptions.Item label="Комментарии" span={2}>
-                  <Text>{version.comments}</Text>
-                </Descriptions.Item>
-              )}
+              <Descriptions.Item label="Автор">
+                {version.created_by || '—'}
+              </Descriptions.Item>
             </Descriptions>
           </div>
 
-          {/* Actions Section - Fixed */}
-          <div style={{ flexShrink: 0, marginBottom: 16 }}>
-            <BudgetVersionActions version={version} onActionComplete={handleAfterAction} />
-          </div>
+          {/* Payroll Summary - if available */}
+          {version.payroll_summary && (
+            <div style={{ flexShrink: 0, marginBottom: 16 }}>
+              <PayrollSummaryCard payrollSummary={version.payroll_summary as PayrollYearlySummary} />
+            </div>
+          )}
 
           <Divider style={{ margin: '8px 0 16px 0' }} />
 
@@ -206,16 +197,6 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
                 onAfterSave={handleAfterAction}
               />
             </div>
-          </div>
-
-          <Divider style={{ margin: '16px 0' }} />
-
-          {/* Timeline Section - Fixed, scrollable if needed */}
-          <div style={{ flexShrink: 0, maxHeight: '200px', overflow: 'auto' }}>
-            <div style={{ marginBottom: 12 }}>
-              <Text strong>История согласования</Text>
-            </div>
-            <BudgetApprovalTimeline versionId={version.id} />
           </div>
         </div>
       )}

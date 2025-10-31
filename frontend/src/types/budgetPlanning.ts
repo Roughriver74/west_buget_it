@@ -128,10 +128,30 @@ export interface BudgetVersion {
   founder3_approved_at?: string
 }
 
+// Payroll Summary Types for Budget Integration
+export interface PayrollMonthlySummary {
+  month: number // 1-12
+  employee_count: number
+  total_base_salary: NumericValue
+  total_bonuses: NumericValue
+  total_other: NumericValue
+  total_planned: NumericValue
+}
+
+export interface PayrollYearlySummary {
+  year: number
+  total_employees: number
+  total_planned_annual: NumericValue
+  total_base_salary_annual: NumericValue
+  total_bonuses_annual: NumericValue
+  monthly_breakdown: PayrollMonthlySummary[]
+}
+
 export interface BudgetVersionWithDetails extends BudgetVersion {
   plan_details: BudgetPlanDetail[]
   scenario?: BudgetScenario
   approval_logs: BudgetApprovalLog[]
+  payroll_summary?: PayrollYearlySummary
 }
 
 export interface BudgetVersionCreate {

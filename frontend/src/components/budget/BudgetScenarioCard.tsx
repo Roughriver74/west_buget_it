@@ -113,20 +113,6 @@ export const BudgetScenarioCard: React.FC<BudgetScenarioCardProps> = ({
             </Descriptions.Item>
           )}
         </Descriptions>
-
-        {assumptions && Object.keys(assumptions).length > 0 && (
-          <div>
-            <Text strong>Допущения:</Text>
-            <div style={{ marginTop: 8 }}>
-              {Object.entries(assumptions).map(([key, value]) => (
-                <div key={key} style={{ marginLeft: 16 }}>
-                  <Text type="secondary">• {key}: </Text>
-                  <Text>{String(value)}</Text>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </Space>
     </Card>
   )

@@ -59,13 +59,32 @@ router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 def recalculate_version_totals(db: Session, version: BudgetVersion) -> None:
-    """Recalculate cached totals for a budget version."""
+    """Recalculate cached totals for a budget version.
+
+    Only sums leaf categories (categories without children) to avoid double counting.
+    """
+    from sqlalchemy import exists, select
+
+    # Subquery to identify parent categories (categories that have children)
+    parent_categories_subq = (
+        select(BudgetCategory.parent_id)
+        .where(BudgetCategory.parent_id.isnot(None))
+        .distinct()
+        .subquery()
+    )
+
+    # Query totals only for leaf categories (categories NOT in parent list)
     totals = (
         db.query(
             func.coalesce(func.sum(BudgetPlanDetail.planned_amount), 0).label("amount"),
             BudgetPlanDetail.type,
         )
-        .filter(BudgetPlanDetail.version_id == version.id)
+        .join(BudgetCategory, BudgetPlanDetail.category_id == BudgetCategory.id)
+        .filter(
+            BudgetPlanDetail.version_id == version.id,
+            # Exclude parent categories (only include leaf categories)
+            ~BudgetCategory.id.in_(parent_categories_subq)
+        )
         .group_by(BudgetPlanDetail.type)
         .all()
     )
@@ -226,15 +245,20 @@ def delete_scenario(
             detail=f"Scenario with id {scenario_id} not found"
         )
 
-    # Check if scenario is used by any versions
-    versions_count = db.query(BudgetVersion).filter(
-        BudgetVersion.scenario_id == scenario_id
+    # Check if scenario has versions with protected statuses
+    protected_versions = db.query(BudgetVersion).filter(
+        BudgetVersion.scenario_id == scenario_id,
+        BudgetVersion.status.in_([
+            BudgetVersionStatusEnum.IN_REVIEW,
+            BudgetVersionStatusEnum.APPROVED,
+            BudgetVersionStatusEnum.ARCHIVED
+        ])
     ).count()
 
-    if versions_count > 0:
+    if protected_versions > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete scenario - it is used by {versions_count} version(s)"
+            detail=f"Cannot delete scenario - it has {protected_versions} version(s) in IN_REVIEW, APPROVED, or ARCHIVED status"
         )
 
     db.delete(db_scenario)
@@ -344,6 +368,80 @@ def get_version(
         ).first()
         if scenario:
             version_dict["scenario"] = BudgetScenarioInDB.model_validate(scenario)
+
+    # Load payroll summary for the same year and department
+    from app.db.models import PayrollPlan
+    from app.schemas.budget_planning import PayrollMonthlySummary, PayrollYearlySummary
+    from decimal import Decimal
+
+    payroll_plans = db.query(PayrollPlan).filter(
+        PayrollPlan.year == version.year,
+        PayrollPlan.department_id == version.department_id
+    ).all()
+
+    if payroll_plans:
+        # Aggregate payroll data by month
+        monthly_data = {}
+        unique_employees = set()
+
+        for plan in payroll_plans:
+            month = plan.month
+            unique_employees.add(plan.employee_id)
+
+            if month not in monthly_data:
+                monthly_data[month] = {
+                    'employee_count': 0,
+                    'total_base_salary': Decimal('0'),
+                    'total_bonuses': Decimal('0'),
+                    'total_other': Decimal('0'),
+                    'total_planned': Decimal('0'),
+                }
+
+            monthly_data[month]['employee_count'] += 1
+            monthly_data[month]['total_base_salary'] += Decimal(str(plan.base_salary))
+
+            # Sum all bonuses
+            bonuses = Decimal('0')
+            if plan.monthly_bonus:
+                bonuses += Decimal(str(plan.monthly_bonus))
+            if plan.quarterly_bonus:
+                bonuses += Decimal(str(plan.quarterly_bonus))
+            if plan.annual_bonus:
+                bonuses += Decimal(str(plan.annual_bonus))
+
+            monthly_data[month]['total_bonuses'] += bonuses
+
+            if plan.other_payments:
+                monthly_data[month]['total_other'] += Decimal(str(plan.other_payments))
+
+            monthly_data[month]['total_planned'] += Decimal(str(plan.total_planned))
+
+        # Create monthly breakdown
+        monthly_breakdown = []
+        for month in sorted(monthly_data.keys()):
+            data = monthly_data[month]
+            monthly_breakdown.append(PayrollMonthlySummary(
+                month=month,
+                employee_count=data['employee_count'],
+                total_base_salary=data['total_base_salary'],
+                total_bonuses=data['total_bonuses'],
+                total_other=data['total_other'],
+                total_planned=data['total_planned']
+            ))
+
+        # Calculate yearly totals
+        total_planned_annual = sum(m.total_planned for m in monthly_breakdown)
+        total_base_salary_annual = sum(m.total_base_salary for m in monthly_breakdown)
+        total_bonuses_annual = sum(m.total_bonuses for m in monthly_breakdown)
+
+        version_dict["payroll_summary"] = PayrollYearlySummary(
+            year=version.year,
+            total_employees=len(unique_employees),
+            total_planned_annual=total_planned_annual,
+            total_base_salary_annual=total_base_salary_annual,
+            total_bonuses_annual=total_bonuses_annual,
+            monthly_breakdown=monthly_breakdown
+        )
 
     return BudgetVersionWithDetails(**version_dict)
 
@@ -470,11 +568,16 @@ def delete_version(
             detail=f"Version with id {version_id} not found"
         )
 
-    # Don't allow deletion of approved versions
-    if db_version.status == BudgetVersionStatusEnum.APPROVED:
+    # Don't allow deletion of versions with protected statuses
+    protected_statuses = [
+        BudgetVersionStatusEnum.IN_REVIEW,
+        BudgetVersionStatusEnum.APPROVED,
+        BudgetVersionStatusEnum.ARCHIVED
+    ]
+    if db_version.status in protected_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete approved version"
+            detail=f"Cannot delete version with status {db_version.status.value}"
         )
 
     db.delete(db_version)
@@ -804,6 +907,107 @@ def approve_version(
     )
     db.add(log_entry)
     db.commit()
+
+    return version
+
+
+@router.post("/versions/{version_id}/apply-to-plan", response_model=BudgetVersionInDB)
+def apply_version_to_plan(
+    version_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Apply APPROVED version to budget plan table.
+    Copies all plan details from the version to budget_plans for the year.
+    Only ADMIN and MANAGER can apply versions to plan.
+    """
+    from app.db.models import UserRoleEnum, BudgetPlan, BudgetStatusEnum
+
+    # Only ADMIN and MANAGER can apply to plan
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER users can apply budget versions to plan"
+        )
+
+    # Get version with details
+    version = db.query(BudgetVersion).filter(
+        BudgetVersion.id == version_id,
+        BudgetVersion.department_id == current_user.department_id
+    ).first()
+
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version with id {version_id} not found"
+        )
+
+    # Only APPROVED versions can be applied to plan
+    if version.status != BudgetVersionStatusEnum.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only APPROVED versions can be applied to plan. Current status: {version.status}"
+        )
+
+    # Get all plan details for this version
+    plan_details = db.query(BudgetPlanDetail).filter(
+        BudgetPlanDetail.version_id == version_id
+    ).all()
+
+    if not plan_details:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot apply empty version. No budget details found."
+        )
+
+    # Group details by category and month for efficient upsert
+    applied_count = 0
+    updated_count = 0
+
+    for detail in plan_details:
+        # Check if budget plan record already exists
+        existing_plan = db.query(BudgetPlan).filter(
+            BudgetPlan.year == version.year,
+            BudgetPlan.month == detail.month,
+            BudgetPlan.department_id == version.department_id,
+            BudgetPlan.category_id == detail.category_id
+        ).first()
+
+        # Calculate CAPEX and OPEX amounts
+        capex_amount = detail.planned_amount if detail.type == ExpenseTypeEnum.CAPEX else Decimal("0")
+        opex_amount = detail.planned_amount if detail.type == ExpenseTypeEnum.OPEX else Decimal("0")
+
+        if existing_plan:
+            # Update existing record
+            existing_plan.planned_amount = detail.planned_amount
+            existing_plan.capex_planned = capex_amount
+            existing_plan.opex_planned = opex_amount
+            existing_plan.status = BudgetStatusEnum.APPROVED
+            existing_plan.updated_at = datetime.utcnow()
+            updated_count += 1
+        else:
+            # Create new record
+            new_plan = BudgetPlan(
+                year=version.year,
+                month=detail.month,
+                department_id=version.department_id,
+                category_id=detail.category_id,
+                planned_amount=detail.planned_amount,
+                capex_planned=capex_amount,
+                opex_planned=opex_amount,
+                status=BudgetStatusEnum.APPROVED
+            )
+            db.add(new_plan)
+            applied_count += 1
+
+    # Commit all changes
+    db.commit()
+    db.refresh(version)
+
+    # Log the result
+    total_records = applied_count + updated_count
+    print(f"Applied version {version_id} to plan: {applied_count} created, {updated_count} updated ({total_records} total)")
 
     return version
 

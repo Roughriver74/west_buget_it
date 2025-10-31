@@ -11,6 +11,7 @@ import {
   EyeOutlined,
   SendOutlined,
   CopyOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
@@ -24,6 +25,7 @@ interface BudgetVersionTableProps {
   onDelete?: (id: number) => void
   onSubmit?: (id: number) => void
   onCopy?: (version: BudgetVersion) => void
+  onApplyToPlan?: (id: number) => void
   selectedRowKeys?: Key[]
   onSelectionChange?: (selectedRowKeys: Key[]) => void
 }
@@ -54,6 +56,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   onDelete,
   onSubmit,
   onCopy,
+  onApplyToPlan,
   selectedRowKeys,
   onSelectionChange,
 }) => {
@@ -132,7 +135,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
     {
       title: 'Действия',
       key: 'actions',
-      width: 200,
+      width: 240,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -177,6 +180,19 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
                 icon={<CopyOutlined />}
                 onClick={() => onCopy(record)}
               />
+            </Tooltip>
+          )}
+          {onApplyToPlan && record.status === BudgetVersionStatus.APPROVED && (
+            <Tooltip title="Применить к плану">
+              <Popconfirm
+                title="Применить к плану бюджета?"
+                description="Данные версии будут скопированы в план бюджета на выбранный год"
+                onConfirm={() => onApplyToPlan(record.id)}
+                okText="Да"
+                cancelText="Нет"
+              >
+                <Button type="link" size="small" icon={<CheckCircleOutlined />} style={{ color: '#52c41a' }} />
+              </Popconfirm>
             </Tooltip>
           )}
           {onDelete && [BudgetVersionStatus.DRAFT, BudgetVersionStatus.REJECTED].includes(record.status) && (

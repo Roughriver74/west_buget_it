@@ -37,6 +37,7 @@ import {
   useDeleteScenario,
   useDeleteVersion,
   useSubmitVersion,
+  useApplyVersionToPlan,
 } from '@/hooks/useBudgetPlanning'
 import { BudgetScenarioType } from '@/types/budgetPlanning'
 import type { BudgetScenario } from '@/types/budgetPlanning'
@@ -133,6 +134,7 @@ const BudgetPlanningPage: React.FC = () => {
   const createVersion = useCreateVersion()
   const deleteVersion = useDeleteVersion()
   const submitVersion = useSubmitVersion()
+  const applyVersionToPlan = useApplyVersionToPlan()
 
   // Handlers
   const handleCreateScenario = async () => {
@@ -182,6 +184,10 @@ const BudgetPlanningPage: React.FC = () => {
 
   const handleSubmitVersion = async (id: number) => {
     await submitVersion.mutateAsync(id)
+  }
+
+  const handleApplyVersionToPlan = async (id: number) => {
+    await applyVersionToPlan.mutateAsync(id)
   }
 
   const openVersionDrawer = (versionId: number, mode: 'view' | 'edit') => {
@@ -370,6 +376,7 @@ const BudgetPlanningPage: React.FC = () => {
             onDelete={handleDeleteVersion}
             onSubmit={handleSubmitVersion}
             onCopy={handleCopyVersion}
+            onApplyToPlan={handleApplyVersionToPlan}
             selectedRowKeys={selectedVersionsForComparison}
             onSelectionChange={setSelectedVersionsForComparison}
           />
