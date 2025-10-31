@@ -36,3 +36,57 @@ body {
 .forecast-row:hover {
   background-color: #e6f4ff !important;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  /* Make tables scrollable on mobile */
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+
+  /* Reduce padding on mobile */
+  .ant-card {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  /* Adjust form items on mobile */
+  .ant-form-item {
+    margin-bottom: 16px !important;
+  }
+
+  /* Stack buttons vertically on small screens */
+  .ant-space {
+    flex-wrap: wrap !important;
+  }
+
+  /* Adjust modal width on mobile */
+  .ant-modal {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px auto !important;
+  }
+
+  /* Adjust drawer width on mobile */
+  .ant-drawer-content-wrapper {
+    max-width: 80vw !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small screens */
+  body {
+    font-size: 14px;
+  }
+
+  .ant-btn {
+    padding: 4px 8px !important;
+    font-size: 14px !important;
+  }
+
+  .ant-table {
+    font-size: 12px !important;
+  }
+}
