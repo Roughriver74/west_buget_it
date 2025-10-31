@@ -306,7 +306,7 @@ const RevenueDashboardPage = () => {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {revenueByStream.map((entry, index) => (
+                    {revenueByStream.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
