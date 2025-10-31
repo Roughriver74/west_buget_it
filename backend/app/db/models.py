@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     JSON,
+    func,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -97,6 +98,40 @@ class KPIGoalStatusEnum(str, enum.Enum):
     ACHIEVED = "ACHIEVED"  # Достигнута
     NOT_ACHIEVED = "NOT_ACHIEVED"  # Не достигнута
     CANCELLED = "CANCELLED"  # Отменена
+
+
+class RevenueStreamTypeEnum(str, enum.Enum):
+    """Enum for revenue stream types"""
+    REGIONAL = "REGIONAL"  # Региональные (СПБ, СЗФО, Регионы)
+    CHANNEL = "CHANNEL"  # Каналы продаж (Опт, Тендеры, Интернет-магазин)
+    PRODUCT = "PRODUCT"  # Продуктовые (Ортодонтия, Оборудование и т.д.)
+
+
+class RevenueCategoryTypeEnum(str, enum.Enum):
+    """Enum for revenue category types"""
+    PRODUCT = "PRODUCT"  # Продукция
+    SERVICE = "SERVICE"  # Услуги
+    EQUIPMENT = "EQUIPMENT"  # Оборудование
+    TENDER = "TENDER"  # Тендеры
+
+
+class RevenuePlanStatusEnum(str, enum.Enum):
+    """Enum for revenue plan statuses"""
+    DRAFT = "DRAFT"  # Черновик
+    PENDING_APPROVAL = "PENDING_APPROVAL"  # На согласовании
+    APPROVED = "APPROVED"  # Утвержден
+    ACTIVE = "ACTIVE"  # Активный
+    ARCHIVED = "ARCHIVED"  # Архивный
+
+
+class RevenueVersionStatusEnum(str, enum.Enum):
+    """Enum for revenue plan version statuses"""
+    DRAFT = "DRAFT"  # Черновик
+    IN_REVIEW = "IN_REVIEW"  # На согласовании
+    REVISION_REQUESTED = "REVISION_REQUESTED"  # Возвращён на доработку
+    APPROVED = "APPROVED"  # Утверждён
+    REJECTED = "REJECTED"  # Отклонён
+    ARCHIVED = "ARCHIVED"  # Архивный
 
 
 class Department(Base):
@@ -1040,3 +1075,348 @@ class EmployeeKPIGoal(Base):
 
     def __repr__(self):
         return f"<EmployeeKPIGoal Employee#{self.employee_id} Goal#{self.goal_id} {self.achievement_percentage}%>"
+
+
+# ============================================================================
+# REVENUE BUDGET MODULE - Модуль бюджета доходов
+# ============================================================================
+
+
+class RevenueStream(Base):
+    """Revenue Stream (Поток доходов) - основная классификация источников дохода"""
+    __tablename__ = "revenue_streams"
+    __table_args__ = (
+        Index('idx_revenue_stream_dept_active', 'department_id', 'is_active'),
+        Index('idx_revenue_stream_type', 'stream_type'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # "СПБ и ЛО", "СЗФО", "Регионы" и т.д.
+    code = Column(String(50), nullable=True, index=True)  # Код потока для идентификации
+    stream_type = Column(Enum(RevenueStreamTypeEnum), nullable=False)
+    # REGIONAL (региональные), CHANNEL (каналы продаж), PRODUCT (продуктовые)
+
+    parent_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    parent = relationship("RevenueStream", remote_side=[id], backref="children")
+
+    def __repr__(self):
+        return f"<RevenueStream {self.name} ({self.stream_type})>"
+
+
+class RevenueCategory(Base):
+    """Revenue Category (Категория доходов) - продуктовые и сервисные категории"""
+    __tablename__ = "revenue_categories"
+    __table_args__ = (
+        Index('idx_revenue_category_dept_active', 'department_id', 'is_active'),
+        Index('idx_revenue_category_type', 'category_type'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # "Брекеты", "Дуги", "Оборудование"
+    code = Column(String(50), unique=True, nullable=True, index=True)
+    category_type = Column(Enum(RevenueCategoryTypeEnum), nullable=False)
+    # PRODUCT (продукция), SERVICE (услуги), EQUIPMENT (оборудование), TENDER (тендеры)
+
+    parent_id = Column(Integer, ForeignKey("revenue_categories.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Специфичные поля
+    default_margin = Column(Numeric(5, 2), nullable=True)  # Наценка в %
+    description = Column(Text, nullable=True)
+
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    parent = relationship("RevenueCategory", remote_side=[id], backref="subcategories")
+
+    def __repr__(self):
+        return f"<RevenueCategory {self.name} ({self.category_type})>"
+
+
+class RevenuePlan(Base):
+    """Revenue Plan (План доходов) - годовой план доходов с версионированием"""
+    __tablename__ = "revenue_plans"
+    __table_args__ = (
+        Index('idx_revenue_plan_year_dept', 'year', 'department_id'),
+        Index('idx_revenue_plan_status', 'status'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)  # "План доходов 2025"
+    year = Column(Integer, nullable=False, index=True)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=True)
+    revenue_category_id = Column(Integer, ForeignKey("revenue_categories.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    status = Column(Enum(RevenuePlanStatusEnum), default=RevenuePlanStatusEnum.DRAFT, nullable=False)
+    # DRAFT, PENDING_APPROVAL, APPROVED, ACTIVE, ARCHIVED
+
+    total_planned_revenue = Column(Numeric(15, 2), nullable=True)
+    description = Column(Text, nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    revenue_stream = relationship("RevenueStream")
+    revenue_category = relationship("RevenueCategory")
+    creator = relationship("User", foreign_keys=[created_by])
+    approver = relationship("User", foreign_keys=[approved_by])
+    versions = relationship("RevenuePlanVersion", back_populates="plan")
+
+    def __repr__(self):
+        return f"<RevenuePlan {self.name} {self.year} ({self.status})>"
+
+class RevenuePlanVersion(Base):
+    """Revenue Plan Version (Версия плана доходов) - версионирование плана"""
+    __tablename__ = "revenue_plan_versions"
+    __table_args__ = (
+        Index('idx_revenue_version_plan', 'plan_id'),
+        Index('idx_revenue_version_status', 'status'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(Integer, ForeignKey("revenue_plans.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    version_name = Column(String(255), nullable=True)
+
+    status = Column(Enum(RevenueVersionStatusEnum), default=RevenueVersionStatusEnum.DRAFT, nullable=False)
+    description = Column(Text, nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    plan = relationship("RevenuePlan", back_populates="versions")
+    details = relationship("RevenuePlanDetail", back_populates="version")
+    creator = relationship("User", foreign_keys=[created_by])
+
+    def __repr__(self):
+        return f"<RevenuePlanVersion #{self.version_number} for Plan#{self.plan_id} ({self.status})>"
+
+
+class RevenuePlanDetail(Base):
+    """Revenue Plan Detail (Детали плана доходов) - детализация плана по месяцам и категориям"""
+    __tablename__ = "revenue_plan_details"
+    __table_args__ = (
+        Index('idx_revenue_detail_version', 'version_id'),
+        Index('idx_revenue_detail_stream', 'revenue_stream_id'),
+        Index('idx_revenue_detail_category', 'revenue_category_id'),
+        Index('idx_revenue_detail_dept', 'department_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    version_id = Column(Integer, ForeignKey("revenue_plan_versions.id"), nullable=False)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=True)
+    revenue_category_id = Column(Integer, ForeignKey("revenue_categories.id"), nullable=True)
+
+    # Месячные планы (12 колонок)
+    month_01 = Column(Numeric(15, 2), default=0)
+    month_02 = Column(Numeric(15, 2), default=0)
+    month_03 = Column(Numeric(15, 2), default=0)
+    month_04 = Column(Numeric(15, 2), default=0)
+    month_05 = Column(Numeric(15, 2), default=0)
+    month_06 = Column(Numeric(15, 2), default=0)
+    month_07 = Column(Numeric(15, 2), default=0)
+    month_08 = Column(Numeric(15, 2), default=0)
+    month_09 = Column(Numeric(15, 2), default=0)
+    month_10 = Column(Numeric(15, 2), default=0)
+    month_11 = Column(Numeric(15, 2), default=0)
+    month_12 = Column(Numeric(15, 2), default=0)
+
+    # Итого
+    total = Column(Numeric(15, 2), nullable=True)
+
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    version = relationship("RevenuePlanVersion", back_populates="details")
+    revenue_stream = relationship("RevenueStream")
+    revenue_category = relationship("RevenueCategory")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<RevenuePlanDetail Version#{self.version_id} Stream#{self.revenue_stream_id} Total={self.total}>"
+
+
+class RevenueActual(Base):
+    """Revenue Actual (Фактические доходы) - фактическая выручка за месяц"""
+    __tablename__ = "revenue_actuals"
+    __table_args__ = (
+        Index('idx_revenue_actual_year_month', 'year', 'month'),
+        Index('idx_revenue_actual_dept', 'department_id'),
+        Index('idx_revenue_actual_stream', 'revenue_stream_id'),
+        Index('idx_revenue_actual_category', 'revenue_category_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=True)
+    revenue_category_id = Column(Integer, ForeignKey("revenue_categories.id"), nullable=True)
+
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)  # 1-12
+
+    planned_amount = Column(Numeric(15, 2), nullable=True)  # Из плана
+    actual_amount = Column(Numeric(15, 2), nullable=False)  # Факт
+    variance = Column(Numeric(15, 2), nullable=True)  # Отклонение
+    variance_percent = Column(Numeric(5, 2), nullable=True)  # % отклонения
+
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Метаданные
+    notes = Column(Text, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    revenue_stream = relationship("RevenueStream")
+    revenue_category = relationship("RevenueCategory")
+    department_rel = relationship("Department")
+    creator = relationship("User", foreign_keys=[created_by])
+
+    def __repr__(self):
+        return f"<RevenueActual {self.year}-{self.month:02d} Actual={self.actual_amount}>"
+
+
+class CustomerMetrics(Base):
+    """Customer Metrics (Клиентские метрики) - метрики клиентской базы по регионам"""
+    __tablename__ = "customer_metrics"
+    __table_args__ = (
+        Index('idx_customer_metrics_year_month', 'year', 'month'),
+        Index('idx_customer_metrics_dept', 'department_id'),
+        Index('idx_customer_metrics_stream', 'revenue_stream_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=False)
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)
+
+    # Клиентские метрики
+    total_customer_base = Column(Integer, nullable=True)  # ОКБ (Общая клиентская база)
+    active_customer_base = Column(Integer, nullable=True)  # АКБ (Активная клиентская база)
+    coverage_rate = Column(Numeric(5, 4), nullable=True)  # Покрытие (АКБ/ОКБ)
+
+    # Сегменты клиентов
+    regular_clinics = Column(Integer, nullable=True)  # Обычные клиники
+    network_clinics = Column(Integer, nullable=True)  # Сетевые клиники
+    new_clinics = Column(Integer, nullable=True)  # Новые клиники
+
+    # Средний чек
+    avg_order_value = Column(Numeric(12, 2), nullable=True)
+    avg_order_value_regular = Column(Numeric(12, 2), nullable=True)
+    avg_order_value_network = Column(Numeric(12, 2), nullable=True)
+    avg_order_value_new = Column(Numeric(12, 2), nullable=True)
+
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    revenue_stream = relationship("RevenueStream")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<CustomerMetrics {self.year}-{self.month:02d} Stream#{self.revenue_stream_id} АКБ={self.active_customer_base}>"
+
+
+class SeasonalityCoefficient(Base):
+    """Seasonality Coefficient (Коэффициенты сезонности) - исторические коэффициенты для прогнозирования"""
+    __tablename__ = "seasonality_coefficients"
+    __table_args__ = (
+        Index('idx_seasonality_year', 'year'),
+        Index('idx_seasonality_dept', 'department_id'),
+        Index('idx_seasonality_stream', 'revenue_stream_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=False)
+    year = Column(Integer, nullable=False, index=True)  # Исторический год
+
+    # Коэффициенты по месяцам (относительно среднего = 1.0)
+    coef_01 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_02 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_03 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_04 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_05 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_06 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_07 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_08 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_09 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_10 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_11 = Column(Numeric(5, 4), nullable=False, default=1.0)
+    coef_12 = Column(Numeric(5, 4), nullable=False, default=1.0)
+
+    description = Column(Text, nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    revenue_stream = relationship("RevenueStream")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<SeasonalityCoefficient {self.year} Stream#{self.revenue_stream_id}>"
+
+
+class RevenueForecast(Base):
+    """Revenue Forecast (Прогноз доходов) - ML-прогнозы на основе исторических данных"""
+    __tablename__ = "revenue_forecasts"
+    __table_args__ = (
+        Index('idx_revenue_forecast_year_month', 'forecast_year', 'forecast_month'),
+        Index('idx_revenue_forecast_dept', 'department_id'),
+        Index('idx_revenue_forecast_stream', 'revenue_stream_id'),
+        Index('idx_revenue_forecast_category', 'revenue_category_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    revenue_stream_id = Column(Integer, ForeignKey("revenue_streams.id"), nullable=True)
+    revenue_category_id = Column(Integer, ForeignKey("revenue_categories.id"), nullable=True)
+
+    forecast_year = Column(Integer, nullable=False, index=True)
+    forecast_month = Column(Integer, nullable=False, index=True)
+
+    forecast_amount = Column(Numeric(15, 2), nullable=False)
+    confidence_level = Column(Numeric(5, 2), nullable=True)  # Уровень доверия (0-100%)
+
+    model_type = Column(String(50), nullable=True)  # "LINEAR", "ARIMA", "ML" и т.д.
+    model_params = Column(JSON, nullable=True)  # Параметры модели
+
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Relationships
+    revenue_stream = relationship("RevenueStream")
+    revenue_category = relationship("RevenueCategory")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<RevenueForecast {self.forecast_year}-{self.forecast_month:02d} Amount={self.forecast_amount}>"
