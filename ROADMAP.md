@@ -1,6 +1,7 @@
 # 🗺️ Roadmap - IT Budget Manager
 
-**Последнее обновление**: 2025-10-31
+**Последнее обновление**: 2025-10-31 21:00 MSK
+**Текущая версия в разработке**: v0.8.0 - Revenue Budget Foundation (~70% готово)
 
 ---
 
@@ -111,6 +112,29 @@
 - **Accessibility**: WCAG AA compliant (контраст, tooltips, keyboard navigation)
 - **Responsive**: Адаптивные компоненты для разных экранов
 - **Календарь оплат**: Улучшенная легенда, tooltips, визуализация прогнозов
+
+#### 🔄 **Revenue Budget Module (v0.8.0 - В РАЗРАБОТКЕ)** ~70% готово
+**Дата старта**: 2025-10-29 | **Последнее обновление**: 2025-10-31
+
+✅ **Выполнено за 2 дня**:
+- **База данных**: 9 таблиц созданы и мигрированы (revenue_streams, revenue_categories, revenue_plans, revenue_plan_details, revenue_plan_versions, revenue_actuals, revenue_forecasts, customer_metrics, seasonality_coefficients)
+- **Backend API**: 12 endpoints для управления справочниками (streams, categories, actuals)
+  - CRUD операции + bulk operations + tree endpoints для иерархии
+  - Multi-tenancy полностью реализована (department_id во всех таблицах)
+- **Frontend**: 4 страницы (1502 строк кода)
+  - RevenueDashboardPage с графиками Plan vs Actual
+  - RevenueStreamsPage, RevenueCategoriesPage, RevenueActualsPage
+  - Интеграция с DepartmentContext для изоляции данных
+- **Исправлены критические баги**:
+  - Миграция ENUM типов (duplicate object error)
+  - Логирование API (user_id parameter error)
+
+❌ **Осталось доделать** (~1-2 недели):
+- Revenue Plans API (CRUD для планов)
+- Revenue Plan Details API (помесячная детализация)
+- Customer Metrics API (клиентские метрики)
+- Seasonality API (коэффициенты сезонности)
+- Excel импорт (import_revenue_excel.py)
 
 ---
 
@@ -265,25 +289,49 @@ ML-прогнозы на основе исторических данных (LIN
 **Цель**: Создать минимальную рабочую версию
 
 **Задачи**:
-1. [ ] Создать модели БД (RevenueStream, RevenueCategory, RevenuePlan, RevenuePlanDetail, RevenueActual)
-2. [ ] Создать миграции Alembic
-3. [ ] Создать базовые API endpoints (CRUD для справочников)
-   - `GET/POST/PUT/DELETE /api/v1/revenue-streams`
-   - `GET/POST/PUT/DELETE /api/v1/revenue-categories`
-   - `GET/POST/PUT/DELETE /api/v1/revenue-plans`
-   - `GET/POST/PUT/DELETE /api/v1/revenue-plan-details`
-   - `GET/POST/PUT/DELETE /api/v1/revenue-actuals`
-4. [ ] Создать импорт из Excel (базовый)
-   - Скрипт `import_revenue_excel.py` для импорта данных из Excel
-   - Маппинг листов: "2025" → RevenuePlanDetail, "Расчет доходной части СПБ СЗФО" → CustomerMetrics
-5. [ ] Создать страницу Revenue Dashboard (только просмотр)
-   - Сводные карточки (общая выручка, прирост, выполнение плана)
-   - График план vs факт (линейный)
-   - Разбивка по регионам (круговая диаграмма)
+1. [x] **Создать модели БД** ✅ ВЫПОЛНЕНО (2025-10-31)
+   - [x] RevenueStream ✅
+   - [x] RevenueCategory ✅
+   - [x] RevenuePlan ✅
+   - [x] RevenuePlanDetail ✅
+   - [x] RevenuePlanVersion ✅
+   - [x] RevenueActual ✅
+   - [x] RevenueForecast ✅
+   - [x] CustomerMetrics ✅
+   - [x] SeasonalityCoefficients ✅
+   - **Всего**: 9 таблиц успешно созданы в БД
 
-**Результат**: Можно импортировать данные и просматривать дашборд
+2. [x] **Создать миграции Alembic** ✅ ВЫПОЛНЕНО (2025-10-31)
+   - [x] Миграция `2025_10_31_0000-9a1b2c3d4e5f_add_revenue_budget_module_tables.py` создана
+   - [x] Миграция успешно применена (версия: `merge_revenue_orgs`)
+   - [x] Все ENUM типы созданы (RevenueStreamTypeEnum, RevenueCategoryTypeEnum, RevenuePlanStatusEnum, RevenueVersionStatusEnum)
 
-**Оценка**: 2-3 недели
+3. [x] **Создать базовые API endpoints (CRUD для справочников)** ⚠️ ЧАСТИЧНО ВЫПОЛНЕНО
+   - [x] `GET/POST/PUT/DELETE /api/v1/revenue/streams` ✅ + bulk operations + tree endpoint
+   - [x] `GET/POST/PUT/DELETE /api/v1/revenue/categories` ✅ + bulk operations + tree endpoint
+   - [x] `GET/POST/PUT/DELETE /api/v1/revenue/actuals` ✅
+   - [ ] `GET/POST/PUT/DELETE /api/v1/revenue/plans` ❌ TODO
+   - [ ] `GET/POST/PUT/DELETE /api/v1/revenue/plan-details` ❌ TODO
+   - **Статус**: 12 endpoints работают, 2 группы endpoints осталось реализовать
+
+4. [ ] **Создать импорт из Excel (базовый)** ❌ TODO
+   - [ ] Скрипт `import_revenue_excel.py` для импорта данных из Excel
+   - [ ] Маппинг листов: "2025" → RevenuePlanDetail, "Расчет доходной части СПБ СЗФО" → CustomerMetrics
+
+5. [x] **Создать страницу Revenue Dashboard (только просмотр)** ✅ ВЫПОЛНЕНО (2025-10-31)
+   - [x] RevenueDashboardPage с графиками (Plan vs Actual, разбивка по потокам) ✅
+   - [x] RevenueStreamsPage (управление потоками доходов) ✅
+   - [x] RevenueCategoriesPage (управление категориями) ✅
+   - [x] RevenueActualsPage (ввод фактов) ✅
+   - [x] Интеграция с multi-tenancy (DepartmentContext) ✅
+   - [x] Роутинг настроен в App.tsx ✅
+   - **Всего**: 1502 строк кода на фронтенде
+
+**Результат**: ✅ Базовая структура создана! Можно просматривать дашборд, управлять справочниками (streams, categories, actuals)
+
+**Статус**: **~70% выполнено** (осталось: revenue-plans API, revenue-plan-details API, импорт Excel)
+
+**Оценка**: 2-3 недели → **Факт: 2 дня** (база готова, осталась доработка)
 
 ---
 
@@ -519,15 +567,42 @@ ML-прогнозы на основе исторических данных (LIN
 
 ### Будущие версии (планируются)
 
-### **v0.8.0 (Q1 2026) - Revenue Budget Foundation**
-**Цель**: Базовая структура модуля доходов
-- [ ] Database models для Revenue Budget (8 новых таблиц)
-- [ ] API endpoints для CRUD операций (30+ endpoints)
-- [ ] Импорт данных из Excel (revenue streams, categories, plans)
-- [ ] Revenue Dashboard (просмотр)
-- [ ] Multi-tenancy для всех новых таблиц
+### **v0.8.0 (Q1 2026) - Revenue Budget Foundation** 🔄 В РАЗРАБОТКЕ
 
-**Оценка**: 3-4 недели
+**Цель**: Базовая структура модуля доходов
+
+**Прогресс**: **~70% выполнено** (обновлено 2025-10-31)
+
+- [x] **Database models для Revenue Budget** ✅ ЗАВЕРШЕНО
+  - [x] 9 таблиц созданы (revenue_streams, revenue_categories, revenue_plans, revenue_plan_details, revenue_plan_versions, revenue_actuals, revenue_forecasts, customer_metrics, seasonality_coefficients)
+  - [x] Все индексы и foreign keys настроены
+  - [x] Multi-tenancy (department_id) для всех таблиц ✅
+
+- [x] **API endpoints для CRUD операций** ⚠️ ЧАСТИЧНО (12/30+ endpoints)
+  - [x] Revenue Streams API (CRUD + bulk + tree) ✅
+  - [x] Revenue Categories API (CRUD + bulk + tree) ✅
+  - [x] Revenue Actuals API (CRUD) ✅
+  - [ ] Revenue Plans API ❌ TODO
+  - [ ] Revenue Plan Details API ❌ TODO
+  - [ ] Customer Metrics API ❌ TODO
+  - [ ] Seasonality Coefficients API ❌ TODO
+
+- [ ] **Импорт данных из Excel** ❌ TODO
+  - [ ] Скрипт import_revenue_excel.py
+  - [ ] Маппинг revenue streams, categories, plans
+
+- [x] **Revenue Dashboard** ✅ ЗАВЕРШЕНО
+  - [x] RevenueDashboardPage с графиками Plan vs Actual ✅
+  - [x] RevenueStreamsPage (управление) ✅
+  - [x] RevenueCategoriesPage (управление) ✅
+  - [x] RevenueActualsPage (ввод фактов) ✅
+  - [x] 1502 строк React кода ✅
+
+- [x] **Multi-tenancy для всех новых таблиц** ✅ ЗАВЕРШЕНО
+  - [x] Все таблицы имеют department_id
+  - [x] DepartmentContext интеграция на фронтенде ✅
+
+**Оценка**: 3-4 недели → **Факт**: 2 дня (база готова) + 1-2 недели (доработка)
 
 ### **v0.9.0 (Q2 2026) - Revenue Planning & Actuals**
 **Цель**: Планирование доходов и учет фактов
