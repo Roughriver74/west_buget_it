@@ -124,10 +124,11 @@ class BudgetVersionInDB(BudgetVersionBase):
 
 
 class BudgetVersionWithDetails(BudgetVersionInDB):
-    """Schema for budget version with plan details"""
+    """Schema for budget version with plan details and payroll summary"""
     plan_details: List["BudgetPlanDetailInDB"] = []
     scenario: Optional[BudgetScenarioInDB] = None
     approval_logs: List["BudgetApprovalLogInDB"] = []
+    payroll_summary: Optional["PayrollYearlySummary"] = None
 
 
 # ============================================================================
@@ -313,6 +314,31 @@ class SetApprovalsRequest(BaseModel):
     founder1_approved: Optional[bool] = None
     founder2_approved: Optional[bool] = None
     founder3_approved: Optional[bool] = None
+
+
+# ============================================================================
+# Payroll Summary Schemas (для интеграции с бюджетом)
+# ============================================================================
+
+
+class PayrollMonthlySummary(BaseModel):
+    """Monthly payroll summary for budget integration"""
+    month: int = Field(..., ge=1, le=12, description="Month (1-12)")
+    employee_count: int = Field(..., description="Number of employees")
+    total_base_salary: Decimal = Field(..., description="Total base salary")
+    total_bonuses: Decimal = Field(..., description="Total bonuses (monthly + quarterly + annual)")
+    total_other: Decimal = Field(..., description="Other payments")
+    total_planned: Decimal = Field(..., description="Total planned payroll")
+
+
+class PayrollYearlySummary(BaseModel):
+    """Yearly payroll summary for budget version"""
+    year: int
+    total_employees: int = Field(..., description="Total unique employees")
+    total_planned_annual: Decimal = Field(..., description="Total planned for year")
+    total_base_salary_annual: Decimal = Field(..., description="Total base salary for year")
+    total_bonuses_annual: Decimal = Field(..., description="Total bonuses for year")
+    monthly_breakdown: List[PayrollMonthlySummary] = Field(default_factory=list)
 
 
 # Update forward references
