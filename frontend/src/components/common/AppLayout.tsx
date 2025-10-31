@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Layout, Menu, theme, Space, Dropdown, Avatar, Button } from 'antd'
+import { Layout, Menu, theme, Space, Dropdown, Avatar, Button, Drawer } from 'antd'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DashboardOutlined,
@@ -16,9 +16,11 @@ import {
   SettingOutlined,
   IdcardOutlined,
   ProjectOutlined,
+  MenuOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import DepartmentSelector from './DepartmentSelector'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
 
 const { Header, Content, Sider } = Layout
 
@@ -28,9 +30,11 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { isMobile } = useBreakpoint()
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
@@ -199,63 +203,123 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       ]
     : baseMenuItems
 
+  // Render menu content (shared between Sider and Drawer)
+  const renderMenu = () => (
+    <Menu
+      theme="dark"
+      selectedKeys={[location.pathname]}
+      mode="inline"
+      items={menuItems}
+      defaultSelectedKeys={[location.pathname]}
+      onClick={() => {
+        if (isMobile) {
+          setMobileMenuOpen(false)
+        }
+      }}
+    />
+  )
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={(value) => setCollapsed(value)}>
-        <div
-          style={{
-            height: 32,
-            margin: 16,
-            color: 'white',
-            fontSize: collapsed ? 14 : 18,
-            fontWeight: 'bold',
-            textAlign: 'center',
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <Sider collapsible collapsed={collapsed} onCollapse={(value) => setCollapsed(value)}>
+          <div
+            style={{
+              height: 32,
+              margin: 16,
+              color: 'white',
+              fontSize: collapsed ? 14 : 18,
+              fontWeight: 'bold',
+              textAlign: 'center',
+            }}
+          >
+            {collapsed ? 'ITB' : 'BDR'}
+          </div>
+          {renderMenu()}
+        </Sider>
+      )}
+
+      {/* Mobile Drawer */}
+      {isMobile && (
+        <Drawer
+          title={
+            <div style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>
+              BDR
+            </div>
+          }
+          placement="left"
+          onClose={() => setMobileMenuOpen(false)}
+          open={mobileMenuOpen}
+          styles={{
+            body: { padding: 0, background: '#001529' },
+            header: { background: '#001529', borderBottom: '1px solid #1d3a5f' },
           }}
+          width={250}
         >
-          {collapsed ? 'ITB' : 'BDR'}
-        </div>
-        <Menu
-          theme="dark"
-          selectedKeys={[location.pathname]}
-          mode="inline"
-          items={menuItems}
-          defaultSelectedKeys={[location.pathname]}
-        />
-      </Sider>
+          {renderMenu()}
+        </Drawer>
+      )}
+
       <Layout>
         <Header
           style={{
-            padding: '0 24px',
+            padding: isMobile ? '0 16px' : '0 24px',
             background: colorBgContainer,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            height: isMobile ? 'auto' : 64,
+            lineHeight: isMobile ? 'normal' : '64px',
           }}
         >
-          <div style={{ fontSize: 20, fontWeight: 500 }}>
-            IT Budget Manager
-          </div>
-          <Space size="large">
-            <DepartmentSelector />
+          <Space>
+            {/* Mobile menu button */}
+            {isMobile && (
+              <Button
+                type="text"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileMenuOpen(true)}
+                style={{ fontSize: 20 }}
+              />
+            )}
+            <div
+              style={{
+                fontSize: isMobile ? 16 : 20,
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isMobile ? 'BDR' : 'IT Budget Manager'}
+            </div>
+          </Space>
+
+          <Space size={isMobile ? 'small' : 'large'} wrap>
+            {!isMobile && <DepartmentSelector />}
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Button type="text" style={{ height: 'auto', padding: '4px 8px' }}>
-                <Space>
+                <Space size="small">
                   <Avatar size="small" icon={<UserOutlined />} />
-                  <span>{user?.full_name || user?.username}</span>
+                  {!isMobile && <span>{user?.full_name || user?.username}</span>}
                 </Space>
               </Button>
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ margin: '24px 16px 0' }}>
+        <Content style={{ margin: isMobile ? '12px 8px 0' : '24px 16px 0' }}>
           <div
             style={{
-              padding: 24,
+              padding: isMobile ? 16 : 24,
               minHeight: 360,
               background: colorBgContainer,
               borderRadius: borderRadiusLG,
             }}
           >
+            {isMobile && (
+              <div style={{ marginBottom: 16 }}>
+                <DepartmentSelector />
+              </div>
+            )}
             {children}
           </div>
         </Content>
