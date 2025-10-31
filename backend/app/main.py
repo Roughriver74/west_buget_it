@@ -11,7 +11,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -192,6 +192,8 @@ app.include_router(comprehensive_report.router, prefix=f"{settings.API_PREFIX}/r
 app.include_router(revenue_streams.router, prefix=f"{settings.API_PREFIX}/revenue/streams", tags=["Revenue Streams"])
 app.include_router(revenue_categories.router, prefix=f"{settings.API_PREFIX}/revenue/categories", tags=["Revenue Categories"])
 app.include_router(revenue_actuals.router, prefix=f"{settings.API_PREFIX}/revenue/actuals", tags=["Revenue Actuals"])
+app.include_router(revenue_plans.router, prefix=f"{settings.API_PREFIX}/revenue/plans", tags=["Revenue Plans"])
+app.include_router(revenue_plan_details.router, prefix=f"{settings.API_PREFIX}/revenue/plan-details", tags=["Revenue Plan Details"])
 
 
 @app.on_event("startup")

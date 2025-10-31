@@ -113,14 +113,19 @@
 - **Responsive**: Адаптивные компоненты для разных экранов
 - **Календарь оплат**: Улучшенная легенда, tooltips, визуализация прогнозов
 
-#### 🔄 **Revenue Budget Module (v0.8.0 - В РАЗРАБОТКЕ)** ~70% готово
-**Дата старта**: 2025-10-29 | **Последнее обновление**: 2025-10-31
+#### 🔄 **Revenue Budget Module (v0.8.0 - В РАЗРАБОТКЕ)** ~85% готово
+**Дата старта**: 2025-10-29 | **Последнее обновление**: 2025-11-01
 
-✅ **Выполнено за 2 дня**:
+✅ **Выполнено за 3 дня**:
 - **База данных**: 9 таблиц созданы и мигрированы (revenue_streams, revenue_categories, revenue_plans, revenue_plan_details, revenue_plan_versions, revenue_actuals, revenue_forecasts, customer_metrics, seasonality_coefficients)
-- **Backend API**: 12 endpoints для управления справочниками (streams, categories, actuals)
-  - CRUD операции + bulk operations + tree endpoints для иерархии
+- **Backend API**: 30+ endpoints для полного управления Revenue модулем
+  - ✅ Revenue Streams API (CRUD + bulk + tree)
+  - ✅ Revenue Categories API (CRUD + bulk + tree)
+  - ✅ Revenue Actuals API (CRUD)
+  - ✅ **NEW!** Revenue Plans API (CRUD + версионирование + approval workflow)
+  - ✅ **NEW!** Revenue Plan Details API (CRUD + bulk operations + summary)
   - Multi-tenancy полностью реализована (department_id во всех таблицах)
+  - Workflow: Draft → In Review → Approved
 - **Frontend**: 4 страницы (1502 строк кода)
   - RevenueDashboardPage с графиками Plan vs Actual
   - RevenueStreamsPage, RevenueCategoriesPage, RevenueActualsPage
@@ -129,12 +134,12 @@
   - Миграция ENUM типов (duplicate object error)
   - Логирование API (user_id parameter error)
 
-❌ **Осталось доделать** (~1-2 недели):
-- Revenue Plans API (CRUD для планов)
-- Revenue Plan Details API (помесячная детализация)
-- Customer Metrics API (клиентские метрики)
-- Seasonality API (коэффициенты сезонности)
-- Excel импорт (import_revenue_excel.py)
+❌ **Осталось доделать** (~1 неделя):
+- Revenue Planning Page (frontend - основная страница планирования)
+- RevenuePlanTable component (таблица с inline editing)
+- Customer Metrics API (клиентские метрики) - опционально
+- Seasonality API (коэффициенты сезонности) - опционально
+- Excel импорт (import_revenue_excel.py) - опционально
 
 ---
 
@@ -306,13 +311,13 @@ ML-прогнозы на основе исторических данных (LIN
    - [x] Миграция успешно применена (версия: `merge_revenue_orgs`)
    - [x] Все ENUM типы созданы (RevenueStreamTypeEnum, RevenueCategoryTypeEnum, RevenuePlanStatusEnum, RevenueVersionStatusEnum)
 
-3. [x] **Создать базовые API endpoints (CRUD для справочников)** ⚠️ ЧАСТИЧНО ВЫПОЛНЕНО
+3. [x] **Создать базовые API endpoints (CRUD для справочников)** ✅ ВЫПОЛНЕНО (2025-11-01)
    - [x] `GET/POST/PUT/DELETE /api/v1/revenue/streams` ✅ + bulk operations + tree endpoint
    - [x] `GET/POST/PUT/DELETE /api/v1/revenue/categories` ✅ + bulk operations + tree endpoint
    - [x] `GET/POST/PUT/DELETE /api/v1/revenue/actuals` ✅
-   - [ ] `GET/POST/PUT/DELETE /api/v1/revenue/plans` ❌ TODO
-   - [ ] `GET/POST/PUT/DELETE /api/v1/revenue/plan-details` ❌ TODO
-   - **Статус**: 12 endpoints работают, 2 группы endpoints осталось реализовать
+   - [x] `GET/POST/PUT/DELETE /api/v1/revenue/plans` ✅ + версионирование + workflow (Draft → In Review → Approved)
+   - [x] `GET/POST/PUT/DELETE /api/v1/revenue/plan-details` ✅ + bulk operations + summary endpoint
+   - **Статус**: Все API endpoints реализованы! 30+ endpoints работают
 
 4. [ ] **Создать импорт из Excel (базовый)** ❌ TODO
    - [ ] Скрипт `import_revenue_excel.py` для импорта данных из Excel
@@ -327,11 +332,11 @@ ML-прогнозы на основе исторических данных (LIN
    - [x] Роутинг настроен в App.tsx ✅
    - **Всего**: 1502 строк кода на фронтенде
 
-**Результат**: ✅ Базовая структура создана! Можно просматривать дашборд, управлять справочниками (streams, categories, actuals)
+**Результат**: ✅ Базовая структура полностью готова! Можно просматривать дашборд, управлять справочниками (streams, categories, actuals), создавать планы с версионированием
 
-**Статус**: **~70% выполнено** (осталось: revenue-plans API, revenue-plan-details API, импорт Excel)
+**Статус**: **~85% выполнено** (осталось: импорт Excel, Revenue Planning Page на frontend)
 
-**Оценка**: 2-3 недели → **Факт: 2 дня** (база готова, осталась доработка)
+**Оценка**: 2-3 недели → **Факт: 3 дня** (база + API готовы)
 
 ---
 
