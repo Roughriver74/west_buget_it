@@ -143,10 +143,8 @@ def get_revenue_plans(
     plans = query.order_by(RevenuePlan.year.desc(), RevenuePlan.created_at.desc()).offset(skip).limit(limit).all()
 
     log_info(
-        "revenue_plans.get_list",
-        user_id=current_user.id,
-        filters={"year": year, "status": status, "department_id": department_id},
-        total=total
+        f"Get revenue plans list - user_id: {current_user.id}, year: {year}, status: {status}, department_id: {department_id}, total: {total}",
+        "revenue_plans"
     )
 
     return plans
@@ -161,7 +159,7 @@ def get_revenue_plan(
     """Get revenue plan by ID"""
     plan = check_plan_access(db, plan_id, current_user)
 
-    log_info("revenue_plans.get", user_id=current_user.id, plan_id=plan_id)
+    log_info(f"Get revenue plan - user_id: {current_user.id}, plan_id: {plan_id}", "revenue_plans")
 
     return plan
 
@@ -237,7 +235,7 @@ def create_revenue_plan(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plans.create", user_id=current_user.id, plan_id=new_plan.id, plan_name=new_plan.name)
+    log_info(f"Create revenue plan - user_id: {current_user.id}, plan_id: {new_plan.id}, plan_name: {new_plan.name}", "revenue_plans")
 
     return new_plan
 
@@ -273,7 +271,7 @@ def update_revenue_plan(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plans.update", user_id=current_user.id, plan_id=plan_id, updates=update_fields)
+    log_info(f"Update revenue plan - user_id: {current_user.id}, plan_id: {plan_id}, updates: {update_fields}", "revenue_plans")
 
     return plan
 
@@ -315,7 +313,7 @@ def delete_revenue_plan(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plans.delete", user_id=current_user.id, plan_id=plan_id)
+    log_info(f"Delete revenue plan - user_id: {current_user.id}, plan_id: {plan_id}", "revenue_plans")
 
 
 @router.post("/{plan_id}/approve", response_model=RevenuePlanInDB)
@@ -353,7 +351,7 @@ def approve_revenue_plan(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plans.approve", user_id=current_user.id, plan_id=plan_id)
+    log_info(f"Approve revenue plan - user_id: {current_user.id}, plan_id: {plan_id}", "revenue_plans")
 
     return plan
 
@@ -380,7 +378,7 @@ def get_plan_versions(
 
     versions = query.order_by(RevenuePlanVersion.version_number.desc()).all()
 
-    log_info("revenue_plans.get_versions", user_id=current_user.id, plan_id=plan_id, count=len(versions))
+    log_info(f"Get plan versions - user_id: {current_user.id}, plan_id: {plan_id}, count: {len(versions)}", "revenue_plans")
 
     return versions
 
@@ -424,7 +422,7 @@ def create_plan_version(
     db.commit()
     db.refresh(new_version)
 
-    log_info("revenue_plans.create_version", user_id=current_user.id, plan_id=plan_id, version_id=new_version.id)
+    log_info(f"Create plan version - user_id: {current_user.id}, plan_id: {plan_id}, version_id: {new_version.id}", "revenue_plans")
 
     return new_version
 
@@ -486,7 +484,7 @@ def update_plan_version(
         recalculate_plan_totals(db, plan)
         db.commit()
 
-    log_info("revenue_plans.update_version", user_id=current_user.id, version_id=version_id, updates=update_fields)
+    log_info(f"Update plan version - user_id: {current_user.id}, version_id: {version_id}, updates: {update_fields}", "revenue_plans")
 
     return version
 
@@ -531,4 +529,4 @@ def delete_plan_version(
     db.delete(version)
     db.commit()
 
-    log_info("revenue_plans.delete_version", user_id=current_user.id, version_id=version_id)
+    log_info(f"Delete plan version - user_id: {current_user.id}, version_id: {version_id}", "revenue_plans")

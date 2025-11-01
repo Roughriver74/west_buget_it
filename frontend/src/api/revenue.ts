@@ -20,6 +20,15 @@ import type {
   RevenueActualCreate,
   RevenueActualUpdate,
   RevenueActualFilters,
+  RevenuePlan,
+  RevenuePlanCreate,
+  RevenuePlanUpdate,
+  RevenuePlanVersion,
+  RevenuePlanVersionCreate,
+  RevenuePlanVersionUpdate,
+  RevenuePlanDetail,
+  RevenuePlanDetailCreate,
+  RevenuePlanDetailUpdate,
 } from '@/types/revenue'
 
 // ==================== Revenue Streams ====================
@@ -242,11 +251,184 @@ export const revenueActualsApi = {
   },
 }
 
+// ==================== Revenue Plans ====================
+
+export const revenuePlansApi = {
+  /**
+   * Get all revenue plans with filtering
+   */
+  getAll: async (params?: {
+    year?: number
+    status?: string
+    department_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<RevenuePlan[]> => {
+    const { data } = await apiClient.get('/revenue/plans/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific revenue plan by ID
+   */
+  getById: async (id: number): Promise<RevenuePlan> => {
+    const { data } = await apiClient.get(`/revenue/plans/${id}`)
+    return data
+  },
+
+  /**
+   * Create a new revenue plan
+   */
+  create: async (plan: RevenuePlanCreate): Promise<RevenuePlan> => {
+    const { data } = await apiClient.post('/revenue/plans/', plan)
+    return data
+  },
+
+  /**
+   * Update an existing revenue plan
+   */
+  update: async (id: number, plan: RevenuePlanUpdate): Promise<RevenuePlan> => {
+    const { data } = await apiClient.put(`/revenue/plans/${id}`, plan)
+    return data
+  },
+
+  /**
+   * Delete a revenue plan
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/plans/${id}`)
+  },
+
+  /**
+   * Approve a revenue plan
+   */
+  approve: async (id: number): Promise<RevenuePlan> => {
+    const { data } = await apiClient.post(`/revenue/plans/${id}/approve`)
+    return data
+  },
+
+  /**
+   * Get all versions for a revenue plan
+   */
+  getVersions: async (planId: number, params?: { status?: string }): Promise<RevenuePlanVersion[]> => {
+    const { data } = await apiClient.get(`/revenue/plans/${planId}/versions`, { params })
+    return data
+  },
+
+  /**
+   * Create a new version for a revenue plan
+   */
+  createVersion: async (planId: number, version: RevenuePlanVersionCreate): Promise<RevenuePlanVersion> => {
+    const { data } = await apiClient.post(`/revenue/plans/${planId}/versions`, version)
+    return data
+  },
+
+  /**
+   * Update a revenue plan version
+   */
+  updateVersion: async (
+    planId: number,
+    versionId: number,
+    version: RevenuePlanVersionUpdate
+  ): Promise<RevenuePlanVersion> => {
+    const { data } = await apiClient.put(`/revenue/plans/${planId}/versions/${versionId}`, version)
+    return data
+  },
+
+  /**
+   * Delete a revenue plan version
+   */
+  deleteVersion: async (planId: number, versionId: number): Promise<void> => {
+    await apiClient.delete(`/revenue/plans/${planId}/versions/${versionId}`)
+  },
+}
+
+// ==================== Revenue Plan Details ====================
+
+export const revenuePlanDetailsApi = {
+  /**
+   * Get all revenue plan details for a version
+   */
+  getAll: async (params: {
+    version_id: number
+    revenue_stream_id?: number
+    revenue_category_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<RevenuePlanDetail[]> => {
+    const { data } = await apiClient.get('/revenue/plan-details/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific revenue plan detail by ID
+   */
+  getById: async (id: number): Promise<RevenuePlanDetail> => {
+    const { data } = await apiClient.get(`/revenue/plan-details/${id}`)
+    return data
+  },
+
+  /**
+   * Create a new revenue plan detail
+   */
+  create: async (detail: RevenuePlanDetailCreate): Promise<RevenuePlanDetail> => {
+    const { data } = await apiClient.post('/revenue/plan-details/', detail)
+    return data
+  },
+
+  /**
+   * Bulk create revenue plan details
+   */
+  bulkCreate: async (details: RevenuePlanDetailCreate[]): Promise<RevenuePlanDetail[]> => {
+    const { data } = await apiClient.post('/revenue/plan-details/bulk', { details })
+    return data
+  },
+
+  /**
+   * Update an existing revenue plan detail
+   */
+  update: async (id: number, detail: RevenuePlanDetailUpdate): Promise<RevenuePlanDetail> => {
+    const { data } = await apiClient.put(`/revenue/plan-details/${id}`, detail)
+    return data
+  },
+
+  /**
+   * Bulk update revenue plan details
+   */
+  bulkUpdate: async (updates: Array<{ id: number; updates: Record<string, number> }>): Promise<RevenuePlanDetail[]> => {
+    const { data } = await apiClient.put('/revenue/plan-details/bulk/update', { updates })
+    return data
+  },
+
+  /**
+   * Delete a revenue plan detail
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/plan-details/${id}`)
+  },
+
+  /**
+   * Get summary statistics for a revenue plan version
+   */
+  getSummary: async (versionId: number): Promise<{
+    version_id: number
+    total_revenue: number
+    monthly_totals: Record<string, number>
+    by_stream: Array<{ stream_id: number; total: number }>
+    by_category: Array<{ category_id: number; total: number }>
+  }> => {
+    const { data } = await apiClient.get(`/revenue/plan-details/version/${versionId}/summary`)
+    return data
+  },
+}
+
 // Export all as a combined object for convenience
 export const revenueApi = {
   streams: revenueStreamsApi,
   categories: revenueCategoriesApi,
   actuals: revenueActualsApi,
+  plans: revenuePlansApi,
+  planDetails: revenuePlanDetailsApi,
 }
 
 export default revenueApi

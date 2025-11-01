@@ -118,11 +118,11 @@ def get_revenue_streams(
 
     streams = query.order_by(RevenueStream.name).offset(skip).limit(limit).all()
 
-    # Cache the result
+    # Cache the result as dictionaries (JSON-serializable)
     cache_service.set(
         CACHE_NAMESPACE,
         cached_key,
-        [RevenueStreamInDB.model_validate(stream) for stream in streams],
+        [RevenueStreamInDB.model_validate(stream).model_dump() for stream in streams],
     )
 
     log_info(f"Retrieved {len(streams)} revenue streams", context=f"User {current_user.id}")

@@ -126,10 +126,8 @@ def get_revenue_plan_details(
     ).offset(skip).limit(limit).all()
 
     log_info(
-        "revenue_plan_details.get_list",
-        user_id=current_user.id,
-        version_id=version_id,
-        total=total
+        f"Get revenue plan details list - user_id: {current_user.id}, version_id: {version_id}, total: {total}",
+        "revenue_plan_details"
     )
 
     return details
@@ -167,7 +165,7 @@ def get_revenue_plan_detail(
                 detail="You can only access revenue plan details from your department"
             )
 
-    log_info("revenue_plan_details.get", user_id=current_user.id, detail_id=detail_id)
+    log_info(f"Get revenue plan detail - user_id: {current_user.id}, detail_id: {detail_id}", "revenue_plan_details")
 
     return detail
 
@@ -262,7 +260,7 @@ def create_revenue_plan_detail(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plan_details.create", user_id=current_user.id, detail_id=new_detail.id)
+    log_info(f"Create revenue plan detail - user_id: {current_user.id}, detail_id: {new_detail.id}", "revenue_plan_details")
 
     return new_detail
 
@@ -356,7 +354,7 @@ def bulk_create_revenue_plan_details(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plan_details.bulk_create", user_id=current_user.id, count=len(created_details))
+    log_info(f"Bulk create revenue plan details - user_id: {current_user.id}, count: {len(created_details)}", "revenue_plan_details")
 
     return created_details
 
@@ -417,7 +415,7 @@ def update_revenue_plan_detail(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plan_details.update", user_id=current_user.id, detail_id=detail_id)
+    log_info(f"Update revenue plan detail - user_id: {current_user.id}, detail_id: {detail_id}", "revenue_plan_details")
 
     return detail
 
@@ -445,9 +443,8 @@ def bulk_update_revenue_plan_details(
 
         if not detail:
             log_error(
-                "revenue_plan_details.bulk_update.not_found",
-                user_id=current_user.id,
-                detail_id=update_item.id
+                f"Bulk update: detail not found - user_id: {current_user.id}, detail_id: {update_item.id}",
+                "revenue_plan_details"
             )
             continue
 
@@ -458,19 +455,16 @@ def bulk_update_revenue_plan_details(
         if current_user.role == UserRoleEnum.USER:
             if plan.department_id != current_user.department_id:
                 log_error(
-                    "revenue_plan_details.bulk_update.access_denied",
-                    user_id=current_user.id,
-                    detail_id=detail.id
+                    f"Bulk update: access denied - user_id: {current_user.id}, detail_id: {detail.id}",
+                    "revenue_plan_details"
                 )
                 continue
 
         # Check if version is editable
         if version.status != RevenueVersionStatusEnum.DRAFT:
             log_error(
-                "revenue_plan_details.bulk_update.not_editable",
-                user_id=current_user.id,
-                detail_id=detail.id,
-                version_status=version.status
+                f"Bulk update: version not editable - user_id: {current_user.id}, detail_id: {detail.id}, version_status: {version.status}",
+                "revenue_plan_details"
             )
             continue
 
@@ -494,7 +488,7 @@ def bulk_update_revenue_plan_details(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plan_details.bulk_update", user_id=current_user.id, count=len(updated_details))
+    log_info(f"Bulk update revenue plan details - user_id: {current_user.id}, count: {len(updated_details)}", "revenue_plan_details")
 
     return updated_details
 
@@ -544,7 +538,7 @@ def delete_revenue_plan_detail(
     # Invalidate cache
     cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
 
-    log_info("revenue_plan_details.delete", user_id=current_user.id, detail_id=detail_id)
+    log_info(f"Delete revenue plan detail - user_id: {current_user.id}, detail_id: {detail_id}", "revenue_plan_details")
 
 
 @router.get("/version/{version_id}/summary")
@@ -601,7 +595,7 @@ def get_version_summary(
             category_totals[category_id] = Decimal("0")
         category_totals[category_id] += detail.total or Decimal("0")
 
-    log_info("revenue_plan_details.get_summary", user_id=current_user.id, version_id=version_id)
+    log_info(f"Get version summary - user_id: {current_user.id}, version_id: {version_id}", "revenue_plan_details")
 
     return {
         "version_id": version_id,

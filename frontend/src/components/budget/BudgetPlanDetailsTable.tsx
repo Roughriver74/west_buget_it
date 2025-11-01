@@ -3,7 +3,7 @@
  * Editable table for monthly budget planning by category
  */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag } from 'antd'
+import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag, theme } from 'antd'
 import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined, PlusOutlined } from '@ant-design/icons'
 import { LoadBaselineModal } from './LoadBaselineModal'
 import { ManageCategoriesModal } from './ManageCategoriesModal'
@@ -12,6 +12,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
 import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
 import { ExpenseType } from '@/types/budgetPlanning'
+import { useTheme } from '@/contexts/ThemeContext'
 
 const { Text } = Typography
 
@@ -95,6 +96,9 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   const [data, setData] = useState<CategoryRow[]>([])
   const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+
+  const { mode } = useTheme()
+  const { token } = theme.useToken()
 
   // Scroll state and refs
   const currentMonth = new Date().getMonth() + 1
@@ -619,7 +623,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
             onChange={(val) => handleCellChange(record.categoryId, month.key, val)}
             style={{
               width: '100%',
-              backgroundColor: isChanged ? '#fff7e6' : undefined,
+              backgroundColor: isChanged ? (mode === 'dark' ? 'rgba(250, 173, 20, 0.15)' : '#fff7e6') : undefined,
             }}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value || '').replace(/\s/g, ''))}
@@ -642,7 +646,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
   const summaryRow = (
     <Table.Summary fixed>
-      <Table.Summary.Row style={{ backgroundColor: '#fafafa' }}>
+      <Table.Summary.Row style={{ backgroundColor: mode === 'dark' ? '#262626' : '#fafafa' }}>
         <Table.Summary.Cell index={0}>
           <Text strong>Итого по месяцам</Text>
         </Table.Summary.Cell>
@@ -679,12 +683,12 @@ export const BudgetPlanDetailsTable = React.forwardRef<
           position: isSticky ? 'sticky' : 'relative',
           top: isSticky ? STICKY_HEADER_OFFSET : undefined,
           zIndex: isSticky ? 10 : 1,
-          backgroundColor: '#fff',
+          backgroundColor: token.colorBgContainer,
           paddingTop: 1,
           paddingBottom: 12,
           marginTop: isSticky ? 0 : 60,
           marginBottom: isSticky ? 16 : 0,
-          borderBottom: '2px solid #f0f0f0',
+          borderBottom: `2px solid ${token.colorBorderSecondary}`,
           boxShadow: isSticky ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
         }}
       >

@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Table, Tag, Spin, message, Button, Space, Alert, Segmented } from 'antd'
+import { Table, Tag, Spin, message, Button, Space, Alert, Segmented, theme } from 'antd'
 import { CopyOutlined, PlusOutlined, DownloadOutlined, WarningOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
 import EditableCell from './EditableCell'
 import CopyPlanModal from './CopyPlanModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface BudgetPlanTableProps {
   year: number
@@ -32,6 +33,8 @@ const BudgetPlanTable = React.forwardRef<
   const { selectedDepartment } = useDepartment()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
+  const { mode } = useTheme()
+  const { token } = theme.useToken()
 
   // Загрузка плана на год
   const { data: planData, isLoading } = useQuery({
@@ -601,11 +604,11 @@ const BudgetPlanTable = React.forwardRef<
           position: 'sticky',
           top: STICKY_HEADER_OFFSET,
           zIndex: 10,
-          backgroundColor: '#fff',
+          backgroundColor: token.colorBgContainer,
           paddingTop: 12,
           paddingBottom: 12,
           marginBottom: 0,
-          borderBottom: '2px solid #f0f0f0',
+          borderBottom: `2px solid ${token.colorBorderSecondary}`,
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         }}
       >
@@ -691,28 +694,64 @@ const BudgetPlanTable = React.forwardRef<
       />
 
       <style>{`
-        .parent-row {
-          background-color: #fafafa !important;
-          font-weight: 500;
-        }
-        .parent-row:hover {
-          background-color: #f0f0f0 !important;
-        }
-        .child-row {
-          background-color: #ffffff !important;
-        }
-        .child-row:hover {
-          background-color: #f5f5f5 !important;
-        }
-        .subtotal-row {
-          background-color: #f0f5ff !important;
-          font-weight: 600;
-        }
-        .grand-total-row {
-          background-color: #e6f7ff !important;
-          font-weight: 700;
-          font-size: 14px;
-        }
+        ${mode === 'dark' ? `
+          .parent-row {
+            background-color: #262626 !important;
+            font-weight: 500;
+          }
+          .parent-row:hover {
+            background-color: #303030 !important;
+          }
+          .child-row {
+            background-color: #1f1f1f !important;
+          }
+          .child-row:hover {
+            background-color: #262626 !important;
+          }
+          .subtotal-row {
+            background-color: #1a1a2e !important;
+            font-weight: 600;
+          }
+          .grand-total-row {
+            background-color: #252540 !important;
+            font-weight: 700;
+            font-size: 14px;
+          }
+          .ant-table-sticky-holder {
+            background: #1f1f1f;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 5;
+          }
+        ` : `
+          .parent-row {
+            background-color: #fafafa !important;
+            font-weight: 500;
+          }
+          .parent-row:hover {
+            background-color: #f0f0f0 !important;
+          }
+          .child-row {
+            background-color: #ffffff !important;
+          }
+          .child-row:hover {
+            background-color: #f5f5f5 !important;
+          }
+          .subtotal-row {
+            background-color: #f0f5ff !important;
+            font-weight: 600;
+          }
+          .grand-total-row {
+            background-color: #e6f7ff !important;
+            font-weight: 700;
+            font-size: 14px;
+          }
+          .ant-table-sticky-holder {
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            z-index: 5;
+          }
+        `}
+
         .ant-table-cell {
           padding: 8px !important;
         }
@@ -735,11 +774,6 @@ const BudgetPlanTable = React.forwardRef<
           background-color: rgba(184, 218, 255, 0.8) !important;
         }
 
-        .ant-table-sticky-holder {
-          background: #fff;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-          z-index: 5;
-        }
         .ant-table-sticky-scroll {
           display: none;
         }

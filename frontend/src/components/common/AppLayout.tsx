@@ -19,8 +19,11 @@ import {
   MenuOutlined,
   RiseOutlined,
   DollarCircleOutlined,
+  BulbOutlined,
+  BulbFilled,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 import DepartmentSelector from './DepartmentSelector'
 
 const { Header, Content, Sider } = Layout
@@ -36,6 +39,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { mode, toggleTheme } = useTheme()
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
@@ -117,6 +121,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/revenue/dashboard',
 					icon: <DashboardOutlined />,
 					label: <Link to='/revenue/dashboard'>Дашборд</Link>,
+				},
+				{
+					key: '/revenue/planning',
+					icon: <ProjectOutlined />,
+					label: <Link to='/revenue/planning'>Планирование</Link>,
 				},
 				{
 					key: '/revenue/streams',
@@ -328,6 +337,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
           <Space size={isMobile ? 'small' : 'large'}>
             {!isMobile && <DepartmentSelector />}
+            <Button
+              type="text"
+              icon={mode === 'dark' ? <BulbFilled style={{ color: '#faad14' }} /> : <BulbOutlined />}
+              onClick={toggleTheme}
+              title={mode === 'dark' ? 'Переключить на светлую тему' : 'Переключить на темную тему'}
+              aria-label={mode === 'dark' ? 'Переключить на светлую тему' : 'Переключить на темную тему'}
+            />
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Button type="text" style={{ height: 'auto', padding: '4px 8px' }}>
                 <Space size="small">
