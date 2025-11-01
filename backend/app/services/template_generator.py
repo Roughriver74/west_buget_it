@@ -363,6 +363,19 @@ class TemplateGenerator:
                 {"number": "EXP-2025-001", "category_name": "Интернет", "contractor_name": "ООО Провайдер", "organization_name": "ООО Наша компания", "amount": 15000, "request_date": "01.01.2025", "payment_date": "", "status": "PENDING", "purpose": "Оплата интернета за январь", "comment": "", "requester": "Иванов И.И."},
                 {"number": "EXP-2025-002", "category_name": "Оборудование", "contractor_name": "ООО Техника", "organization_name": "ООО Наша компания", "amount": 250000, "request_date": "05.01.2025", "payment_date": "10.01.2025", "status": "PAID", "purpose": "Покупка сервера", "comment": "Оплачено", "requester": "Петров П.П."},
             ],
+            "budget_plans": [
+                {"year": 2025, "month": 1, "category_name": "Интернет", "planned_amount": 15000, "capex_planned": 0, "opex_planned": 15000, "status": "DRAFT"},
+                {"year": 2025, "month": 1, "category_name": "Оборудование", "planned_amount": 250000, "capex_planned": 250000, "opex_planned": 0, "status": "APPROVED"},
+                {"year": 2025, "month": 2, "category_name": "Интернет", "planned_amount": 15000, "capex_planned": 0, "opex_planned": 15000, "status": "DRAFT"},
+            ],
+            "budget_plan_details": [
+                {"version_id": 1, "category_name": "Интернет", "type": "OPEX", "month": 1, "planned_amount": 15000, "subcategory": "", "calculation_method": "AVERAGE", "business_driver": "Количество сотрудников", "justification": "Средний расход за прошлый год", "based_on_year": 2024, "growth_rate": 5.0},
+                {"version_id": 1, "category_name": "Оборудование", "type": "CAPEX", "month": 1, "planned_amount": 250000, "subcategory": "Серверы", "calculation_method": "MANUAL", "business_driver": "Новый проект", "justification": "Покупка сервера для нового сервиса", "based_on_year": None, "growth_rate": None},
+            ],
+            "revenue_plan_details": [
+                {"version_id": 1, "revenue_stream_name": "Подписки", "revenue_category_name": "SaaS", "month_01": 100000, "month_02": 105000, "month_03": 110000, "month_04": 115000, "month_05": 120000, "month_06": 125000, "month_07": 130000, "month_08": 135000, "month_09": 140000, "month_10": 145000, "month_11": 150000, "month_12": 155000},
+                {"version_id": 1, "revenue_stream_name": "Консалтинг", "revenue_category_name": "Услуги", "month_01": 50000, "month_02": 50000, "month_03": 60000, "month_04": 60000, "month_05": 70000, "month_06": 70000, "month_07": 80000, "month_08": 80000, "month_09": 90000, "month_10": 90000, "month_11": 100000, "month_12": 100000},
+            ],
         }
 
         examples_en = {
@@ -385,6 +398,19 @@ class TemplateGenerator:
             "expenses": [
                 {"number": "EXP-2025-001", "category_name": "Internet", "contractor_name": "Provider LLC", "organization_name": "Our Company LLC", "amount": 15000, "request_date": "01.01.2025", "payment_date": "", "status": "PENDING", "purpose": "Internet payment for January", "comment": "", "requester": "J. Smith"},
                 {"number": "EXP-2025-002", "category_name": "Equipment", "contractor_name": "Tech LLC", "organization_name": "Our Company LLC", "amount": 250000, "request_date": "05.01.2025", "payment_date": "10.01.2025", "status": "PAID", "purpose": "Server purchase", "comment": "Paid", "requester": "P. Johnson"},
+            ],
+            "budget_plans": [
+                {"year": 2025, "month": 1, "category_name": "Internet", "planned_amount": 15000, "capex_planned": 0, "opex_planned": 15000, "status": "DRAFT"},
+                {"year": 2025, "month": 1, "category_name": "Equipment", "planned_amount": 250000, "capex_planned": 250000, "opex_planned": 0, "status": "APPROVED"},
+                {"year": 2025, "month": 2, "category_name": "Internet", "planned_amount": 15000, "capex_planned": 0, "opex_planned": 15000, "status": "DRAFT"},
+            ],
+            "budget_plan_details": [
+                {"version_id": 1, "category_name": "Internet", "type": "OPEX", "month": 1, "planned_amount": 15000, "subcategory": "", "calculation_method": "AVERAGE", "business_driver": "Employee count", "justification": "Average expense from last year", "based_on_year": 2024, "growth_rate": 5.0},
+                {"version_id": 1, "category_name": "Equipment", "type": "CAPEX", "month": 1, "planned_amount": 250000, "subcategory": "Servers", "calculation_method": "MANUAL", "business_driver": "New project", "justification": "Server purchase for new service", "based_on_year": None, "growth_rate": None},
+            ],
+            "revenue_plan_details": [
+                {"version_id": 1, "revenue_stream_name": "Subscriptions", "revenue_category_name": "SaaS", "month_01": 100000, "month_02": 105000, "month_03": 110000, "month_04": 115000, "month_05": 120000, "month_06": 125000, "month_07": 130000, "month_08": 135000, "month_09": 140000, "month_10": 145000, "month_11": 150000, "month_12": 155000},
+                {"version_id": 1, "revenue_stream_name": "Consulting", "revenue_category_name": "Services", "month_01": 50000, "month_02": 50000, "month_03": 60000, "month_04": 60000, "month_05": 70000, "month_06": 70000, "month_07": 80000, "month_08": 80000, "month_09": 90000, "month_10": 90000, "month_11": 100000, "month_12": 100000},
             ],
         }
 

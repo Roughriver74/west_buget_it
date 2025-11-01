@@ -1,0 +1,176 @@
+{
+  "entity": "revenue_plan_details",
+  "display_name": {
+    "ru": "Детали плана доходов",
+    "en": "Revenue Plan Details"
+  },
+  "description": {
+    "ru": "Импорт детального плана доходов с разбивкой по 12 месяцам",
+    "en": "Import detailed revenue plan with 12-month breakdown"
+  },
+  "fields": [
+    {
+      "name": "version_id",
+      "display_name": {"ru": "ID версии плана", "en": "Version ID"},
+      "type": "integer",
+      "required": true,
+      "aliases": ["version_id", "версия", "version"]
+    },
+    {
+      "name": "revenue_stream_name",
+      "display_name": {"ru": "Поток доходов", "en": "Revenue Stream"},
+      "type": "string",
+      "required": false,
+      "lookup_entity": "revenue_streams",
+      "lookup_field": "name",
+      "auto_create": false,
+      "aliases": ["поток_доходов", "revenue_stream", "stream", "поток"]
+    },
+    {
+      "name": "revenue_category_name",
+      "display_name": {"ru": "Категория доходов", "en": "Revenue Category"},
+      "type": "string",
+      "required": false,
+      "lookup_entity": "revenue_categories",
+      "lookup_field": "name",
+      "auto_create": false,
+      "aliases": ["категория_доходов", "revenue_category", "category", "категория"]
+    },
+    {
+      "name": "month_01",
+      "display_name": {"ru": "Январь", "en": "January"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["январь", "january", "янв", "jan", "месяц_01", "month_01", "01"]
+    },
+    {
+      "name": "month_02",
+      "display_name": {"ru": "Февраль", "en": "February"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["февраль", "february", "фев", "feb", "месяц_02", "month_02", "02"]
+    },
+    {
+      "name": "month_03",
+      "display_name": {"ru": "Март", "en": "March"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["март", "march", "мар", "mar", "месяц_03", "month_03", "03"]
+    },
+    {
+      "name": "month_04",
+      "display_name": {"ru": "Апрель", "en": "April"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["апрель", "april", "апр", "apr", "месяц_04", "month_04", "04"]
+    },
+    {
+      "name": "month_05",
+      "display_name": {"ru": "Май", "en": "May"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["май", "may", "месяц_05", "month_05", "05"]
+    },
+    {
+      "name": "month_06",
+      "display_name": {"ru": "Июнь", "en": "June"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["июнь", "june", "июн", "jun", "месяц_06", "month_06", "06"]
+    },
+    {
+      "name": "month_07",
+      "display_name": {"ru": "Июль", "en": "July"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["июль", "july", "июл", "jul", "месяц_07", "month_07", "07"]
+    },
+    {
+      "name": "month_08",
+      "display_name": {"ru": "Август", "en": "August"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["август", "august", "авг", "aug", "месяц_08", "month_08", "08"]
+    },
+    {
+      "name": "month_09",
+      "display_name": {"ru": "Сентябрь", "en": "September"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["сентябрь", "september", "сен", "sep", "месяц_09", "month_09", "09"]
+    },
+    {
+      "name": "month_10",
+      "display_name": {"ru": "Октябрь", "en": "October"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["октябрь", "october", "окт", "oct", "месяц_10", "month_10", "10"]
+    },
+    {
+      "name": "month_11",
+      "display_name": {"ru": "Ноябрь", "en": "November"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["ноябрь", "november", "ноя", "nov", "месяц_11", "month_11", "11"]
+    },
+    {
+      "name": "month_12",
+      "display_name": {"ru": "Декабрь", "en": "December"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["декабрь", "december", "дек", "dec", "месяц_12", "month_12", "12"]
+    }
+  ],
+  "validation_rules": {
+    "cross_field": [
+      {
+        "description": "Version must exist and be editable",
+        "check": "version_editable"
+      },
+      {
+        "description": "At least one of revenue_stream or revenue_category must be provided",
+        "check": "stream_or_category_required"
+      }
+    ],
+    "business_rules": [
+      {
+        "description": "Total is calculated automatically as sum of all months",
+        "check": "auto_total"
+      }
+    ]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": ["version_id", "revenue_stream_name", "revenue_category_name"],
+    "auto_create_related": false,
+    "skip_duplicates": false,
+    "batch_size": 50,
+    "calculated_fields": {
+      "total": "month_01 + month_02 + month_03 + month_04 + month_05 + month_06 + month_07 + month_08 + month_09 + month_10 + month_11 + month_12"
+    }
+  }
+}

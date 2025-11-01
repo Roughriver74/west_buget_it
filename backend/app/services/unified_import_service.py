@@ -21,15 +21,23 @@ from app.services.import_config_manager import (
 )
 from app.db.models import (
     BudgetCategory,
+    BudgetPlan,
+    BudgetPlanDetail,
+    BudgetVersion,
     Contractor,
     Organization,
     Employee,
     PayrollPlan,
     Expense,
+    RevenueStream,
+    RevenueCategory,
+    RevenuePlanDetail,
+    RevenuePlanVersion,
     User,
     CategoryTypeEnum,
     ExpenseStatusEnum,
-    EmploymentTypeEnum
+    EmploymentTypeEnum,
+    BudgetStatusEnum
 )
 
 logger = logging.getLogger(__name__)
@@ -41,11 +49,16 @@ class UnifiedImportService:
     # Map entity names to SQLAlchemy models
     ENTITY_MODELS = {
         "budget_categories": BudgetCategory,
+        "budget_plans": BudgetPlan,
+        "budget_plan_details": BudgetPlanDetail,
         "contractors": Contractor,
         "organizations": Organization,
         "employees": Employee,
         "payroll_plans": PayrollPlan,
         "expenses": Expense,
+        "revenue_streams": RevenueStream,
+        "revenue_categories": RevenueCategory,
+        "revenue_plan_details": RevenuePlanDetail,
     }
 
     def __init__(self, db: Session, current_user: User):
@@ -367,6 +380,12 @@ class UnifiedImportService:
             messages.extend(self._validate_payroll_plans(mapped_data))
         elif entity_type == "expenses":
             messages.extend(self._validate_expenses(mapped_data))
+        elif entity_type == "budget_plans":
+            messages.extend(self._validate_budget_plans(mapped_data))
+        elif entity_type == "budget_plan_details":
+            messages.extend(self._validate_budget_plan_details(mapped_data))
+        elif entity_type == "revenue_plan_details":
+            messages.extend(self._validate_revenue_plan_details(mapped_data))
 
         return messages
 
@@ -431,6 +450,177 @@ class UnifiedImportService:
 
         return messages
 
+    def _validate_budget_plans(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate budget plans business rules"""
+        messages = []
+
+        for row in data:
+            row_num = row["_row_number"]
+
+            # Check category exists
+            category_name = row.get("category_name")
+            if category_name:
+                category = self.db.query(BudgetCategory).filter(
+                    BudgetCategory.name == category_name,
+                    BudgetCategory.department_id == self.current_user.department_id,
+                    BudgetCategory.is_active == True
+                ).first()
+
+                if not category:
+                    messages.append({
+                        "row": row_num,
+                        "column": "category_name",
+                        "severity": "error",
+                        "message": f"Category '{category_name}' not found in your department",
+                        "value": category_name
+                    })
+
+            # Check amount consistency
+            planned = row.get("planned_amount", 0) or 0
+            capex = row.get("capex_planned", 0) or 0
+            opex = row.get("opex_planned", 0) or 0
+
+            if capex or opex:
+                total = capex + opex
+                if abs(total - planned) > 0.01:  # Allow small floating point differences
+                    messages.append({
+                        "row": row_num,
+                        "column": "planned_amount",
+                        "severity": "warning",
+                        "message": f"planned_amount ({planned}) should equal capex_planned + opex_planned ({total})",
+                        "value": None
+                    })
+
+        return messages
+
+    def _validate_budget_plan_details(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate budget plan details business rules"""
+        messages = []
+
+        for row in data:
+            row_num = row["_row_number"]
+
+            # Check version exists and is editable
+            version_id = row.get("version_id")
+            if version_id:
+                version = self.db.query(BudgetVersion).filter(
+                    BudgetVersion.id == version_id
+                ).first()
+
+                if not version:
+                    messages.append({
+                        "row": row_num,
+                        "column": "version_id",
+                        "severity": "error",
+                        "message": f"Budget version {version_id} not found",
+                        "value": version_id
+                    })
+                elif version.status not in ["DRAFT", "IN_REVIEW"]:
+                    messages.append({
+                        "row": row_num,
+                        "column": "version_id",
+                        "severity": "error",
+                        "message": f"Budget version {version_id} is {version.status}, cannot edit",
+                        "value": version_id
+                    })
+
+            # Check category exists
+            category_name = row.get("category_name")
+            if category_name:
+                category = self.db.query(BudgetCategory).filter(
+                    BudgetCategory.name == category_name,
+                    BudgetCategory.department_id == self.current_user.department_id
+                ).first()
+
+                if not category:
+                    messages.append({
+                        "row": row_num,
+                        "column": "category_name",
+                        "severity": "error",
+                        "message": f"Category '{category_name}' not found",
+                        "value": category_name
+                    })
+
+        return messages
+
+    def _validate_revenue_plan_details(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate revenue plan details business rules"""
+        messages = []
+
+        for row in data:
+            row_num = row["_row_number"]
+
+            # Check version exists
+            version_id = row.get("version_id")
+            if version_id:
+                version = self.db.query(RevenuePlanVersion).filter(
+                    RevenuePlanVersion.id == version_id
+                ).first()
+
+                if not version:
+                    messages.append({
+                        "row": row_num,
+                        "column": "version_id",
+                        "severity": "error",
+                        "message": f"Revenue plan version {version_id} not found",
+                        "value": version_id
+                    })
+                elif version.status not in ["DRAFT", "IN_REVIEW"]:
+                    messages.append({
+                        "row": row_num,
+                        "column": "version_id",
+                        "severity": "error",
+                        "message": f"Revenue plan version {version_id} is {version.status}, cannot edit",
+                        "value": version_id
+                    })
+
+            # Check at least one of stream or category is provided
+            stream_name = row.get("revenue_stream_name")
+            category_name = row.get("revenue_category_name")
+
+            if not stream_name and not category_name:
+                messages.append({
+                    "row": row_num,
+                    "column": "revenue_stream_name",
+                    "severity": "error",
+                    "message": "At least one of revenue_stream or revenue_category must be provided",
+                    "value": None
+                })
+
+            # Validate stream if provided
+            if stream_name:
+                stream = self.db.query(RevenueStream).filter(
+                    RevenueStream.name == stream_name,
+                    RevenueStream.department_id == self.current_user.department_id
+                ).first()
+
+                if not stream:
+                    messages.append({
+                        "row": row_num,
+                        "column": "revenue_stream_name",
+                        "severity": "error",
+                        "message": f"Revenue stream '{stream_name}' not found",
+                        "value": stream_name
+                    })
+
+            # Validate category if provided
+            if category_name:
+                category = self.db.query(RevenueCategory).filter(
+                    RevenueCategory.name == category_name,
+                    RevenueCategory.department_id == self.current_user.department_id
+                ).first()
+
+                if not category:
+                    messages.append({
+                        "row": row_num,
+                        "column": "revenue_category_name",
+                        "severity": "error",
+                        "message": f"Revenue category '{category_name}' not found",
+                        "value": category_name
+                    })
+
+        return messages
+
     def _import_entities(
         self,
         entity_type: str,
@@ -489,6 +679,16 @@ class UnifiedImportService:
                             })
                             skipped_count += 1
                             continue
+
+                # Calculate derived fields
+                calculated_fields = config.get_calculated_fields()
+                if calculated_fields:
+                    for field_name, expression in calculated_fields.items():
+                        # Simple evaluation for sum expressions
+                        if "+" in expression:
+                            field_names = [f.strip() for f in expression.split("+")]
+                            total = sum(row.get(f, 0) or 0 for f in field_names)
+                            row[field_name] = total
 
                 # Check for updates
                 existing_entity = None
