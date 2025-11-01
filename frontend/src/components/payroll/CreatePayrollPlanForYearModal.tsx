@@ -29,21 +29,6 @@ interface CreatePayrollPlanForYearModalProps {
   onClose: () => void
 }
 
-const MONTHS = [
-  'Январь',
-  'Февраль',
-  'Март',
-  'Апрель',
-  'Май',
-  'Июнь',
-  'Июль',
-  'Август',
-  'Сентябрь',
-  'Октябрь',
-  'Ноябрь',
-  'Декабрь',
-]
-
 export const CreatePayrollPlanForYearModal: React.FC<CreatePayrollPlanForYearModalProps> = ({
   open,
   onClose,

@@ -7,7 +7,6 @@ import { Modal, Form, Input, Select, message } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { categoriesApi } from '@/api/categories'
 import { ExpenseType } from '@/types/budgetPlanning'
-import type { BudgetCategory } from '@/types'
 
 interface CreateCategoryModalProps {
   open: boolean
