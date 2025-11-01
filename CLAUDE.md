@@ -73,6 +73,50 @@ postgresql://budget_user:budget_pass@localhost:54329/it_budget_db
 ```
 
 ### Data Import
+
+#### Universal Import System (Recommended)
+```bash
+# 1. Get available entities
+curl -X GET "http://localhost:8000/api/v1/import/entities" -H "Authorization: Bearer $TOKEN"
+
+# 2. Download template
+curl -X GET "http://localhost:8000/api/v1/import/template/employees?language=ru" \
+  -H "Authorization: Bearer $TOKEN" -o template.xlsx
+
+# 3. Preview import (analyze file structure)
+curl -X POST "http://localhost:8000/api/v1/import/preview" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "entity_type=employees" \
+  -F "file=@employees.xlsx"
+
+# 4. Validate data
+curl -X POST "http://localhost:8000/api/v1/import/validate" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "entity_type=employees" \
+  -F 'column_mapping={"ФИО":"full_name","Должность":"position","Оклад":"base_salary"}' \
+  -F "file=@employees.xlsx"
+
+# 5. Execute import
+curl -X POST "http://localhost:8000/api/v1/import/execute" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "entity_type=employees" \
+  -F 'column_mapping={"ФИО":"full_name","Должность":"position","Оклад":"base_salary"}' \
+  -F "file=@employees.xlsx"
+```
+
+**Features:**
+- ✅ Dynamic data type detection
+- ✅ Flexible column mapping
+- ✅ Preview before import
+- ✅ Detailed validation with row-level errors
+- ✅ Multi-language templates (RU/EN)
+- ✅ Auto-create related entities
+
+**Supported entities:** categories, contractors, organizations, employees, payroll_plans, expenses
+
+See full documentation: `docs/UNIVERSAL_IMPORT_SYSTEM.md`
+
+#### Legacy Scripts (Manual)
 ```bash
 cd backend
 python scripts/import_excel.py --file ../IT_Budget_Analysis_Full.xlsx

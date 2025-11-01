@@ -1,0 +1,150 @@
+{
+  "entity": "expenses",
+  "display_name": {
+    "ru": "Расходы",
+    "en": "Expenses"
+  },
+  "description": {
+    "ru": "Импорт заявок на расходование средств",
+    "en": "Import expense requests"
+  },
+  "fields": [
+    {
+      "name": "number",
+      "display_name": {"ru": "Номер заявки", "en": "Request Number"},
+      "type": "string",
+      "required": false,
+      "max_length": 50,
+      "aliases": ["номер", "number", "номер_заявки", "request_number", "заявка"]
+    },
+    {
+      "name": "category_name",
+      "display_name": {"ru": "Категория", "en": "Category"},
+      "type": "string",
+      "required": true,
+      "lookup_entity": "budget_categories",
+      "lookup_field": "name",
+      "auto_create": true,
+      "aliases": ["категория", "category", "статья", "category_name"]
+    },
+    {
+      "name": "contractor_name",
+      "display_name": {"ru": "Контрагент", "en": "Contractor"},
+      "type": "string",
+      "required": true,
+      "lookup_entity": "contractors",
+      "lookup_field": "name",
+      "auto_create": true,
+      "aliases": ["контрагент", "contractor", "поставщик", "supplier", "получатель"]
+    },
+    {
+      "name": "organization_name",
+      "display_name": {"ru": "Организация", "en": "Organization"},
+      "type": "string",
+      "required": false,
+      "lookup_entity": "organizations",
+      "lookup_field": "name",
+      "auto_create": true,
+      "aliases": ["организация", "organization", "org"]
+    },
+    {
+      "name": "amount",
+      "display_name": {"ru": "Сумма", "en": "Amount"},
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "aliases": ["сумма", "amount", "sum", "сумма_документа"]
+    },
+    {
+      "name": "request_date",
+      "display_name": {"ru": "Дата заявки", "en": "Request Date"},
+      "type": "date",
+      "required": false,
+      "aliases": ["дата_заявки", "request_date", "дата заявки", "желательная_дата_платежа"]
+    },
+    {
+      "name": "payment_date",
+      "display_name": {"ru": "Дата оплаты", "en": "Payment Date"},
+      "type": "date",
+      "required": false,
+      "aliases": ["дата_оплаты", "payment_date", "дата оплаты"]
+    },
+    {
+      "name": "status",
+      "display_name": {"ru": "Статус", "en": "Status"},
+      "type": "enum",
+      "required": false,
+      "enum": ["DRAFT", "PENDING", "APPROVED", "REJECTED", "PAID", "CANCELLED"],
+      "default": "PENDING",
+      "aliases": ["статус", "status"],
+      "value_mapping": {
+        "черновик": "DRAFT",
+        "к оплате": "PENDING",
+        "ожидает": "PENDING",
+        "согласована": "APPROVED",
+        "утверждена": "APPROVED",
+        "отклонена": "REJECTED",
+        "оплачена": "PAID",
+        "оплачено": "PAID",
+        "отменена": "CANCELLED",
+        "draft": "DRAFT",
+        "pending": "PENDING",
+        "approved": "APPROVED",
+        "rejected": "REJECTED",
+        "paid": "PAID",
+        "cancelled": "CANCELLED"
+      }
+    },
+    {
+      "name": "purpose",
+      "display_name": {"ru": "Назначение платежа", "en": "Purpose"},
+      "type": "string",
+      "required": false,
+      "max_length": 1000,
+      "aliases": ["назначение", "purpose", "назначение_платежа", "описание"]
+    },
+    {
+      "name": "comment",
+      "display_name": {"ru": "Комментарий", "en": "Comment"},
+      "type": "string",
+      "required": false,
+      "max_length": 500,
+      "aliases": ["комментарий", "comment", "примечание", "notes"]
+    },
+    {
+      "name": "requester",
+      "display_name": {"ru": "Кто заявил", "en": "Requester"},
+      "type": "string",
+      "required": false,
+      "max_length": 255,
+      "aliases": ["кто_заявил", "requester", "инициатор", "автор"]
+    }
+  ],
+  "validation_rules": {
+    "cross_field": [
+      {
+        "description": "Payment date must be after request date",
+        "check": "payment_after_request"
+      },
+      {
+        "description": "Category must exist in system",
+        "check": "category_exists"
+      }
+    ],
+    "business_rules": [
+      {
+        "description": "PAID status requires payment_date",
+        "check": "paid_requires_date"
+      }
+    ]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "number",
+    "auto_create_related": true,
+    "skip_duplicates": false,
+    "batch_size": 100,
+    "mark_as_imported": true,
+    "needs_review": false
+  }
+}

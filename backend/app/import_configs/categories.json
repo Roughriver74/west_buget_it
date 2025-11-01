@@ -1,0 +1,64 @@
+{
+  "entity": "budget_categories",
+  "display_name": {
+    "ru": "Бюджетные категории",
+    "en": "Budget Categories"
+  },
+  "description": {
+    "ru": "Импорт категорий расходов (OPEX/CAPEX)",
+    "en": "Import expense categories (OPEX/CAPEX)"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "display_name": {"ru": "Название", "en": "Name"},
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "min_length": 2,
+      "max_length": 255,
+      "aliases": ["название", "name", "наименование", "title", "category_name"]
+    },
+    {
+      "name": "type",
+      "display_name": {"ru": "Тип", "en": "Type"},
+      "type": "enum",
+      "required": true,
+      "enum": ["OPEX", "CAPEX"],
+      "aliases": ["тип", "type", "category_type"],
+      "case_insensitive": true
+    },
+    {
+      "name": "description",
+      "display_name": {"ru": "Описание", "en": "Description"},
+      "type": "string",
+      "required": false,
+      "max_length": 500,
+      "aliases": ["описание", "description", "desc", "примечание"]
+    },
+    {
+      "name": "is_active",
+      "display_name": {"ru": "Активна", "en": "Active"},
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активна", "is_active", "active", "enabled", "активен"]
+    }
+  ],
+  "validation_rules": {
+    "cross_field": [],
+    "business_rules": [
+      {
+        "description": "Category name must be unique within department",
+        "check": "unique_name"
+      }
+    ]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "name",
+    "auto_create_related": false,
+    "skip_duplicates": false,
+    "batch_size": 100
+  }
+}
