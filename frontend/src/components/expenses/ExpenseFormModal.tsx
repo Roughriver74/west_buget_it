@@ -72,14 +72,20 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: number; values: any }) =>
       expensesApi.update(id, values),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('✅ Заявка успешно обновлена:', data)
       message.success('Заявка успешно обновлена')
+      // Invalidate all expenses queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['expenses'] })
+      // Also refetch to ensure immediate update
+      queryClient.refetchQueries({ queryKey: ['expenses'] })
       form.resetFields()
       onCancel()
     },
     onError: (error: any) => {
-      message.error(`Ошибка при обновлении заявки: ${error.message}`)
+      console.error('❌ Ошибка при обновлении заявки:', error)
+      console.error('Детали ошибки:', error.response?.data)
+      message.error(`Ошибка при обновлении заявки: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -112,18 +118,26 @@ const ExpenseFormModal: React.FC<ExpenseFormModalProps> = ({
     try {
       const values = await form.validateFields()
 
-      // Format dates to ISO string
+      // Format dates to ISO string with time set to noon to avoid timezone issues
       const formattedValues = {
         ...values,
         request_date: values.request_date
-          ? dayjs(values.request_date).toISOString()
+          ? dayjs(values.request_date).hour(12).minute(0).second(0).millisecond(0).toISOString()
           : undefined,
         payment_date: values.payment_date
-          ? dayjs(values.payment_date).toISOString()
+          ? dayjs(values.payment_date).hour(12).minute(0).second(0).millisecond(0).toISOString()
           : undefined,
         is_paid: values.status === 'PAID',
         is_closed: values.status === 'CLOSED',
       }
+
+      console.log('📤 Отправка данных на сервер:', {
+        mode,
+        expenseId: expense?.id,
+        formattedValues,
+        originalRequestDate: expense?.request_date,
+        newRequestDate: formattedValues.request_date,
+      })
 
       if (mode === 'create') {
         createMutation.mutate(formattedValues)
