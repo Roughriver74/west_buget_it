@@ -1,0 +1,92 @@
+{
+  "entity": "employees",
+  "display_name": {
+    "ru": "Сотрудники",
+    "en": "Employees"
+  },
+  "description": {
+    "ru": "Импорт данных сотрудников",
+    "en": "Import employee data"
+  },
+  "fields": [
+    {
+      "name": "full_name",
+      "display_name": {"ru": "ФИО", "en": "Full Name"},
+      "type": "string",
+      "required": true,
+      "min_length": 3,
+      "max_length": 255,
+      "aliases": ["фио", "full_name", "имя", "name", "сотрудник", "employee"]
+    },
+    {
+      "name": "position",
+      "display_name": {"ru": "Должность", "en": "Position"},
+      "type": "string",
+      "required": true,
+      "max_length": 255,
+      "aliases": ["должность", "position", "роль", "role", "title"]
+    },
+    {
+      "name": "base_salary",
+      "display_name": {"ru": "Базовый оклад", "en": "Base Salary"},
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "max": 10000000,
+      "aliases": ["базовый_оклад", "base_salary", "оклад", "salary", "зарплата"]
+    },
+    {
+      "name": "hire_date",
+      "display_name": {"ru": "Дата приема", "en": "Hire Date"},
+      "type": "date",
+      "required": false,
+      "aliases": ["дата_приема", "hire_date", "дата_найма", "дата приема"]
+    },
+    {
+      "name": "employment_type",
+      "display_name": {"ru": "Тип занятости", "en": "Employment Type"},
+      "type": "enum",
+      "required": false,
+      "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"],
+      "default": "FULL_TIME",
+      "aliases": ["тип_занятости", "employment_type", "тип", "type"],
+      "value_mapping": {
+        "полная": "FULL_TIME",
+        "частичная": "PART_TIME",
+        "контракт": "CONTRACT",
+        "фриланс": "FREELANCE",
+        "full": "FULL_TIME",
+        "part": "PART_TIME"
+      }
+    },
+    {
+      "name": "is_active",
+      "display_name": {"ru": "Активен", "en": "Active"},
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активен", "is_active", "active", "работает"]
+    }
+  ],
+  "validation_rules": {
+    "cross_field": [
+      {
+        "description": "Hire date cannot be in the future",
+        "check": "hire_date_not_future"
+      }
+    ],
+    "business_rules": [
+      {
+        "description": "Full name must be unique within department",
+        "check": "unique_full_name"
+      }
+    ]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "full_name",
+    "auto_create_related": false,
+    "skip_duplicates": false,
+    "batch_size": 50
+  }
+}

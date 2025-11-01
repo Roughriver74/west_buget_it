@@ -1,0 +1,72 @@
+{
+  "entity": "contractors",
+  "display_name": {
+    "ru": "Контрагенты",
+    "en": "Contractors"
+  },
+  "description": {
+    "ru": "Импорт контрагентов и поставщиков",
+    "en": "Import contractors and suppliers"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "display_name": {"ru": "Название", "en": "Name"},
+      "type": "string",
+      "required": true,
+      "min_length": 2,
+      "max_length": 255,
+      "aliases": ["название", "name", "наименование", "полное_название", "full_name"]
+    },
+    {
+      "name": "short_name",
+      "display_name": {"ru": "Краткое название", "en": "Short Name"},
+      "type": "string",
+      "required": false,
+      "max_length": 100,
+      "aliases": ["краткое_название", "short_name", "краткое название", "сокращение"]
+    },
+    {
+      "name": "inn",
+      "display_name": {"ru": "ИНН", "en": "INN"},
+      "type": "string",
+      "required": false,
+      "unique": true,
+      "pattern": "^[0-9]{10}$|^[0-9]{12}$",
+      "aliases": ["инн", "inn", "tax_id"]
+    },
+    {
+      "name": "contact_info",
+      "display_name": {"ru": "Контактная информация", "en": "Contact Info"},
+      "type": "string",
+      "required": false,
+      "max_length": 500,
+      "aliases": ["контактная_информация", "contact_info", "контакты", "contacts", "телефон", "phone"]
+    },
+    {
+      "name": "is_active",
+      "display_name": {"ru": "Активен", "en": "Active"},
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активен", "is_active", "active", "enabled"]
+    }
+  ],
+  "validation_rules": {
+    "cross_field": [],
+    "business_rules": [
+      {
+        "description": "INN must be unique if provided",
+        "check": "unique_inn"
+      }
+    ]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "inn",
+    "update_key_fallback": "name",
+    "auto_create_related": false,
+    "skip_duplicates": false,
+    "batch_size": 100
+  }
+}
