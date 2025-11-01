@@ -1,13 +1,16 @@
 /**
  * Manage Categories Modal
- * Allows adding/removing categories from budget version
+ * Allows adding/removing categories from budget version and creating new categories
  */
 import React, { useState, useMemo } from 'react'
-import { Modal, Transfer, message, Alert, Space, Typography } from 'antd'
+import { Modal, Transfer, message, Alert, Space, Typography, Button, Form, Input, Select, Divider } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
 import type { Key } from 'react'
 import { planDetailsApi } from '@/api/budgetPlanning'
 import type { BudgetPlanDetail } from '@/types/budgetPlanning'
 import { ExpenseType } from '@/types/budgetPlanning'
+import { categoriesApi } from '@/api/categories'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 const { Text } = Typography
 
@@ -40,7 +43,26 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const queryClient = useQueryClient()
   const [removing, setRemoving] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createForm] = Form.useForm()
+
+  // Create category mutation
+  const createCategoryMutation = useMutation({
+    mutationFn: (data: { name: string; type: ExpenseType; parent_id?: number | null }) =>
+      categoriesApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      message.success('Категория создана')
+      createForm.resetFields()
+      setShowCreateForm(false)
+      onSuccess()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.detail || 'Ошибка при создании категории')
+    },
+  })
 
   // Get categories that have plan details
   const usedCategoryIds = useMemo(() => {
@@ -124,11 +146,25 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
         okButtonProps: { danger: true },
         onOk: async () => {
           await handleRemoveCategories(toRemove)
+          onClose() // Закрываем модальное окно после успешного удаления
         },
       })
     } else {
       message.info('Нет изменений')
       onClose()
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    try {
+      const values = await createForm.validateFields()
+      await createCategoryMutation.mutateAsync({
+        name: values.name,
+        type: values.type,
+        parent_id: values.parent_id || null,
+      })
+    } catch (error) {
+      console.error('Create category error:', error)
     }
   }
 
@@ -139,14 +175,29 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
         .filter(cat => usedCategoryIds.has(cat.id))
         .map(cat => cat.id.toString())
     )
+    setShowCreateForm(false)
+    createForm.resetFields()
     onClose()
   }
+
+  // Get parent category options (only parent categories can be selected as parents)
+  const parentCategoryOptions = useMemo(() => {
+    return categories
+      .filter(cat => {
+        const hasChildren = categories.some(c => c.parentId === cat.id)
+        return hasChildren || cat.parentId === null
+      })
+      .map(cat => ({
+        label: cat.name,
+        value: cat.id,
+      }))
+  }, [categories])
 
   return (
     <Modal
       open={open}
       title="Управление категориями"
-      width={800}
+      width={900}
       onCancel={handleClose}
       onOk={handleSave}
       confirmLoading={removing}
@@ -167,6 +218,80 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
           type="info"
           showIcon
         />
+
+        {/* Create Category Section */}
+        <div>
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            style={{ width: '100%' }}
+          >
+            {showCreateForm ? 'Скрыть форму создания' : 'Создать новую категорию'}
+          </Button>
+
+          {showCreateForm && (
+            <div style={{ marginTop: 16, padding: 16, border: '1px solid #d9d9d9', borderRadius: 4 }}>
+              <Form
+                form={createForm}
+                layout="vertical"
+                onFinish={handleCreateCategory}
+              >
+                <Form.Item
+                  name="name"
+                  label="Название категории"
+                  rules={[{ required: true, message: 'Введите название категории' }]}
+                >
+                  <Input placeholder="Например: Облачные сервисы" />
+                </Form.Item>
+
+                <Form.Item
+                  name="type"
+                  label="Тип расходов"
+                  rules={[{ required: true, message: 'Выберите тип расходов' }]}
+                >
+                  <Select placeholder="Выберите тип">
+                    <Select.Option value={ExpenseType.OPEX}>OPEX (Операционные расходы)</Select.Option>
+                    <Select.Option value={ExpenseType.CAPEX}>CAPEX (Капитальные расходы)</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="parent_id"
+                  label="Родительская категория (опционально)"
+                >
+                  <Select
+                    placeholder="Выберите родительскую категорию или оставьте пустым"
+                    allowClear
+                    options={parentCategoryOptions}
+                  />
+                </Form.Item>
+
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Space>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={createCategoryMutation.isPending}
+                    >
+                      Создать категорию
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowCreateForm(false)
+                        createForm.resetFields()
+                      }}
+                    >
+                      Отмена
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+            </div>
+          )}
+        </div>
+
+        <Divider />
 
         <Transfer
           dataSource={transferData}

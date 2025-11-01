@@ -4,9 +4,10 @@
  */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag } from 'antd'
-import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined } from '@ant-design/icons'
+import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined, PlusOutlined } from '@ant-design/icons'
 import { LoadBaselineModal } from './LoadBaselineModal'
 import { ManageCategoriesModal } from './ManageCategoriesModal'
+import { CreateCategoryModal } from './CreateCategoryModal'
 import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
 import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
@@ -114,6 +115,9 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
   // Manage categories modal state
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState<boolean>(false)
+
+  // Create category modal state
+  const [createCategoryOpen, setCreateCategoryOpen] = useState<boolean>(false)
 
   const { orderedCategories, descendantsMap } = useMemo(() => {
     if (!categories.length) {
@@ -741,16 +745,23 @@ export const BudgetPlanDetailsTable = React.forwardRef<
             {isEditable && (
               <>
                 <Button
-                  icon={<DownloadOutlined />}
-                  onClick={() => setBaselineModalOpen(true)}
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => setCreateCategoryOpen(true)}
                 >
-                  Загрузить из {year - 1} года
+                  Создать категорию
                 </Button>
                 <Button
                   icon={<AppstoreAddOutlined />}
                   onClick={() => setManageCategoriesOpen(true)}
                 >
                   Управление категориями
+                </Button>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={() => setBaselineModalOpen(true)}
+                >
+                  Загрузить из {year - 1} года
                 </Button>
               </>
             )}
@@ -831,6 +842,16 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         onSuccess={() => {
           onAfterSave?.()
         }}
+      />
+
+      {/* Create Category Modal */}
+      <CreateCategoryModal
+        open={createCategoryOpen}
+        onClose={() => setCreateCategoryOpen(false)}
+        onSuccess={() => {
+          onAfterSave?.()
+        }}
+        categories={categories}
       />
     </div>
   )
