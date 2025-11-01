@@ -31,6 +31,7 @@ import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
 import PayrollActualFormModal from '../components/payroll/PayrollActualFormModal';
 import PayrollImportModal from '../components/payroll/PayrollImportModal';
 import GeneratePayrollExpensesModal from '../components/payroll/GeneratePayrollExpensesModal';
+import { CreatePayrollPlanForYearModal } from '../components/payroll/CreatePayrollPlanForYearModal';
 
 const { Option } = Select;
 
@@ -48,6 +49,7 @@ export default function PayrollPlanPage() {
   const [actualModalVisible, setActualModalVisible] = useState(false);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [generateExpensesModalVisible, setGenerateExpensesModalVisible] = useState(false);
+  const [createYearPlanModalVisible, setCreateYearPlanModalVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
   const [editingPlan, setEditingPlan] = useState<PayrollPlanWithEmployee | null>(null);
 
@@ -163,6 +165,15 @@ export default function PayrollPlanPage() {
       label: 'Добавить факт',
       icon: <PlusOutlined />,
       onClick: () => handleAddActual(),
+    },
+    {
+      type: 'divider',
+    },
+    {
+      key: 'create-year-plan',
+      label: 'Создать план на год',
+      icon: <TeamOutlined />,
+      onClick: () => setCreateYearPlanModalVisible(true),
     },
     {
       type: 'divider',
@@ -509,6 +520,11 @@ export default function PayrollPlanPage() {
       <GeneratePayrollExpensesModal
         open={generateExpensesModalVisible}
         onClose={() => setGenerateExpensesModalVisible(false)}
+      />
+
+      <CreatePayrollPlanForYearModal
+        open={createYearPlanModalVisible}
+        onClose={() => setCreateYearPlanModalVisible(false)}
       />
     </div>
   );
