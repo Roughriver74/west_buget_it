@@ -37,7 +37,7 @@ export const BudgetScenarioCard: React.FC<BudgetScenarioCardProps> = ({
   onSelect,
   selected = false,
 }) => {
-  const { scenario_name, scenario_type, year, global_growth_rate, inflation_rate, fx_rate, description, assumptions } = scenario
+  const { scenario_name, scenario_type, year, global_growth_rate, inflation_rate, fx_rate, description } = scenario
 
   return (
     <Card
