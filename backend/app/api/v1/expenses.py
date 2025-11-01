@@ -304,6 +304,20 @@ def create_expense(
 
     # Determine the department_id we'll be using
     expense_data = expense.model_dump()
+
+    # Convert ISO date strings to datetime if needed (fix timezone issues)
+    if 'request_date' in expense_data and expense_data['request_date']:
+        if isinstance(expense_data['request_date'], str):
+            # Parse ISO string and ensure time is set to noon to avoid timezone shift
+            dt = datetime.fromisoformat(expense_data['request_date'].replace('Z', '+00:00'))
+            expense_data['request_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=None)
+
+    if 'payment_date' in expense_data and expense_data['payment_date']:
+        if isinstance(expense_data['payment_date'], str):
+            # Parse ISO string and ensure time is set to noon to avoid timezone shift
+            dt = datetime.fromisoformat(expense_data['payment_date'].replace('Z', '+00:00'))
+            expense_data['payment_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=None)
+
     target_department_id = None
 
     if current_user.role == UserRoleEnum.USER:
@@ -419,6 +433,19 @@ def update_expense(
 
     # Update fields
     update_data = expense.model_dump(exclude_unset=True)
+
+    # Convert ISO date strings to datetime if needed (fix timezone issues)
+    if 'request_date' in update_data and update_data['request_date']:
+        if isinstance(update_data['request_date'], str):
+            # Parse ISO string and ensure time is set to noon to avoid timezone shift
+            dt = datetime.fromisoformat(update_data['request_date'].replace('Z', '+00:00'))
+            update_data['request_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=None)
+
+    if 'payment_date' in update_data and update_data['payment_date']:
+        if isinstance(update_data['payment_date'], str):
+            # Parse ISO string and ensure time is set to noon to avoid timezone shift
+            dt = datetime.fromisoformat(update_data['payment_date'].replace('Z', '+00:00'))
+            update_data['payment_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0, tzinfo=None)
 
     # SECURITY: Validate that new category/contractor belong to same department (for USER)
     if current_user.role == UserRoleEnum.USER:

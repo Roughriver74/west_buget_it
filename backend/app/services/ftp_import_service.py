@@ -160,23 +160,30 @@ class FTPImportService:
                     expense['status'] = 'PENDING'  # Default status
 
                 # Parse dates (format: dd.mm.yyyy)
+                # Set time to 12:00 (noon) to avoid timezone conversion issues
                 if expense.get('request_date'):
                     if isinstance(expense['request_date'], str):
                         # Parse date in format dd.mm.yyyy
                         expense['request_date'] = pd.to_datetime(expense['request_date'], format='%d.%m.%Y', errors='coerce')
                         if pd.notna(expense['request_date']):
-                            expense['request_date'] = expense['request_date'].to_pydatetime()
+                            # Set time to 12:00 to avoid timezone issues (prevents day shift)
+                            dt = expense['request_date'].to_pydatetime()
+                            expense['request_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0)
                     elif isinstance(expense['request_date'], pd.Timestamp):
-                        expense['request_date'] = expense['request_date'].to_pydatetime()
+                        dt = expense['request_date'].to_pydatetime()
+                        expense['request_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0)
 
                 if expense.get('payment_date'):
                     if isinstance(expense['payment_date'], str):
                         # Parse date in format dd.mm.yyyy
                         expense['payment_date'] = pd.to_datetime(expense['payment_date'], format='%d.%m.%Y', errors='coerce')
                         if pd.notna(expense['payment_date']):
-                            expense['payment_date'] = expense['payment_date'].to_pydatetime()
+                            # Set time to 12:00 to avoid timezone issues (prevents day shift)
+                            dt = expense['payment_date'].to_pydatetime()
+                            expense['payment_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0)
                     elif isinstance(expense['payment_date'], pd.Timestamp):
-                        expense['payment_date'] = expense['payment_date'].to_pydatetime()
+                        dt = expense['payment_date'].to_pydatetime()
+                        expense['payment_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0)
 
                 # Parse amount
                 if expense.get('amount'):
@@ -510,13 +517,8 @@ class FTPImportService:
                     continue
 
                 # Find/create related entities
-                # Use smart keyword matching for category
-                category = self.find_category_by_keywords(
-                    db,
-                    comment=expense_data.get('comment'),
-                    purpose=expense_data.get('purpose'),
-                    dds_category=expense_data.get('category_name')
-                )
+                # Don't auto-assign category - leave it None for manual assignment
+                category = None
 
                 contractor = self.find_or_create_contractor(
                     db,
