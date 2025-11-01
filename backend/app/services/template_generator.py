@@ -352,8 +352,8 @@ class TemplateGenerator:
                 {"name": "ИП Иванов И.И.", "short_name": "Иванов", "inn": "123456789012", "contact_info": "ivanov@mail.ru", "is_active": "Да"},
             ],
             "employees": [
-                {"full_name": "Иванов Иван Иванович", "position": "Системный администратор", "base_salary": 80000, "hire_date": "01.01.2023", "employment_type": "FULL_TIME", "is_active": "Да"},
-                {"full_name": "Петрова Мария Сергеевна", "position": "Разработчик", "base_salary": 120000, "hire_date": "15.03.2023", "employment_type": "FULL_TIME", "is_active": "Да"},
+                {"full_name": "Иванов Иван Иванович", "position": "Системный администратор", "base_salary": 80000, "hire_date": "01.01.2023", "employee_number": "E001"},
+                {"full_name": "Петрова Мария Сергеевна", "position": "Разработчик", "base_salary": 120000, "hire_date": "15.03.2023", "employee_number": "E002"},
             ],
             "payroll_plans": [
                 {"year": 2025, "month": 1, "employee_name": "Иванов Иван Иванович", "base_salary": 80000, "bonus": 8000, "other_payments": 0, "notes": ""},
@@ -388,8 +388,8 @@ class TemplateGenerator:
                 {"name": "IP Ivanov I.I.", "short_name": "Ivanov", "inn": "123456789012", "contact_info": "ivanov@mail.ru", "is_active": "Yes"},
             ],
             "employees": [
-                {"full_name": "John Smith", "position": "System Administrator", "base_salary": 80000, "hire_date": "01.01.2023", "employment_type": "FULL_TIME", "is_active": "Yes"},
-                {"full_name": "Mary Johnson", "position": "Developer", "base_salary": 120000, "hire_date": "15.03.2023", "employment_type": "FULL_TIME", "is_active": "Yes"},
+                {"full_name": "John Smith", "position": "System Administrator", "base_salary": 80000, "hire_date": "01.01.2023", "employee_number": "E001"},
+                {"full_name": "Mary Johnson", "position": "Developer", "base_salary": 120000, "hire_date": "15.03.2023", "employee_number": "E002"},
             ],
             "payroll_plans": [
                 {"year": 2025, "month": 1, "employee_name": "John Smith", "base_salary": 80000, "bonus": 8000, "other_payments": 0, "notes": ""},

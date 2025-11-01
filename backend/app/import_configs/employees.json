@@ -43,29 +43,12 @@
       "aliases": ["дата_приема", "hire_date", "дата_найма", "дата приема"]
     },
     {
-      "name": "employment_type",
-      "display_name": {"ru": "Тип занятости", "en": "Employment Type"},
-      "type": "enum",
+      "name": "employee_number",
+      "display_name": {"ru": "Табельный номер", "en": "Employee Number"},
+      "type": "string",
       "required": false,
-      "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"],
-      "default": "FULL_TIME",
-      "aliases": ["тип_занятости", "employment_type", "тип", "type"],
-      "value_mapping": {
-        "полная": "FULL_TIME",
-        "частичная": "PART_TIME",
-        "контракт": "CONTRACT",
-        "фриланс": "FREELANCE",
-        "full": "FULL_TIME",
-        "part": "PART_TIME"
-      }
-    },
-    {
-      "name": "is_active",
-      "display_name": {"ru": "Активен", "en": "Active"},
-      "type": "boolean",
-      "required": false,
-      "default": true,
-      "aliases": ["активен", "is_active", "active", "работает"]
+      "max_length": 50,
+      "aliases": ["табельный_номер", "employee_number", "номер", "number"]
     }
   ],
   "validation_rules": {

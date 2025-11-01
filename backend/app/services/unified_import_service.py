@@ -34,9 +34,8 @@ from app.db.models import (
     RevenuePlanDetail,
     RevenuePlanVersion,
     User,
-    CategoryTypeEnum,
+    ExpenseTypeEnum,
     ExpenseStatusEnum,
-    EmploymentTypeEnum,
     BudgetStatusEnum
 )
 
@@ -769,9 +768,9 @@ class UnifiedImportService:
             # Detect OPEX/CAPEX from name
             name_lower = name.lower()
             if any(kw in name_lower for kw in ["оборудование", "техника", "hardware", "equipment"]):
-                entity_data["type"] = CategoryTypeEnum.CAPEX
+                entity_data["type"] = ExpenseTypeEnum.CAPEX
             else:
-                entity_data["type"] = CategoryTypeEnum.OPEX
+                entity_data["type"] = ExpenseTypeEnum.OPEX
 
         entity = model_class(**entity_data)
         self.db.add(entity)
