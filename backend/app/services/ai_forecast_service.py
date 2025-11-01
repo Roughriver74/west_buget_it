@@ -9,7 +9,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, and_
 from decimal import Decimal
 
-from app.db.models import Expense, BudgetCategory, Contractor, ExpenseStatusEnum
+from app.db.models import (
+    Expense, BudgetCategory, Contractor, ExpenseStatusEnum,
+    BudgetVersion, BudgetPlanDetail, BudgetVersionStatusEnum
+)
 from app.core.config import settings
 
 # Module-level logger
@@ -141,10 +144,101 @@ class AIForecastService:
             "total_expenses": sum(s.count for s in monthly_stats),
         }
 
+    def get_approved_budget_plans(
+        self,
+        department_id: int,
+        year: int,
+        month: int,
+        category_id: Optional[int] = None,
+    ) -> Dict:
+        """
+        Get approved budget plans for the target month
+
+        Args:
+            department_id: Department ID
+            year: Target year
+            month: Target month (1-12)
+            category_id: Optional category filter
+
+        Returns:
+            Dict with approved budget plan data
+        """
+        # Find approved budget version for the target year
+        approved_version = (
+            self.db.query(BudgetVersion)
+            .filter(
+                BudgetVersion.department_id == department_id,
+                BudgetVersion.year == year,
+                BudgetVersion.status == BudgetVersionStatusEnum.APPROVED,
+            )
+            .order_by(BudgetVersion.approved_at.desc())
+            .first()
+        )
+
+        if not approved_version:
+            return {
+                "has_approved_plan": False,
+                "total_planned": 0,
+                "categories": [],
+            }
+
+        # Get plan details for the target month
+        query = (
+            self.db.query(
+                BudgetPlanDetail.category_id,
+                BudgetCategory.name.label("category_name"),
+                BudgetPlanDetail.planned_amount,
+                BudgetPlanDetail.type,
+                BudgetPlanDetail.justification,
+                BudgetPlanDetail.calculation_method,
+            )
+            .join(BudgetCategory, BudgetPlanDetail.category_id == BudgetCategory.id)
+            .filter(
+                BudgetPlanDetail.version_id == approved_version.id,
+                BudgetPlanDetail.month == month,
+            )
+        )
+
+        if category_id:
+            query = query.filter(BudgetPlanDetail.category_id == category_id)
+
+        plan_details = query.all()
+
+        if not plan_details:
+            return {
+                "has_approved_plan": False,
+                "total_planned": 0,
+                "categories": [],
+            }
+
+        categories = [
+            {
+                "category_id": detail.category_id,
+                "category_name": detail.category_name,
+                "planned_amount": float(detail.planned_amount),
+                "type": detail.type,
+                "justification": detail.justification,
+                "calculation_method": detail.calculation_method,
+            }
+            for detail in plan_details
+        ]
+
+        total_planned = sum(float(detail.planned_amount) for detail in plan_details)
+
+        return {
+            "has_approved_plan": True,
+            "version_id": approved_version.id,
+            "version_name": approved_version.version_name or f"Версия {approved_version.version_number}",
+            "approved_at": approved_version.approved_at.isoformat() if approved_version.approved_at else None,
+            "total_planned": total_planned,
+            "categories": categories,
+        }
+
     def build_ai_prompt(
         self,
         historical_data: List[Dict],
         statistics: Dict,
+        approved_plans: Dict,
         year: int,
         month: int,
         category_name: Optional[str] = None,
@@ -155,6 +249,7 @@ class AIForecastService:
         Args:
             historical_data: List of historical expenses
             statistics: Statistical summary
+            approved_plans: Approved budget plans data
             year: Target forecast year
             month: Target forecast month
             category_name: Optional category name for context
@@ -212,9 +307,32 @@ class AIForecastService:
             ]
         )
 
+        # Format approved budget plans (if available)
+        approved_plans_text = ""
+        if approved_plans.get("has_approved_plan"):
+            categories_list = "\n".join(
+                [
+                    f"- {cat['category_name']}: {cat['planned_amount']:,.0f} ₽ ({cat['type']}){'  | Обоснование: ' + cat['justification'] if cat['justification'] else ''}"
+                    for cat in approved_plans["categories"]
+                ]
+            )
+            approved_plans_text = f"""
+
+💼 УТВЕРЖДЁННЫЙ БЮДЖЕТНЫЙ ПЛАН НА {month:02d}.{year}:
+
+Версия: {approved_plans['version_name']}
+Утверждён: {approved_plans['approved_at'][:10] if approved_plans['approved_at'] else 'N/A'}
+Общая сумма плана: {approved_plans['total_planned']:,.0f} ₽
+
+Детализация по категориям:
+{categories_list}
+
+⚠️ ВАЖНО: Утверждённый бюджетный план имеет ПРИОРИТЕТ при формировании прогноза!
+Используй данные из плана как базовую основу и дополни их историческими данными для категорий, не указанных в плане."""
+
         prompt = f"""Ты - эксперт по финансовому прогнозированию.
 
-ЗАДАЧА: Сгенерируй детальный прогноз расходов{category_context} на {month:02d}.{year} на основе исторических данных.
+ЗАДАЧА: Сгенерируй детальный прогноз расходов{category_context} на {month:02d}.{year} на основе утверждённого бюджета и исторических данных.
 
 📊 ИСТОРИЧЕСКИЕ ДАННЫЕ ЗА 18 МЕСЯЦЕВ:
 
@@ -228,15 +346,20 @@ class AIForecastService:
 
 Топ категорий расходов:
 {category_text}
+{approved_plans_text}
 
 📋 ИНСТРУКЦИИ:
-1. ОБЯЗАТЕЛЬНО проанализируй месячную динамику выше - есть ли рост, падение или стабильность
-2. ОБЯЗАТЕЛЬНО учти данные за {month:02d}.{year-1} (если есть) - это показывает сезонность
-3. ОБЯЗАТЕЛЬНО учти текущий тренд последних месяцев
-4. Примени выявленные паттерны к прогнозу на {month:02d}.{year}
-5. Сгенерируй 7-10 конкретных статей расходов с обоснованием каждой
-6. В reasoning для каждой статьи укажи, на основе каких исторических данных сделан прогноз
-7. ⚠️ ВАЖНО: Округляй все суммы до сотен (например: 120000, 85300, а не 120456 или 85367)
+1. ПРИОРИТЕТ: Если есть утверждённый бюджетный план - используй суммы из него как базовую основу
+2. Для категорий из утверждённого плана - включи их в прогноз с запланированными суммами
+3. Дополни прогноз категориями из исторических данных, которых НЕТ в утверждённом плане
+4. Проанализируй месячную динамику - есть ли рост, падение или стабильность
+5. Учти данные за {month:02d}.{year-1} (если есть) - это показывает сезонность
+6. Учти текущий тренд последних месяцев
+7. Сгенерируй 7-15 конкретных статей расходов с обоснованием каждой
+8. В reasoning для каждой статьи ОБЯЗАТЕЛЬНО укажи источник:
+   - "Из утверждённого плана: [сумма] ₽" - если из бюджетного плана
+   - "На основе истории: ..." - если из исторических данных
+9. ⚠️ ВАЖНО: Округляй все суммы до сотен (например: 120000, 85300, а не 120456 или 85367)
 
 ФОРМАТ ОТВЕТА (JSON):
 {{
@@ -246,15 +369,15 @@ class AIForecastService:
     {{
       "description": "Связь (телефон/интернет)",
       "amount": 200000,
-      "reasoning": "На основе данных за {month:02d}.{year-1}: 195000 ₽, с учетом тренда +5%"
+      "reasoning": "Из утверждённого плана: 200000 ₽"
     }},
     {{
       "description": "Лицензии и подписки",
       "amount": 150000,
-      "reasoning": "Регулярный платеж, среднее за последние 6 месяцев: 148000 ₽"
+      "reasoning": "На основе истории: регулярный платеж, среднее за последние 6 месяцев: 148000 ₽"
     }}
   ],
-  "summary": "Прогноз учитывает сезонность и текущий тренд роста 5%"
+  "summary": "Прогноз основан на утверждённом бюджетном плане (категорий: X) и дополнен историческими данными. Учтена сезонность и тренд."
 }}
 
 ⚠️ ВАЖНО:
@@ -305,6 +428,14 @@ class AIForecastService:
             department_id=department_id, category_id=category_id
         )
 
+        # Get approved budget plans for the target month
+        approved_plans = self.get_approved_budget_plans(
+            department_id=department_id,
+            year=year,
+            month=month,
+            category_id=category_id,
+        )
+
         # Get category name if provided
         category_name = None
         if category_id:
@@ -316,6 +447,7 @@ class AIForecastService:
         prompt = self.build_ai_prompt(
             historical_data=historical_expenses,
             statistics=statistics,
+            approved_plans=approved_plans,
             year=year,
             month=month,
             category_name=category_name,
@@ -396,6 +528,10 @@ class AIForecastService:
                 forecast_data["ai_model"] = self.AI_MODEL
                 forecast_data["generated_at"] = datetime.now().isoformat()
                 forecast_data["historical_months"] = len(statistics["monthly_data"])
+                forecast_data["has_approved_plan"] = approved_plans.get("has_approved_plan", False)
+                if approved_plans.get("has_approved_plan"):
+                    forecast_data["approved_plan_total"] = approved_plans.get("total_planned", 0)
+                    forecast_data["approved_plan_version"] = approved_plans.get("version_name", "")
 
                 return forecast_data
 
