@@ -33,6 +33,7 @@ const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
 const BudgetIncomeStatementPage = lazy(() => import('./pages/BudgetIncomeStatementPage'))
 const CustomerMetricsAnalyticsPage = lazy(() => import('./pages/CustomerMetricsAnalyticsPage'))
 const RevenueAnalyticsExtendedPage = lazy(() => import('./pages/RevenueAnalyticsExtendedPage'))
+const UnifiedFinancialDashboardPage = lazy(() => import('./pages/UnifiedFinancialDashboardPage'))
 
 // Reference data module
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'))
@@ -274,6 +275,7 @@ function App() {
                         <Route path="/analytics/budget-income-statement" element={<BudgetIncomeStatementPage />} />
                         <Route path="/analytics/customer-metrics" element={<CustomerMetricsAnalyticsPage />} />
                         <Route path="/analytics/revenue-extended" element={<RevenueAnalyticsExtendedPage />} />
+                        <Route path="/analytics/unified-dashboard" element={<UnifiedFinancialDashboardPage />} />
                         <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                         <Route path="/forecast" element={<ForecastPage />} />
                         </Routes>
