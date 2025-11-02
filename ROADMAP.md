@@ -1,7 +1,7 @@
 # 🗺️ Roadmap - IT Budget Manager
 
-**Последнее обновление**: 2025-11-02 23:00 MSK
-**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (50%)
+**Последнее обновление**: 2025-11-03 00:00 MSK
+**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (75%)
 **Последняя завершенная**: v0.9.0 - Performance & UX Improvements ✅ (100%)
 
 ---
@@ -760,7 +760,7 @@ ML-прогнозы на основе исторических данных (LIN
 **Оценка**: 4-6 недель → **Факт**: 1 день (основные задачи выполнены) 🚀
 
 ### **v1.0.0 (Q3 2026) - Revenue Analytics & Integration**
-**Статус**: 🔨 В РАЗРАБОТКЕ (50% выполнено)
+**Статус**: 🔨 В РАЗРАБОТКЕ (75% выполнено)
 **Цель**: Полная интеграция с модулем расходов
 
 #### БДР (Бюджет доходов и расходов)
@@ -790,12 +790,24 @@ ML-прогнозы на основе исторических данных (LIN
   - ✅ Segment analysis (regular, network, new clinics)
   - ✅ Multi-tenancy support (department filtering)
 
-#### Revenue Analytics (Remaining)
-- [ ] Revenue Analytics (региональная разбивка, продуктовый микс)
+#### Revenue Analytics
+- [x] **Revenue Analytics (региональная разбивка, продуктовый микс)** ✅ ВЫПОЛНЕНО (2025-11-02)
+  - ✅ Backend API endpoint `/analytics/revenue-analytics`
+  - ✅ Pydantic schemas (RevenueAnalytics, Monthly, ByStream, ByCategory)
+  - ✅ Aggregation from revenue_actuals table
+  - ✅ Regional breakdown by revenue streams (REGIONAL/CHANNEL/PRODUCT)
+  - ✅ Product mix by revenue categories (PRODUCT/SERVICE/EQUIPMENT/TENDER)
+  - ✅ Frontend page RevenueAnalyticsExtendedPage (~670 lines)
+  - ✅ Monthly trends (LineChart)
+  - ✅ PieCharts for regional & product distribution
+  - ✅ Tables with progress bars & share percentages
+  - ✅ Growth metrics (year-over-year)
+
+#### Remaining Tasks
 - [ ] Совмещенный дашборд (Revenue + Expenses)
 - [ ] Экспорт отчетов
 
-**Оценка**: 3-4 недели → **Прогресс**: 3 дня (БДР + Customer Metrics завершены)
+**Оценка**: 3-4 недели → **Прогресс**: 4 дня (БДР + Customer Metrics + Revenue Analytics завершены)
 
 ### **v1.1.0 (Q4 2026) - ML Forecasting (опционально)**
 **Цель**: ML-прогнозирование доходов
