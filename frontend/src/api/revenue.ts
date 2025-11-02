@@ -564,6 +564,106 @@ export const seasonalityApi = {
   },
 }
 
+// ==================== Revenue Analytics ====================
+
+export const revenueAnalyticsApi = {
+  /**
+   * Get regional breakdown (revenue by region/stream)
+   */
+  getRegionalBreakdown: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    regions: Array<{
+      stream_id: number
+      stream_name: string
+      stream_type: string
+      planned_revenue: number
+      actual_revenue: number
+      variance: number
+      variance_percent: number
+    }>
+    total_planned: number
+    total_actual: number
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/regional-breakdown', { params })
+    return data
+  },
+
+  /**
+   * Get product mix (revenue by category)
+   */
+  getProductMix: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    categories: Array<{
+      category_id: number
+      category_name: string
+      category_type: string
+      planned_revenue: number
+      actual_revenue: number
+      planned_share: number
+      actual_share: number
+    }>
+    total_planned: number
+    total_actual: number
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/product-mix', { params })
+    return data
+  },
+
+  /**
+   * Get monthly trends (plan vs actual by month)
+   */
+  getMonthlyTrends: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    monthly_data: Array<{
+      month: number
+      month_name: string
+      planned: number
+      actual: number
+      variance: number
+    }>
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/monthly-trends', { params })
+    return data
+  },
+
+  /**
+   * Get top performers (top regions and categories)
+   */
+  getTopPerformers: async (params: {
+    year: number
+    limit?: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    top_regions: Array<{
+      id: number
+      name: string
+      total_revenue: number
+    }>
+    top_categories: Array<{
+      id: number
+      name: string
+      total_revenue: number
+    }>
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/top-performers', { params })
+    return data
+  },
+}
+
 // Export all as a combined object for convenience
 export const revenueApi = {
   streams: revenueStreamsApi,
@@ -573,6 +673,7 @@ export const revenueApi = {
   planDetails: revenuePlanDetailsApi,
   customerMetrics: customerMetricsApi,
   seasonality: seasonalityApi,
+  analytics: revenueAnalyticsApi,
 }
 
 export default revenueApi
