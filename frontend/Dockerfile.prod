@@ -15,8 +15,10 @@ RUN npm ci --only=production=false
 COPY . .
 
 # Build application
-# Default to /api (nginx will proxy to backend)
-ARG VITE_API_URL=/api
+# IMPORTANT: Set this to your production API URL
+# For separate domains: https://api.budget-west.shknv.ru/api/v1
+# For nginx proxy: /api/v1
+ARG VITE_API_URL=https://api.budget-west.shknv.ru/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build
