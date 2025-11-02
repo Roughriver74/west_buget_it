@@ -238,7 +238,7 @@ const RevenueAnalyticsPage = () => {
     )
   }
 
-  const isLoading =
+  // const isLoading =
     isLoadingRegional || isLoadingProductMix || isLoadingTrends || isLoadingTopPerformers
 
   return (

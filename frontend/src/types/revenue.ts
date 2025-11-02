@@ -283,13 +283,16 @@ export interface CustomerMetrics {
   department_id: number
   year: number
   month: number
-  total_customer_base: number      // ОКБ (Общая клиентская база)
-  active_customer_base: number     // АКБ (Активная клиентская база)
-  coverage_percent?: number        // Покрытие (АКБ/ОКБ)
-  avg_check_regular?: number       // Средний чек (обычные клиники)
-  avg_check_chain?: number         // Средний чек (сетевые клиники)
-  avg_check_new?: number           // Средний чек (новые клиники)
-  comment?: string
+  total_customer_base?: number      // ОКБ (Общая клиентская база)
+  active_customer_base?: number     // АКБ (Активная клиентская база)
+  coverage_rate?: number            // Покрытие (АКБ/ОКБ)
+  regular_clinics?: number          // Обычные клиники
+  network_clinics?: number          // Сетевые клиники
+  new_clinics?: number              // Новые клиники
+  avg_order_value?: number          // Средний чек
+  avg_order_value_regular?: number  // Средний чек (обычные клиники)
+  avg_order_value_network?: number  // Средний чек (сетевые клиники)
+  avg_order_value_new?: number      // Средний чек (новые клиники)
   created_at: string
   updated_at?: string
 }
@@ -299,21 +302,29 @@ export interface CustomerMetricsCreate {
   department_id?: number
   year: number
   month: number
-  total_customer_base: number
-  active_customer_base: number
-  avg_check_regular?: number
-  avg_check_chain?: number
-  avg_check_new?: number
-  comment?: string
+  total_customer_base?: number
+  active_customer_base?: number
+  coverage_rate?: number
+  regular_clinics?: number
+  network_clinics?: number
+  new_clinics?: number
+  avg_order_value?: number
+  avg_order_value_regular?: number
+  avg_order_value_network?: number
+  avg_order_value_new?: number
 }
 
 export interface CustomerMetricsUpdate {
   total_customer_base?: number
   active_customer_base?: number
-  avg_check_regular?: number
-  avg_check_chain?: number
-  avg_check_new?: number
-  comment?: string
+  coverage_rate?: number
+  regular_clinics?: number
+  network_clinics?: number
+  new_clinics?: number
+  avg_order_value?: number
+  avg_order_value_regular?: number
+  avg_order_value_network?: number
+  avg_order_value_new?: number
 }
 
 // ==================== Seasonality Coefficient ====================
@@ -323,19 +334,19 @@ export interface SeasonalityCoefficient {
   revenue_stream_id: number
   department_id: number
   year: number
-  month_01_coeff: number
-  month_02_coeff: number
-  month_03_coeff: number
-  month_04_coeff: number
-  month_05_coeff: number
-  month_06_coeff: number
-  month_07_coeff: number
-  month_08_coeff: number
-  month_09_coeff: number
-  month_10_coeff: number
-  month_11_coeff: number
-  month_12_coeff: number
-  comment?: string
+  coef_01: number
+  coef_02: number
+  coef_03: number
+  coef_04: number
+  coef_05: number
+  coef_06: number
+  coef_07: number
+  coef_08: number
+  coef_09: number
+  coef_10: number
+  coef_11: number
+  coef_12: number
+  description?: string
   created_at: string
   updated_at?: string
 }
@@ -344,19 +355,35 @@ export interface SeasonalityCoefficientCreate {
   revenue_stream_id: number
   department_id?: number
   year: number
-  month_01_coeff?: number
-  month_02_coeff?: number
-  month_03_coeff?: number
-  month_04_coeff?: number
-  month_05_coeff?: number
-  month_06_coeff?: number
-  month_07_coeff?: number
-  month_08_coeff?: number
-  month_09_coeff?: number
-  month_10_coeff?: number
-  month_11_coeff?: number
-  month_12_coeff?: number
-  comment?: string
+  coef_01?: number
+  coef_02?: number
+  coef_03?: number
+  coef_04?: number
+  coef_05?: number
+  coef_06?: number
+  coef_07?: number
+  coef_08?: number
+  coef_09?: number
+  coef_10?: number
+  coef_11?: number
+  coef_12?: number
+  description?: string
+}
+
+export interface SeasonalityCoefficientUpdate {
+  coef_01?: number
+  coef_02?: number
+  coef_03?: number
+  coef_04?: number
+  coef_05?: number
+  coef_06?: number
+  coef_07?: number
+  coef_08?: number
+  coef_09?: number
+  coef_10?: number
+  coef_11?: number
+  coef_12?: number
+  description?: string
 }
 
 // ==================== Revenue Forecast ====================

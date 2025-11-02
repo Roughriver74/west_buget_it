@@ -104,9 +104,9 @@ const CustomerMetricsPage = () => {
     const avgCoverage = totalCustomerBase > 0 ? (activeCustomerBase / totalCustomerBase) * 100 : 0
 
     const avgCheckRegular =
-      metrics.reduce((sum, m) => sum + Number(m.avg_check_regular || 0), 0) / (metrics.length || 1)
+      metrics.reduce((sum, m) => sum + Number(m.avg_order_value_regular || 0), 0) / (metrics.length || 1)
     const avgCheckNetwork =
-      metrics.reduce((sum, m) => sum + Number(m.avg_check_network || 0), 0) / (metrics.length || 1)
+      metrics.reduce((sum, m) => sum + Number(m.avg_order_value_network || 0), 0) / (metrics.length || 1)
 
     return {
       totalCustomerBase,
@@ -124,13 +124,13 @@ const CustomerMetricsPage = () => {
         form.setFieldsValue({
           year: metricsItem.year,
           month: metricsItem.month,
-          region: metricsItem.region,
+          region: metricsItem.revenue_stream_id,
           total_customer_base: metricsItem.total_customer_base,
           active_customer_base: metricsItem.active_customer_base,
-          avg_check_regular: metricsItem.avg_check_regular,
-          avg_check_network: metricsItem.avg_check_network,
-          avg_check_new_clinics: metricsItem.avg_check_new_clinics,
-          notes: metricsItem.notes,
+          avg_order_value_regular: metricsItem.avg_order_value_regular,
+          avg_order_value_network: metricsItem.avg_order_value_network,
+          avg_order_value_new: metricsItem.avg_order_value_new,
+          // notes: metricsItem.description, // field removed from backend
         })
       } else {
         setEditingMetrics(null)
@@ -220,24 +220,24 @@ const CustomerMetricsPage = () => {
     },
     {
       title: 'Средний чек (обычные)',
-      dataIndex: 'avg_check_regular',
-      key: 'avg_check_regular',
+      dataIndex: 'avg_order_value_regular',
+      key: 'avg_order_value_regular',
       width: 140,
       align: 'right' as const,
       render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
     },
     {
       title: 'Средний чек (сетевые)',
-      dataIndex: 'avg_check_network',
-      key: 'avg_check_network',
+      dataIndex: 'avg_order_value_network',
+      key: 'avg_order_value_network',
       width: 140,
       align: 'right' as const,
       render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
     },
     {
       title: 'Средний чек (новые клиники)',
-      dataIndex: 'avg_check_new_clinics',
-      key: 'avg_check_new_clinics',
+      dataIndex: 'avg_order_value_new',
+      key: 'avg_order_value_new',
       width: 160,
       align: 'right' as const,
       render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
@@ -505,7 +505,7 @@ const CustomerMetricsPage = () => {
 
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="avg_check_regular" label="Средний чек (обычные клиенты)">
+              <Form.Item name="avg_order_value_regular" label="Средний чек (обычные клиенты)">
                 <InputNumber
                   min={0}
                   step={100}
@@ -516,7 +516,7 @@ const CustomerMetricsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="avg_check_network" label="Средний чек (сетевые клиенты)">
+              <Form.Item name="avg_order_value_network" label="Средний чек (сетевые клиенты)">
                 <InputNumber
                   min={0}
                   step={100}
@@ -527,7 +527,7 @@ const CustomerMetricsPage = () => {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="avg_check_new_clinics" label="Средний чек (новые клиники)">
+              <Form.Item name="avg_order_value_new" label="Средний чек (новые клиники)">
                 <InputNumber
                   min={0}
                   step={100}
