@@ -29,6 +29,12 @@ import type {
   RevenuePlanDetail,
   RevenuePlanDetailCreate,
   RevenuePlanDetailUpdate,
+  CustomerMetrics,
+  CustomerMetricsCreate,
+  CustomerMetricsUpdate,
+  SeasonalityCoefficient,
+  SeasonalityCoefficientCreate,
+  SeasonalityCoefficientUpdate,
 } from '@/types/revenue'
 
 // ==================== Revenue Streams ====================
@@ -341,6 +347,30 @@ export const revenuePlansApi = {
   deleteVersion: async (planId: number, versionId: number): Promise<void> => {
     await apiClient.delete(`/revenue/plans/${planId}/versions/${versionId}`)
   },
+
+  /**
+   * Copy revenue plan from source year to target year
+   */
+  copyPlan: async (
+    targetYear: number,
+    sourceYear: number,
+    coefficient: number = 1.0,
+    departmentId?: number
+  ): Promise<{
+    message: string
+    department_id: number
+    created_plans: number
+    created_versions: number
+    created_details: number
+    skipped_plans: number
+  }> => {
+    const { data } = await apiClient.post(
+      `/revenue/plans/year/${targetYear}/copy-from/${sourceYear}`,
+      { coefficient },
+      { params: departmentId ? { department_id: departmentId } : undefined }
+    )
+    return data
+  },
 }
 
 // ==================== Revenue Plan Details ====================
@@ -422,6 +452,218 @@ export const revenuePlanDetailsApi = {
   },
 }
 
+// ==================== Customer Metrics ====================
+
+export const customerMetricsApi = {
+  /**
+   * Get all customer metrics with filtering
+   */
+  getAll: async (params?: {
+    year?: number
+    month?: number
+    region?: string
+    department_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<CustomerMetrics[]> => {
+    const { data } = await apiClient.get('/revenue/customer-metrics/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific customer metrics by ID
+   */
+  getById: async (id: number): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.get(`/revenue/customer-metrics/${id}`)
+    return data
+  },
+
+  /**
+   * Create new customer metrics
+   */
+  create: async (metrics: CustomerMetricsCreate): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.post('/revenue/customer-metrics/', metrics)
+    return data
+  },
+
+  /**
+   * Update existing customer metrics
+   */
+  update: async (id: number, metrics: CustomerMetricsUpdate): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.put(`/revenue/customer-metrics/${id}`, metrics)
+    return data
+  },
+
+  /**
+   * Delete customer metrics
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/customer-metrics/${id}`)
+  },
+}
+
+// ==================== Seasonality Coefficients ====================
+
+export const seasonalityApi = {
+  /**
+   * Get all seasonality coefficients with filtering
+   */
+  getAll: async (params?: {
+    year?: number
+    category?: string
+    department_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<SeasonalityCoefficient[]> => {
+    const { data } = await apiClient.get('/revenue/seasonality/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific seasonality coefficient by ID
+   */
+  getById: async (id: number): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.get(`/revenue/seasonality/${id}`)
+    return data
+  },
+
+  /**
+   * Create new seasonality coefficient
+   */
+  create: async (coefficient: SeasonalityCoefficientCreate): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.post('/revenue/seasonality/', coefficient)
+    return data
+  },
+
+  /**
+   * Update existing seasonality coefficient
+   */
+  update: async (id: number, coefficient: SeasonalityCoefficientUpdate): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.put(`/revenue/seasonality/${id}`, coefficient)
+    return data
+  },
+
+  /**
+   * Delete seasonality coefficient
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/seasonality/${id}`)
+  },
+
+  /**
+   * Calculate seasonality coefficients from historical data
+   */
+  calculateFromHistory: async (params: {
+    year: number
+    category: string
+    lookback_years?: number
+    department_id?: number
+  }): Promise<any> => {
+    const { data } = await apiClient.post('/revenue/seasonality/calculate-from-history', null, { params })
+    return data
+  },
+}
+
+// ==================== Revenue Analytics ====================
+
+export const revenueAnalyticsApi = {
+  /**
+   * Get regional breakdown (revenue by region/stream)
+   */
+  getRegionalBreakdown: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    regions: Array<{
+      stream_id: number
+      stream_name: string
+      stream_type: string
+      planned_revenue: number
+      actual_revenue: number
+      variance: number
+      variance_percent: number
+    }>
+    total_planned: number
+    total_actual: number
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/regional-breakdown', { params })
+    return data
+  },
+
+  /**
+   * Get product mix (revenue by category)
+   */
+  getProductMix: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    categories: Array<{
+      category_id: number
+      category_name: string
+      category_type: string
+      planned_revenue: number
+      actual_revenue: number
+      planned_share: number
+      actual_share: number
+    }>
+    total_planned: number
+    total_actual: number
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/product-mix', { params })
+    return data
+  },
+
+  /**
+   * Get monthly trends (plan vs actual by month)
+   */
+  getMonthlyTrends: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    monthly_data: Array<{
+      month: number
+      month_name: string
+      planned: number
+      actual: number
+      variance: number
+    }>
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/monthly-trends', { params })
+    return data
+  },
+
+  /**
+   * Get top performers (top regions and categories)
+   */
+  getTopPerformers: async (params: {
+    year: number
+    limit?: number
+    department_id?: number
+  }): Promise<{
+    year: number
+    department_id: number
+    top_regions: Array<{
+      id: number
+      name: string
+      total_revenue: number
+    }>
+    top_categories: Array<{
+      id: number
+      name: string
+      total_revenue: number
+    }>
+  }> => {
+    const { data } = await apiClient.get('/revenue/analytics/top-performers', { params })
+    return data
+  },
+}
+
 // Export all as a combined object for convenience
 export const revenueApi = {
   streams: revenueStreamsApi,
@@ -429,6 +671,9 @@ export const revenueApi = {
   actuals: revenueActualsApi,
   plans: revenuePlansApi,
   planDetails: revenuePlanDetailsApi,
+  customerMetrics: customerMetricsApi,
+  seasonality: seasonalityApi,
+  analytics: revenueAnalyticsApi,
 }
 
 export default revenueApi

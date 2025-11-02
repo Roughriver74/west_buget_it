@@ -34,6 +34,7 @@ import {
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { revenueApi } from '@/api/revenue'
 import type { RevenuePlan, RevenuePlanCreate, RevenuePlanStatus } from '@/types/revenue'
+import CopyRevenuePlanModal from '@/components/revenue/CopyRevenuePlanModal'
 import dayjs from 'dayjs'
 
 const { Option } = Select
@@ -44,6 +45,7 @@ const RevenuePlanningPage = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [isModalVisible, setIsModalVisible] = useState(false)
+  const [isCopyModalVisible, setIsCopyModalVisible] = useState(false)
   const [editingPlan, setEditingPlan] = useState<RevenuePlan | null>(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedStatus, setSelectedStatus] = useState<RevenuePlanStatus | undefined>()
@@ -390,13 +392,21 @@ const RevenuePlanningPage = () => {
             </Space>
           </Col>
           <Col>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => handleOpenModal()}
-            >
-              Создать план
-            </Button>
+            <Space>
+              <Button
+                icon={<CopyOutlined />}
+                onClick={() => setIsCopyModalVisible(true)}
+              >
+                Скопировать план
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenModal()}
+              >
+                Создать план
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -453,6 +463,17 @@ const RevenuePlanningPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Copy Plan Modal */}
+      <CopyRevenuePlanModal
+        open={isCopyModalVisible}
+        targetYear={selectedYear}
+        departmentId={selectedDepartment?.id}
+        onClose={() => setIsCopyModalVisible(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['revenue-plans'] })
+        }}
+      />
     </div>
   )
 }

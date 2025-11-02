@@ -30,10 +30,16 @@ from app.schemas import (
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 from app.services.cache import cache_service
+from pydantic import BaseModel
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 CACHE_NAMESPACE = "revenue_plans"
+
+
+class CopyPlanRequest(BaseModel):
+    """Request to copy revenue plan from another year"""
+    coefficient: float = 1.0  # Коэффициент корректировки (1.0 = без изменений, 1.1 = +10%)
 
 
 def recalculate_plan_totals(db: Session, plan: RevenuePlan) -> None:
@@ -354,6 +360,195 @@ def approve_revenue_plan(
     log_info(f"Approve revenue plan - user_id: {current_user.id}, plan_id: {plan_id}", "revenue_plans")
 
     return plan
+
+
+@router.post("/year/{year}/copy-from/{source_year}")
+def copy_revenue_plan(
+    year: int,
+    source_year: int,
+    request: CopyPlanRequest,
+    department_id: Optional[int] = Query(None, description="Department ID (MANAGER/ADMIN only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Copy revenue plan from source year to target year with optional coefficient
+
+    - USER: Can only copy plan for their own department
+    - MANAGER/ADMIN: Can copy plan for any department
+
+    Process:
+    1. Find source plan(s) from source_year
+    2. Find approved version of source plan
+    3. Create new plan for target year
+    4. Create version v1 for new plan
+    5. Copy all details with coefficient applied
+    """
+    # SECURITY: Determine and validate department_id
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only copy for their own department
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    else:
+        # MANAGER/ADMIN can specify department or use their own
+        target_department_id = department_id if department_id is not None else current_user.department_id
+
+    if not target_department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department ID is required. Please specify department_id parameter or ensure user has a department."
+        )
+
+    # Find source plans for this department
+    source_plans = (
+        db.query(RevenuePlan)
+        .filter(
+            RevenuePlan.year == source_year,
+            RevenuePlan.department_id == target_department_id
+        )
+        .all()
+    )
+
+    if not source_plans:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No revenue plans found for year {source_year} in department #{target_department_id}"
+        )
+
+    created_plans = 0
+    created_versions = 0
+    created_details = 0
+    skipped_plans = 0
+
+    for source_plan in source_plans:
+        # Find approved version of source plan
+        source_version = (
+            db.query(RevenuePlanVersion)
+            .filter(
+                RevenuePlanVersion.plan_id == source_plan.id,
+                RevenuePlanVersion.status == RevenueVersionStatusEnum.APPROVED
+            )
+            .first()
+        )
+
+        if not source_version:
+            log_info(
+                f"Skipping plan {source_plan.id} ('{source_plan.name}') - no approved version found",
+                "revenue_plans"
+            )
+            skipped_plans += 1
+            continue
+
+        # Check if target plan already exists
+        existing_plan = (
+            db.query(RevenuePlan)
+            .filter(
+                RevenuePlan.name == source_plan.name.replace(str(source_year), str(year)),
+                RevenuePlan.year == year,
+                RevenuePlan.department_id == target_department_id
+            )
+            .first()
+        )
+
+        if existing_plan:
+            log_info(
+                f"Plan '{existing_plan.name}' already exists for year {year} - skipping",
+                "revenue_plans"
+            )
+            skipped_plans += 1
+            continue
+
+        # Create new plan
+        new_plan = RevenuePlan(
+            name=source_plan.name.replace(str(source_year), str(year)),
+            year=year,
+            department_id=target_department_id,
+            revenue_stream_id=source_plan.revenue_stream_id,
+            revenue_category_id=source_plan.revenue_category_id,
+            description=f"Copied from {source_year} (coefficient: {request.coefficient})",
+            status=RevenuePlanStatusEnum.DRAFT,
+            total_planned_revenue=Decimal("0"),
+            created_by=current_user.id,
+            created_at=datetime.now()
+        )
+        db.add(new_plan)
+        db.flush([new_plan])  # Get plan ID
+        created_plans += 1
+
+        # Create version v1 for new plan
+        new_version = RevenuePlanVersion(
+            plan_id=new_plan.id,
+            version_number=1,
+            version_name="Version 1 (Copied)",
+            description=f"Copied from plan '{source_plan.name}' (year {source_year}, version {source_version.version_number})",
+            status=RevenueVersionStatusEnum.DRAFT,
+            created_by=current_user.id,
+            created_at=datetime.now()
+        )
+        db.add(new_version)
+        db.flush([new_version])  # Get version ID
+        created_versions += 1
+
+        # Copy all details from source version
+        source_details = (
+            db.query(RevenuePlanDetail)
+            .filter(RevenuePlanDetail.version_id == source_version.id)
+            .all()
+        )
+
+        for source_detail in source_details:
+            # Apply coefficient to all monthly values
+            new_detail = RevenuePlanDetail(
+                version_id=new_version.id,
+                revenue_stream_id=source_detail.revenue_stream_id,
+                revenue_category_id=source_detail.revenue_category_id,
+                department_id=target_department_id,
+                month_01=Decimal(str(round(float(source_detail.month_01 or 0) * request.coefficient, 2))),
+                month_02=Decimal(str(round(float(source_detail.month_02 or 0) * request.coefficient, 2))),
+                month_03=Decimal(str(round(float(source_detail.month_03 or 0) * request.coefficient, 2))),
+                month_04=Decimal(str(round(float(source_detail.month_04 or 0) * request.coefficient, 2))),
+                month_05=Decimal(str(round(float(source_detail.month_05 or 0) * request.coefficient, 2))),
+                month_06=Decimal(str(round(float(source_detail.month_06 or 0) * request.coefficient, 2))),
+                month_07=Decimal(str(round(float(source_detail.month_07 or 0) * request.coefficient, 2))),
+                month_08=Decimal(str(round(float(source_detail.month_08 or 0) * request.coefficient, 2))),
+                month_09=Decimal(str(round(float(source_detail.month_09 or 0) * request.coefficient, 2))),
+                month_10=Decimal(str(round(float(source_detail.month_10 or 0) * request.coefficient, 2))),
+                month_11=Decimal(str(round(float(source_detail.month_11 or 0) * request.coefficient, 2))),
+                month_12=Decimal(str(round(float(source_detail.month_12 or 0) * request.coefficient, 2))),
+                notes=source_detail.notes,
+                created_at=datetime.now()
+            )
+            db.add(new_detail)
+            created_details += 1
+
+        # Recalculate plan totals
+        recalculate_plan_totals(db, new_plan)
+
+    db.commit()
+
+    # Invalidate cache
+    cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
+
+    log_info(
+        f"Copy revenue plan - user_id: {current_user.id}, source_year: {source_year}, target_year: {year}, "
+        f"department_id: {target_department_id}, coefficient: {request.coefficient}, "
+        f"created_plans: {created_plans}, created_versions: {created_versions}, created_details: {created_details}, "
+        f"skipped_plans: {skipped_plans}",
+        "revenue_plans"
+    )
+
+    return {
+        "message": f"Copied revenue plans from {source_year} to {year} with coefficient {request.coefficient}",
+        "department_id": target_department_id,
+        "created_plans": created_plans,
+        "created_versions": created_versions,
+        "created_details": created_details,
+        "skipped_plans": skipped_plans
+    }
 
 
 # ============================================================================
