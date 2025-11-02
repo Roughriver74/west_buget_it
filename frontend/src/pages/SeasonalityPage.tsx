@@ -115,18 +115,18 @@ const SeasonalityPage = () => {
   // Calculate average coefficient and validation
   const calculateAverage = useCallback((values: any) => {
     const coeffs = [
-      values.coeff_month_01,
-      values.coeff_month_02,
-      values.coeff_month_03,
-      values.coeff_month_04,
-      values.coeff_month_05,
-      values.coeff_month_06,
-      values.coeff_month_07,
-      values.coeff_month_08,
-      values.coeff_month_09,
-      values.coeff_month_10,
-      values.coeff_month_11,
-      values.coeff_month_12,
+      values.coef_01,
+      values.coef_02,
+      values.coef_03,
+      values.coef_04,
+      values.coef_05,
+      values.coef_06,
+      values.coef_07,
+      values.coef_08,
+      values.coef_09,
+      values.coef_10,
+      values.coef_11,
+      values.coef_12,
     ].filter((v) => v !== undefined && v !== null)
 
     if (coeffs.length === 0) return { avg: 1.0, isValid: false }
@@ -144,38 +144,38 @@ const SeasonalityPage = () => {
         setEditingCoefficient(coefficient)
         form.setFieldsValue({
           year: coefficient.year,
-          category: coefficient.category,
-          coeff_month_01: coefficient.coeff_month_01,
-          coeff_month_02: coefficient.coeff_month_02,
-          coeff_month_03: coefficient.coeff_month_03,
-          coeff_month_04: coefficient.coeff_month_04,
-          coeff_month_05: coefficient.coeff_month_05,
-          coeff_month_06: coefficient.coeff_month_06,
-          coeff_month_07: coefficient.coeff_month_07,
-          coeff_month_08: coefficient.coeff_month_08,
-          coeff_month_09: coefficient.coeff_month_09,
-          coeff_month_10: coefficient.coeff_month_10,
-          coeff_month_11: coefficient.coeff_month_11,
-          coeff_month_12: coefficient.coeff_month_12,
-          notes: coefficient.notes,
+          category: coefficient.revenue_stream_id,
+          coef_01: coefficient.coef_01,
+          coef_02: coefficient.coef_02,
+          coef_03: coefficient.coef_03,
+          coef_04: coefficient.coef_04,
+          coef_05: coefficient.coef_05,
+          coef_06: coefficient.coef_06,
+          coef_07: coefficient.coef_07,
+          coef_08: coefficient.coef_08,
+          coef_09: coefficient.coef_09,
+          coef_10: coefficient.coef_10,
+          coef_11: coefficient.coef_11,
+          coef_12: coefficient.coef_12,
+          notes: coefficient.description,
         })
       } else {
         setEditingCoefficient(null)
         // Set default values (all 1.0)
         form.setFieldsValue({
           year: selectedYear,
-          coeff_month_01: 1.0,
-          coeff_month_02: 1.0,
-          coeff_month_03: 1.0,
-          coeff_month_04: 1.0,
-          coeff_month_05: 1.0,
-          coeff_month_06: 1.0,
-          coeff_month_07: 1.0,
-          coeff_month_08: 1.0,
-          coeff_month_09: 1.0,
-          coeff_month_10: 1.0,
-          coeff_month_11: 1.0,
-          coeff_month_12: 1.0,
+          coef_01: 1.0,
+          coef_02: 1.0,
+          coef_03: 1.0,
+          coef_04: 1.0,
+          coef_05: 1.0,
+          coef_06: 1.0,
+          coef_07: 1.0,
+          coef_08: 1.0,
+          coef_09: 1.0,
+          coef_10: 1.0,
+          coef_11: 1.0,
+          coef_12: 1.0,
         })
       }
       setIsModalVisible(true)
@@ -202,7 +202,7 @@ const SeasonalityPage = () => {
   // Expand row to show monthly coefficients
   const expandedRowRender = (record: SeasonalityCoefficient) => {
     const monthlyData = MONTH_NAMES.map((name, index) => {
-      const field = `coeff_month_${String(index + 1).padStart(2, '0')}` as keyof SeasonalityCoefficient
+      const field = `coef_${String(index + 1).padStart(2, '0')}` as keyof SeasonalityCoefficient
       const value = Number(record[field]) || 1.0
 
       return {
@@ -260,18 +260,18 @@ const SeasonalityPage = () => {
       width: 180,
       render: (_: any, record: SeasonalityCoefficient) => {
         const coeffs = [
-          record.coeff_month_01,
-          record.coeff_month_02,
-          record.coeff_month_03,
-          record.coeff_month_04,
-          record.coeff_month_05,
-          record.coeff_month_06,
-          record.coeff_month_07,
-          record.coeff_month_08,
-          record.coeff_month_09,
-          record.coeff_month_10,
-          record.coeff_month_11,
-          record.coeff_month_12,
+          record.coef_01,
+          record.coef_02,
+          record.coef_03,
+          record.coef_04,
+          record.coef_05,
+          record.coef_06,
+          record.coef_07,
+          record.coef_08,
+          record.coef_09,
+          record.coef_10,
+          record.coef_11,
+          record.coef_12,
         ]
         const sum = coeffs.reduce((a, b) => a + Number(b || 0), 0)
         const avg = sum / 12
@@ -385,7 +385,7 @@ const SeasonalityPage = () => {
           <Card>
             <Statistic
               title="Категорий"
-              value={new Set(coefficients.map((c) => c.category)).size}
+              value={new Set(coefficients.map((c) => c.revenue_stream_id)).size}
               prefix={<BarChartOutlined />}
             />
           </Card>
@@ -501,7 +501,7 @@ const SeasonalityPage = () => {
             {MONTH_NAMES.map((month, index) => (
               <Col span={6} key={index}>
                 <Form.Item
-                  name={`coeff_month_${String(index + 1).padStart(2, '0')}`}
+                  name={`coef_${String(index + 1).padStart(2, '0')}`}
                   label={month}
                   rules={[{ required: true, message: 'Введите коэффициент' }]}
                 >
