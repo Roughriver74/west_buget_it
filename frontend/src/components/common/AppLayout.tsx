@@ -194,6 +194,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/analytics/extended',
 					label: <Link to='/analytics/extended'>Расширенная аналитика</Link>,
 				},
+				{
+					key: '/analytics/budget-income-statement',
+					icon: <LineChartOutlined />,
+					label: <Link to='/analytics/budget-income-statement'>БДР (Доходы и Расходы)</Link>,
+				},
 			],
 		},
 

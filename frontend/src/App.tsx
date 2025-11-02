@@ -30,6 +30,7 @@ const ExtendedAnalyticsPage = lazy(() => import('./pages/ExtendedAnalyticsPage')
 const PaymentCalendarPage = lazy(() => import('./pages/PaymentCalendarPage'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage'))
 const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
+const BudgetIncomeStatementPage = lazy(() => import('./pages/BudgetIncomeStatementPage'))
 
 // Reference data module
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'))
@@ -268,6 +269,7 @@ function App() {
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/analytics/balance" element={<BalanceAnalyticsPage />} />
                         <Route path="/analytics/extended" element={<ExtendedAnalyticsPage />} />
+                        <Route path="/analytics/budget-income-statement" element={<BudgetIncomeStatementPage />} />
                         <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                         <Route path="/forecast" element={<ForecastPage />} />
                         </Routes>
