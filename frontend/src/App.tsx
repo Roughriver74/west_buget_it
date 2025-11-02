@@ -41,6 +41,7 @@ import RevenuePlanningPage from './pages/RevenuePlanningPage'
 import RevenuePlanDetailsPage from './pages/RevenuePlanDetailsPage'
 import CustomerMetricsPage from './pages/CustomerMetricsPage'
 import SeasonalityPage from './pages/SeasonalityPage'
+import RevenueAnalyticsPage from './pages/RevenueAnalyticsPage'
 
 function App() {
   return (
@@ -222,6 +223,7 @@ function App() {
                         <Route path="/revenue/actuals" element={<RevenueActualsPage />} />
                         <Route path="/revenue/customer-metrics" element={<CustomerMetricsPage />} />
                         <Route path="/revenue/seasonality" element={<SeasonalityPage />} />
+                        <Route path="/revenue/analytics" element={<RevenueAnalyticsPage />} />
 
                         {/* Revenue Planning - Admin and Manager only */}
                         <Route

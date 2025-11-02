@@ -153,6 +153,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <LineChartOutlined />,
 					label: <Link to='/revenue/seasonality'>Коэффициенты сезонности</Link>,
 				},
+				{
+					key: '/revenue/analytics',
+					icon: <BarChartOutlined />,
+					label: <Link to='/revenue/analytics'>Аналитика доходов</Link>,
+				},
 			],
 		},
 		{
