@@ -20,6 +20,7 @@ from app.db.models import (
     RevenueStream,
     RevenueCategory,
     RevenueVersionStatusEnum,
+    SeasonalityCoefficient,
 )
 from app.schemas import (
     RevenuePlanDetailCreate,
@@ -604,3 +605,113 @@ def get_version_summary(
         "by_stream": [{"stream_id": k, "total": float(v)} for k, v in stream_totals.items()],
         "by_category": [{"category_id": k, "total": float(v)} for k, v in category_totals.items()]
     }
+
+
+class ApplySeasonalityRequest(BaseModel):
+    """Request for applying seasonality coefficients to a plan detail"""
+    detail_id: int
+    seasonality_coefficient_id: int
+    annual_target: Decimal
+
+
+@router.post("/apply-seasonality", response_model=RevenuePlanDetailInDB)
+def apply_seasonality_coefficients(
+    request: ApplySeasonalityRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Apply seasonality coefficients to distribute annual revenue target across 12 months
+
+    **Algorithm:**
+    - Get seasonality coefficients (12 monthly coefficients that average to ~1.0)
+    - Calculate monthly values: month_value = annual_target * (coefficient / 12)
+    - Update revenue plan detail with calculated monthly values
+
+    **Example:**
+    - Annual target: 120,000
+    - Coefficient for January: 1.2 (20% above average)
+    - January value: 120,000 * (1.2 / 12) = 12,000
+
+    **Requirements:**
+    - Plan detail must exist and be editable (DRAFT status)
+    - Seasonality coefficient must exist and belong to same department
+    - User must have access to the plan detail
+    """
+    # Get detail and check access
+    detail = db.query(RevenuePlanDetail).filter(RevenuePlanDetail.id == request.detail_id).first()
+
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Revenue plan detail with id {request.detail_id} not found"
+        )
+
+    # Check version access
+    version = check_version_access(db, detail.version_id, current_user)
+
+    # Check if version is editable
+    if version.status != RevenueVersionStatusEnum.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot edit revenue plan details in {version.status} status. Only DRAFT versions are editable."
+        )
+
+    # Get seasonality coefficient
+    coefficient = db.query(SeasonalityCoefficient).filter(
+        SeasonalityCoefficient.id == request.seasonality_coefficient_id
+    ).first()
+
+    if not coefficient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Seasonality coefficient with id {request.seasonality_coefficient_id} not found"
+        )
+
+    # Check department match
+    if coefficient.department_id != detail.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Seasonality coefficient must belong to the same department as the plan detail"
+        )
+
+    # Validate annual target
+    if request.annual_target <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Annual target must be greater than zero"
+        )
+
+    # Apply seasonality coefficients
+    # Formula: monthly_value = annual_target * (coefficient / 12)
+    detail.month_01 = request.annual_target * (coefficient.coeff_month_01 / Decimal("12"))
+    detail.month_02 = request.annual_target * (coefficient.coeff_month_02 / Decimal("12"))
+    detail.month_03 = request.annual_target * (coefficient.coeff_month_03 / Decimal("12"))
+    detail.month_04 = request.annual_target * (coefficient.coeff_month_04 / Decimal("12"))
+    detail.month_05 = request.annual_target * (coefficient.coeff_month_05 / Decimal("12"))
+    detail.month_06 = request.annual_target * (coefficient.coeff_month_06 / Decimal("12"))
+    detail.month_07 = request.annual_target * (coefficient.coeff_month_07 / Decimal("12"))
+    detail.month_08 = request.annual_target * (coefficient.coeff_month_08 / Decimal("12"))
+    detail.month_09 = request.annual_target * (coefficient.coeff_month_09 / Decimal("12"))
+    detail.month_10 = request.annual_target * (coefficient.coeff_month_10 / Decimal("12"))
+    detail.month_11 = request.annual_target * (coefficient.coeff_month_11 / Decimal("12"))
+    detail.month_12 = request.annual_target * (coefficient.coeff_month_12 / Decimal("12"))
+
+    # Recalculate total
+    recalculate_detail_total(detail)
+
+    detail.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(detail)
+
+    # Invalidate cache
+    cache_service.delete_pattern(f"{CACHE_NAMESPACE}:*")
+
+    log_info(
+        f"Apply seasonality coefficients - user_id: {current_user.id}, detail_id: {request.detail_id}, "
+        f"coefficient_id: {request.seasonality_coefficient_id}, annual_target: {request.annual_target}",
+        "revenue_plan_details"
+    )
+
+    return detail
