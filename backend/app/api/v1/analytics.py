@@ -1,11 +1,16 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, Path, HTTPException
+from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum, PayrollPlan, PayrollActual
+from app.db.models import (
+    Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail,
+    ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
+    PayrollPlan, PayrollActual, Department,
+    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream
+)
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (
@@ -35,6 +40,9 @@ from app.schemas.analytics import (
     PlanVsActualSummary,
     PlanVsActualMonthly,
     PlanVsActualCategory,
+    BudgetIncomeStatement,
+    BudgetIncomeStatementMonthly,
+    BudgetIncomeStatementCategory,
 )
 from app.schemas.budget_validation import (
     BudgetStatusResponse,
@@ -1117,4 +1125,250 @@ def validate_expense(
         warnings=result.warnings,
         errors=result.errors,
         budget_info=BudgetInfo(**result.budget_info) if result.budget_info else None
+    )
+
+
+@router.get("/budget-income-statement", response_model=BudgetIncomeStatement)
+def get_budget_income_statement(
+    year: int = Query(..., description="Year for the budget income statement"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    БДР (Бюджет доходов и расходов) - Budget Income Statement
+
+    Returns a comprehensive financial report showing:
+    - Revenue (planned vs actual)
+    - Expenses (planned vs actual)
+    - Profit (Revenue - Expenses)
+    - Profitability metrics (ROI, Profit Margin)
+    - Monthly breakdown
+
+    - USER: Can only see their own department
+    - MANAGER/ADMIN: Can filter by department or see all
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        pass  # Can filter by department or see all
+
+    # Get department name if specific department
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        department_name = dept.name if dept else None
+
+    # MONTH_NAMES for Russian locale
+    MONTH_NAMES = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    # Initialize monthly data structure
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": MONTH_NAMES[month - 1],
+            "revenue_planned": 0.0,
+            "revenue_actual": 0.0,
+            "expenses_planned": 0.0,
+            "expenses_actual": 0.0,
+        }
+
+    # ========== REVENUE DATA ==========
+
+    # Get revenue planned from RevenuePlanDetail
+    revenue_plan_query = db.query(
+        RevenuePlanDetail.month,
+        func.sum(RevenuePlanDetail.planned_amount).label('total')
+    ).filter(RevenuePlanDetail.year == year)
+
+    if department_id:
+        revenue_plan_query = revenue_plan_query.filter(RevenuePlanDetail.department_id == department_id)
+
+    revenue_plan_query = revenue_plan_query.group_by(RevenuePlanDetail.month)
+
+    for row in revenue_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["revenue_planned"] = float(row.total or 0)
+
+    # Get revenue actual from RevenueActual
+    revenue_actual_query = db.query(
+        RevenueActual.month,
+        func.sum(RevenueActual.actual_amount).label('total')
+    ).filter(RevenueActual.year == year)
+
+    if department_id:
+        revenue_actual_query = revenue_actual_query.filter(RevenueActual.department_id == department_id)
+
+    revenue_actual_query = revenue_actual_query.group_by(RevenueActual.month)
+
+    for row in revenue_actual_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["revenue_actual"] = float(row.total or 0)
+
+    # ========== EXPENSE DATA ==========
+
+    # Get expenses planned from BudgetPlan
+    expenses_plan_query = db.query(
+        BudgetPlan.month,
+        func.sum(BudgetPlan.planned_amount).label('total')
+    ).filter(BudgetPlan.year == year)
+
+    if department_id:
+        expenses_plan_query = expenses_plan_query.filter(BudgetPlan.department_id == department_id)
+
+    expenses_plan_query = expenses_plan_query.group_by(BudgetPlan.month)
+
+    for row in expenses_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_planned"] = float(row.total or 0)
+
+    # Get expenses actual from Expense table
+    expenses_actual_query = db.query(
+        extract('month', Expense.request_date).label('month'),
+        func.sum(Expense.amount).label('total')
+    ).filter(extract('year', Expense.request_date) == year)
+
+    if department_id:
+        expenses_actual_query = expenses_actual_query.filter(Expense.department_id == department_id)
+
+    expenses_actual_query = expenses_actual_query.group_by(extract('month', Expense.request_date))
+
+    for row in expenses_actual_query.all():
+        month = int(row.month)
+        if month in monthly_data:
+            monthly_data[month]["expenses_actual"] = float(row.total or 0)
+
+    # Also add PayrollPlan to expenses
+    payroll_plan_query = db.query(
+        PayrollPlan.month,
+        func.sum(PayrollPlan.total_planned).label('total')
+    ).filter(PayrollPlan.year == year)
+
+    if department_id:
+        payroll_plan_query = payroll_plan_query.filter(PayrollPlan.department_id == department_id)
+
+    payroll_plan_query = payroll_plan_query.group_by(PayrollPlan.month)
+
+    for row in payroll_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_planned"] += float(row.total or 0)
+
+    # Add PayrollActual to actual expenses
+    payroll_actual_query = db.query(
+        PayrollActual.month,
+        func.sum(PayrollActual.total_paid).label('total')
+    ).filter(PayrollActual.year == year)
+
+    if department_id:
+        payroll_actual_query = payroll_actual_query.filter(PayrollActual.department_id == department_id)
+
+    payroll_actual_query = payroll_actual_query.group_by(PayrollActual.month)
+
+    for row in payroll_actual_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_actual"] += float(row.total or 0)
+
+    # ========== CALCULATE TOTALS AND METRICS ==========
+
+    total_revenue_planned = sum(m["revenue_planned"] for m in monthly_data.values())
+    total_revenue_actual = sum(m["revenue_actual"] for m in monthly_data.values())
+    total_expenses_planned = sum(m["expenses_planned"] for m in monthly_data.values())
+    total_expenses_actual = sum(m["expenses_actual"] for m in monthly_data.values())
+
+    revenue_difference = total_revenue_actual - total_revenue_planned
+    revenue_execution_percent = (
+        (total_revenue_actual / total_revenue_planned * 100)
+        if total_revenue_planned > 0 else 0
+    )
+
+    expenses_difference = total_expenses_actual - total_expenses_planned
+    expenses_execution_percent = (
+        (total_expenses_actual / total_expenses_planned * 100)
+        if total_expenses_planned > 0 else 0
+    )
+
+    profit_planned = total_revenue_planned - total_expenses_planned
+    profit_actual = total_revenue_actual - total_expenses_actual
+    profit_difference = profit_actual - profit_planned
+
+    profit_margin_planned = (
+        (profit_planned / total_revenue_planned * 100)
+        if total_revenue_planned > 0 else 0
+    )
+    profit_margin_actual = (
+        (profit_actual / total_revenue_actual * 100)
+        if total_revenue_actual > 0 else 0
+    )
+
+    roi_planned = (
+        (profit_planned / total_expenses_planned * 100)
+        if total_expenses_planned > 0 else 0
+    )
+    roi_actual = (
+        (profit_actual / total_expenses_actual * 100)
+        if total_expenses_actual > 0 else 0
+    )
+
+    # ========== BUILD MONTHLY BREAKDOWN ==========
+
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        profit_planned_month = m_data["revenue_planned"] - m_data["expenses_planned"]
+        profit_actual_month = m_data["revenue_actual"] - m_data["expenses_actual"]
+
+        profit_margin_planned_month = (
+            (profit_planned_month / m_data["revenue_planned"] * 100)
+            if m_data["revenue_planned"] > 0 else 0
+        )
+        profit_margin_actual_month = (
+            (profit_actual_month / m_data["revenue_actual"] * 100)
+            if m_data["revenue_actual"] > 0 else 0
+        )
+
+        by_month.append(
+            BudgetIncomeStatementMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                revenue_planned=m_data["revenue_planned"],
+                revenue_actual=m_data["revenue_actual"],
+                expenses_planned=m_data["expenses_planned"],
+                expenses_actual=m_data["expenses_actual"],
+                profit_planned=profit_planned_month,
+                profit_actual=profit_actual_month,
+                profit_margin_planned=round(profit_margin_planned_month, 2),
+                profit_margin_actual=round(profit_margin_actual_month, 2),
+            )
+        )
+
+    return BudgetIncomeStatement(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        revenue_planned=total_revenue_planned,
+        revenue_actual=total_revenue_actual,
+        revenue_difference=revenue_difference,
+        revenue_execution_percent=round(revenue_execution_percent, 2),
+        expenses_planned=total_expenses_planned,
+        expenses_actual=total_expenses_actual,
+        expenses_difference=expenses_difference,
+        expenses_execution_percent=round(expenses_execution_percent, 2),
+        profit_planned=profit_planned,
+        profit_actual=profit_actual,
+        profit_difference=profit_difference,
+        profit_margin_planned=round(profit_margin_planned, 2),
+        profit_margin_actual=round(profit_margin_actual, 2),
+        roi_planned=round(roi_planned, 2),
+        roi_actual=round(roi_actual, 2),
+        by_month=by_month,
     )

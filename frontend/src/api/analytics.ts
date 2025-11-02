@@ -75,4 +75,13 @@ export const analyticsApi = {
     const { data } = await apiClient.get('analytics/payment-forecast/summary', { params })
     return data
   },
+
+  // Budget Income Statement (БДР)
+  getBudgetIncomeStatement: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/budget-income-statement', { params })
+    return data
+  },
 }

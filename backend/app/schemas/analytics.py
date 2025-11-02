@@ -225,3 +225,77 @@ class PlanVsActualSummary(BaseModel):
     execution_percent: float
     by_month: list[PlanVsActualMonthly]
     by_category: list[PlanVsActualCategory]
+
+
+# ============================================================================
+# Budget Income Statement (БДР) Schemas
+# ============================================================================
+
+class BudgetIncomeStatementMonthly(BaseModel):
+    """Monthly breakdown for budget income statement"""
+    month: int
+    month_name: str
+    revenue_planned: float
+    revenue_actual: float
+    expenses_planned: float
+    expenses_actual: float
+    profit_planned: float
+    profit_actual: float
+    profit_margin_planned: float  # %
+    profit_margin_actual: float   # %
+
+
+class BudgetIncomeStatementCategory(BaseModel):
+    """Category-level breakdown (revenue streams and expense categories)"""
+    category_id: int
+    category_name: str
+    category_type: str  # 'revenue' or 'expense'
+    planned: float
+    actual: float
+    difference: float
+    execution_percent: float
+
+
+class BudgetIncomeStatement(BaseModel):
+    """
+    БДР (Бюджет доходов и расходов) - Budget Income Statement
+
+    Shows the complete financial picture:
+    - Revenue (from revenue_plans and revenue_actuals)
+    - Expenses (from budget_plans and expenses)
+    - Profit (Revenue - Expenses)
+    - Profitability metrics (ROI, Profit Margin)
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Revenue totals
+    revenue_planned: float
+    revenue_actual: float
+    revenue_difference: float
+    revenue_execution_percent: float
+
+    # Expense totals
+    expenses_planned: float
+    expenses_actual: float
+    expenses_difference: float
+    expenses_execution_percent: float
+
+    # Profit calculations
+    profit_planned: float  # Revenue - Expenses (planned)
+    profit_actual: float   # Revenue - Expenses (actual)
+    profit_difference: float
+
+    # Profitability metrics
+    profit_margin_planned: float  # Profit / Revenue * 100 (%)
+    profit_margin_actual: float   # Profit / Revenue * 100 (%)
+    roi_planned: float            # Profit / Expenses * 100 (%)
+    roi_actual: float             # Profit / Expenses * 100 (%)
+
+    # Monthly breakdown
+    by_month: List[BudgetIncomeStatementMonthly]
+
+    # Category breakdown (optional)
+    revenue_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
+    expenses_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
