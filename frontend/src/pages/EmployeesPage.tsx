@@ -23,11 +23,13 @@ import {
   SearchOutlined,
   UserOutlined,
   DownloadOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { employeeAPI, Employee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
+import EmployeeImportModal from '../components/employees/EmployeeImportModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -54,6 +56,7 @@ export default function EmployeesPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>();
+  const [importModalVisible, setImportModalVisible] = useState(false);
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -142,6 +145,15 @@ export default function EmployeesPage() {
     } catch (error) {
       message.error('Ошибка при экспорте');
     }
+  };
+
+  const handleImport = () => {
+    setImportModalVisible(true);
+  };
+
+  const handleCloseImportModal = () => {
+    setImportModalVisible(false);
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
   };
 
   // Calculate statistics
@@ -433,6 +445,12 @@ export default function EmployeesPage() {
           </Space>
           <Space>
             <Button
+              icon={<UploadOutlined />}
+              onClick={handleImport}
+            >
+              Импорт из Excel
+            </Button>
+            <Button
               icon={<DownloadOutlined />}
               onClick={handleExport}
             >
@@ -467,6 +485,11 @@ export default function EmployeesPage() {
         visible={modalVisible}
         employee={selectedEmployee}
         onCancel={handleCloseModal}
+      />
+
+      <EmployeeImportModal
+        visible={importModalVisible}
+        onCancel={handleCloseImportModal}
       />
     </div>
   );

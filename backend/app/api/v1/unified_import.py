@@ -209,7 +209,12 @@ async def execute_import(
     )
 
     if not result["success"]:
-        raise HTTPException(status_code=400, detail=result.get("error", "Import failed"))
+        # Include validation_result in error response for better debugging
+        error_detail = {
+            "detail": result.get("error", "Import failed"),
+            "validation_result": result.get("validation_result")
+        }
+        raise HTTPException(status_code=400, detail=error_detail)
 
     return result
 
@@ -255,13 +260,15 @@ def download_template(
     entity_info = config_manager.get_entity_info(entity_type, language)
     display_name = entity_info["display_name"] if entity_info else entity_type
 
-    filename = f"template_{entity_type}_{language}.xlsx"
+    # Use RFC 5987 encoding for non-ASCII filename
+    import urllib.parse
+    filename = f"Шаблон_{display_name}.xlsx" if language == "ru" else f"Template_{entity_type}.xlsx"
+    encoded_filename = urllib.parse.quote(filename)
 
     return StreamingResponse(
         template_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
-            "Content-Description": f"Template: {display_name}"
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
         }
     )

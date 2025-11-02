@@ -7,35 +7,50 @@ import apiClient from '@/api/client';
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
 
-interface BudgetPlanImportModalProps {
+interface EmployeeImportModalProps {
   visible: boolean;
-  versionId: number | null;
   onCancel: () => void;
 }
 
 interface ImportResult {
   success: boolean;
-  message: string;
-  total_rows: number;
-  created: number;
-  updated: number;
-  skipped: number;
-  errors: string[];
+  message?: string;
+  stats?: {
+    total_rows: number;
+    created: number;
+    updated: number;
+    skipped: number;
+  };
+  errors?: string[];
 }
 
-export default function BudgetPlanImportModal({ visible, versionId, onCancel }: BudgetPlanImportModalProps) {
+export default function EmployeeImportModal({ visible, onCancel }: EmployeeImportModalProps) {
   const queryClient = useQueryClient();
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
-      if (!versionId) throw new Error('Version ID is required');
-
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('entity_type', 'employees');
 
-      const response = await apiClient.post(`/budget/planning/versions/${versionId}/import`, formData, {
+      // Basic column mapping for employees - the unified service will auto-detect columns
+      const columnMapping = {
+        'ФИО': 'full_name',
+        'Должность': 'position',
+        'Базовый оклад': 'base_salary',
+        'Оклад': 'base_salary',
+        'Месячная премия': 'monthly_bonus_base',
+        'Квартальная премия': 'quarterly_bonus_base',
+        'Годовая премия': 'annual_bonus_base',
+        'Дата приема': 'hire_date',
+        'Табельный номер': 'employee_number'
+      };
+
+      formData.append('column_mapping', JSON.stringify(columnMapping));
+
+      const response = await apiClient.post('/import/execute', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -45,15 +60,47 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
     onSuccess: (data) => {
       setImportResult(data);
       if (data.success) {
-        message.success('Импорт завершён успешно!');
-        queryClient.invalidateQueries({ queryKey: ['budget-version', versionId] });
-        queryClient.invalidateQueries({ queryKey: ['budget-plan-details', versionId] });
+        message.success('Импорт сотрудников завершён успешно!');
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
       } else {
         message.error('Импорт завершён с ошибками');
       }
     },
     onError: (error: any) => {
-      message.error(`Ошибка импорта: ${error.response?.data?.detail || error.message || 'Неизвестная ошибка'}`);
+      console.log('Import error details:', error.response?.data);
+      const errorDetail = error.response?.data?.detail;
+      const validationResult = error.response?.data?.validation_result;
+
+      // Show detailed validation errors if available
+      if (validationResult) {
+        console.log('Validation result:', validationResult);
+        const errorMessages = validationResult.messages?.filter((m: any) => m.severity === 'error') || [];
+        if (errorMessages.length > 0) {
+          Modal.error({
+            title: 'Ошибки валидации',
+            content: (
+              <div style={{ maxHeight: 400, overflow: 'auto' }}>
+                {errorMessages.slice(0, 10).map((msg: any, index: number) => (
+                  <div key={index} style={{ marginBottom: 8 }}>
+                    <strong>Строка {msg.row}:</strong> {msg.message}
+                    {msg.column && ` (колонка: ${msg.column})`}
+                    {msg.value !== null && msg.value !== undefined && ` [значение: ${msg.value}]`}
+                  </div>
+                ))}
+                {errorMessages.length > 10 && (
+                  <div style={{ marginTop: 8, fontStyle: 'italic' }}>
+                    ... и ещё {errorMessages.length - 10} ошибок
+                  </div>
+                )}
+              </div>
+            ),
+            width: 600,
+          });
+          return;
+        }
+      }
+
+      message.error(`Ошибка импорта: ${errorDetail || error.message || 'Неизвестная ошибка'}`);
     },
   });
 
@@ -80,7 +127,7 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
   const handleDownloadTemplate = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${API_URL}/budget/planning/versions/template/download`;
+      const url = `${API_URL}/import/template/employees?language=ru&include_examples=true`;
 
       // Get token from localStorage
       const token = localStorage.getItem('token');
@@ -101,7 +148,7 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'Шаблон_План_Бюджета.xlsx';
+      link.download = 'Шаблон_Импорт_Сотрудников.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -131,7 +178,7 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
 
   return (
     <Modal
-      title="Импорт плана бюджета из Excel"
+      title="Импорт сотрудников из Excel"
       open={visible}
       onOk={importResult ? handleClose : undefined}
       onCancel={handleCancel}
@@ -150,18 +197,22 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
               <div>
                 <p>Excel файл должен содержать следующие колонки:</p>
                 <ul>
-                  <li><Text strong>Категория</Text> - название категории бюджета (должна существовать в справочнике)</li>
-                  <li><Text strong>Тип</Text> - OPEX или CAPEX</li>
-                  <li><Text strong>Январь, Февраль, ..., Декабрь</Text> - суммы по месяцам (12 колонок)</li>
-                  <li><Text strong>Обоснование</Text> - обоснование расходов (опционально)</li>
+                  <li><Text strong>ФИО</Text> - полное имя сотрудника (обязательно)</li>
+                  <li><Text strong>Должность</Text> - должность сотрудника (обязательно)</li>
+                  <li><Text strong>Базовый оклад</Text> или <Text strong>Оклад</Text> - размер оклада (обязательно)</li>
+                  <li><Text strong>Месячная премия</Text> - ежемесячная премия (опционально)</li>
+                  <li><Text strong>Квартальная премия</Text> - премия раз в квартал (опционально)</li>
+                  <li><Text strong>Годовая премия</Text> - премия раз в год (опционально)</li>
+                  <li><Text strong>Дата приема</Text> - дата приема на работу (опционально)</li>
+                  <li><Text strong>Табельный номер</Text> - табельный номер (опционально)</li>
                 </ul>
                 <p style={{ marginTop: 10 }}>
-                  <Text type="warning" strong>Важно:</Text> Категории должны быть предварительно созданы в справочнике категорий.
-                  Если категория не найдена, строка будет пропущена.
+                  <Text type="warning" strong>Важно:</Text> Система автоматически определит колонки по названиям.
+                  Поддерживаются различные варианты названий.
                 </p>
                 <p style={{ marginTop: 10 }}>
                   <Text type="secondary">
-                    Если план для категории на указанный месяц уже существует, он будет обновлён.
+                    Если сотрудник с таким ФИО уже существует, его данные будут обновлены.
                   </Text>
                 </p>
               </div>
@@ -211,35 +262,37 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
             style={{ marginBottom: 20 }}
           />
 
-          <Row gutter={16} style={{ marginBottom: 20 }}>
-            <Col span={6}>
-              <Statistic
-                title="Всего строк"
-                value={importResult.total_rows}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Создано"
-                value={importResult.created}
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Обновлено"
-                value={importResult.updated}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Пропущено"
-                value={importResult.skipped}
-                valueStyle={{ color: '#cf1322' }}
-              />
-            </Col>
-          </Row>
+          {importResult.stats && (
+            <Row gutter={16} style={{ marginBottom: 20 }}>
+              <Col span={6}>
+                <Statistic
+                  title="Всего строк"
+                  value={importResult.stats.total_rows}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Создано"
+                  value={importResult.stats.created}
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Обновлено"
+                  value={importResult.stats.updated}
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Пропущено"
+                  value={importResult.stats.skipped}
+                  valueStyle={{ color: '#cf1322' }}
+                />
+              </Col>
+            </Row>
+          )}
 
           {importResult.errors && importResult.errors.length > 0 && (
             <>
@@ -250,11 +303,6 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
                     {importResult.errors.map((error, index) => (
                       <div key={index}>• {error}</div>
                     ))}
-                    {importResult.skipped > importResult.errors.length && (
-                      <div style={{ marginTop: 10, fontStyle: 'italic' }}>
-                        И еще {importResult.skipped - importResult.errors.length} ошибок...
-                      </div>
-                    )}
                   </div>
                 }
                 type="error"
@@ -265,7 +313,7 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
 
           <Alert
             message="Что дальше?"
-            description="Данные импортированы. Вы можете перейти к просмотру и редактированию плана или закрыть это окно."
+            description="Данные импортированы. Вы можете перейти к просмотру списка сотрудников или закрыть это окно."
             type="info"
             showIcon
             style={{ marginTop: 16 }}

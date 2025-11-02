@@ -3,6 +3,7 @@ API endpoints for Budget Planning 2026 Module
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime
@@ -1710,3 +1711,65 @@ async def import_budget_plan_details(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error importing file: {str(e)}"
         )
+
+
+@router.get("/versions/template/download", status_code=status.HTTP_200_OK)
+async def download_budget_template(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Download Excel template for budget plan import
+    """
+    # Create a template DataFrame with the correct structure
+    template_data = {
+        'Категория': ['Пример категории 1', 'Пример категории 2'],
+        'Тип': ['OPEX', 'CAPEX'],
+        'Январь': [0, 0],
+        'Февраль': [0, 0],
+        'Март': [0, 0],
+        'Апрель': [0, 0],
+        'Май': [0, 0],
+        'Июнь': [0, 0],
+        'Июль': [0, 0],
+        'Август': [0, 0],
+        'Сентябрь': [0, 0],
+        'Октябрь': [0, 0],
+        'Ноябрь': [0, 0],
+        'Декабрь': [0, 0],
+        'Обоснование': ['Пример обоснования', 'Пример обоснования']
+    }
+
+    df = pd.DataFrame(template_data)
+
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='План бюджета')
+
+        # Get workbook and worksheet
+        workbook = writer.book
+        worksheet = writer.sheets['План бюджета']
+
+        # Auto-adjust column widths
+        for idx, col in enumerate(df.columns, 1):
+            max_length = max(
+                df[col].astype(str).apply(len).max(),
+                len(col)
+            ) + 2
+            worksheet.column_dimensions[chr(64 + idx)].width = min(max_length, 50)
+
+    output.seek(0)
+
+    # Return as streaming response
+    # Use RFC 5987 encoding for non-ASCII filename
+    import urllib.parse
+    filename = "Шаблон_План_Бюджета.xlsx"
+    encoded_filename = urllib.parse.quote(filename)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
+    )

@@ -49,6 +49,33 @@
       "required": false,
       "max_length": 50,
       "aliases": ["табельный_номер", "employee_number", "номер", "number"]
+    },
+    {
+      "name": "monthly_bonus_base",
+      "display_name": {"ru": "Месячная премия", "en": "Monthly Bonus"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "max": 5000000,
+      "aliases": ["месячная_премия", "monthly_bonus", "ежемесячная_премия", "месячная премия"]
+    },
+    {
+      "name": "quarterly_bonus_base",
+      "display_name": {"ru": "Квартальная премия", "en": "Quarterly Bonus"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "max": 5000000,
+      "aliases": ["квартальная_премия", "quarterly_bonus", "квартальная премия"]
+    },
+    {
+      "name": "annual_bonus_base",
+      "display_name": {"ru": "Годовая премия", "en": "Annual Bonus"},
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "max": 10000000,
+      "aliases": ["годовая_премия", "annual_bonus", "годовая премия"]
     }
   ],
   "validation_rules": {

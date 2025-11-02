@@ -12,8 +12,8 @@ from app.db.models import (
     Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail,
     ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
     PayrollPlan, PayrollActual, Department,
-    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream, RevenueCategory,
-    CustomerMetrics
+    RevenuePlan, RevenuePlanDetail, RevenuePlanVersion, RevenueActual, RevenueStream, RevenueCategory,
+    RevenueVersionStatusEnum, CustomerMetrics
 )
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
@@ -1197,19 +1197,35 @@ def get_budget_income_statement(
     # ========== REVENUE DATA ==========
 
     # Get revenue planned from RevenuePlanDetail
-    revenue_plan_query = db.query(
-        RevenuePlanDetail.month,
-        func.sum(RevenuePlanDetail.planned_amount).label('total')
-    ).filter(RevenuePlanDetail.year == year)
+    # RevenuePlanDetail stores data in fields month_01...month_12
+    # Need to get approved plan versions for the year
+
+    approved_versions_query = db.query(RevenuePlanVersion.id).join(
+        RevenuePlan, RevenuePlanVersion.plan_id == RevenuePlan.id
+    ).filter(
+        RevenuePlan.year == year,
+        RevenuePlanVersion.status == RevenueVersionStatusEnum.APPROVED
+    )
 
     if department_id:
-        revenue_plan_query = revenue_plan_query.filter(RevenuePlanDetail.department_id == department_id)
+        approved_versions_query = approved_versions_query.filter(
+            RevenuePlan.department_id == department_id
+        )
 
-    revenue_plan_query = revenue_plan_query.group_by(RevenuePlanDetail.month)
+    approved_version_ids = [v.id for v in approved_versions_query.all()]
 
-    for row in revenue_plan_query.all():
-        if row.month in monthly_data:
-            monthly_data[row.month]["revenue_planned"] = float(row.total or 0)
+    if approved_version_ids:
+        # Get details of approved versions
+        details = db.query(RevenuePlanDetail).filter(
+            RevenuePlanDetail.version_id.in_(approved_version_ids)
+        ).all()
+
+        # Sum by months
+        for detail in details:
+            for month_num in range(1, 13):
+                month_field = f"month_{month_num:02d}"
+                value = getattr(detail, month_field, 0) or 0
+                monthly_data[month_num]["revenue_planned"] += float(value)
 
     # Get revenue actual from RevenueActual
     revenue_actual_query = db.query(
@@ -1429,9 +1445,44 @@ def get_customer_metrics_analytics(
     current_year_metrics = query.all()
 
     if not current_year_metrics:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No customer metrics found for year {year}"
+        # Return empty data instead of 404 error for better UX
+        month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                       "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+        by_month_empty = [
+            CustomerMetricsMonthly(
+                month=m,
+                month_name=month_names[m-1],
+                total_customer_base=0,
+                active_customer_base=0,
+                coverage_rate=0.0,
+                avg_order_value=0.0,
+                avg_order_value_regular=0.0,
+                avg_order_value_network=0.0,
+                avg_order_value_new=0.0,
+            )
+            for m in range(1, 13)
+        ]
+
+        return CustomerMetricsAnalytics(
+            year=year,
+            department_id=department_id,
+            department_name=department_name,
+            total_customer_base=0,
+            active_customer_base=0,
+            coverage_rate=0.0,
+            regular_clinics=0,
+            network_clinics=0,
+            new_clinics=0,
+            avg_order_value=0.0,
+            avg_order_value_regular=0.0,
+            avg_order_value_network=0.0,
+            avg_order_value_new=0.0,
+            customer_base_growth=None,
+            active_base_growth=None,
+            avg_check_growth=None,
+            by_month=by_month_empty,
+            by_stream=[],
         )
 
     # Aggregate totals for current year
@@ -1643,9 +1694,37 @@ def get_revenue_analytics(
     current_year_data = query.all()
 
     if not current_year_data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No revenue data found for year {year}"
+        # Return empty data instead of 404 error for better UX
+        month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                       "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+        by_month_empty = [
+            RevenueAnalyticsMonthly(
+                month=m,
+                month_name=month_names[m-1],
+                planned=0.0,
+                actual=0.0,
+                variance=0.0,
+                variance_percent=0.0,
+                execution_percent=0.0,
+            )
+            for m in range(1, 13)
+        ]
+
+        return RevenueAnalytics(
+            year=year,
+            department_id=department_id,
+            department_name=department_name,
+            total_planned=0.0,
+            total_actual=0.0,
+            total_variance=0.0,
+            total_variance_percent=0.0,
+            total_execution_percent=0.0,
+            planned_growth=None,
+            actual_growth=None,
+            by_month=by_month_empty,
+            by_stream=None,
+            by_category=None,
         )
 
     # Calculate totals

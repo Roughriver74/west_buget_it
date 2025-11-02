@@ -29,6 +29,7 @@ import { BudgetCalculatorForm } from '@/components/budget/BudgetCalculatorForm'
 import { BudgetVersionDetailDrawer } from '@/components/budget/BudgetVersionDetailDrawer'
 import { BudgetVersionComparisonModal } from '@/components/budget/BudgetVersionComparisonModal'
 import BudgetScenarioComparisonChart from '@/components/budget/BudgetScenarioComparisonChart'
+import BudgetPlanImportModal from '@/components/budget/BudgetPlanImportModal'
 import {
   useBudgetScenarios,
   useBudgetVersions,
@@ -37,6 +38,8 @@ import {
   useDeleteScenario,
   useDeleteVersion,
   useSubmitVersion,
+  useApproveVersion,
+  useRevertVersionStatus,
   useApplyVersionToPlan,
 } from '@/hooks/useBudgetPlanning'
 import { BudgetScenarioType } from '@/types/budgetPlanning'
@@ -59,6 +62,8 @@ const BudgetPlanningPage: React.FC = () => {
   const [activeVersionId, setActiveVersionId] = useState<number | null>(null)
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false)
   const [selectedVersionsForComparison, setSelectedVersionsForComparison] = useState<Key[]>([])
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importVersionId, setImportVersionId] = useState<number | null>(null)
   const [scenarioForm] = Form.useForm()
   const [versionForm] = Form.useForm()
 
@@ -73,6 +78,7 @@ const BudgetPlanningPage: React.FC = () => {
     refetch: refetchScenarios,
   } = useBudgetScenarios({
     year: selectedYear,
+    department_id: departmentId,
   })
 
   const {
@@ -84,6 +90,7 @@ const BudgetPlanningPage: React.FC = () => {
   } = useBudgetVersions({
     year: selectedYear,
     scenario_id: selectedScenario?.id,
+    department_id: departmentId,
   })
 
   const {
@@ -134,6 +141,8 @@ const BudgetPlanningPage: React.FC = () => {
   const createVersion = useCreateVersion()
   const deleteVersion = useDeleteVersion()
   const submitVersion = useSubmitVersion()
+  const approveVersion = useApproveVersion()
+  const revertVersionStatus = useRevertVersionStatus()
   const applyVersionToPlan = useApplyVersionToPlan()
 
   // Handlers
@@ -186,6 +195,14 @@ const BudgetPlanningPage: React.FC = () => {
     await submitVersion.mutateAsync(id)
   }
 
+  const handleApproveVersion = async (id: number) => {
+    await approveVersion.mutateAsync({ id })
+  }
+
+  const handleRevertVersionStatus = async (id: number) => {
+    await revertVersionStatus.mutateAsync(id)
+  }
+
   const handleApplyVersionToPlan = async (id: number) => {
     await applyVersionToPlan.mutateAsync(id)
   }
@@ -210,6 +227,17 @@ const BudgetPlanningPage: React.FC = () => {
 
   const handleEditVersion = (version: any) => {
     openVersionDrawer(version.id, 'edit')
+  }
+
+  const handleImportVersion = (version: any) => {
+    setImportVersionId(version.id)
+    setIsImportModalOpen(true)
+  }
+
+  const handleImportModalClose = () => {
+    setIsImportModalOpen(false)
+    setImportVersionId(null)
+    refetchVersions()
   }
 
   const handleVersionDrawerClose = () => {
@@ -375,7 +403,10 @@ const BudgetPlanningPage: React.FC = () => {
             onEdit={handleEditVersion}
             onDelete={handleDeleteVersion}
             onSubmit={handleSubmitVersion}
+            onApprove={handleApproveVersion}
+            onRevert={handleRevertVersionStatus}
             onCopy={handleCopyVersion}
+            onImport={handleImportVersion}
             onApplyToPlan={handleApplyVersionToPlan}
             selectedRowKeys={selectedVersionsForComparison}
             onSelectionChange={setSelectedVersionsForComparison}
@@ -386,7 +417,11 @@ const BudgetPlanningPage: React.FC = () => {
       {/* Scenario Comparison Chart */}
       {hasEnoughScenariosForComparison && (
         <div style={{ marginTop: 24 }}>
-          <BudgetScenarioComparisonChart year={selectedYear} scenarioIds={scenarioIds} />
+          <BudgetScenarioComparisonChart
+            year={selectedYear}
+            departmentId={departmentId}
+            scenarioIds={scenarioIds}
+          />
         </div>
       )}
 
@@ -514,6 +549,12 @@ const BudgetPlanningPage: React.FC = () => {
         version1Id={selectedVersionsForComparison[0] ? Number(selectedVersionsForComparison[0]) : null}
         version2Id={selectedVersionsForComparison[1] ? Number(selectedVersionsForComparison[1]) : null}
         onClose={handleComparisonModalClose}
+      />
+
+      <BudgetPlanImportModal
+        visible={isImportModalOpen}
+        versionId={importVersionId}
+        onCancel={handleImportModalClose}
       />
     </div>
   )

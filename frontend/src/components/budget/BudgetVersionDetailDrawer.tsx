@@ -2,15 +2,13 @@
  * Budget Version Detail Drawer
  * Displays version metadata, plan editor, and approval history
  */
-import React, { useMemo, useRef } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Drawer, Descriptions, Divider, Spin, Typography, Button } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { useBudgetVersionWithDetails } from '@/hooks/useBudgetPlanning'
 import { BudgetVersionStatus, ExpenseType } from '@/types/budgetPlanning'
 import { BudgetVersionStatusBadge } from './BudgetVersionStatusBadge'
 import { BudgetPlanDetailsTable } from './BudgetPlanDetailsTable'
-import { PayrollSummaryCard } from './PayrollSummaryCard'
-import type { PayrollYearlySummary } from '@/types/budgetPlanning'
 
 const { Text } = Typography
 
@@ -39,6 +37,7 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
   onVersionUpdated,
 }) => {
   const tableRef = useRef<{ scrollBy: (direction: 'left' | 'right') => void } | null>(null)
+  const [riskPremiumEnabled, setRiskPremiumEnabled] = useState<boolean>(false)
   const shouldFetch = open && !!versionId
   const {
     data: version,
@@ -69,6 +68,31 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
       }),
     []
   )
+
+  // Calculate totals with risk premium
+  const displayTotals = useMemo(() => {
+    if (!version) {
+      return {
+        total: 0,
+        capex: 0,
+        opex: 0,
+      }
+    }
+
+    const total = Number(version.total_amount || 0)
+    const capex = Number(version.total_capex || 0)
+    const opex = Number(version.total_opex || 0)
+
+    if (riskPremiumEnabled) {
+      return {
+        total: total * 1.1,
+        capex: capex * 1.1,
+        opex: opex * 1.1,
+      }
+    }
+
+    return { total, capex, opex }
+  }, [version, riskPremiumEnabled])
 
   return (
     <Drawer
@@ -111,29 +135,67 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
                 <BudgetVersionStatusBadge status={version.status} />
               </Descriptions.Item>
               <Descriptions.Item label="Сумма, ₽">
-                {currencyFormatter.format(Number(version.total_amount || 0))}
+                {currencyFormatter.format(displayTotals.total)}
+                {riskPremiumEnabled && (
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                    (+10%)
+                  </Text>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Сценарий">
                 {version.scenario?.scenario_name || '—'}
               </Descriptions.Item>
               <Descriptions.Item label="CAPEX, ₽">
-                {currencyFormatter.format(Number(version.total_capex || 0))}
+                {currencyFormatter.format(displayTotals.capex)}
+                {riskPremiumEnabled && (
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                    (+10%)
+                  </Text>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="OPEX, ₽">
-                {currencyFormatter.format(Number(version.total_opex || 0))}
+                {currencyFormatter.format(displayTotals.opex)}
+                {riskPremiumEnabled && (
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                    (+10%)
+                  </Text>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="Автор">
                 {version.created_by || '—'}
               </Descriptions.Item>
+              {version.payroll_summary && (
+                <>
+                  <Descriptions.Item label="ФОТ (год), ₽">
+                    {currencyFormatter.format(
+                      riskPremiumEnabled
+                        ? Number(version.payroll_summary.total_planned_annual || 0) * 1.1
+                        : Number(version.payroll_summary.total_planned_annual || 0)
+                    )}
+                    {riskPremiumEnabled && (
+                      <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                        (+10%)
+                      </Text>
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Сотрудников">
+                    {version.payroll_summary.total_employees || 0}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Средн. ЗП/мес, ₽">
+                    {version.payroll_summary.total_employees > 0
+                      ? currencyFormatter.format(
+                          (riskPremiumEnabled
+                            ? Number(version.payroll_summary.total_planned_annual || 0) * 1.1
+                            : Number(version.payroll_summary.total_planned_annual || 0)) /
+                            12 /
+                            version.payroll_summary.total_employees
+                        )
+                      : '—'}
+                  </Descriptions.Item>
+                </>
+              )}
             </Descriptions>
           </div>
-
-          {/* Payroll Summary - if available */}
-          {version.payroll_summary && (
-            <div style={{ flexShrink: 0, marginBottom: 16 }}>
-              <PayrollSummaryCard payrollSummary={version.payroll_summary as PayrollYearlySummary} />
-            </div>
-          )}
 
           <Divider style={{ margin: '8px 0 16px 0' }} />
 
@@ -195,6 +257,8 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
                 categories={categories}
                 isEditable={isEditable}
                 onAfterSave={handleAfterAction}
+                onRiskPremiumChange={setRiskPremiumEnabled}
+                payrollSummary={version.payroll_summary}
               />
             </div>
           </div>

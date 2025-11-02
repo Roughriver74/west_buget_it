@@ -368,10 +368,12 @@ export interface BudgetScenarioFilters {
   year?: number
   scenario_type?: BudgetScenarioType
   is_active?: boolean
+  department_id?: number
 }
 
 export interface BudgetVersionFilters {
   year?: number
   status?: BudgetVersionStatus
   scenario_id?: number
+  department_id?: number
 }

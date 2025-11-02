@@ -3,7 +3,7 @@
  * Allows adding/removing categories from budget version and creating new categories
  */
 import React, { useState, useMemo } from 'react'
-import { Modal, Transfer, message, Alert, Space, Typography, Button, Form, Input, Select, Divider } from 'antd'
+import { Modal, Transfer, message, Alert, Space, Typography, Button, Form, Input, Select, Divider, Spin } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import type { Key } from 'react'
 import { planDetailsApi } from '@/api/budgetPlanning'
@@ -23,6 +23,7 @@ interface Category {
 
 interface ManageCategoriesModalProps {
   open: boolean
+  versionId: number
   categories: Category[]
   planDetails: BudgetPlanDetail[]
   onClose: () => void
@@ -38,6 +39,7 @@ interface TransferItem {
 
 export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   open,
+  versionId,
   categories,
   planDetails,
   onClose,
@@ -47,6 +49,8 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   const [removing, setRemoving] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createForm] = Form.useForm()
+  const [freshPlanDetails, setFreshPlanDetails] = useState<BudgetPlanDetail[]>([])
+  const [loadingFreshData, setLoadingFreshData] = useState(false)
 
   // Create category mutation
   const createCategoryMutation = useMutation({
@@ -64,10 +68,29 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
     },
   })
 
-  // Get categories that have plan details
+  // Load fresh plan details when modal opens
+  React.useEffect(() => {
+    if (open) {
+      const loadFreshData = async () => {
+        setLoadingFreshData(true)
+        try {
+          const data = await planDetailsApi.getByVersion(versionId)
+          setFreshPlanDetails(data)
+        } catch (error) {
+          console.error('Failed to load plan details:', error)
+          setFreshPlanDetails(planDetails)
+        } finally {
+          setLoadingFreshData(false)
+        }
+      }
+      loadFreshData()
+    }
+  }, [open, versionId, planDetails])
+
+  // Get categories that have plan details (use fresh data)
   const usedCategoryIds = useMemo(() => {
-    return new Set(planDetails.map(pd => pd.category_id))
-  }, [planDetails])
+    return new Set(freshPlanDetails.map(pd => pd.category_id))
+  }, [freshPlanDetails])
 
   // Filter only leaf categories (categories without children)
   const leafCategories = useMemo(() => {
@@ -88,11 +111,17 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
   }, [leafCategories])
 
   // Target keys (categories that are currently in the version)
-  const [targetKeys, setTargetKeys] = useState<Key[]>(() => {
-    return leafCategories
-      .filter(cat => usedCategoryIds.has(cat.id))
-      .map(cat => cat.id.toString())
-  })
+  const [targetKeys, setTargetKeys] = useState<Key[]>([])
+
+  // Sync targetKeys only when modal opens
+  React.useEffect(() => {
+    if (open) {
+      const newTargetKeys = leafCategories
+        .filter(cat => usedCategoryIds.has(cat.id))
+        .map(cat => cat.id.toString())
+      setTargetKeys(newTargetKeys)
+    }
+  }, [open, leafCategories, usedCategoryIds])
 
   const handleChange = (newTargetKeys: Key[]) => {
     setTargetKeys(newTargetKeys)
@@ -102,8 +131,11 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
     setRemoving(true)
 
     try {
+      // Get latest plan details from server to ensure we have all records
+      const latestPlanDetails = await planDetailsApi.getByVersion(versionId)
+
       // Find all plan details for these categories
-      const detailsToRemove = planDetails.filter(pd =>
+      const detailsToRemove = latestPlanDetails.filter(pd =>
         categoryIdsToRemove.includes(pd.category_id)
       )
 
@@ -119,6 +151,10 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
 
       await Promise.all(promises)
 
+      // Invalidate plan details cache to refetch updated data
+      // Use the correct queryKey pattern from budgetPlanningKeys
+      queryClient.invalidateQueries({ queryKey: ['budgetPlanning', 'planDetails'] })
+
       message.success(`Удалено ${detailsToRemove.length} записей`)
       onSuccess()
     } catch (error: any) {
@@ -129,15 +165,64 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
     }
   }
 
+  const handleAddCategories = async (categoryIdsToAdd: number[]) => {
+    setRemoving(true)
+
+    try {
+      // Create one empty plan detail (month 1) for each category to make it appear in table
+      // Other months will be created when user enters values
+      const promises = categoryIdsToAdd.map(categoryId => {
+        const category = categories.find(c => c.id === categoryId)
+        if (!category) {
+          throw new Error(`Category with id ${categoryId} not found`)
+        }
+        return planDetailsApi.create({
+          version_id: versionId,
+          category_id: categoryId,
+          month: 1,
+          planned_amount: 0,
+          type: category.type,
+        })
+      })
+
+      await Promise.all(promises)
+
+      // Invalidate plan details cache to refetch updated data
+      queryClient.invalidateQueries({ queryKey: ['budgetPlanning', 'planDetails'] })
+
+      message.success(`Добавлено ${categoryIdsToAdd.length} категорий`)
+      onSuccess()
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка при добавлении категорий')
+      console.error('Add categories error:', error)
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const handleSave = async () => {
     const currentCategoryIds = new Set(usedCategoryIds)
     const newCategoryIds = new Set(targetKeys.map(key => Number(key.toString())))
 
-    // Find categories to remove
+    // Find categories to remove and add
     const toRemove = Array.from(currentCategoryIds).filter(id => !newCategoryIds.has(id))
+    const toAdd = Array.from(newCategoryIds).filter(id => !currentCategoryIds.has(id))
 
-    if (toRemove.length > 0) {
-      // Show confirmation if removing categories with data
+    if (toRemove.length > 0 && toAdd.length > 0) {
+      // Both adding and removing
+      Modal.confirm({
+        title: 'Применить изменения?',
+        content: `Будет добавлено ${toAdd.length} категорий и удалено ${toRemove.length} категорий. Продолжить?`,
+        okText: 'Применить',
+        cancelText: 'Отмена',
+        onOk: async () => {
+          await handleRemoveCategories(toRemove)
+          await handleAddCategories(toAdd)
+          onClose()
+        },
+      })
+    } else if (toRemove.length > 0) {
+      // Only removing
       Modal.confirm({
         title: 'Удалить категории?',
         content: `Будут удалены все данные для ${toRemove.length} категорий. Продолжить?`,
@@ -146,9 +231,13 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
         okButtonProps: { danger: true },
         onOk: async () => {
           await handleRemoveCategories(toRemove)
-          onClose() // Закрываем модальное окно после успешного удаления
+          onClose()
         },
       })
+    } else if (toAdd.length > 0) {
+      // Only adding
+      await handleAddCategories(toAdd)
+      onClose()
     } else {
       message.info('Нет изменений')
       onClose()
@@ -293,11 +382,12 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
 
         <Divider />
 
-        <Transfer
-          dataSource={transferData}
-          titles={['Доступные категории', 'В версии']}
-          targetKeys={targetKeys}
-          onChange={handleChange}
+        <Spin spinning={loadingFreshData} tip="Загрузка категорий...">
+          <Transfer
+            dataSource={transferData}
+            titles={['Доступные категории', 'В версии']}
+            targetKeys={targetKeys}
+            onChange={handleChange}
           render={item => (
             <div>
               <div>{item.title}</div>
@@ -322,6 +412,7 @@ export const ManageCategoriesModal: React.FC<ManageCategoriesModalProps> = ({
             item.title.toLowerCase().includes(inputValue.toLowerCase())
           }
         />
+        </Spin>
 
         <div style={{ padding: '12px 16px', backgroundColor: '#fff7e6', borderRadius: 4 }}>
           <Text strong>

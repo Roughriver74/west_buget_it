@@ -16,6 +16,7 @@ const { Text } = Typography
 
 interface BudgetScenarioComparisonChartProps {
   year: number
+  departmentId?: number
   scenarioIds: {
     base?: number
     optimistic?: number
@@ -37,6 +38,7 @@ const scenarioNames = {
 
 const BudgetScenarioComparisonChart: React.FC<BudgetScenarioComparisonChartProps> = ({
   year,
+  departmentId,
   scenarioIds,
 }) => {
   // Fetch versions for each scenario
@@ -45,11 +47,12 @@ const BudgetScenarioComparisonChart: React.FC<BudgetScenarioComparisonChartProps
     isLoading: baseLoading,
     isError: baseError,
   } = useQuery({
-    queryKey: ['versions', year, scenarioIds.base],
+    queryKey: ['versions', year, scenarioIds.base, departmentId],
     queryFn: () =>
       versionsApi.getAll({
         year,
         scenario_id: scenarioIds.base,
+        department_id: departmentId,
       }),
     enabled: !!scenarioIds.base,
   })
@@ -59,11 +62,12 @@ const BudgetScenarioComparisonChart: React.FC<BudgetScenarioComparisonChartProps
     isLoading: optimisticLoading,
     isError: optimisticError,
   } = useQuery({
-    queryKey: ['versions', year, scenarioIds.optimistic],
+    queryKey: ['versions', year, scenarioIds.optimistic, departmentId],
     queryFn: () =>
       versionsApi.getAll({
         year,
         scenario_id: scenarioIds.optimistic,
+        department_id: departmentId,
       }),
     enabled: !!scenarioIds.optimistic,
   })
@@ -73,11 +77,12 @@ const BudgetScenarioComparisonChart: React.FC<BudgetScenarioComparisonChartProps
     isLoading: pessimisticLoading,
     isError: pessimisticError,
   } = useQuery({
-    queryKey: ['versions', year, scenarioIds.pessimistic],
+    queryKey: ['versions', year, scenarioIds.pessimistic, departmentId],
     queryFn: () =>
       versionsApi.getAll({
         year,
         scenario_id: scenarioIds.pessimistic,
+        department_id: departmentId,
       }),
     enabled: !!scenarioIds.pessimistic,
   })

@@ -108,8 +108,8 @@ const PayrollTaxWidget: React.FC<PayrollTaxWidgetProps> = ({
     innerRadius: 0.6,
     color: ['#52c41a', '#faad14', '#f5222d', '#ff7a45', '#fa541c'],
     label: {
-      type: 'outer',
-      content: (item: any) => `${item.type} ${(item.percent * 100).toFixed(1)}%`,
+      text: (item: any) => `${item.type} ${(item.percent * 100).toFixed(1)}%`,
+      position: 'outside' as const,
     },
     statistic: {
       title: {

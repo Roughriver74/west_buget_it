@@ -186,6 +186,29 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
     return rows
   }, [data, categoriesData])
 
+  // Legend colors based on theme - MUST be before conditional returns
+  const legendColors = useMemo(() => {
+    if (isDark) {
+      return [
+        { color: '#1d3a1d', label: '≤50%' },
+        { color: '#2d4a2d', label: '≤75%' },
+        { color: '#3d5a3d', label: '≤90%' },
+        { color: '#4a4a1d', label: '≤100%' },
+        { color: '#4a3a1d', label: '≤110%' },
+        { color: '#4a1d1d', label: '>110%' },
+      ]
+    } else {
+      return [
+        { color: '#d9f7be', label: '≤50%' },
+        { color: '#b7eb8f', label: '≤75%' },
+        { color: '#95de64', label: '≤90%' },
+        { color: '#ffd666', label: '≤100%' },
+        { color: '#ff9c6e', label: '≤110%' },
+        { color: '#ff4d4f', label: '>110%' },
+      ]
+    }
+  }, [isDark])
+
   if (isLoading) {
     return (
       <Card title="Тепловая карта отклонений">
@@ -213,29 +236,6 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
       </Card>
     )
   }
-
-  // Legend colors based on theme
-  const legendColors = useMemo(() => {
-    if (isDark) {
-      return [
-        { color: '#1d3a1d', label: '≤50%' },
-        { color: '#2d4a2d', label: '≤75%' },
-        { color: '#3d5a3d', label: '≤90%' },
-        { color: '#4a4a1d', label: '≤100%' },
-        { color: '#4a3a1d', label: '≤110%' },
-        { color: '#4a1d1d', label: '>110%' },
-      ]
-    } else {
-      return [
-        { color: '#d9f7be', label: '≤50%' },
-        { color: '#b7eb8f', label: '≤75%' },
-        { color: '#95de64', label: '≤90%' },
-        { color: '#ffd666', label: '≤100%' },
-        { color: '#ff9c6e', label: '≤110%' },
-        { color: '#ff4d4f', label: '>110%' },
-      ]
-    }
-  }, [isDark])
 
   return (
     <Card

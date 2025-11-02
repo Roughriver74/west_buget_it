@@ -48,6 +48,7 @@ export const scenariosApi = {
     if (filters?.year) params.append('year', filters.year.toString())
     if (filters?.scenario_type) params.append('scenario_type', filters.scenario_type)
     if (filters?.is_active !== undefined) params.append('is_active', filters.is_active.toString())
+    if (filters?.department_id) params.append('department_id', filters.department_id.toString())
 
     const response = await apiClient.get<BudgetScenario[]>(
       `${BASE_PATH}/scenarios?${params.toString()}`
@@ -100,6 +101,7 @@ export const versionsApi = {
     if (filters?.year) params.append('year', filters.year.toString())
     if (filters?.status) params.append('status', filters.status)
     if (filters?.scenario_id) params.append('scenario_id', filters.scenario_id.toString())
+    if (filters?.department_id) params.append('department_id', filters.department_id.toString())
 
     const response = await apiClient.get<BudgetVersion[]>(
       `${BASE_PATH}/versions?${params.toString()}`

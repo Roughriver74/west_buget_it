@@ -12,9 +12,13 @@ import {
   SendOutlined,
   CopyOutlined,
   CheckCircleOutlined,
+  CheckOutlined,
+  UploadOutlined,
+  UndoOutlined,
 } from '@ant-design/icons'
 import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
+import { useAuth } from '@/contexts/AuthContext'
 import dayjs from 'dayjs'
 
 interface BudgetVersionTableProps {
@@ -24,7 +28,10 @@ interface BudgetVersionTableProps {
   onEdit?: (version: BudgetVersion) => void
   onDelete?: (id: number) => void
   onSubmit?: (id: number) => void
+  onApprove?: (id: number) => void
+  onRevert?: (id: number) => void
   onCopy?: (version: BudgetVersion) => void
+  onImport?: (version: BudgetVersion) => void
   onApplyToPlan?: (id: number) => void
   selectedRowKeys?: Key[]
   onSelectionChange?: (selectedRowKeys: Key[]) => void
@@ -55,11 +62,16 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   onEdit,
   onDelete,
   onSubmit,
+  onApprove,
+  onRevert,
   onCopy,
+  onImport,
   onApplyToPlan,
   selectedRowKeys,
   onSelectionChange,
 }) => {
+  const { user } = useAuth()
+  const canApprove = user?.role === 'ADMIN' || user?.role === 'MANAGER'
   const columns: ColumnsType<BudgetVersion> = [
     {
       title: 'Год',
@@ -135,7 +147,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
     {
       title: 'Действия',
       key: 'actions',
-      width: 240,
+      width: 280,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -159,6 +171,16 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
               />
             </Tooltip>
           )}
+          {onImport && [BudgetVersionStatus.DRAFT, BudgetVersionStatus.REVISION_REQUESTED].includes(record.status) && (
+            <Tooltip title="Импорт из Excel">
+              <Button
+                type="link"
+                size="small"
+                icon={<UploadOutlined />}
+                onClick={() => onImport(record)}
+              />
+            </Tooltip>
+          )}
           {onSubmit && record.status === BudgetVersionStatus.DRAFT && (
             <Tooltip title="Отправить на согласование">
               <Popconfirm
@@ -169,6 +191,32 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
                 cancelText="Нет"
               >
                 <Button type="link" size="small" icon={<SendOutlined />} />
+              </Popconfirm>
+            </Tooltip>
+          )}
+          {onApprove && canApprove && [BudgetVersionStatus.IN_REVIEW, BudgetVersionStatus.REVISION_REQUESTED].includes(record.status) && (
+            <Tooltip title="Утвердить">
+              <Popconfirm
+                title="Утвердить версию бюджета?"
+                description="Версия получит статус 'Утверждена' и будет готова к применению"
+                onConfirm={() => onApprove(record.id)}
+                okText="Да"
+                cancelText="Нет"
+              >
+                <Button type="link" size="small" icon={<CheckOutlined />} style={{ color: '#52c41a' }} />
+              </Popconfirm>
+            </Tooltip>
+          )}
+          {onRevert && canApprove && [BudgetVersionStatus.IN_REVIEW, BudgetVersionStatus.APPROVED].includes(record.status) && (
+            <Tooltip title="Вернуть в черновик">
+              <Popconfirm
+                title="Вернуть версию в статус 'Черновик'?"
+                description="Версия станет доступной для редактирования"
+                onConfirm={() => onRevert(record.id)}
+                okText="Да"
+                cancelText="Нет"
+              >
+                <Button type="link" size="small" icon={<UndoOutlined />} style={{ color: '#faad14' }} />
               </Popconfirm>
             </Tooltip>
           )}

@@ -8,7 +8,7 @@ export interface User {
   username: string;
   email: string;
   full_name: string | null;
-  role: 'ADMIN' | 'ACCOUNTANT' | 'REQUESTER';
+  role: 'ADMIN' | 'MANAGER' | 'USER' | 'ACCOUNTANT' | 'REQUESTER';
   is_active: boolean;
   is_verified: boolean;
   department_id: number | null;
@@ -38,7 +38,7 @@ interface RegisterData {
   department_id?: number;
   position?: string;
   phone?: string;
-  role?: 'ADMIN' | 'ACCOUNTANT' | 'REQUESTER';
+  role?: 'ADMIN' | 'MANAGER' | 'USER' | 'ACCOUNTANT' | 'REQUESTER';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

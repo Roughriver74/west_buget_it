@@ -109,8 +109,17 @@ export const useDeleteScenario = () => {
       message.success('Сценарий успешно удален')
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.detail || 'Ошибка при удалении сценария'
-      message.error(errorMessage)
+      const errorDetail = error.response?.data?.detail || 'Ошибка при удалении сценария'
+
+      // Check if error is about versions with protected status
+      if (errorDetail.includes('version(s) in IN_REVIEW, APPROVED, or ARCHIVED status')) {
+        message.error({
+          content: 'Невозможно удалить сценарий: он содержит версии со статусами В ПРОВЕРКЕ, ОДОБРЕНО или АРХИВИРОВАНО. Измените статус версий на ЧЕРНОВИК или удалите их перед удалением сценария.',
+          duration: 8,
+        })
+      } else {
+        message.error(errorDetail)
+      }
     },
   })
 }
@@ -230,6 +239,23 @@ export const useApproveVersion = () => {
     },
     onError: () => {
       message.error('Ошибка при утверждении версии')
+    },
+  })
+}
+
+export const useRevertVersionStatus = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      versionsApi.update(id, { status: 'DRAFT' as any }),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.versions() })
+      queryClient.invalidateQueries({ queryKey: budgetPlanningKeys.version(id) })
+      message.success('Статус версии изменен на ЧЕРНОВИК')
+    },
+    onError: () => {
+      message.error('Ошибка при изменении статуса версии')
     },
   })
 }

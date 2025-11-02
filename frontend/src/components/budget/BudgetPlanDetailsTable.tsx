@@ -11,7 +11,7 @@ import { CreateCategoryModal } from './CreateCategoryModal'
 import type { ColumnsType } from 'antd/es/table'
 import { usePlanDetails, useCreatePlanDetail, useUpdatePlanDetail } from '@/hooks/useBudgetPlanning'
 import type { BudgetPlanDetailCreate, BudgetPlanDetailUpdate } from '@/types/budgetPlanning'
-import { ExpenseType } from '@/types/budgetPlanning'
+import { ExpenseType, type NumericValue } from '@/types/budgetPlanning'
 import { useTheme } from '@/contexts/ThemeContext'
 
 const { Text } = Typography
@@ -60,12 +60,28 @@ interface Category {
   parentId: number | null
 }
 
+interface PayrollMonthlySummary {
+  month: number
+  total_planned: NumericValue
+}
+
+interface PayrollYearlySummary {
+  year: number
+  total_employees: number
+  total_planned_annual: NumericValue
+  total_base_salary_annual: NumericValue
+  total_bonuses_annual: NumericValue
+  monthly_breakdown: PayrollMonthlySummary[]
+}
+
 interface BudgetPlanDetailsTableProps {
   versionId: number
   year: number
   categories: Category[]
   isEditable: boolean
   onAfterSave?: () => void
+  onRiskPremiumChange?: (enabled: boolean) => void
+  payrollSummary?: PayrollYearlySummary | null
 }
 
 interface CategoryRow {
@@ -88,6 +104,8 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   categories,
   isEditable,
   onAfterSave,
+  onRiskPremiumChange,
+  payrollSummary,
 }, ref) => {
   const { data: planDetails = [], isLoading } = usePlanDetails(versionId)
   const createMutation = useCreatePlanDetail()
@@ -110,6 +128,11 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
   // Risk premium state
   const [riskEnabled, setRiskEnabled] = useState<boolean>(false)
+
+  // Notify parent when risk premium changes
+  useEffect(() => {
+    onRiskPremiumChange?.(riskEnabled)
+  }, [riskEnabled, onRiskPremiumChange])
 
   // Sticky state
   const [isSticky, setIsSticky] = useState<boolean>(false)
@@ -181,7 +204,11 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       return []
     }
 
-    return orderedCategories.map((category) => {
+    // Get set of category IDs that have plan details (used in this version)
+    const categoriesWithData = new Set(planDetails.map(d => d.category_id))
+
+    // Build all rows first
+    const allRows = orderedCategories.map((category) => {
       const row: CategoryRow = {
         categoryId: category.id,
         categoryName: category.name,
@@ -192,10 +219,12 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         parentId: category.parentId ?? null,
       }
 
+      // Initialize all months with 0
       MONTHS.forEach((month) => {
         row[`month_${month.key}`] = 0
       })
 
+      // Fill with actual data from plan details
       const categoryDetails = planDetails.filter((d) => d.category_id === category.id)
       categoryDetails.forEach((detail) => {
         const amount = Number(detail.planned_amount ?? 0)
@@ -205,6 +234,15 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
       return row
     })
+
+    // Filter: show only categories that have data OR parent categories with children that have data
+    const hasDataInSubtree = (categoryId: number): boolean => {
+      if (categoriesWithData.has(categoryId)) return true
+      const descendants = descendantsMap.get(categoryId) ?? []
+      return descendants.some(descId => categoriesWithData.has(descId))
+    }
+
+    return allRows.filter(row => hasDataInSubtree(row.categoryId))
   }, [orderedCategories, planDetails, descendantsMap])
 
   // Initialize data from categories and plan details
@@ -235,7 +273,43 @@ export const BudgetPlanDetailsTable = React.forwardRef<
     [collapsed, parentLookup]
   )
 
-  const visibleData = useMemo(() => data.filter(isRowVisible), [data, isRowVisible])
+  // Create synthetic payroll row
+  const payrollRow = useMemo((): CategoryRow | null => {
+    if (!payrollSummary) return null
+
+    const row: CategoryRow = {
+      categoryId: -1, // Special ID for payroll
+      categoryName: 'ФОТ (Фонд оплаты труда)',
+      categoryType: ExpenseType.OPEX,
+      categoryLevel: 0,
+      hasChildren: false,
+      descendantIds: [],
+      parentId: null,
+    }
+
+    // Initialize all months to 0
+    MONTHS.forEach((month) => {
+      row[`month_${month.key}`] = 0
+    })
+
+    // Fill with payroll data
+    if (payrollSummary.monthly_breakdown) {
+      payrollSummary.monthly_breakdown.forEach((monthData) => {
+        row[`month_${monthData.month}`] = Number(monthData.total_planned ?? 0)
+      })
+    }
+
+    return row
+  }, [payrollSummary])
+
+  const visibleData = useMemo(() => {
+    const filtered = data.filter(isRowVisible)
+    // Add payroll row at the end if it exists
+    if (payrollRow) {
+      return [...filtered, payrollRow]
+    }
+    return filtered
+  }, [data, isRowVisible, payrollRow])
 
   const toggleCollapse = useCallback((categoryId: number) => {
     setCollapsed((prev) => {
@@ -609,8 +683,16 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         const displayValue = getMonthValue(record, month.key)
         const formatted = formatNumber(Number(displayValue ?? 0))
 
-        if (!isEditable || record.hasChildren) {
-          return <Text>{formatted}</Text>
+        // Make payroll row (id = -1) readonly, also parent rows and when not editable
+        if (!isEditable || record.hasChildren || record.categoryId === -1) {
+          return (
+            <Text style={{
+              fontWeight: record.categoryId === -1 ? 600 : undefined,
+              color: record.categoryId === -1 ? (mode === 'dark' ? '#1890ff' : '#0050b3') : undefined
+            }}>
+              {formatted}
+            </Text>
+          )
         }
 
         const cellKey = `${record.categoryId}_${month.key}`
@@ -840,6 +922,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       {/* Manage Categories Modal */}
       <ManageCategoriesModal
         open={manageCategoriesOpen}
+        versionId={versionId}
         categories={categories}
         planDetails={planDetails}
         onClose={() => setManageCategoriesOpen(false)}
