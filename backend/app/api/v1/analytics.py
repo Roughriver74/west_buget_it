@@ -9,7 +9,8 @@ from app.db.models import (
     Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail,
     ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
     PayrollPlan, PayrollActual, Department,
-    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream
+    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream,
+    CustomerMetrics
 )
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
@@ -43,6 +44,9 @@ from app.schemas.analytics import (
     BudgetIncomeStatement,
     BudgetIncomeStatementMonthly,
     BudgetIncomeStatementCategory,
+    CustomerMetricsAnalytics,
+    CustomerMetricsMonthly,
+    CustomerMetricsByStream,
 )
 from app.schemas.budget_validation import (
     BudgetStatusResponse,
@@ -1371,4 +1375,221 @@ def get_budget_income_statement(
         roi_planned=round(roi_planned, 2),
         roi_actual=round(roi_actual, 2),
         by_month=by_month,
+    )
+
+
+@router.get("/customer-metrics-analytics", response_model=CustomerMetricsAnalytics)
+def get_customer_metrics_analytics(
+    year: int = Query(..., description="Year for customer metrics analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Customer Metrics Analytics (Аналитика клиентских метрик)
+
+    Returns comprehensive customer analytics showing:
+    - ОКБ (Общая клиентская база) - Total Customer Base
+    - АКБ (Активная клиентская база) - Active Customer Base
+    - Покрытие (АКБ/ОКБ) - Coverage Rate
+    - Средний чек по сегментам - Average Order Value by segments
+    - Динамика по месяцам - Monthly trends
+    - Разбивка по потокам доходов - Breakdown by revenue streams
+    - Growth metrics compared to previous year
+    """
+    # Multi-tenancy enforcement
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+
+    # Get department name if filtering by department
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        if dept:
+            department_name = dept.name
+
+    # Build base query for current year
+    query = db.query(CustomerMetrics).filter(CustomerMetrics.year == year)
+    if department_id:
+        query = query.filter(CustomerMetrics.department_id == department_id)
+
+    # Get all metrics for the year
+    current_year_metrics = query.all()
+
+    if not current_year_metrics:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No customer metrics found for year {year}"
+        )
+
+    # Aggregate totals for current year
+    total_customer_base = sum(m.total_customer_base or 0 for m in current_year_metrics)
+    active_customer_base = sum(m.active_customer_base or 0 for m in current_year_metrics)
+    coverage_rate = (active_customer_base / total_customer_base * 100) if total_customer_base > 0 else 0
+
+    # Clinic segments
+    regular_clinics = sum(m.regular_clinics or 0 for m in current_year_metrics)
+    network_clinics = sum(m.network_clinics or 0 for m in current_year_metrics)
+    new_clinics = sum(m.new_clinics or 0 for m in current_year_metrics)
+
+    # Calculate weighted average order values
+    def weighted_avg(metrics_list, field_name):
+        total_value = sum(getattr(m, field_name, 0) or 0 for m in metrics_list)
+        count = sum(1 for m in metrics_list if getattr(m, field_name, None) is not None)
+        return float(total_value / count) if count > 0 else 0.0
+
+    avg_order_value = weighted_avg(current_year_metrics, "avg_order_value")
+    avg_order_value_regular = weighted_avg(current_year_metrics, "avg_order_value_regular")
+    avg_order_value_network = weighted_avg(current_year_metrics, "avg_order_value_network")
+    avg_order_value_new = weighted_avg(current_year_metrics, "avg_order_value_new")
+
+    # Get previous year metrics for growth calculation
+    prev_year_query = db.query(CustomerMetrics).filter(CustomerMetrics.year == year - 1)
+    if department_id:
+        prev_year_query = prev_year_query.filter(CustomerMetrics.department_id == department_id)
+    prev_year_metrics = prev_year_query.all()
+
+    customer_base_growth = None
+    active_base_growth = None
+    avg_check_growth = None
+
+    if prev_year_metrics:
+        prev_total_customer_base = sum(m.total_customer_base or 0 for m in prev_year_metrics)
+        prev_active_customer_base = sum(m.active_customer_base or 0 for m in prev_year_metrics)
+        prev_avg_order_value = weighted_avg(prev_year_metrics, "avg_order_value")
+
+        if prev_total_customer_base > 0:
+            customer_base_growth = ((total_customer_base - prev_total_customer_base) / prev_total_customer_base) * 100
+        if prev_active_customer_base > 0:
+            active_base_growth = ((active_customer_base - prev_active_customer_base) / prev_active_customer_base) * 100
+        if prev_avg_order_value > 0:
+            avg_check_growth = ((avg_order_value - prev_avg_order_value) / prev_avg_order_value) * 100
+
+    # Monthly breakdown
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": month_names[month - 1],
+            "total_customer_base": 0,
+            "active_customer_base": 0,
+            "coverage_rate": 0.0,
+            "avg_order_value": 0.0,
+            "avg_order_value_regular": 0.0,
+            "avg_order_value_network": 0.0,
+            "avg_order_value_new": 0.0,
+        }
+
+    # Aggregate metrics by month
+    for metrics in current_year_metrics:
+        month = metrics.month
+        if month in monthly_data:
+            monthly_data[month]["total_customer_base"] += metrics.total_customer_base or 0
+            monthly_data[month]["active_customer_base"] += metrics.active_customer_base or 0
+            # Average order values - take average across revenue streams
+            if metrics.avg_order_value:
+                monthly_data[month]["avg_order_value"] += float(metrics.avg_order_value)
+            if metrics.avg_order_value_regular:
+                monthly_data[month]["avg_order_value_regular"] += float(metrics.avg_order_value_regular)
+            if metrics.avg_order_value_network:
+                monthly_data[month]["avg_order_value_network"] += float(metrics.avg_order_value_network)
+            if metrics.avg_order_value_new:
+                monthly_data[month]["avg_order_value_new"] += float(metrics.avg_order_value_new)
+
+    # Calculate coverage rates and averages
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        coverage = (m_data["active_customer_base"] / m_data["total_customer_base"] * 100) if m_data["total_customer_base"] > 0 else 0
+
+        # Count streams with data for averaging
+        month_metrics = [m for m in current_year_metrics if m.month == month]
+        stream_count = len(month_metrics) if month_metrics else 1
+
+        by_month.append(
+            CustomerMetricsMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                total_customer_base=m_data["total_customer_base"],
+                active_customer_base=m_data["active_customer_base"],
+                coverage_rate=round(coverage, 2),
+                avg_order_value=round(m_data["avg_order_value"] / stream_count, 2),
+                avg_order_value_regular=round(m_data["avg_order_value_regular"] / stream_count, 2),
+                avg_order_value_network=round(m_data["avg_order_value_network"] / stream_count, 2),
+                avg_order_value_new=round(m_data["avg_order_value_new"] / stream_count, 2),
+            )
+        )
+
+    # Breakdown by revenue stream
+    stream_data = {}
+    for metrics in current_year_metrics:
+        stream_id = metrics.revenue_stream_id
+        if stream_id not in stream_data:
+            stream_data[stream_id] = {
+                "revenue_stream_id": stream_id,
+                "revenue_stream_name": metrics.revenue_stream.name if metrics.revenue_stream else f"Stream #{stream_id}",
+                "total_customer_base": 0,
+                "active_customer_base": 0,
+                "regular_clinics": 0,
+                "network_clinics": 0,
+                "new_clinics": 0,
+                "avg_order_value_sum": 0.0,
+                "count": 0,
+            }
+
+        stream_data[stream_id]["total_customer_base"] += metrics.total_customer_base or 0
+        stream_data[stream_id]["active_customer_base"] += metrics.active_customer_base or 0
+        stream_data[stream_id]["regular_clinics"] += metrics.regular_clinics or 0
+        stream_data[stream_id]["network_clinics"] += metrics.network_clinics or 0
+        stream_data[stream_id]["new_clinics"] += metrics.new_clinics or 0
+        if metrics.avg_order_value:
+            stream_data[stream_id]["avg_order_value_sum"] += float(metrics.avg_order_value)
+            stream_data[stream_id]["count"] += 1
+
+    by_stream = []
+    for stream_id, data in stream_data.items():
+        coverage = (data["active_customer_base"] / data["total_customer_base"] * 100) if data["total_customer_base"] > 0 else 0
+        avg_order = data["avg_order_value_sum"] / data["count"] if data["count"] > 0 else 0.0
+
+        by_stream.append(
+            CustomerMetricsByStream(
+                revenue_stream_id=data["revenue_stream_id"],
+                revenue_stream_name=data["revenue_stream_name"],
+                total_customer_base=data["total_customer_base"],
+                active_customer_base=data["active_customer_base"],
+                coverage_rate=round(coverage, 2),
+                avg_order_value=round(avg_order, 2),
+                regular_clinics=data["regular_clinics"],
+                network_clinics=data["network_clinics"],
+                new_clinics=data["new_clinics"],
+            )
+        )
+
+    return CustomerMetricsAnalytics(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        total_customer_base=total_customer_base,
+        active_customer_base=active_customer_base,
+        coverage_rate=round(coverage_rate, 2),
+        regular_clinics=regular_clinics,
+        network_clinics=network_clinics,
+        new_clinics=new_clinics,
+        avg_order_value=round(avg_order_value, 2),
+        avg_order_value_regular=round(avg_order_value_regular, 2),
+        avg_order_value_network=round(avg_order_value_network, 2),
+        avg_order_value_new=round(avg_order_value_new, 2),
+        customer_base_growth=round(customer_base_growth, 2) if customer_base_growth is not None else None,
+        active_base_growth=round(active_base_growth, 2) if active_base_growth is not None else None,
+        avg_check_growth=round(avg_check_growth, 2) if avg_check_growth is not None else None,
+        by_month=by_month,
+        by_stream=by_stream,
     )

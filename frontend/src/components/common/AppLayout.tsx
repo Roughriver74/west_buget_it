@@ -199,6 +199,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <LineChartOutlined />,
 					label: <Link to='/analytics/budget-income-statement'>БДР (Доходы и Расходы)</Link>,
 				},
+				{
+					key: '/analytics/customer-metrics',
+					icon: <TeamOutlined />,
+					label: <Link to='/analytics/customer-metrics'>Клиентские метрики</Link>,
+				},
 			],
 		},
 

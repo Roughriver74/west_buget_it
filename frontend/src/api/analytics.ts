@@ -84,4 +84,13 @@ export const analyticsApi = {
     const { data } = await apiClient.get('analytics/budget-income-statement', { params })
     return data
   },
+
+  // Customer Metrics Analytics (Аналитика клиентских метрик)
+  getCustomerMetricsAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/customer-metrics-analytics', { params })
+    return data
+  },
 }

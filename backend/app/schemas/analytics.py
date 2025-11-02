@@ -299,3 +299,78 @@ class BudgetIncomeStatement(BaseModel):
     # Category breakdown (optional)
     revenue_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
     expenses_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
+
+
+# ============================================================================
+# Customer Metrics Analytics
+# ============================================================================
+
+class CustomerMetricsMonthly(BaseModel):
+    """Monthly customer metrics"""
+    month: int
+    month_name: str
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float  # АКБ/ОКБ * 100 (%)
+    avg_order_value: float
+    avg_order_value_regular: float
+    avg_order_value_network: float
+    avg_order_value_new: float
+
+
+class CustomerMetricsByStream(BaseModel):
+    """Customer metrics by revenue stream"""
+    revenue_stream_id: int
+    revenue_stream_name: str
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float
+    avg_order_value: float
+    # Clinic segments
+    regular_clinics: int
+    network_clinics: int
+    new_clinics: int
+
+
+class CustomerMetricsAnalytics(BaseModel):
+    """
+    Customer Metrics Analytics (Аналитика клиентских метрик)
+
+    Aggregated analytics showing:
+    - ОКБ (Общая клиентская база) - Total Customer Base
+    - АКБ (Активная клиентская база) - Active Customer Base
+    - Покрытие (АКБ/ОКБ) - Coverage Rate
+    - Средний чек по сегментам - Average Order Value by segments
+    - Динамика по месяцам - Monthly trends
+    - Разбивка по потокам доходов - Breakdown by revenue streams
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Summary totals
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float  # %
+
+    # Clinic segments totals
+    regular_clinics: int
+    network_clinics: int
+    new_clinics: int
+
+    # Average order values
+    avg_order_value: float
+    avg_order_value_regular: float
+    avg_order_value_network: float
+    avg_order_value_new: float
+
+    # Growth metrics (compared to previous year)
+    customer_base_growth: Optional[float] = None  # %
+    active_base_growth: Optional[float] = None    # %
+    avg_check_growth: Optional[float] = None      # %
+
+    # Monthly breakdown
+    by_month: List[CustomerMetricsMonthly]
+
+    # Breakdown by revenue stream
+    by_stream: Optional[List[CustomerMetricsByStream]] = None
