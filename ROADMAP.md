@@ -1,7 +1,7 @@
 # 🗺️ Roadmap - IT Budget Manager
 
-**Последнее обновление**: 2025-11-03 00:00 MSK
-**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (75%)
+**Последнее обновление**: 2025-11-03 01:00 MSK
+**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (90%)
 **Последняя завершенная**: v0.9.0 - Performance & UX Improvements ✅ (100%)
 
 ---
@@ -760,7 +760,7 @@ ML-прогнозы на основе исторических данных (LIN
 **Оценка**: 4-6 недель → **Факт**: 1 день (основные задачи выполнены) 🚀
 
 ### **v1.0.0 (Q3 2026) - Revenue Analytics & Integration**
-**Статус**: 🔨 В РАЗРАБОТКЕ (75% выполнено)
+**Статус**: 🔨 В РАЗРАБОТКЕ (90% выполнено)
 **Цель**: Полная интеграция с модулем расходов
 
 #### БДР (Бюджет доходов и расходов)
@@ -803,11 +803,24 @@ ML-прогнозы на основе исторических данных (LIN
   - ✅ Tables with progress bars & share percentages
   - ✅ Growth metrics (year-over-year)
 
-#### Remaining Tasks
-- [ ] Совмещенный дашборд (Revenue + Expenses)
-- [ ] Экспорт отчетов
+#### Unified Financial Dashboard
+- [x] **Unified Financial Dashboard (Финансовый дашборд)** ✅ ВЫПОЛНЕНО (2025-11-03)
+  - ✅ Frontend page UnifiedFinancialDashboardPage (~400 lines)
+  - ✅ Comprehensive financial overview: Revenue + Expenses + Profit
+  - ✅ 4 interactive charts:
+    * LineChart - Financial dynamics (Revenue, Expenses, Profit)
+    * AreaChart - Cumulative cash flow
+    * ComposedChart - Profit trend with margin
+  - ✅ Key metrics cards: Revenue, Expenses, Profit with progress bars
+  - ✅ Profitability metrics: Profit Margin, ROI
+  - ✅ Top 5 lists: Revenue sources & Expense categories
+  - ✅ Reuses existing БДР endpoint (no new backend code)
+  - ✅ Responsive design with Ant Design Grid
 
-**Оценка**: 3-4 недели → **Прогресс**: 4 дня (БДР + Customer Metrics + Revenue Analytics завершены)
+#### Remaining Tasks
+- [ ] Экспорт отчетов (Excel/CSV export for analytics)
+
+**Оценка**: 3-4 недели → **Прогресс**: 4 дня (БДР + Customer Metrics + Revenue Analytics + Unified Dashboard завершены)
 
 ### **v1.1.0 (Q4 2026) - ML Forecasting (опционально)**
 **Цель**: ML-прогнозирование доходов
