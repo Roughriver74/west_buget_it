@@ -352,7 +352,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Space>
 
           <Space size={isMobile ? 'small' : 'large'}>
-            {!isMobile && <DepartmentSelector />}
+            <DepartmentSelector />
             <Button
               type="text"
               icon={mode === 'dark' ? <BulbFilled style={{ color: '#faad14' }} /> : <BulbOutlined />}

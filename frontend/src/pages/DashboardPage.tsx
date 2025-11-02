@@ -51,7 +51,7 @@ const DashboardPage = () => {
   return (
     <div>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={8} lg={6}>
           <Select
             value={year}
             onChange={setYear}
@@ -63,7 +63,7 @@ const DashboardPage = () => {
             ]}
           />
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} md={8} lg={6}>
           <Select
             value={month}
             onChange={setMonth}
