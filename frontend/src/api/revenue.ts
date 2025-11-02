@@ -450,6 +450,18 @@ export const revenuePlanDetailsApi = {
     const { data } = await apiClient.get(`/revenue/plan-details/version/${versionId}/summary`)
     return data
   },
+
+  /**
+   * Apply seasonality coefficients to distribute annual revenue target across 12 months
+   */
+  applySeasonality: async (params: {
+    detail_id: number
+    seasonality_coefficient_id: number
+    annual_target: number
+  }): Promise<RevenuePlanDetail> => {
+    const { data } = await apiClient.post('/revenue/plan-details/apply-seasonality', params)
+    return data
+  },
 }
 
 // ==================== Customer Metrics ====================
