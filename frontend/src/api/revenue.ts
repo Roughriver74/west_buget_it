@@ -341,6 +341,30 @@ export const revenuePlansApi = {
   deleteVersion: async (planId: number, versionId: number): Promise<void> => {
     await apiClient.delete(`/revenue/plans/${planId}/versions/${versionId}`)
   },
+
+  /**
+   * Copy revenue plan from source year to target year
+   */
+  copyPlan: async (
+    targetYear: number,
+    sourceYear: number,
+    coefficient: number = 1.0,
+    departmentId?: number
+  ): Promise<{
+    message: string
+    department_id: number
+    created_plans: number
+    created_versions: number
+    created_details: number
+    skipped_plans: number
+  }> => {
+    const { data } = await apiClient.post(
+      `/revenue/plans/year/${targetYear}/copy-from/${sourceYear}`,
+      { coefficient },
+      { params: departmentId ? { department_id: departmentId } : undefined }
+    )
+    return data
+  },
 }
 
 // ==================== Revenue Plan Details ====================
