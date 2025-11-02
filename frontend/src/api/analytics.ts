@@ -93,4 +93,13 @@ export const analyticsApi = {
     const { data } = await apiClient.get('analytics/customer-metrics-analytics', { params })
     return data
   },
+
+  // Revenue Analytics (Аналитика доходов)
+  getRevenueAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/revenue-analytics', { params })
+    return data
+  },
 }

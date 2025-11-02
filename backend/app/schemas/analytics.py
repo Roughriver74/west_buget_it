@@ -374,3 +374,80 @@ class CustomerMetricsAnalytics(BaseModel):
 
     # Breakdown by revenue stream
     by_stream: Optional[List[CustomerMetricsByStream]] = None
+
+
+# ============================================================================
+# Revenue Analytics
+# ============================================================================
+
+class RevenueAnalyticsMonthly(BaseModel):
+    """Monthly revenue analytics"""
+    month: int
+    month_name: str
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+
+
+class RevenueAnalyticsByStream(BaseModel):
+    """Revenue analytics by stream (regional breakdown)"""
+    revenue_stream_id: int
+    revenue_stream_name: str
+    stream_type: str  # REGIONAL, CHANNEL, PRODUCT
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+    share_of_total: float  # % of total revenue
+
+
+class RevenueAnalyticsByCategory(BaseModel):
+    """Revenue analytics by category (product mix)"""
+    revenue_category_id: int
+    revenue_category_name: str
+    category_type: str  # PRODUCT, SERVICE, EQUIPMENT, TENDER
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+    share_of_total: float  # % of total revenue
+
+
+class RevenueAnalytics(BaseModel):
+    """
+    Revenue Analytics (Аналитика доходов)
+
+    Comprehensive revenue analytics showing:
+    - Total revenue (planned vs actual)
+    - Региональная разбивка (regional breakdown by revenue streams)
+    - Продуктовый микс (product mix by revenue categories)
+    - Помесячная динамика (monthly trends)
+    - Growth metrics compared to previous year
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Summary totals
+    total_planned: float
+    total_actual: float
+    total_variance: float
+    total_variance_percent: float
+    total_execution_percent: float
+
+    # Growth metrics (compared to previous year)
+    planned_growth: Optional[float] = None  # %
+    actual_growth: Optional[float] = None   # %
+
+    # Monthly breakdown
+    by_month: List[RevenueAnalyticsMonthly]
+
+    # Regional breakdown (by revenue streams)
+    by_stream: Optional[List[RevenueAnalyticsByStream]] = None
+
+    # Product mix (by revenue categories)
+    by_category: Optional[List[RevenueAnalyticsByCategory]] = None

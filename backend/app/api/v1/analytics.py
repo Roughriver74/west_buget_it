@@ -9,7 +9,7 @@ from app.db.models import (
     Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail,
     ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
     PayrollPlan, PayrollActual, Department,
-    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream,
+    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream, RevenueCategory,
     CustomerMetrics
 )
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
@@ -47,6 +47,10 @@ from app.schemas.analytics import (
     CustomerMetricsAnalytics,
     CustomerMetricsMonthly,
     CustomerMetricsByStream,
+    RevenueAnalytics,
+    RevenueAnalyticsMonthly,
+    RevenueAnalyticsByStream,
+    RevenueAnalyticsByCategory,
 )
 from app.schemas.budget_validation import (
     BudgetStatusResponse,
@@ -1592,4 +1596,206 @@ def get_customer_metrics_analytics(
         avg_check_growth=round(avg_check_growth, 2) if avg_check_growth is not None else None,
         by_month=by_month,
         by_stream=by_stream,
+    )
+
+
+@router.get("/revenue-analytics", response_model=RevenueAnalytics)
+def get_revenue_analytics(
+    year: int = Query(..., description="Year for revenue analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Revenue Analytics (Аналитика доходов)
+    
+    Returns comprehensive revenue analytics showing:
+    - Total revenue (planned vs actual)
+    - Региональная разбивка (regional breakdown by revenue streams)
+    - Продуктовый микс (product mix by revenue categories)
+    - Помесячная динамика (monthly trends)
+    - Growth metrics compared to previous year
+    """
+    # Multi-tenancy enforcement
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+
+    # Get department name
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        if dept:
+            department_name = dept.name
+
+    # Query revenue actuals for current year
+    query = db.query(RevenueActual).filter(RevenueActual.year == year)
+    if department_id:
+        query = query.filter(RevenueActual.department_id == department_id)
+
+    current_year_data = query.all()
+
+    if not current_year_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No revenue data found for year {year}"
+        )
+
+    # Calculate totals
+    total_planned = sum(float(item.planned_amount or 0) for item in current_year_data)
+    total_actual = sum(float(item.actual_amount or 0) for item in current_year_data)
+    total_variance = total_actual - total_planned
+    total_variance_percent = ((total_variance / total_planned) * 100) if total_planned > 0 else 0
+    total_execution_percent = ((total_actual / total_planned) * 100) if total_planned > 0 else 0
+
+    # Get previous year data for growth metrics
+    prev_year_query = db.query(RevenueActual).filter(RevenueActual.year == year - 1)
+    if department_id:
+        prev_year_query = prev_year_query.filter(RevenueActual.department_id == department_id)
+    prev_year_data = prev_year_query.all()
+
+    planned_growth = None
+    actual_growth = None
+
+    if prev_year_data:
+        prev_total_planned = sum(float(item.planned_amount or 0) for item in prev_year_data)
+        prev_total_actual = sum(float(item.actual_amount or 0) for item in prev_year_data)
+
+        if prev_total_planned > 0:
+            planned_growth = ((total_planned - prev_total_planned) / prev_total_planned) * 100
+        if prev_total_actual > 0:
+            actual_growth = ((total_actual - prev_total_actual) / prev_total_actual) * 100
+
+    # Monthly breakdown
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": month_names[month - 1],
+            "planned": 0.0,
+            "actual": 0.0,
+        }
+
+    for item in current_year_data:
+        month = item.month
+        if month in monthly_data:
+            monthly_data[month]["planned"] += float(item.planned_amount or 0)
+            monthly_data[month]["actual"] += float(item.actual_amount or 0)
+
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        variance = m_data["actual"] - m_data["planned"]
+        variance_percent = ((variance / m_data["planned"]) * 100) if m_data["planned"] > 0 else 0
+        execution_percent = ((m_data["actual"] / m_data["planned"]) * 100) if m_data["planned"] > 0 else 0
+
+        by_month.append(
+            RevenueAnalyticsMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                planned=round(m_data["planned"], 2),
+                actual=round(m_data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+            )
+        )
+
+    # Breakdown by revenue stream (regional breakdown)
+    stream_data = {}
+    for item in current_year_data:
+        if item.revenue_stream_id:
+            stream_id = item.revenue_stream_id
+            if stream_id not in stream_data:
+                stream_data[stream_id] = {
+                    "revenue_stream_id": stream_id,
+                    "revenue_stream_name": item.revenue_stream.name if item.revenue_stream else f"Stream #{stream_id}",
+                    "stream_type": item.revenue_stream.stream_type.value if item.revenue_stream else "UNKNOWN",
+                    "planned": 0.0,
+                    "actual": 0.0,
+                }
+
+            stream_data[stream_id]["planned"] += float(item.planned_amount or 0)
+            stream_data[stream_id]["actual"] += float(item.actual_amount or 0)
+
+    by_stream = []
+    for stream_id, data in stream_data.items():
+        variance = data["actual"] - data["planned"]
+        variance_percent = ((variance / data["planned"]) * 100) if data["planned"] > 0 else 0
+        execution_percent = ((data["actual"] / data["planned"]) * 100) if data["planned"] > 0 else 0
+        share_of_total = ((data["actual"] / total_actual) * 100) if total_actual > 0 else 0
+
+        by_stream.append(
+            RevenueAnalyticsByStream(
+                revenue_stream_id=data["revenue_stream_id"],
+                revenue_stream_name=data["revenue_stream_name"],
+                stream_type=data["stream_type"],
+                planned=round(data["planned"], 2),
+                actual=round(data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+                share_of_total=round(share_of_total, 2),
+            )
+        )
+
+    # Breakdown by revenue category (product mix)
+    category_data = {}
+    for item in current_year_data:
+        if item.revenue_category_id:
+            category_id = item.revenue_category_id
+            if category_id not in category_data:
+                category_data[category_id] = {
+                    "revenue_category_id": category_id,
+                    "revenue_category_name": item.revenue_category.name if item.revenue_category else f"Category #{category_id}",
+                    "category_type": item.revenue_category.category_type.value if item.revenue_category else "UNKNOWN",
+                    "planned": 0.0,
+                    "actual": 0.0,
+                }
+
+            category_data[category_id]["planned"] += float(item.planned_amount or 0)
+            category_data[category_id]["actual"] += float(item.actual_amount or 0)
+
+    by_category = []
+    for category_id, data in category_data.items():
+        variance = data["actual"] - data["planned"]
+        variance_percent = ((variance / data["planned"]) * 100) if data["planned"] > 0 else 0
+        execution_percent = ((data["actual"] / data["planned"]) * 100) if data["planned"] > 0 else 0
+        share_of_total = ((data["actual"] / total_actual) * 100) if total_actual > 0 else 0
+
+        by_category.append(
+            RevenueAnalyticsByCategory(
+                revenue_category_id=data["revenue_category_id"],
+                revenue_category_name=data["revenue_category_name"],
+                category_type=data["category_type"],
+                planned=round(data["planned"], 2),
+                actual=round(data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+                share_of_total=round(share_of_total, 2),
+            )
+        )
+
+    return RevenueAnalytics(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        total_planned=round(total_planned, 2),
+        total_actual=round(total_actual, 2),
+        total_variance=round(total_variance, 2),
+        total_variance_percent=round(total_variance_percent, 2),
+        total_execution_percent=round(total_execution_percent, 2),
+        planned_growth=round(planned_growth, 2) if planned_growth is not None else None,
+        actual_growth=round(actual_growth, 2) if actual_growth is not None else None,
+        by_month=by_month,
+        by_stream=by_stream if by_stream else None,
+        by_category=by_category if by_category else None,
     )

@@ -204,6 +204,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <TeamOutlined />,
 					label: <Link to='/analytics/customer-metrics'>Клиентские метрики</Link>,
 				},
+				{ 					key: '/analytics/revenue-extended', 					icon: <DollarCircleOutlined />, 					label: <Link to='/analytics/revenue-extended'>Аналитика доходов</Link>, 				},
 			],
 		},
 
