@@ -6,7 +6,8 @@ echo "IT Budget Manager - Frontend Starting"
 echo "======================================"
 
 # Default values if not provided
-VITE_API_URL=${VITE_API_URL:-"http://localhost:8888"}
+# Use /api so nginx can proxy to backend
+VITE_API_URL=${VITE_API_URL:-"/api"}
 
 echo "Configuring frontend with:"
 echo "  VITE_API_URL: $VITE_API_URL"

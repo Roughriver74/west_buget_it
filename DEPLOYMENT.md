@@ -1,169 +1,293 @@
-# Deployment Guide
+# IT Budget Manager - Production Deployment Guide
 
-## Quick Deploy
+## Проблемы, которые были исправлены
 
-To deploy the application to production server:
+### 1. Mixed Content Error
+**Проблема**: HTTPS сайт (https://budget-west.shknv.ru) пытался обращаться к HTTP API (http://localhost:8888), браузер блокировал запросы.
+
+**Решение**: 
+- Nginx фронтенда теперь проксирует `/api/*` запросы к бэкенду
+- Фронтенд использует относительный путь `/api` вместо абсолютного URL
+- Все запросы идут через один домен по HTTPS
+
+### 2. Localhost в Production
+**Проблема**: Фронтенд был собран с `VITE_API_URL=http://localhost:8888`.
+
+**Решение**:
+- Изменен default в `Dockerfile.prod`: `VITE_API_URL=/api`
+- Обновлен `docker-compose.prod.yml` для передачи правильного значения
+- Обновлен `docker-entrypoint.sh` с правильным default
+
+## Быстрый деплой
+
+### Шаг 1: Настройте .env.production
 
 ```bash
-./deploy-prod.sh
+# Скопируйте и отредактируйте файл
+cp .env.production .env.production.local
+nano .env.production
+
+# ОБЯЗАТЕЛЬНО измените:
+# 1. DB_PASSWORD - сильный пароль для БД
+# 2. SECRET_KEY - случайная строка минимум 32 символа
 ```
 
-This script will:
-1. ✅ Check connection to server
-2. ✅ Backup current configuration
-3. ✅ Upload updated files
-4. ✅ Update CORS settings in .env
-5. ✅ Rebuild and restart Docker services
-6. ✅ Check service health
-7. ✅ Show recent logs
+Генерация SECRET_KEY:
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-## Manual Deploy
-
-If you need to deploy manually:
+### Шаг 2: Запустите деплой
 
 ```bash
-# 1. Connect to server
+./deploy.sh
+```
+
+Скрипт автоматически:
+1. ✅ Проверит конфигурацию
+2. ✅ Создаст deployment пакет
+3. ✅ Загрузит файлы на сервер
+4. ✅ Соберет Docker образы
+5. ✅ Запустит сервисы
+
+### Шаг 3: Проверьте статус
+
+```bash
+# Подключитесь к серверу
 ssh root@93.189.228.52
 
-# 2. Navigate to project directory
-cd /root/budget-app
+# Перейдите в директорию проекта
+cd /root/it_budget
 
-# 3. Pull latest changes or update files
-git pull  # if using git
-# OR
-# Upload files manually using scp
-
-# 4. Update .env file with correct CORS settings
-nano .env
-# Set: CORS_ORIGINS='["https://budget-west.shknv.ru","https://api.budget-west.shknv.ru"]'
-
-# 5. Rebuild and restart services
-docker-compose -f docker-compose.prod.yml down
-docker-compose -f docker-compose.prod.yml up -d --build
-
-# 6. Check status
+# Проверьте статус контейнеров
 docker-compose -f docker-compose.prod.yml ps
-docker logs it_budget_backend_prod
 
-# 7. Test health endpoint
-curl http://localhost:8000/health
+# Посмотрите логи
+docker-compose -f docker-compose.prod.yml logs -f
 ```
 
-## Environment Variables
+## Архитектура Production
 
-Ensure these are set in `.env` on the server:
+```
+[Браузер] HTTPS
+    ↓
+[budget-west.shknv.ru] (Caddy/Cloudflare)
+    ↓
+[Frontend Container:80] Nginx
+    ├─→ /api/* → proxy_pass http://backend:8000/api/v1
+    └─→ /* → React SPA (static files)
+    
+[Backend Container:8000] FastAPI
+    ↓
+[Database Container:5432] PostgreSQL
+```
+
+## Ключевые изменения
+
+### 1. frontend/nginx.conf
+Добавлено проксирование API:
+```nginx
+location /api/ {
+    proxy_pass http://backend:8000;
+    # ... proxy headers
+}
+```
+
+### 2. frontend/Dockerfile.prod
+```dockerfile
+ARG VITE_API_URL=/api  # Изменено с http://localhost:8888
+```
+
+### 3. frontend/docker-entrypoint.sh
+```bash
+VITE_API_URL=${VITE_API_URL:-"/api"}  # Изменено с http://localhost:8888
+```
+
+### 4. docker-compose.prod.yml
+```yaml
+frontend:
+  build:
+    args:
+      VITE_API_URL: /api  # Используем относительный путь
+  environment:
+    VITE_API_URL: /api
+```
+
+## Проверка конфигурации
+
+### Проверить API URL фронтенда
+```bash
+# На сервере
+curl http://localhost:3001/config-check
+```
+
+Должен вернуть:
+```javascript
+window.ENV_CONFIG = {
+  VITE_API_URL: '/api'
+};
+```
+
+### Проверить проксирование Nginx
+```bash
+# Внутри frontend контейнера
+docker exec -it it_budget_frontend_prod sh
+
+# Проверить конфиг
+cat /etc/nginx/conf.d/default.conf | grep -A 10 "location /api/"
+```
+
+### Проверить работу API через фронтенд
+```bash
+# Должно вернуть данные от бэкенда
+curl http://localhost:3001/api/v1/health
+```
+
+## Управление сервисами
+
+### Перезапуск
+```bash
+cd /root/it_budget
+docker-compose -f docker-compose.prod.yml restart
+```
+
+### Остановка
+```bash
+docker-compose -f docker-compose.prod.yml down
+```
+
+### Пересборка (после изменений кода)
+```bash
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml build --no-cache
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Просмотр логов
+```bash
+# Все сервисы
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Только фронтенд
+docker-compose -f docker-compose.prod.yml logs -f frontend
+
+# Только бэкенд
+docker-compose -f docker-compose.prod.yml logs -f backend
+```
+
+## Миграции БД
+
+После первого деплоя или изменений в моделях:
 
 ```bash
-# CORS - CRITICAL for API access
-CORS_ORIGINS='["https://budget-west.shknv.ru","https://api.budget-west.shknv.ru"]'
+# Зайти в контейнер бэкенда
+docker exec -it it_budget_backend_prod bash
 
-# Database
-DB_USER=budget_user
-DB_PASSWORD=<strong-password>
-DB_NAME=it_budget_db
+# Применить миграции
+cd /app
+alembic upgrade head
 
-# Security
-SECRET_KEY=<32+ character random string>
-
-# Application
-DEBUG=False
+# Создать админа (если нужно)
+python create_admin.py
 ```
 
 ## Troubleshooting
 
-### 503 Service Unavailable
+### Фронтенд не может подключиться к API
 
-If you see 503 errors:
-
-1. **Check backend is running:**
+1. Проверьте, что бэкенд запущен:
    ```bash
-   docker ps | grep backend
+   docker-compose -f docker-compose.prod.yml ps backend
    ```
 
-2. **Check backend logs:**
+2. Проверьте API URL в env-config.js:
    ```bash
-   docker logs it_budget_backend_prod
+   curl http://localhost:3001/config-check
    ```
 
-3. **Check health endpoint:**
+3. Проверьте логи Nginx:
    ```bash
-   docker exec it_budget_backend_prod curl http://localhost:8000/health
+   docker-compose -f docker-compose.prod.yml logs frontend | grep -i error
    ```
 
-4. **Check Traefik logs:**
+### Mixed Content Error в браузере
+
+Убедитесь, что:
+- `VITE_API_URL=/api` (НЕ http://...)
+- Nginx проксирует `/api/*` к бэкенду
+- Фронтенд собран с правильным VITE_API_URL
+
+### 401 Unauthorized при логине
+
+1. Проверьте CORS в бэкенде:
    ```bash
-   docker logs <traefik-container-name>
+   docker exec -it it_budget_backend_prod env | grep CORS
    ```
 
-### CORS Errors
-
-If you see CORS preflight errors:
-
-1. **Verify CORS_ORIGINS in .env:**
-   ```bash
-   grep CORS_ORIGINS .env
+2. Должно быть:
    ```
-   Should include both frontend and API domains.
-
-2. **Restart backend after changing .env:**
-   ```bash
-   docker-compose -f docker-compose.prod.yml restart backend
+   CORS_ORIGINS=["https://budget-west.shknv.ru",...]
    ```
 
-### Database Connection Issues
+### База данных не запускается
 
-If backend can't connect to database:
-
-1. **Check database is running:**
+1. Проверьте логи:
    ```bash
-   docker ps | grep postgres
+   docker-compose -f docker-compose.prod.yml logs db
    ```
 
-2. **Check database health:**
+2. Проверьте права на volume:
    ```bash
-   docker exec it_budget_db_prod pg_isready -U budget_user
+   ls -la /var/lib/docker/volumes/
    ```
 
-3. **Verify database credentials in .env**
+## Мониторинг
 
-## Post-Deployment Checklist
+### Health Checks
 
-- [ ] Frontend loads at https://budget-west.shknv.ru
-- [ ] API responds at https://api.budget-west.shknv.ru/health
-- [ ] Login works (test with admin credentials)
-- [ ] Can create/view expenses
-- [ ] Department switching works
-- [ ] No CORS errors in browser console
+- Frontend: http://localhost:3001/health
+- Backend: http://localhost:8888/health
+- Database: через `pg_isready`
 
-## Rollback
+### Метрики (если Prometheus включен)
 
-If deployment fails, restore from backup:
+- http://localhost:8888/metrics
 
+## Безопасность
+
+✅ HTTPS через Caddy/Cloudflare
+✅ Security headers в Nginx
+✅ CORS настроен только для домена
+✅ JWT токены с истечением
+✅ PostgreSQL не доступен извне (только через Docker network)
+✅ Пароли в .env (не в коде)
+
+## Backup
+
+### Бэкап базы данных
 ```bash
-ssh root@93.189.228.52
-cd /root/budget-app
+# Создать бэкап
+docker exec it_budget_db pg_dump -U budget_user it_budget_db > backup_$(date +%Y%m%d).sql
 
-# List backups
-ls -lh backups/
+# Восстановить бэкап
+cat backup_20250102.sql | docker exec -i it_budget_db psql -U budget_user -d it_budget_db
+```
 
-# Restore latest backup
-tar -xzf backups/backup-YYYYMMDD-HHMMSS.tar.gz
-
-# Restart services
+### Бэкап volumes
+```bash
+# Остановить сервисы
 docker-compose -f docker-compose.prod.yml down
+
+# Бэкап
+tar -czf volumes_backup_$(date +%Y%m%d).tar.gz /var/lib/docker/volumes/it-budget-prod*
+
+# Запустить сервисы
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-## Monitoring
+## Контакты
 
-- **Logs:** `docker logs -f it_budget_backend_prod`
-- **Metrics:** https://api.budget-west.shknv.ru/metrics (if Prometheus enabled)
-- **Health:** https://api.budget-west.shknv.ru/health
-
-## Support
-
-If issues persist:
-1. Check logs for specific error messages
-2. Verify all environment variables are set correctly
-3. Ensure Traefik is routing correctly
-4. Check firewall rules allow traffic on ports 80/443
+- Фронтенд: https://budget-west.shknv.ru
+- API: http://93.189.228.52:8888
+- API Docs: http://93.189.228.52:8888/docs
+- Server: ssh root@93.189.228.52

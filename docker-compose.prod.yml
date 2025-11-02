@@ -105,10 +105,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        # Use relative path /api for API requests (nginx will proxy to backend)
+        VITE_API_URL: /api
     image: it-budget-frontend:prod
     container_name: it_budget_frontend_prod
     restart: always
+    environment:
+      # Runtime env (for docker-entrypoint.sh)
+      VITE_API_URL: /api
     ports:
       - "${FRONTEND_PORT:-3001}:80"
     depends_on:
@@ -121,7 +125,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
-    # Note: Coolify uses Caddy for proxying, configured via Coolify UI
+    # Note: Frontend nginx proxies /api/* to backend:8000
 
 volumes:
   postgres_data:
