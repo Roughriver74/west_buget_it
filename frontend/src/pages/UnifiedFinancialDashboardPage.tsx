@@ -10,7 +10,6 @@ import { Typography, Card, Row, Col, Select, Statistic, Progress, Space, Tag } f
 import {
   LineChart,
   Line,
-  BarChart,
   Bar,
   AreaChart,
   Area,
@@ -28,7 +27,6 @@ import dayjs from 'dayjs'
 import {
   DollarOutlined,
   RiseOutlined,
-  FallOutlined,
   TrophyOutlined,
   WarningOutlined,
 } from '@ant-design/icons'

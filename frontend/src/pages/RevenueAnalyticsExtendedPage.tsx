@@ -13,8 +13,6 @@ import { Typography, Card, Row, Col, Select, Statistic, Table, Tabs, Space, Tag,
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -425,7 +423,7 @@ const RevenueAnalyticsExtendedPage = () => {
                           fill="#8884d8"
                           dataKey="value"
                         >
-                          {regionalPieData.map((entry, index) => (
+                          {regionalPieData.map((_entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
@@ -470,7 +468,7 @@ const RevenueAnalyticsExtendedPage = () => {
                           fill="#8884d8"
                           dataKey="value"
                         >
-                          {productPieData.map((entry, index) => (
+                          {productPieData.map((_entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
