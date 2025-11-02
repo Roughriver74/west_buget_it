@@ -102,4 +102,38 @@ export const analyticsApi = {
     const { data } = await apiClient.get('analytics/revenue-analytics', { params })
     return data
   },
+
+  // Export methods
+  exportBudgetIncomeStatement: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/budget-income-statement/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  exportCustomerMetricsAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/customer-metrics-analytics/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  exportRevenueAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/revenue-analytics/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
 }

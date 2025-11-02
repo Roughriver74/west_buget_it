@@ -40,6 +40,8 @@ import {
 } from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
+import ExportButton from '@/components/common/ExportButton'
+import { generateExportFilename } from '@/utils/downloadUtils'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -308,12 +310,26 @@ const CustomerMetricsAnalyticsPage = () => {
             </Select>
           </Col>
           <Col xs={24} sm={16} md={18}>
-            {data.department_name && (
-              <Space>
-                <Text type="secondary">Отдел:</Text>
-                <Text strong>{data.department_name}</Text>
-              </Space>
-            )}
+            <Row justify="space-between" align="middle">
+              <Col>
+                {data.department_name && (
+                  <Space>
+                    <Text type="secondary">Отдел:</Text>
+                    <Text strong>{data.department_name}</Text>
+                  </Space>
+                )}
+              </Col>
+              <Col>
+                <ExportButton
+                  exportFn={() => analyticsApi.exportCustomerMetricsAnalytics({
+                    year,
+                    department_id: selectedDepartment?.id
+                  })}
+                  filename={generateExportFilename('Customer_Metrics', year)}
+                  buttonText="Экспорт в Excel"
+                />
+              </Col>
+            </Row>
           </Col>
         </Row>
       </Card>
