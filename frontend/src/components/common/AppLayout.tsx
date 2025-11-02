@@ -19,6 +19,7 @@ import {
   MenuOutlined,
   RiseOutlined,
   DollarCircleOutlined,
+  LineChartOutlined,
   BulbOutlined,
   BulbFilled,
 } from '@ant-design/icons'
@@ -141,6 +142,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/revenue/actuals',
 					icon: <DollarCircleOutlined />,
 					label: <Link to='/revenue/actuals'>Фактические доходы</Link>,
+				},
+				{
+					key: '/revenue/customer-metrics',
+					icon: <TeamOutlined />,
+					label: <Link to='/revenue/customer-metrics'>Клиентские метрики</Link>,
+				},
+				{
+					key: '/revenue/seasonality',
+					icon: <LineChartOutlined />,
+					label: <Link to='/revenue/seasonality'>Коэффициенты сезонности</Link>,
 				},
 			],
 		},

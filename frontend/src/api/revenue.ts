@@ -29,6 +29,12 @@ import type {
   RevenuePlanDetail,
   RevenuePlanDetailCreate,
   RevenuePlanDetailUpdate,
+  CustomerMetrics,
+  CustomerMetricsCreate,
+  CustomerMetricsUpdate,
+  SeasonalityCoefficient,
+  SeasonalityCoefficientCreate,
+  SeasonalityCoefficientUpdate,
 } from '@/types/revenue'
 
 // ==================== Revenue Streams ====================
@@ -446,6 +452,118 @@ export const revenuePlanDetailsApi = {
   },
 }
 
+// ==================== Customer Metrics ====================
+
+export const customerMetricsApi = {
+  /**
+   * Get all customer metrics with filtering
+   */
+  getAll: async (params?: {
+    year?: number
+    month?: number
+    region?: string
+    department_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<CustomerMetrics[]> => {
+    const { data } = await apiClient.get('/revenue/customer-metrics/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific customer metrics by ID
+   */
+  getById: async (id: number): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.get(`/revenue/customer-metrics/${id}`)
+    return data
+  },
+
+  /**
+   * Create new customer metrics
+   */
+  create: async (metrics: CustomerMetricsCreate): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.post('/revenue/customer-metrics/', metrics)
+    return data
+  },
+
+  /**
+   * Update existing customer metrics
+   */
+  update: async (id: number, metrics: CustomerMetricsUpdate): Promise<CustomerMetrics> => {
+    const { data } = await apiClient.put(`/revenue/customer-metrics/${id}`, metrics)
+    return data
+  },
+
+  /**
+   * Delete customer metrics
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/customer-metrics/${id}`)
+  },
+}
+
+// ==================== Seasonality Coefficients ====================
+
+export const seasonalityApi = {
+  /**
+   * Get all seasonality coefficients with filtering
+   */
+  getAll: async (params?: {
+    year?: number
+    category?: string
+    department_id?: number
+    skip?: number
+    limit?: number
+  }): Promise<SeasonalityCoefficient[]> => {
+    const { data } = await apiClient.get('/revenue/seasonality/', { params })
+    return data
+  },
+
+  /**
+   * Get a specific seasonality coefficient by ID
+   */
+  getById: async (id: number): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.get(`/revenue/seasonality/${id}`)
+    return data
+  },
+
+  /**
+   * Create new seasonality coefficient
+   */
+  create: async (coefficient: SeasonalityCoefficientCreate): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.post('/revenue/seasonality/', coefficient)
+    return data
+  },
+
+  /**
+   * Update existing seasonality coefficient
+   */
+  update: async (id: number, coefficient: SeasonalityCoefficientUpdate): Promise<SeasonalityCoefficient> => {
+    const { data } = await apiClient.put(`/revenue/seasonality/${id}`, coefficient)
+    return data
+  },
+
+  /**
+   * Delete seasonality coefficient
+   */
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/revenue/seasonality/${id}`)
+  },
+
+  /**
+   * Calculate seasonality coefficients from historical data
+   */
+  calculateFromHistory: async (params: {
+    year: number
+    category: string
+    lookback_years?: number
+    department_id?: number
+  }): Promise<any> => {
+    const { data } = await apiClient.post('/revenue/seasonality/calculate-from-history', null, { params })
+    return data
+  },
+}
+
 // Export all as a combined object for convenience
 export const revenueApi = {
   streams: revenueStreamsApi,
@@ -453,6 +571,8 @@ export const revenueApi = {
   actuals: revenueActualsApi,
   plans: revenuePlansApi,
   planDetails: revenuePlanDetailsApi,
+  customerMetrics: customerMetricsApi,
+  seasonality: seasonalityApi,
 }
 
 export default revenueApi
