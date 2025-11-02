@@ -13,8 +13,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Deploy server
 
 ```bash
-ssh root@93.189.228.52        
+ssh root@93.189.228.52
 ```
+
+**Production deployment**: See [Coolify Setup Guide](docs/COOLIFY_SETUP.md)
+
+**Troubleshooting deployment issues**: See [Coolify Fix Guide](docs/COOLIFY_FIX.md) - решение проблем с API URL и CORS
 
 ### Quick Start
 ```bash

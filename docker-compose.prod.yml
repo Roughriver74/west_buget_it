@@ -105,14 +105,16 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        # Use relative path /api for API requests (nginx will proxy to backend)
-        VITE_API_URL: /api
+        # API URL - can be relative (/api) or full URL (https://api.domain.com)
+        # Defaults to /api if not set (nginx will proxy to backend)
+        VITE_API_URL: ${VITE_API_URL:-/api}
     image: it-budget-frontend:prod
     container_name: it_budget_frontend_prod
     restart: always
     environment:
       # Runtime env (for docker-entrypoint.sh)
-      VITE_API_URL: /api
+      # Use env variable or default to /api
+      VITE_API_URL: ${VITE_API_URL:-/api}
     ports:
       - "${FRONTEND_PORT:-3001}:80"
     depends_on:
@@ -125,7 +127,8 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
-    # Note: Frontend nginx proxies /api/* to backend:8000
+    # Note: If VITE_API_URL=/api, nginx proxies /api/* to backend:8000
+    # If VITE_API_URL=https://api.domain.com, frontend makes direct requests
 
 volumes:
   postgres_data:
