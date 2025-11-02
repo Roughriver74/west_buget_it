@@ -194,6 +194,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/analytics/extended',
 					label: <Link to='/analytics/extended'>Расширенная аналитика</Link>,
 				},
+				{
+					key: '/analytics/budget-income-statement',
+					icon: <LineChartOutlined />,
+					label: <Link to='/analytics/budget-income-statement'>БДР (Доходы и Расходы)</Link>,
+				},
+				{
+					key: '/analytics/customer-metrics',
+					icon: <TeamOutlined />,
+					label: <Link to='/analytics/customer-metrics'>Клиентские метрики</Link>,
+				},
+				{
+					key: '/analytics/revenue-extended',
+					icon: <DollarCircleOutlined />,
+					label: <Link to='/analytics/revenue-extended'>Аналитика доходов</Link>,
+				},
+				{
+					key: '/analytics/unified-dashboard',
+					icon: <FundOutlined />,
+					label: <Link to='/analytics/unified-dashboard'>Финансовый дашборд</Link>,
+				},
 			],
 		},
 
@@ -352,7 +372,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </Space>
 
           <Space size={isMobile ? 'small' : 'large'}>
-            {!isMobile && <DepartmentSelector />}
+            <DepartmentSelector />
             <Button
               type="text"
               icon={mode === 'dark' ? <BulbFilled style={{ color: '#faad14' }} /> : <BulbOutlined />}

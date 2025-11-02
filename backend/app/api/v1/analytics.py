@@ -1,11 +1,20 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, Path, HTTPException
+import io
+import pandas as pd
+from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta
 
 from app.db import get_db
-from app.db.models import Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail, ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum, PayrollPlan, PayrollActual
+from app.db.models import (
+    Expense, BudgetCategory, BudgetPlan, BudgetVersion, BudgetPlanDetail,
+    ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
+    PayrollPlan, PayrollActual, Department,
+    RevenuePlan, RevenuePlanDetail, RevenueActual, RevenueStream, RevenueCategory,
+    CustomerMetrics
+)
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
 from app.schemas.analytics import (
@@ -35,6 +44,16 @@ from app.schemas.analytics import (
     PlanVsActualSummary,
     PlanVsActualMonthly,
     PlanVsActualCategory,
+    BudgetIncomeStatement,
+    BudgetIncomeStatementMonthly,
+    BudgetIncomeStatementCategory,
+    CustomerMetricsAnalytics,
+    CustomerMetricsMonthly,
+    CustomerMetricsByStream,
+    RevenueAnalytics,
+    RevenueAnalyticsMonthly,
+    RevenueAnalyticsByStream,
+    RevenueAnalyticsByCategory,
 )
 from app.schemas.budget_validation import (
     BudgetStatusResponse,
@@ -1117,4 +1136,1551 @@ def validate_expense(
         warnings=result.warnings,
         errors=result.errors,
         budget_info=BudgetInfo(**result.budget_info) if result.budget_info else None
+    )
+
+
+@router.get("/budget-income-statement", response_model=BudgetIncomeStatement)
+def get_budget_income_statement(
+    year: int = Query(..., description="Year for the budget income statement"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    БДР (Бюджет доходов и расходов) - Budget Income Statement
+
+    Returns a comprehensive financial report showing:
+    - Revenue (planned vs actual)
+    - Expenses (planned vs actual)
+    - Profit (Revenue - Expenses)
+    - Profitability metrics (ROI, Profit Margin)
+    - Monthly breakdown
+
+    - USER: Can only see their own department
+    - MANAGER/ADMIN: Can filter by department or see all
+    """
+    # Enforce department filtering based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        pass  # Can filter by department or see all
+
+    # Get department name if specific department
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        department_name = dept.name if dept else None
+
+    # MONTH_NAMES for Russian locale
+    MONTH_NAMES = [
+        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ]
+
+    # Initialize monthly data structure
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": MONTH_NAMES[month - 1],
+            "revenue_planned": 0.0,
+            "revenue_actual": 0.0,
+            "expenses_planned": 0.0,
+            "expenses_actual": 0.0,
+        }
+
+    # ========== REVENUE DATA ==========
+
+    # Get revenue planned from RevenuePlanDetail
+    revenue_plan_query = db.query(
+        RevenuePlanDetail.month,
+        func.sum(RevenuePlanDetail.planned_amount).label('total')
+    ).filter(RevenuePlanDetail.year == year)
+
+    if department_id:
+        revenue_plan_query = revenue_plan_query.filter(RevenuePlanDetail.department_id == department_id)
+
+    revenue_plan_query = revenue_plan_query.group_by(RevenuePlanDetail.month)
+
+    for row in revenue_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["revenue_planned"] = float(row.total or 0)
+
+    # Get revenue actual from RevenueActual
+    revenue_actual_query = db.query(
+        RevenueActual.month,
+        func.sum(RevenueActual.actual_amount).label('total')
+    ).filter(RevenueActual.year == year)
+
+    if department_id:
+        revenue_actual_query = revenue_actual_query.filter(RevenueActual.department_id == department_id)
+
+    revenue_actual_query = revenue_actual_query.group_by(RevenueActual.month)
+
+    for row in revenue_actual_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["revenue_actual"] = float(row.total or 0)
+
+    # ========== EXPENSE DATA ==========
+
+    # Get expenses planned from BudgetPlan
+    expenses_plan_query = db.query(
+        BudgetPlan.month,
+        func.sum(BudgetPlan.planned_amount).label('total')
+    ).filter(BudgetPlan.year == year)
+
+    if department_id:
+        expenses_plan_query = expenses_plan_query.filter(BudgetPlan.department_id == department_id)
+
+    expenses_plan_query = expenses_plan_query.group_by(BudgetPlan.month)
+
+    for row in expenses_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_planned"] = float(row.total or 0)
+
+    # Get expenses actual from Expense table
+    expenses_actual_query = db.query(
+        extract('month', Expense.request_date).label('month'),
+        func.sum(Expense.amount).label('total')
+    ).filter(extract('year', Expense.request_date) == year)
+
+    if department_id:
+        expenses_actual_query = expenses_actual_query.filter(Expense.department_id == department_id)
+
+    expenses_actual_query = expenses_actual_query.group_by(extract('month', Expense.request_date))
+
+    for row in expenses_actual_query.all():
+        month = int(row.month)
+        if month in monthly_data:
+            monthly_data[month]["expenses_actual"] = float(row.total or 0)
+
+    # Also add PayrollPlan to expenses
+    payroll_plan_query = db.query(
+        PayrollPlan.month,
+        func.sum(PayrollPlan.total_planned).label('total')
+    ).filter(PayrollPlan.year == year)
+
+    if department_id:
+        payroll_plan_query = payroll_plan_query.filter(PayrollPlan.department_id == department_id)
+
+    payroll_plan_query = payroll_plan_query.group_by(PayrollPlan.month)
+
+    for row in payroll_plan_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_planned"] += float(row.total or 0)
+
+    # Add PayrollActual to actual expenses
+    payroll_actual_query = db.query(
+        PayrollActual.month,
+        func.sum(PayrollActual.total_paid).label('total')
+    ).filter(PayrollActual.year == year)
+
+    if department_id:
+        payroll_actual_query = payroll_actual_query.filter(PayrollActual.department_id == department_id)
+
+    payroll_actual_query = payroll_actual_query.group_by(PayrollActual.month)
+
+    for row in payroll_actual_query.all():
+        if row.month in monthly_data:
+            monthly_data[row.month]["expenses_actual"] += float(row.total or 0)
+
+    # ========== CALCULATE TOTALS AND METRICS ==========
+
+    total_revenue_planned = sum(m["revenue_planned"] for m in monthly_data.values())
+    total_revenue_actual = sum(m["revenue_actual"] for m in monthly_data.values())
+    total_expenses_planned = sum(m["expenses_planned"] for m in monthly_data.values())
+    total_expenses_actual = sum(m["expenses_actual"] for m in monthly_data.values())
+
+    revenue_difference = total_revenue_actual - total_revenue_planned
+    revenue_execution_percent = (
+        (total_revenue_actual / total_revenue_planned * 100)
+        if total_revenue_planned > 0 else 0
+    )
+
+    expenses_difference = total_expenses_actual - total_expenses_planned
+    expenses_execution_percent = (
+        (total_expenses_actual / total_expenses_planned * 100)
+        if total_expenses_planned > 0 else 0
+    )
+
+    profit_planned = total_revenue_planned - total_expenses_planned
+    profit_actual = total_revenue_actual - total_expenses_actual
+    profit_difference = profit_actual - profit_planned
+
+    profit_margin_planned = (
+        (profit_planned / total_revenue_planned * 100)
+        if total_revenue_planned > 0 else 0
+    )
+    profit_margin_actual = (
+        (profit_actual / total_revenue_actual * 100)
+        if total_revenue_actual > 0 else 0
+    )
+
+    roi_planned = (
+        (profit_planned / total_expenses_planned * 100)
+        if total_expenses_planned > 0 else 0
+    )
+    roi_actual = (
+        (profit_actual / total_expenses_actual * 100)
+        if total_expenses_actual > 0 else 0
+    )
+
+    # ========== BUILD MONTHLY BREAKDOWN ==========
+
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        profit_planned_month = m_data["revenue_planned"] - m_data["expenses_planned"]
+        profit_actual_month = m_data["revenue_actual"] - m_data["expenses_actual"]
+
+        profit_margin_planned_month = (
+            (profit_planned_month / m_data["revenue_planned"] * 100)
+            if m_data["revenue_planned"] > 0 else 0
+        )
+        profit_margin_actual_month = (
+            (profit_actual_month / m_data["revenue_actual"] * 100)
+            if m_data["revenue_actual"] > 0 else 0
+        )
+
+        by_month.append(
+            BudgetIncomeStatementMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                revenue_planned=m_data["revenue_planned"],
+                revenue_actual=m_data["revenue_actual"],
+                expenses_planned=m_data["expenses_planned"],
+                expenses_actual=m_data["expenses_actual"],
+                profit_planned=profit_planned_month,
+                profit_actual=profit_actual_month,
+                profit_margin_planned=round(profit_margin_planned_month, 2),
+                profit_margin_actual=round(profit_margin_actual_month, 2),
+            )
+        )
+
+    return BudgetIncomeStatement(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        revenue_planned=total_revenue_planned,
+        revenue_actual=total_revenue_actual,
+        revenue_difference=revenue_difference,
+        revenue_execution_percent=round(revenue_execution_percent, 2),
+        expenses_planned=total_expenses_planned,
+        expenses_actual=total_expenses_actual,
+        expenses_difference=expenses_difference,
+        expenses_execution_percent=round(expenses_execution_percent, 2),
+        profit_planned=profit_planned,
+        profit_actual=profit_actual,
+        profit_difference=profit_difference,
+        profit_margin_planned=round(profit_margin_planned, 2),
+        profit_margin_actual=round(profit_margin_actual, 2),
+        roi_planned=round(roi_planned, 2),
+        roi_actual=round(roi_actual, 2),
+        by_month=by_month,
+    )
+
+
+@router.get("/customer-metrics-analytics", response_model=CustomerMetricsAnalytics)
+def get_customer_metrics_analytics(
+    year: int = Query(..., description="Year for customer metrics analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Customer Metrics Analytics (Аналитика клиентских метрик)
+
+    Returns comprehensive customer analytics showing:
+    - ОКБ (Общая клиентская база) - Total Customer Base
+    - АКБ (Активная клиентская база) - Active Customer Base
+    - Покрытие (АКБ/ОКБ) - Coverage Rate
+    - Средний чек по сегментам - Average Order Value by segments
+    - Динамика по месяцам - Monthly trends
+    - Разбивка по потокам доходов - Breakdown by revenue streams
+    - Growth metrics compared to previous year
+    """
+    # Multi-tenancy enforcement
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+
+    # Get department name if filtering by department
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        if dept:
+            department_name = dept.name
+
+    # Build base query for current year
+    query = db.query(CustomerMetrics).filter(CustomerMetrics.year == year)
+    if department_id:
+        query = query.filter(CustomerMetrics.department_id == department_id)
+
+    # Get all metrics for the year
+    current_year_metrics = query.all()
+
+    if not current_year_metrics:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No customer metrics found for year {year}"
+        )
+
+    # Aggregate totals for current year
+    total_customer_base = sum(m.total_customer_base or 0 for m in current_year_metrics)
+    active_customer_base = sum(m.active_customer_base or 0 for m in current_year_metrics)
+    coverage_rate = (active_customer_base / total_customer_base * 100) if total_customer_base > 0 else 0
+
+    # Clinic segments
+    regular_clinics = sum(m.regular_clinics or 0 for m in current_year_metrics)
+    network_clinics = sum(m.network_clinics or 0 for m in current_year_metrics)
+    new_clinics = sum(m.new_clinics or 0 for m in current_year_metrics)
+
+    # Calculate weighted average order values
+    def weighted_avg(metrics_list, field_name):
+        total_value = sum(getattr(m, field_name, 0) or 0 for m in metrics_list)
+        count = sum(1 for m in metrics_list if getattr(m, field_name, None) is not None)
+        return float(total_value / count) if count > 0 else 0.0
+
+    avg_order_value = weighted_avg(current_year_metrics, "avg_order_value")
+    avg_order_value_regular = weighted_avg(current_year_metrics, "avg_order_value_regular")
+    avg_order_value_network = weighted_avg(current_year_metrics, "avg_order_value_network")
+    avg_order_value_new = weighted_avg(current_year_metrics, "avg_order_value_new")
+
+    # Get previous year metrics for growth calculation
+    prev_year_query = db.query(CustomerMetrics).filter(CustomerMetrics.year == year - 1)
+    if department_id:
+        prev_year_query = prev_year_query.filter(CustomerMetrics.department_id == department_id)
+    prev_year_metrics = prev_year_query.all()
+
+    customer_base_growth = None
+    active_base_growth = None
+    avg_check_growth = None
+
+    if prev_year_metrics:
+        prev_total_customer_base = sum(m.total_customer_base or 0 for m in prev_year_metrics)
+        prev_active_customer_base = sum(m.active_customer_base or 0 for m in prev_year_metrics)
+        prev_avg_order_value = weighted_avg(prev_year_metrics, "avg_order_value")
+
+        if prev_total_customer_base > 0:
+            customer_base_growth = ((total_customer_base - prev_total_customer_base) / prev_total_customer_base) * 100
+        if prev_active_customer_base > 0:
+            active_base_growth = ((active_customer_base - prev_active_customer_base) / prev_active_customer_base) * 100
+        if prev_avg_order_value > 0:
+            avg_check_growth = ((avg_order_value - prev_avg_order_value) / prev_avg_order_value) * 100
+
+    # Monthly breakdown
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": month_names[month - 1],
+            "total_customer_base": 0,
+            "active_customer_base": 0,
+            "coverage_rate": 0.0,
+            "avg_order_value": 0.0,
+            "avg_order_value_regular": 0.0,
+            "avg_order_value_network": 0.0,
+            "avg_order_value_new": 0.0,
+        }
+
+    # Aggregate metrics by month
+    for metrics in current_year_metrics:
+        month = metrics.month
+        if month in monthly_data:
+            monthly_data[month]["total_customer_base"] += metrics.total_customer_base or 0
+            monthly_data[month]["active_customer_base"] += metrics.active_customer_base or 0
+            # Average order values - take average across revenue streams
+            if metrics.avg_order_value:
+                monthly_data[month]["avg_order_value"] += float(metrics.avg_order_value)
+            if metrics.avg_order_value_regular:
+                monthly_data[month]["avg_order_value_regular"] += float(metrics.avg_order_value_regular)
+            if metrics.avg_order_value_network:
+                monthly_data[month]["avg_order_value_network"] += float(metrics.avg_order_value_network)
+            if metrics.avg_order_value_new:
+                monthly_data[month]["avg_order_value_new"] += float(metrics.avg_order_value_new)
+
+    # Calculate coverage rates and averages
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        coverage = (m_data["active_customer_base"] / m_data["total_customer_base"] * 100) if m_data["total_customer_base"] > 0 else 0
+
+        # Count streams with data for averaging
+        month_metrics = [m for m in current_year_metrics if m.month == month]
+        stream_count = len(month_metrics) if month_metrics else 1
+
+        by_month.append(
+            CustomerMetricsMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                total_customer_base=m_data["total_customer_base"],
+                active_customer_base=m_data["active_customer_base"],
+                coverage_rate=round(coverage, 2),
+                avg_order_value=round(m_data["avg_order_value"] / stream_count, 2),
+                avg_order_value_regular=round(m_data["avg_order_value_regular"] / stream_count, 2),
+                avg_order_value_network=round(m_data["avg_order_value_network"] / stream_count, 2),
+                avg_order_value_new=round(m_data["avg_order_value_new"] / stream_count, 2),
+            )
+        )
+
+    # Breakdown by revenue stream
+    stream_data = {}
+    for metrics in current_year_metrics:
+        stream_id = metrics.revenue_stream_id
+        if stream_id not in stream_data:
+            stream_data[stream_id] = {
+                "revenue_stream_id": stream_id,
+                "revenue_stream_name": metrics.revenue_stream.name if metrics.revenue_stream else f"Stream #{stream_id}",
+                "total_customer_base": 0,
+                "active_customer_base": 0,
+                "regular_clinics": 0,
+                "network_clinics": 0,
+                "new_clinics": 0,
+                "avg_order_value_sum": 0.0,
+                "count": 0,
+            }
+
+        stream_data[stream_id]["total_customer_base"] += metrics.total_customer_base or 0
+        stream_data[stream_id]["active_customer_base"] += metrics.active_customer_base or 0
+        stream_data[stream_id]["regular_clinics"] += metrics.regular_clinics or 0
+        stream_data[stream_id]["network_clinics"] += metrics.network_clinics or 0
+        stream_data[stream_id]["new_clinics"] += metrics.new_clinics or 0
+        if metrics.avg_order_value:
+            stream_data[stream_id]["avg_order_value_sum"] += float(metrics.avg_order_value)
+            stream_data[stream_id]["count"] += 1
+
+    by_stream = []
+    for stream_id, data in stream_data.items():
+        coverage = (data["active_customer_base"] / data["total_customer_base"] * 100) if data["total_customer_base"] > 0 else 0
+        avg_order = data["avg_order_value_sum"] / data["count"] if data["count"] > 0 else 0.0
+
+        by_stream.append(
+            CustomerMetricsByStream(
+                revenue_stream_id=data["revenue_stream_id"],
+                revenue_stream_name=data["revenue_stream_name"],
+                total_customer_base=data["total_customer_base"],
+                active_customer_base=data["active_customer_base"],
+                coverage_rate=round(coverage, 2),
+                avg_order_value=round(avg_order, 2),
+                regular_clinics=data["regular_clinics"],
+                network_clinics=data["network_clinics"],
+                new_clinics=data["new_clinics"],
+            )
+        )
+
+    return CustomerMetricsAnalytics(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        total_customer_base=total_customer_base,
+        active_customer_base=active_customer_base,
+        coverage_rate=round(coverage_rate, 2),
+        regular_clinics=regular_clinics,
+        network_clinics=network_clinics,
+        new_clinics=new_clinics,
+        avg_order_value=round(avg_order_value, 2),
+        avg_order_value_regular=round(avg_order_value_regular, 2),
+        avg_order_value_network=round(avg_order_value_network, 2),
+        avg_order_value_new=round(avg_order_value_new, 2),
+        customer_base_growth=round(customer_base_growth, 2) if customer_base_growth is not None else None,
+        active_base_growth=round(active_base_growth, 2) if active_base_growth is not None else None,
+        avg_check_growth=round(avg_check_growth, 2) if avg_check_growth is not None else None,
+        by_month=by_month,
+        by_stream=by_stream,
+    )
+
+
+@router.get("/revenue-analytics", response_model=RevenueAnalytics)
+def get_revenue_analytics(
+    year: int = Query(..., description="Year for revenue analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Revenue Analytics (Аналитика доходов)
+    
+    Returns comprehensive revenue analytics showing:
+    - Total revenue (planned vs actual)
+    - Региональная разбивка (regional breakdown by revenue streams)
+    - Продуктовый микс (product mix by revenue categories)
+    - Помесячная динамика (monthly trends)
+    - Growth metrics compared to previous year
+    """
+    # Multi-tenancy enforcement
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        department_id = current_user.department_id
+
+    # Get department name
+    department_name = None
+    if department_id:
+        dept = db.query(Department).filter(Department.id == department_id).first()
+        if dept:
+            department_name = dept.name
+
+    # Query revenue actuals for current year
+    query = db.query(RevenueActual).filter(RevenueActual.year == year)
+    if department_id:
+        query = query.filter(RevenueActual.department_id == department_id)
+
+    current_year_data = query.all()
+
+    if not current_year_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No revenue data found for year {year}"
+        )
+
+    # Calculate totals
+    total_planned = sum(float(item.planned_amount or 0) for item in current_year_data)
+    total_actual = sum(float(item.actual_amount or 0) for item in current_year_data)
+    total_variance = total_actual - total_planned
+    total_variance_percent = ((total_variance / total_planned) * 100) if total_planned > 0 else 0
+    total_execution_percent = ((total_actual / total_planned) * 100) if total_planned > 0 else 0
+
+    # Get previous year data for growth metrics
+    prev_year_query = db.query(RevenueActual).filter(RevenueActual.year == year - 1)
+    if department_id:
+        prev_year_query = prev_year_query.filter(RevenueActual.department_id == department_id)
+    prev_year_data = prev_year_query.all()
+
+    planned_growth = None
+    actual_growth = None
+
+    if prev_year_data:
+        prev_total_planned = sum(float(item.planned_amount or 0) for item in prev_year_data)
+        prev_total_actual = sum(float(item.actual_amount or 0) for item in prev_year_data)
+
+        if prev_total_planned > 0:
+            planned_growth = ((total_planned - prev_total_planned) / prev_total_planned) * 100
+        if prev_total_actual > 0:
+            actual_growth = ((total_actual - prev_total_actual) / prev_total_actual) * 100
+
+    # Monthly breakdown
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+
+    monthly_data = {}
+    for month in range(1, 13):
+        monthly_data[month] = {
+            "month": month,
+            "month_name": month_names[month - 1],
+            "planned": 0.0,
+            "actual": 0.0,
+        }
+
+    for item in current_year_data:
+        month = item.month
+        if month in monthly_data:
+            monthly_data[month]["planned"] += float(item.planned_amount or 0)
+            monthly_data[month]["actual"] += float(item.actual_amount or 0)
+
+    by_month = []
+    for month in range(1, 13):
+        m_data = monthly_data[month]
+        variance = m_data["actual"] - m_data["planned"]
+        variance_percent = ((variance / m_data["planned"]) * 100) if m_data["planned"] > 0 else 0
+        execution_percent = ((m_data["actual"] / m_data["planned"]) * 100) if m_data["planned"] > 0 else 0
+
+        by_month.append(
+            RevenueAnalyticsMonthly(
+                month=month,
+                month_name=m_data["month_name"],
+                planned=round(m_data["planned"], 2),
+                actual=round(m_data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+            )
+        )
+
+    # Breakdown by revenue stream (regional breakdown)
+    stream_data = {}
+    for item in current_year_data:
+        if item.revenue_stream_id:
+            stream_id = item.revenue_stream_id
+            if stream_id not in stream_data:
+                stream_data[stream_id] = {
+                    "revenue_stream_id": stream_id,
+                    "revenue_stream_name": item.revenue_stream.name if item.revenue_stream else f"Stream #{stream_id}",
+                    "stream_type": item.revenue_stream.stream_type.value if item.revenue_stream else "UNKNOWN",
+                    "planned": 0.0,
+                    "actual": 0.0,
+                }
+
+            stream_data[stream_id]["planned"] += float(item.planned_amount or 0)
+            stream_data[stream_id]["actual"] += float(item.actual_amount or 0)
+
+    by_stream = []
+    for stream_id, data in stream_data.items():
+        variance = data["actual"] - data["planned"]
+        variance_percent = ((variance / data["planned"]) * 100) if data["planned"] > 0 else 0
+        execution_percent = ((data["actual"] / data["planned"]) * 100) if data["planned"] > 0 else 0
+        share_of_total = ((data["actual"] / total_actual) * 100) if total_actual > 0 else 0
+
+        by_stream.append(
+            RevenueAnalyticsByStream(
+                revenue_stream_id=data["revenue_stream_id"],
+                revenue_stream_name=data["revenue_stream_name"],
+                stream_type=data["stream_type"],
+                planned=round(data["planned"], 2),
+                actual=round(data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+                share_of_total=round(share_of_total, 2),
+            )
+        )
+
+    # Breakdown by revenue category (product mix)
+    category_data = {}
+    for item in current_year_data:
+        if item.revenue_category_id:
+            category_id = item.revenue_category_id
+            if category_id not in category_data:
+                category_data[category_id] = {
+                    "revenue_category_id": category_id,
+                    "revenue_category_name": item.revenue_category.name if item.revenue_category else f"Category #{category_id}",
+                    "category_type": item.revenue_category.category_type.value if item.revenue_category else "UNKNOWN",
+                    "planned": 0.0,
+                    "actual": 0.0,
+                }
+
+            category_data[category_id]["planned"] += float(item.planned_amount or 0)
+            category_data[category_id]["actual"] += float(item.actual_amount or 0)
+
+    by_category = []
+    for category_id, data in category_data.items():
+        variance = data["actual"] - data["planned"]
+        variance_percent = ((variance / data["planned"]) * 100) if data["planned"] > 0 else 0
+        execution_percent = ((data["actual"] / data["planned"]) * 100) if data["planned"] > 0 else 0
+        share_of_total = ((data["actual"] / total_actual) * 100) if total_actual > 0 else 0
+
+        by_category.append(
+            RevenueAnalyticsByCategory(
+                revenue_category_id=data["revenue_category_id"],
+                revenue_category_name=data["revenue_category_name"],
+                category_type=data["category_type"],
+                planned=round(data["planned"], 2),
+                actual=round(data["actual"], 2),
+                variance=round(variance, 2),
+                variance_percent=round(variance_percent, 2),
+                execution_percent=round(execution_percent, 2),
+                share_of_total=round(share_of_total, 2),
+            )
+        )
+
+    return RevenueAnalytics(
+        year=year,
+        department_id=department_id,
+        department_name=department_name,
+        total_planned=round(total_planned, 2),
+        total_actual=round(total_actual, 2),
+        total_variance=round(total_variance, 2),
+        total_variance_percent=round(total_variance_percent, 2),
+        total_execution_percent=round(total_execution_percent, 2),
+        planned_growth=round(planned_growth, 2) if planned_growth is not None else None,
+        actual_growth=round(actual_growth, 2) if actual_growth is not None else None,
+        by_month=by_month,
+        by_stream=by_stream if by_stream else None,
+        by_category=by_category if by_category else None,
+    )
+
+
+# ==================== EXPORT ENDPOINTS ====================
+
+@router.get("/budget-income-statement/export", response_class=StreamingResponse)
+def export_budget_income_statement(
+    year: int = Query(..., description="Year for the budget income statement"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Export БДР (Budget Income Statement) to Excel
+    
+    Creates Excel file with 4 sheets:
+    - Summary: Overall financial metrics
+    - Monthly: Monthly breakdown
+    - Revenue: Revenue by category
+    - Expenses: Expenses by category
+    """
+    # Multi-tenancy: enforce department access
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    elif current_user.role == UserRoleEnum.MANAGER:
+        if department_id is None:
+            target_department_id = current_user.department_id
+    
+    # Get department name
+    department_name = None
+    if target_department_id:
+        dept = db.query(Department).filter(Department.id == target_department_id).first()
+        if dept:
+            department_name = dept.name
+    
+    # === REVENUE DATA ===
+    revenue_planned_query = db.query(func.sum(RevenuePlanDetail.planned_amount))
+    if target_department_id:
+        revenue_planned_query = revenue_planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        ).filter(RevenuePlan.department_id == target_department_id)
+    else:
+        revenue_planned_query = revenue_planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        )
+    revenue_planned_query = revenue_planned_query.filter(RevenuePlan.year == year)
+    revenue_planned = float(revenue_planned_query.scalar() or 0)
+    
+    revenue_actual_query = db.query(func.sum(RevenueActual.amount))
+    if target_department_id:
+        revenue_actual_query = revenue_actual_query.filter(
+            RevenueActual.department_id == target_department_id
+        )
+    revenue_actual_query = revenue_actual_query.filter(extract('year', RevenueActual.date) == year)
+    revenue_actual = float(revenue_actual_query.scalar() or 0)
+    
+    # === EXPENSES DATA ===
+    expenses_planned_query = db.query(func.sum(BudgetPlanDetail.planned_amount))
+    if target_department_id:
+        expenses_planned_query = expenses_planned_query.join(
+            BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
+        ).join(
+            BudgetPlan, BudgetVersion.budget_plan_id == BudgetPlan.id
+        ).filter(BudgetPlan.department_id == target_department_id)
+    else:
+        expenses_planned_query = expenses_planned_query.join(
+            BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
+        ).join(
+            BudgetPlan, BudgetVersion.budget_plan_id == BudgetPlan.id
+        )
+    expenses_planned_query = expenses_planned_query.filter(BudgetPlan.year == year)
+    expenses_planned = float(expenses_planned_query.scalar() or 0)
+    
+    expenses_actual_query = db.query(func.sum(Expense.amount))
+    if target_department_id:
+        expenses_actual_query = expenses_actual_query.filter(
+            Expense.department_id == target_department_id
+        )
+    expenses_actual_query = expenses_actual_query.filter(
+        extract('year', Expense.expense_date) == year,
+        Expense.status.in_([ExpenseStatusEnum.APPROVED, ExpenseStatusEnum.PAID])
+    )
+    expenses_actual = float(expenses_actual_query.scalar() or 0)
+    
+    # === PAYROLL DATA ===
+    payroll_planned_query = db.query(
+        func.sum(PayrollPlan.base_salary + PayrollPlan.monthly_bonus + 
+                 PayrollPlan.quarterly_bonus + PayrollPlan.annual_bonus)
+    )
+    if target_department_id:
+        payroll_planned_query = payroll_planned_query.filter(
+            PayrollPlan.department_id == target_department_id
+        )
+    payroll_planned_query = payroll_planned_query.filter(PayrollPlan.year == year)
+    payroll_planned = float(payroll_planned_query.scalar() or 0)
+    
+    payroll_actual_query = db.query(func.sum(PayrollActual.total_amount))
+    if target_department_id:
+        payroll_actual_query = payroll_actual_query.filter(
+            PayrollActual.department_id == target_department_id
+        )
+    payroll_actual_query = payroll_actual_query.filter(
+        extract('year', PayrollActual.payment_date) == year
+    )
+    payroll_actual = float(payroll_actual_query.scalar() or 0)
+    
+    # Add payroll to expenses
+    expenses_planned += payroll_planned
+    expenses_actual += payroll_actual
+    
+    # === CALCULATIONS ===
+    profit_planned = revenue_planned - expenses_planned
+    profit_actual = revenue_actual - expenses_actual
+    
+    profit_margin_planned = (profit_planned / revenue_planned * 100) if revenue_planned > 0 else 0
+    profit_margin_actual = (profit_actual / revenue_actual * 100) if revenue_actual > 0 else 0
+    roi_planned = (profit_planned / expenses_planned * 100) if expenses_planned > 0 else 0
+    roi_actual = (profit_actual / expenses_actual * 100) if expenses_actual > 0 else 0
+    
+    # === SHEET 1: SUMMARY ===
+    summary_data = [
+        {"Показатель": "Год", "Значение": year},
+        {"Показатель": "Отдел", "Значение": department_name or "Все отделы"},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "ДОХОДЫ", "Значение": ""},
+        {"Показатель": "Доходы (План)", "Значение": revenue_planned},
+        {"Показатель": "Доходы (Факт)", "Значение": revenue_actual},
+        {"Показатель": "Отклонение доходов", "Значение": revenue_actual - revenue_planned},
+        {"Показатель": "Исполнение доходов (%)", "Значение": (revenue_actual / revenue_planned * 100) if revenue_planned > 0 else 0},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "РАСХОДЫ", "Значение": ""},
+        {"Показатель": "Расходы (План)", "Значение": expenses_planned},
+        {"Показатель": "Расходы (Факт)", "Значение": expenses_actual},
+        {"Показатель": "Отклонение расходов", "Значение": expenses_actual - expenses_planned},
+        {"Показатель": "Исполнение расходов (%)", "Значение": (expenses_actual / expenses_planned * 100) if expenses_planned > 0 else 0},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "ПРИБЫЛЬ", "Значение": ""},
+        {"Показатель": "Прибыль (План)", "Значение": profit_planned},
+        {"Показатель": "Прибыль (Факт)", "Значение": profit_actual},
+        {"Показатель": "Отклонение прибыли", "Значение": profit_actual - profit_planned},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "РЕНТАБЕЛЬНОСТЬ", "Значение": ""},
+        {"Показатель": "Рентабельность (План) %", "Значение": profit_margin_planned},
+        {"Показатель": "Рентабельность (Факт) %", "Значение": profit_margin_actual},
+        {"Показатель": "ROI (План) %", "Значение": roi_planned},
+        {"Показатель": "ROI (Факт) %", "Значение": roi_actual},
+    ]
+    df_summary = pd.DataFrame(summary_data)
+    
+    # === SHEET 2: MONTHLY BREAKDOWN ===
+    monthly_data = []
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+    
+    for month in range(1, 13):
+        # Revenue monthly
+        rev_plan_month = db.query(func.sum(RevenuePlanDetail.planned_amount))
+        if target_department_id:
+            rev_plan_month = rev_plan_month.join(
+                RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+            ).filter(RevenuePlan.department_id == target_department_id)
+        else:
+            rev_plan_month = rev_plan_month.join(
+                RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+            )
+        rev_plan_month = rev_plan_month.filter(
+            RevenuePlan.year == year,
+            RevenuePlanDetail.month == month
+        ).scalar() or 0
+        
+        rev_actual_month = db.query(func.sum(RevenueActual.amount))
+        if target_department_id:
+            rev_actual_month = rev_actual_month.filter(
+                RevenueActual.department_id == target_department_id
+            )
+        rev_actual_month = rev_actual_month.filter(
+            extract('year', RevenueActual.date) == year,
+            extract('month', RevenueActual.date) == month
+        ).scalar() or 0
+        
+        # Expenses monthly
+        exp_plan_month = db.query(func.sum(BudgetPlanDetail.planned_amount))
+        if target_department_id:
+            exp_plan_month = exp_plan_month.join(
+                BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
+            ).join(
+                BudgetPlan, BudgetVersion.budget_plan_id == BudgetPlan.id
+            ).filter(BudgetPlan.department_id == target_department_id)
+        else:
+            exp_plan_month = exp_plan_month.join(
+                BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
+            ).join(
+                BudgetPlan, BudgetVersion.budget_plan_id == BudgetPlan.id
+            )
+        exp_plan_month = exp_plan_month.filter(
+            BudgetPlan.year == year,
+            BudgetPlanDetail.month == month
+        ).scalar() or 0
+        
+        exp_actual_month = db.query(func.sum(Expense.amount))
+        if target_department_id:
+            exp_actual_month = exp_actual_month.filter(
+                Expense.department_id == target_department_id
+            )
+        exp_actual_month = exp_actual_month.filter(
+            extract('year', Expense.expense_date) == year,
+            extract('month', Expense.expense_date) == month,
+            Expense.status.in_([ExpenseStatusEnum.APPROVED, ExpenseStatusEnum.PAID])
+        ).scalar() or 0
+        
+        # Payroll monthly
+        payroll_plan_month = db.query(
+            func.sum(PayrollPlan.base_salary + PayrollPlan.monthly_bonus)
+        )
+        if target_department_id:
+            payroll_plan_month = payroll_plan_month.filter(
+                PayrollPlan.department_id == target_department_id
+            )
+        payroll_plan_month = payroll_plan_month.filter(
+            PayrollPlan.year == year,
+            PayrollPlan.month == month
+        ).scalar() or 0
+        
+        payroll_actual_month = db.query(func.sum(PayrollActual.total_amount))
+        if target_department_id:
+            payroll_actual_month = payroll_actual_month.filter(
+                PayrollActual.department_id == target_department_id
+            )
+        payroll_actual_month = payroll_actual_month.filter(
+            extract('year', PayrollActual.payment_date) == year,
+            extract('month', PayrollActual.payment_date) == month
+        ).scalar() or 0
+        
+        exp_plan_total = float(exp_plan_month) + float(payroll_plan_month)
+        exp_actual_total = float(exp_actual_month) + float(payroll_actual_month)
+        
+        profit_plan = float(rev_plan_month) - exp_plan_total
+        profit_act = float(rev_actual_month) - exp_actual_total
+        
+        monthly_data.append({
+            "Месяц": month_names[month - 1],
+            "Доходы (План)": float(rev_plan_month),
+            "Доходы (Факт)": float(rev_actual_month),
+            "Расходы (План)": exp_plan_total,
+            "Расходы (Факт)": exp_actual_total,
+            "Прибыль (План)": profit_plan,
+            "Прибыль (Факт)": profit_act,
+            "Рентабельность (План) %": (profit_plan / float(rev_plan_month) * 100) if float(rev_plan_month) > 0 else 0,
+            "Рентабельность (Факт) %": (profit_act / float(rev_actual_month) * 100) if float(rev_actual_month) > 0 else 0,
+        })
+    df_monthly = pd.DataFrame(monthly_data)
+    
+    # === SHEET 3: REVENUE BY CATEGORY ===
+    revenue_by_cat = db.query(
+        RevenueCategory.id,
+        RevenueCategory.name,
+        func.sum(RevenuePlanDetail.planned_amount).label('planned')
+    ).join(
+        RevenuePlanDetail, RevenueCategory.id == RevenuePlanDetail.revenue_category_id
+    ).join(
+        RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+    )
+    
+    if target_department_id:
+        revenue_by_cat = revenue_by_cat.filter(
+            RevenuePlan.department_id == target_department_id
+        )
+    
+    revenue_by_cat = revenue_by_cat.filter(
+        RevenuePlan.year == year
+    ).group_by(RevenueCategory.id, RevenueCategory.name).all()
+    
+    revenue_cat_data = []
+    for cat in revenue_by_cat:
+        # Get actual for this category
+        actual_query = db.query(func.sum(RevenueActual.amount))
+        if target_department_id:
+            actual_query = actual_query.filter(
+                RevenueActual.department_id == target_department_id
+            )
+        actual_query = actual_query.filter(
+            RevenueActual.revenue_category_id == cat.id,
+            extract('year', RevenueActual.date) == year
+        )
+        actual = float(actual_query.scalar() or 0)
+        
+        planned = float(cat.planned or 0)
+        diff = actual - planned
+        exec_pct = (actual / planned * 100) if planned > 0 else 0
+        
+        revenue_cat_data.append({
+            "Категория": cat.name,
+            "План": planned,
+            "Факт": actual,
+            "Отклонение": diff,
+            "Исполнение %": exec_pct
+        })
+    df_revenue_cat = pd.DataFrame(revenue_cat_data)
+    
+    # === SHEET 4: EXPENSES BY CATEGORY ===
+    expenses_by_cat = db.query(
+        BudgetCategory.id,
+        BudgetCategory.name,
+        func.sum(BudgetPlanDetail.planned_amount).label('planned')
+    ).join(
+        BudgetPlanDetail, BudgetCategory.id == BudgetPlanDetail.category_id
+    ).join(
+        BudgetVersion, BudgetPlanDetail.version_id == BudgetVersion.id
+    ).join(
+        BudgetPlan, BudgetVersion.budget_plan_id == BudgetPlan.id
+    )
+    
+    if target_department_id:
+        expenses_by_cat = expenses_by_cat.filter(
+            BudgetPlan.department_id == target_department_id
+        )
+    
+    expenses_by_cat = expenses_by_cat.filter(
+        BudgetPlan.year == year
+    ).group_by(BudgetCategory.id, BudgetCategory.name).all()
+    
+    expenses_cat_data = []
+    for cat in expenses_by_cat:
+        # Get actual for this category
+        actual_query = db.query(func.sum(Expense.amount))
+        if target_department_id:
+            actual_query = actual_query.filter(
+                Expense.department_id == target_department_id
+            )
+        actual_query = actual_query.filter(
+            Expense.category_id == cat.id,
+            extract('year', Expense.expense_date) == year,
+            Expense.status.in_([ExpenseStatusEnum.APPROVED, ExpenseStatusEnum.PAID])
+        )
+        actual = float(actual_query.scalar() or 0)
+        
+        planned = float(cat.planned or 0)
+        diff = actual - planned
+        exec_pct = (actual / planned * 100) if planned > 0 else 0
+        
+        expenses_cat_data.append({
+            "Категория": cat.name,
+            "План": planned,
+            "Факт": actual,
+            "Отклонение": diff,
+            "Исполнение %": exec_pct
+        })
+    
+    # Add payroll as a category
+    expenses_cat_data.append({
+        "Категория": "ФОТ (Фонд оплаты труда)",
+        "План": payroll_planned,
+        "Факт": payroll_actual,
+        "Отклонение": payroll_actual - payroll_planned,
+        "Исполнение %": (payroll_actual / payroll_planned * 100) if payroll_planned > 0 else 0
+    })
+    df_expenses_cat = pd.DataFrame(expenses_cat_data)
+    
+    # === CREATE EXCEL FILE ===
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_summary.to_excel(writer, index=False, sheet_name='Сводка')
+        df_monthly.to_excel(writer, index=False, sheet_name='По месяцам')
+        df_revenue_cat.to_excel(writer, index=False, sheet_name='Доходы по категориям')
+        df_expenses_cat.to_excel(writer, index=False, sheet_name='Расходы по категориям')
+    
+    output.seek(0)
+    
+    filename = f"BDR_{year}"
+    if department_name:
+        filename += f"_{department_name}"
+    filename += ".xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/customer-metrics-analytics/export", response_class=StreamingResponse)
+def export_customer_metrics_analytics(
+    year: int = Query(..., description="Year for customer metrics analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Export Customer Metrics Analytics to Excel
+    
+    Creates Excel file with 3 sheets:
+    - Summary: Overall customer metrics
+    - Monthly: Monthly breakdown
+    - Streams: Breakdown by revenue streams
+    """
+    # Multi-tenancy: enforce department access
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    elif current_user.role == UserRoleEnum.MANAGER:
+        if department_id is None:
+            target_department_id = current_user.department_id
+    
+    # Get department name
+    department_name = None
+    if target_department_id:
+        dept = db.query(Department).filter(Department.id == target_department_id).first()
+        if dept:
+            department_name = dept.name
+    
+    # === GET CURRENT YEAR DATA ===
+    query = db.query(CustomerMetrics)
+    if target_department_id:
+        query = query.filter(CustomerMetrics.department_id == target_department_id)
+    query = query.filter(CustomerMetrics.year == year)
+    
+    metrics = query.all()
+    
+    if not metrics:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No customer metrics found for year {year}"
+        )
+    
+    # Aggregate totals
+    total_customer_base = sum(m.total_customer_base or 0 for m in metrics)
+    active_customer_base = sum(m.active_customer_base or 0 for m in metrics)
+    coverage_rate = (active_customer_base / total_customer_base * 100) if total_customer_base > 0 else 0
+    
+    regular_clinics = sum(m.regular_clinics or 0 for m in metrics)
+    network_clinics = sum(m.network_clinics or 0 for m in metrics)
+    new_clinics = sum(m.new_clinics or 0 for m in metrics)
+    
+    # Weighted average for order values
+    total_weight = sum(m.active_customer_base or 0 for m in metrics)
+    avg_order_value = sum((m.avg_order_value or 0) * (m.active_customer_base or 0) for m in metrics) / total_weight if total_weight > 0 else 0
+    avg_order_value_regular = sum((m.avg_order_value_regular or 0) * (m.regular_clinics or 0) for m in metrics) / regular_clinics if regular_clinics > 0 else 0
+    avg_order_value_network = sum((m.avg_order_value_network or 0) * (m.network_clinics or 0) for m in metrics) / network_clinics if network_clinics > 0 else 0
+    avg_order_value_new = sum((m.avg_order_value_new or 0) * (m.new_clinics or 0) for m in metrics) / new_clinics if new_clinics > 0 else 0
+    
+    # Get previous year data for growth metrics
+    prev_query = db.query(CustomerMetrics)
+    if target_department_id:
+        prev_query = prev_query.filter(CustomerMetrics.department_id == target_department_id)
+    prev_query = prev_query.filter(CustomerMetrics.year == year - 1)
+    prev_metrics = prev_query.all()
+    
+    customer_base_growth = None
+    active_base_growth = None
+    avg_check_growth = None
+    
+    if prev_metrics:
+        prev_total_base = sum(m.total_customer_base or 0 for m in prev_metrics)
+        prev_active_base = sum(m.active_customer_base or 0 for m in prev_metrics)
+        prev_weight = sum(m.active_customer_base or 0 for m in prev_metrics)
+        prev_avg_order = sum((m.avg_order_value or 0) * (m.active_customer_base or 0) for m in prev_metrics) / prev_weight if prev_weight > 0 else 0
+        
+        customer_base_growth = ((total_customer_base - prev_total_base) / prev_total_base * 100) if prev_total_base > 0 else 0
+        active_base_growth = ((active_customer_base - prev_active_base) / prev_active_base * 100) if prev_active_base > 0 else 0
+        avg_check_growth = ((avg_order_value - prev_avg_order) / prev_avg_order * 100) if prev_avg_order > 0 else 0
+    
+    # === SHEET 1: SUMMARY ===
+    summary_data = [
+        {"Показатель": "Год", "Значение": year},
+        {"Показатель": "Отдел", "Значение": department_name or "Все отделы"},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "КЛИЕНТСКАЯ БАЗА", "Значение": ""},
+        {"Показатель": "ОКБ (Общая клиентская база)", "Значение": total_customer_base},
+        {"Показатель": "АКБ (Активная клиентская база)", "Значение": active_customer_base},
+        {"Показатель": "Покрытие (АКБ/ОКБ) %", "Значение": coverage_rate},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "СЕГМЕНТЫ", "Значение": ""},
+        {"Показатель": "Регулярные клиники", "Значение": regular_clinics},
+        {"Показатель": "Сетевые клиники", "Значение": network_clinics},
+        {"Показатель": "Новые клиники", "Значение": new_clinics},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "СРЕДНИЙ ЧЕК", "Значение": ""},
+        {"Показатель": "Средний чек (общий)", "Значение": avg_order_value},
+        {"Показатель": "Средний чек (регулярные)", "Значение": avg_order_value_regular},
+        {"Показатель": "Средний чек (сетевые)", "Значение": avg_order_value_network},
+        {"Показатель": "Средний чек (новые)", "Значение": avg_order_value_new},
+    ]
+    
+    if customer_base_growth is not None:
+        summary_data.extend([
+            {"Показатель": "", "Значение": ""},
+            {"Показатель": "ДИНАМИКА (год к году)", "Значение": ""},
+            {"Показатель": "Рост ОКБ %", "Значение": customer_base_growth},
+            {"Показатель": "Рост АКБ %", "Значение": active_base_growth},
+            {"Показатель": "Рост среднего чека %", "Значение": avg_check_growth},
+        ])
+    
+    df_summary = pd.DataFrame(summary_data)
+    
+    # === SHEET 2: MONTHLY BREAKDOWN ===
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+    
+    monthly_data = []
+    for month in range(1, 13):
+        month_query = db.query(CustomerMetrics)
+        if target_department_id:
+            month_query = month_query.filter(CustomerMetrics.department_id == target_department_id)
+        month_query = month_query.filter(
+            CustomerMetrics.year == year,
+            CustomerMetrics.month == month
+        )
+        month_metrics = month_query.all()
+        
+        if month_metrics:
+            month_total_base = sum(m.total_customer_base or 0 for m in month_metrics)
+            month_active_base = sum(m.active_customer_base or 0 for m in month_metrics)
+            month_coverage = (month_active_base / month_total_base * 100) if month_total_base > 0 else 0
+            
+            month_weight = sum(m.active_customer_base or 0 for m in month_metrics)
+            month_avg_order = sum((m.avg_order_value or 0) * (m.active_customer_base or 0) for m in month_metrics) / month_weight if month_weight > 0 else 0
+            
+            month_regular = sum(m.regular_clinics or 0 for m in month_metrics)
+            month_network = sum(m.network_clinics or 0 for m in month_metrics)
+            month_new = sum(m.new_clinics or 0 for m in month_metrics)
+            
+            monthly_data.append({
+                "Месяц": month_names[month - 1],
+                "ОКБ": month_total_base,
+                "АКБ": month_active_base,
+                "Покрытие %": month_coverage,
+                "Средний чек": month_avg_order,
+                "Регулярные": month_regular,
+                "Сетевые": month_network,
+                "Новые": month_new,
+            })
+    
+    df_monthly = pd.DataFrame(monthly_data)
+    
+    # === SHEET 3: BY REVENUE STREAMS ===
+    stream_data = []
+    streams = db.query(RevenueStream).filter(RevenueStream.is_active == True).all()
+    
+    for stream in streams:
+        stream_query = db.query(CustomerMetrics)
+        if target_department_id:
+            stream_query = stream_query.filter(CustomerMetrics.department_id == target_department_id)
+        stream_query = stream_query.filter(
+            CustomerMetrics.year == year,
+            CustomerMetrics.revenue_stream_id == stream.id
+        )
+        stream_metrics = stream_query.all()
+        
+        if stream_metrics:
+            stream_total_base = sum(m.total_customer_base or 0 for m in stream_metrics)
+            stream_active_base = sum(m.active_customer_base or 0 for m in stream_metrics)
+            stream_coverage = (stream_active_base / stream_total_base * 100) if stream_total_base > 0 else 0
+            
+            stream_weight = sum(m.active_customer_base or 0 for m in stream_metrics)
+            stream_avg_order = sum((m.avg_order_value or 0) * (m.active_customer_base or 0) for m in stream_metrics) / stream_weight if stream_weight > 0 else 0
+            
+            stream_regular = sum(m.regular_clinics or 0 for m in stream_metrics)
+            stream_network = sum(m.network_clinics or 0 for m in stream_metrics)
+            stream_new = sum(m.new_clinics or 0 for m in stream_metrics)
+            
+            stream_data.append({
+                "Поток доходов": stream.name,
+                "Тип": stream.stream_type,
+                "ОКБ": stream_total_base,
+                "АКБ": stream_active_base,
+                "Покрытие %": stream_coverage,
+                "Средний чек": stream_avg_order,
+                "Регулярные": stream_regular,
+                "Сетевые": stream_network,
+                "Новые": stream_new,
+            })
+    
+    df_streams = pd.DataFrame(stream_data)
+    
+    # === CREATE EXCEL FILE ===
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_summary.to_excel(writer, index=False, sheet_name='Сводка')
+        df_monthly.to_excel(writer, index=False, sheet_name='По месяцам')
+        if not df_streams.empty:
+            df_streams.to_excel(writer, index=False, sheet_name='По потокам доходов')
+    
+    output.seek(0)
+    
+    filename = f"Customer_Metrics_{year}"
+    if department_name:
+        filename += f"_{department_name}"
+    filename += ".xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/revenue-analytics/export", response_class=StreamingResponse)
+def export_revenue_analytics(
+    year: int = Query(..., description="Year for revenue analytics"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Export Revenue Analytics to Excel
+    
+    Creates Excel file with 4 sheets:
+    - Summary: Overall revenue metrics
+    - Monthly: Monthly breakdown
+    - Streams: Regional breakdown by revenue streams
+    - Categories: Product mix by revenue categories
+    """
+    # Multi-tenancy: enforce department access
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    elif current_user.role == UserRoleEnum.MANAGER:
+        if department_id is None:
+            target_department_id = current_user.department_id
+    
+    # Get department name
+    department_name = None
+    if target_department_id:
+        dept = db.query(Department).filter(Department.id == target_department_id).first()
+        if dept:
+            department_name = dept.name
+    
+    # === GET REVENUE DATA ===
+    # Planned revenue
+    planned_query = db.query(func.sum(RevenuePlanDetail.planned_amount))
+    if target_department_id:
+        planned_query = planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        ).filter(RevenuePlan.department_id == target_department_id)
+    else:
+        planned_query = planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        )
+    planned_query = planned_query.filter(RevenuePlan.year == year)
+    total_planned = float(planned_query.scalar() or 0)
+    
+    # Actual revenue
+    actual_query = db.query(func.sum(RevenueActual.amount))
+    if target_department_id:
+        actual_query = actual_query.filter(RevenueActual.department_id == target_department_id)
+    actual_query = actual_query.filter(extract('year', RevenueActual.date) == year)
+    total_actual = float(actual_query.scalar() or 0)
+    
+    # Calculate totals
+    total_variance = total_actual - total_planned
+    total_variance_percent = (total_variance / total_planned * 100) if total_planned > 0 else 0
+    total_execution_percent = (total_actual / total_planned * 100) if total_planned > 0 else 0
+    
+    # Get previous year data for growth
+    prev_planned_query = db.query(func.sum(RevenuePlanDetail.planned_amount))
+    if target_department_id:
+        prev_planned_query = prev_planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        ).filter(RevenuePlan.department_id == target_department_id)
+    else:
+        prev_planned_query = prev_planned_query.join(
+            RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+        )
+    prev_planned_query = prev_planned_query.filter(RevenuePlan.year == year - 1)
+    prev_planned = float(prev_planned_query.scalar() or 0)
+    
+    prev_actual_query = db.query(func.sum(RevenueActual.amount))
+    if target_department_id:
+        prev_actual_query = prev_actual_query.filter(RevenueActual.department_id == target_department_id)
+    prev_actual_query = prev_actual_query.filter(extract('year', RevenueActual.date) == year - 1)
+    prev_actual = float(prev_actual_query.scalar() or 0)
+    
+    planned_growth = ((total_planned - prev_planned) / prev_planned * 100) if prev_planned > 0 else None
+    actual_growth = ((total_actual - prev_actual) / prev_actual * 100) if prev_actual > 0 else None
+    
+    # === SHEET 1: SUMMARY ===
+    summary_data = [
+        {"Показатель": "Год", "Значение": year},
+        {"Показатель": "Отдел", "Значение": department_name or "Все отделы"},
+        {"Показатель": "", "Значение": ""},
+        {"Показатель": "ДОХОДЫ", "Значение": ""},
+        {"Показатель": "План", "Значение": total_planned},
+        {"Показатель": "Факт", "Значение": total_actual},
+        {"Показатель": "Отклонение", "Значение": total_variance},
+        {"Показатель": "Отклонение %", "Значение": total_variance_percent},
+        {"Показатель": "Исполнение %", "Значение": total_execution_percent},
+    ]
+    
+    if planned_growth is not None:
+        summary_data.extend([
+            {"Показатель": "", "Значение": ""},
+            {"Показатель": "ДИНАМИКА (год к году)", "Значение": ""},
+            {"Показатель": "Рост плана %", "Значение": planned_growth},
+            {"Показатель": "Рост факта %", "Значение": actual_growth},
+        ])
+    
+    df_summary = pd.DataFrame(summary_data)
+    
+    # === SHEET 2: MONTHLY BREAKDOWN ===
+    month_names = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
+    
+    monthly_data = []
+    for month in range(1, 13):
+        # Planned monthly
+        planned_month = db.query(func.sum(RevenuePlanDetail.planned_amount))
+        if target_department_id:
+            planned_month = planned_month.join(
+                RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+            ).filter(RevenuePlan.department_id == target_department_id)
+        else:
+            planned_month = planned_month.join(
+                RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+            )
+        planned_month = planned_month.filter(
+            RevenuePlan.year == year,
+            RevenuePlanDetail.month == month
+        ).scalar() or 0
+        
+        # Actual monthly
+        actual_month = db.query(func.sum(RevenueActual.amount))
+        if target_department_id:
+            actual_month = actual_month.filter(RevenueActual.department_id == target_department_id)
+        actual_month = actual_month.filter(
+            extract('year', RevenueActual.date) == year,
+            extract('month', RevenueActual.date) == month
+        ).scalar() or 0
+        
+        planned_month = float(planned_month)
+        actual_month = float(actual_month)
+        variance = actual_month - planned_month
+        variance_pct = (variance / planned_month * 100) if planned_month > 0 else 0
+        exec_pct = (actual_month / planned_month * 100) if planned_month > 0 else 0
+        
+        monthly_data.append({
+            "Месяц": month_names[month - 1],
+            "План": planned_month,
+            "Факт": actual_month,
+            "Отклонение": variance,
+            "Отклонение %": variance_pct,
+            "Исполнение %": exec_pct,
+        })
+    
+    df_monthly = pd.DataFrame(monthly_data)
+    
+    # === SHEET 3: BY REVENUE STREAMS (REGIONAL) ===
+    streams = db.query(
+        RevenueStream.id,
+        RevenueStream.name,
+        RevenueStream.stream_type,
+        func.sum(RevenuePlanDetail.planned_amount).label('planned')
+    ).join(
+        RevenuePlanDetail, RevenueStream.id == RevenuePlanDetail.revenue_stream_id
+    ).join(
+        RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+    )
+    
+    if target_department_id:
+        streams = streams.filter(RevenuePlan.department_id == target_department_id)
+    
+    streams = streams.filter(
+        RevenuePlan.year == year
+    ).group_by(RevenueStream.id, RevenueStream.name, RevenueStream.stream_type).all()
+    
+    stream_data = []
+    for stream in streams:
+        # Get actual for this stream
+        actual_query = db.query(func.sum(RevenueActual.amount))
+        if target_department_id:
+            actual_query = actual_query.filter(RevenueActual.department_id == target_department_id)
+        actual_query = actual_query.filter(
+            RevenueActual.revenue_stream_id == stream.id,
+            extract('year', RevenueActual.date) == year
+        )
+        actual = float(actual_query.scalar() or 0)
+        
+        planned = float(stream.planned or 0)
+        variance = actual - planned
+        variance_pct = (variance / planned * 100) if planned > 0 else 0
+        exec_pct = (actual / planned * 100) if planned > 0 else 0
+        share = (actual / total_actual * 100) if total_actual > 0 else 0
+        
+        stream_data.append({
+            "Поток доходов": stream.name,
+            "Тип": stream.stream_type,
+            "План": planned,
+            "Факт": actual,
+            "Отклонение": variance,
+            "Отклонение %": variance_pct,
+            "Исполнение %": exec_pct,
+            "Доля от общего дохода %": share,
+        })
+    
+    df_streams = pd.DataFrame(stream_data)
+    
+    # === SHEET 4: BY REVENUE CATEGORIES (PRODUCT MIX) ===
+    categories = db.query(
+        RevenueCategory.id,
+        RevenueCategory.name,
+        RevenueCategory.category_type,
+        func.sum(RevenuePlanDetail.planned_amount).label('planned')
+    ).join(
+        RevenuePlanDetail, RevenueCategory.id == RevenuePlanDetail.revenue_category_id
+    ).join(
+        RevenuePlan, RevenuePlanDetail.revenue_plan_id == RevenuePlan.id
+    )
+    
+    if target_department_id:
+        categories = categories.filter(RevenuePlan.department_id == target_department_id)
+    
+    categories = categories.filter(
+        RevenuePlan.year == year
+    ).group_by(RevenueCategory.id, RevenueCategory.name, RevenueCategory.category_type).all()
+    
+    category_data = []
+    for category in categories:
+        # Get actual for this category
+        actual_query = db.query(func.sum(RevenueActual.amount))
+        if target_department_id:
+            actual_query = actual_query.filter(RevenueActual.department_id == target_department_id)
+        actual_query = actual_query.filter(
+            RevenueActual.revenue_category_id == category.id,
+            extract('year', RevenueActual.date) == year
+        )
+        actual = float(actual_query.scalar() or 0)
+        
+        planned = float(category.planned or 0)
+        variance = actual - planned
+        variance_pct = (variance / planned * 100) if planned > 0 else 0
+        exec_pct = (actual / planned * 100) if planned > 0 else 0
+        share = (actual / total_actual * 100) if total_actual > 0 else 0
+        
+        category_data.append({
+            "Категория дохода": category.name,
+            "Тип": category.category_type,
+            "План": planned,
+            "Факт": actual,
+            "Отклонение": variance,
+            "Отклонение %": variance_pct,
+            "Исполнение %": exec_pct,
+            "Доля от общего дохода %": share,
+        })
+    
+    df_categories = pd.DataFrame(category_data)
+    
+    # === CREATE EXCEL FILE ===
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_summary.to_excel(writer, index=False, sheet_name='Сводка')
+        df_monthly.to_excel(writer, index=False, sheet_name='По месяцам')
+        if not df_streams.empty:
+            df_streams.to_excel(writer, index=False, sheet_name='Региональная разбивка')
+        if not df_categories.empty:
+            df_categories.to_excel(writer, index=False, sheet_name='Продуктовый микс')
+    
+    output.seek(0)
+    
+    filename = f"Revenue_Analytics_{year}"
+    if department_name:
+        filename += f"_{department_name}"
+    filename += ".xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )

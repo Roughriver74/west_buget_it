@@ -1,47 +1,71 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { DepartmentProvider } from './contexts/DepartmentContext'
 import AppLayout from './components/common/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
+import LoadingState from './components/common/LoadingState'
+
+// Public pages - load immediately
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
+
+// Core pages - load immediately (frequently accessed)
 import DashboardPage from './pages/DashboardPage'
-import CustomDashboardPage from './pages/CustomDashboardPage'
-import ExpensesPage from './pages/ExpensesPage'
-import BudgetOverviewPage from './pages/BudgetOverviewPage'
-import BudgetPlanPage from './pages/BudgetPlanPage'
-import CategoriesPage from './pages/CategoriesPage'
-import ContractorsPage from './pages/ContractorsPage'
-import OrganizationsPage from './pages/OrganizationsPage'
-import ContractorDetailPage from './pages/ContractorDetailPage'
-import OrganizationDetailPage from './pages/OrganizationDetailPage'
-import AnalyticsPage from './pages/AnalyticsPage'
-import BalanceAnalyticsPage from './pages/BalanceAnalyticsPage'
-import ExtendedAnalyticsPage from './pages/ExtendedAnalyticsPage'
-import PaymentCalendarPage from './pages/PaymentCalendarPage'
-import ForecastPage from './pages/ForecastPage'
-import DepartmentsPage from './pages/DepartmentsPage'
-import UsersPage from './pages/UsersPage'
-import EmployeesPage from './pages/EmployeesPage'
-import EmployeeDetailPage from './pages/EmployeeDetailPage'
-import PayrollPlanPage from './pages/PayrollPlanPage'
-import PayrollAnalyticsPage from './pages/PayrollAnalyticsPage'
-import KpiManagementPage from './pages/KpiManagementPage'
-import KPIAnalyticsPage from './pages/KPIAnalyticsPage'
-import BudgetPlanningPage from './pages/BudgetPlanningPage'
-import PayrollActualsPage from './pages/PayrollActualsPage'
-import NDFLCalculatorPage from './pages/NDFLCalculatorPage'
-import RevenueDashboardPage from './pages/RevenueDashboardPage'
-import RevenueStreamsPage from './pages/RevenueStreamsPage'
-import RevenueCategoriesPage from './pages/RevenueCategoriesPage'
-import RevenueActualsPage from './pages/RevenueActualsPage'
-import RevenuePlanningPage from './pages/RevenuePlanningPage'
-import RevenuePlanDetailsPage from './pages/RevenuePlanDetailsPage'
-import CustomerMetricsPage from './pages/CustomerMetricsPage'
-import SeasonalityPage from './pages/SeasonalityPage'
-import RevenueAnalyticsPage from './pages/RevenueAnalyticsPage'
+
+// Lazy-loaded pages (code splitting by module)
+
+// Budget module
+const BudgetOverviewPage = lazy(() => import('./pages/BudgetOverviewPage'))
+const BudgetPlanPage = lazy(() => import('./pages/BudgetPlanPage'))
+const BudgetPlanningPage = lazy(() => import('./pages/BudgetPlanningPage'))
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage'))
+
+// Analytics module
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
+const BalanceAnalyticsPage = lazy(() => import('./pages/BalanceAnalyticsPage'))
+const ExtendedAnalyticsPage = lazy(() => import('./pages/ExtendedAnalyticsPage'))
+const PaymentCalendarPage = lazy(() => import('./pages/PaymentCalendarPage'))
+const ForecastPage = lazy(() => import('./pages/ForecastPage'))
+const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
+const BudgetIncomeStatementPage = lazy(() => import('./pages/BudgetIncomeStatementPage'))
+const CustomerMetricsAnalyticsPage = lazy(() => import('./pages/CustomerMetricsAnalyticsPage'))
+const RevenueAnalyticsExtendedPage = lazy(() => import('./pages/RevenueAnalyticsExtendedPage'))
+const UnifiedFinancialDashboardPage = lazy(() => import('./pages/UnifiedFinancialDashboardPage'))
+
+// Reference data module
+const CategoriesPage = lazy(() => import('./pages/CategoriesPage'))
+const ContractorsPage = lazy(() => import('./pages/ContractorsPage'))
+const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'))
+const ContractorDetailPage = lazy(() => import('./pages/ContractorDetailPage'))
+const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage'))
+
+// Admin module
+const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
+const UsersPage = lazy(() => import('./pages/UsersPage'))
+
+// Payroll module
+const EmployeesPage = lazy(() => import('./pages/EmployeesPage'))
+const EmployeeDetailPage = lazy(() => import('./pages/EmployeeDetailPage'))
+const PayrollPlanPage = lazy(() => import('./pages/PayrollPlanPage'))
+const PayrollActualsPage = lazy(() => import('./pages/PayrollActualsPage'))
+const PayrollAnalyticsPage = lazy(() => import('./pages/PayrollAnalyticsPage'))
+const KpiManagementPage = lazy(() => import('./pages/KpiManagementPage'))
+const KPIAnalyticsPage = lazy(() => import('./pages/KPIAnalyticsPage'))
+const NDFLCalculatorPage = lazy(() => import('./pages/NDFLCalculatorPage'))
+
+// Revenue module
+const RevenueDashboardPage = lazy(() => import('./pages/RevenueDashboardPage'))
+const RevenueStreamsPage = lazy(() => import('./pages/RevenueStreamsPage'))
+const RevenueCategoriesPage = lazy(() => import('./pages/RevenueCategoriesPage'))
+const RevenueActualsPage = lazy(() => import('./pages/RevenueActualsPage'))
+const RevenuePlanningPage = lazy(() => import('./pages/RevenuePlanningPage'))
+const RevenuePlanDetailsPage = lazy(() => import('./pages/RevenuePlanDetailsPage'))
+const CustomerMetricsPage = lazy(() => import('./pages/CustomerMetricsPage'))
+const SeasonalityPage = lazy(() => import('./pages/SeasonalityPage'))
+const RevenueAnalyticsPage = lazy(() => import('./pages/RevenueAnalyticsPage'))
 
 function App() {
   return (
@@ -61,12 +85,13 @@ function App() {
                 <ProtectedRoute>
                   <DepartmentProvider>
                     <AppLayout>
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="/dashboard" element={<DashboardPage />} />
-                        <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
-                        <Route path="/budget" element={<BudgetOverviewPage />} />
-                        <Route path="/expenses" element={<ExpensesPage />} />
+                      <Suspense fallback={<LoadingState />}>
+                        <Routes>
+                          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                          <Route path="/dashboard" element={<DashboardPage />} />
+                          <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
+                          <Route path="/budget" element={<BudgetOverviewPage />} />
+                          <Route path="/expenses" element={<ExpensesPage />} />
 
                         {/* Budget planning - Accountant and Admin only */}
                         <Route
@@ -247,13 +272,18 @@ function App() {
                         <Route path="/analytics" element={<AnalyticsPage />} />
                         <Route path="/analytics/balance" element={<BalanceAnalyticsPage />} />
                         <Route path="/analytics/extended" element={<ExtendedAnalyticsPage />} />
+                        <Route path="/analytics/budget-income-statement" element={<BudgetIncomeStatementPage />} />
+                        <Route path="/analytics/customer-metrics" element={<CustomerMetricsAnalyticsPage />} />
+                        <Route path="/analytics/revenue-extended" element={<RevenueAnalyticsExtendedPage />} />
+                        <Route path="/analytics/unified-dashboard" element={<UnifiedFinancialDashboardPage />} />
                         <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                         <Route path="/forecast" element={<ForecastPage />} />
-                      </Routes>
-                  </AppLayout>
-                </DepartmentProvider>
-              </ProtectedRoute>
-            }
+                        </Routes>
+                      </Suspense>
+                    </AppLayout>
+                  </DepartmentProvider>
+                </ProtectedRoute>
+              }
             />
           </Routes>
         </AuthProvider>

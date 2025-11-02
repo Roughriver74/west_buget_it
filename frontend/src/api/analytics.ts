@@ -75,4 +75,65 @@ export const analyticsApi = {
     const { data } = await apiClient.get('analytics/payment-forecast/summary', { params })
     return data
   },
+
+  // Budget Income Statement (БДР)
+  getBudgetIncomeStatement: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/budget-income-statement', { params })
+    return data
+  },
+
+  // Customer Metrics Analytics (Аналитика клиентских метрик)
+  getCustomerMetricsAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/customer-metrics-analytics', { params })
+    return data
+  },
+
+  // Revenue Analytics (Аналитика доходов)
+  getRevenueAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const { data } = await apiClient.get('analytics/revenue-analytics', { params })
+    return data
+  },
+
+  // Export methods
+  exportBudgetIncomeStatement: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/budget-income-statement/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  exportCustomerMetricsAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/customer-metrics-analytics/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  exportRevenueAnalytics: async (params: {
+    year: number
+    department_id?: number
+  }) => {
+    const response = await apiClient.get('analytics/revenue-analytics/export', {
+      params,
+      responseType: 'blob',
+    })
+    return response.data
+  },
 }

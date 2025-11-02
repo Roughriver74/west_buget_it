@@ -3,13 +3,15 @@
  * Heat map showing budget deviations by category and month
  */
 import React, { useMemo } from 'react'
-import { Card, Typography, Space, Tooltip } from 'antd'
+import { Card, Typography, Space, Tooltip, theme } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/api'
+import { useTheme } from '@/contexts/ThemeContext'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 
 const { Text } = Typography
+const { useToken } = theme
 
 interface BudgetDeviationHeatmapProps {
   year: number
@@ -49,6 +51,10 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
   departmentId,
   height = 600,
 }) => {
+  const { token } = useToken()
+  const { mode } = useTheme()
+  const isDark = mode === 'dark'
+
   // Fetch budget execution data
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['budget-execution', year, departmentId],
@@ -71,17 +77,28 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
     },
   })
 
-  // Calculate color based on execution percentage
+  // Calculate color based on execution percentage with theme support
   const getHeatmapColor = (executionPercent: number, hasData: boolean) => {
-    if (!hasData) return '#f5f5f5' // No data
+    if (!hasData) return isDark ? '#1f1f1f' : '#f5f5f5' // No data
 
     // Color scale from green (under budget) to red (over budget)
-    if (executionPercent <= 50) return '#d9f7be'      // Far under budget
-    if (executionPercent <= 75) return '#b7eb8f'      // Under budget
-    if (executionPercent <= 90) return '#95de64'      // On track
-    if (executionPercent <= 100) return '#ffd666'     // Near limit
-    if (executionPercent <= 110) return '#ff9c6e'     // Slightly over
-    return '#ff4d4f'                                   // Significantly over
+    // Dark theme: darker, more muted colors
+    // Light theme: brighter, more vibrant colors
+    if (isDark) {
+      if (executionPercent <= 50) return '#1d3a1d'      // Far under budget (dark green)
+      if (executionPercent <= 75) return '#2d4a2d'      // Under budget
+      if (executionPercent <= 90) return '#3d5a3d'      // On track
+      if (executionPercent <= 100) return '#4a4a1d'     // Near limit (dark yellow)
+      if (executionPercent <= 110) return '#4a3a1d'     // Slightly over (dark orange)
+      return '#4a1d1d'                                   // Significantly over (dark red)
+    } else {
+      if (executionPercent <= 50) return '#d9f7be'      // Far under budget
+      if (executionPercent <= 75) return '#b7eb8f'      // Under budget
+      if (executionPercent <= 90) return '#95de64'      // On track
+      if (executionPercent <= 100) return '#ffd666'     // Near limit
+      if (executionPercent <= 110) return '#ff9c6e'     // Slightly over
+      return '#ff4d4f'                                   // Significantly over
+    }
   }
 
   const formatCurrency = (value: number) => {
@@ -197,85 +214,73 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
     )
   }
 
+  // Legend colors based on theme
+  const legendColors = useMemo(() => {
+    if (isDark) {
+      return [
+        { color: '#1d3a1d', label: '≤50%' },
+        { color: '#2d4a2d', label: '≤75%' },
+        { color: '#3d5a3d', label: '≤90%' },
+        { color: '#4a4a1d', label: '≤100%' },
+        { color: '#4a3a1d', label: '≤110%' },
+        { color: '#4a1d1d', label: '>110%' },
+      ]
+    } else {
+      return [
+        { color: '#d9f7be', label: '≤50%' },
+        { color: '#b7eb8f', label: '≤75%' },
+        { color: '#95de64', label: '≤90%' },
+        { color: '#ffd666', label: '≤100%' },
+        { color: '#ff9c6e', label: '≤110%' },
+        { color: '#ff4d4f', label: '>110%' },
+      ]
+    }
+  }, [isDark])
+
   return (
     <Card
       title="Тепловая карта отклонений"
     >
       {/* Legend */}
-      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>Легенда:</Text>
-        <Space size={4}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#d9f7be',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>≤50%</Text>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#b7eb8f',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>≤75%</Text>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#95de64',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>≤90%</Text>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#ffd666',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>≤100%</Text>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#ff9c6e',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>≤110%</Text>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                backgroundColor: '#ff4d4f',
-                border: '1px solid #ddd',
-              }}
-            />
-            <Text style={{ fontSize: 11 }}>&gt;110%</Text>
-          </div>
+      <div style={{
+        marginBottom: 16,
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+        fontSize: 12,
+      }}>
+        <Text type="secondary" style={{ fontSize: 12, marginBottom: 4 }}>Легенда:</Text>
+        <Space size={4} wrap style={{ flex: 1 }}>
+          {legendColors.map((item, index) => (
+            <div key={index} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              minWidth: 'fit-content'
+            }}>
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  backgroundColor: item.color,
+                  border: `1px solid ${isDark ? '#434343' : '#ddd'}`,
+                  flexShrink: 0,
+                }}
+              />
+              <Text style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{item.label}</Text>
+            </div>
+          ))}
         </Space>
       </div>
 
       {/* Heatmap Table */}
-      <div style={{ overflowX: 'auto', maxHeight: height - 150, overflowY: 'auto' }}>
+      <div style={{
+        overflowX: 'auto',
+        maxHeight: height - 150,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch' // Smooth scrolling on iOS
+      }}>
         <table
           style={{
             width: '100%',
@@ -284,15 +289,16 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: '#fafafa' }}>
+            <tr style={{ backgroundColor: isDark ? token.Table?.headerBg : '#fafafa' }}>
               <th
                 style={{
                   padding: '8px',
                   textAlign: 'left',
-                  borderBottom: '2px solid #f0f0f0',
+                  borderBottom: `2px solid ${isDark ? token.colorBorderSecondary : '#f0f0f0'}`,
                   position: 'sticky',
                   top: 0,
-                  backgroundColor: '#fafafa',
+                  backgroundColor: isDark ? token.Table?.headerBg : '#fafafa',
+                  color: isDark ? token.Table?.headerColor : 'inherit',
                   zIndex: 1,
                   minWidth: 200,
                 }}
@@ -305,10 +311,11 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
                   style={{
                     padding: '8px',
                     textAlign: 'center',
-                    borderBottom: '2px solid #f0f0f0',
+                    borderBottom: `2px solid ${isDark ? token.colorBorderSecondary : '#f0f0f0'}`,
                     position: 'sticky',
                     top: 0,
-                    backgroundColor: '#fafafa',
+                    backgroundColor: isDark ? token.Table?.headerBg : '#fafafa',
+                    color: isDark ? token.Table?.headerColor : 'inherit',
                     zIndex: 1,
                     minWidth: 70,
                   }}
@@ -323,14 +330,16 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
               <tr
                 key={category.category_id}
                 style={{
-                  backgroundColor: category.isParent ? '#fafafa' : 'transparent',
+                  backgroundColor: category.isParent
+                    ? (isDark ? token.Table?.headerBg : '#fafafa')
+                    : 'transparent',
                 }}
               >
                 <td
                   style={{
                     padding: '8px',
                     paddingLeft: category.level === 1 ? '24px' : '8px',
-                    borderBottom: '1px solid #f0f0f0',
+                    borderBottom: `1px solid ${isDark ? token.colorBorderSecondary : '#f0f0f0'}`,
                     fontWeight: category.isParent ? 600 : category.level === 0 ? 500 : 400,
                     fontSize: category.isParent ? '13px' : '12px',
                   }}
@@ -364,7 +373,7 @@ const BudgetDeviationHeatmap: React.FC<BudgetDeviationHeatmapProps> = ({
                         style={{
                           padding: '8px',
                           textAlign: 'center',
-                          borderBottom: '1px solid #f0f0f0',
+                          borderBottom: `1px solid ${isDark ? token.colorBorderSecondary : '#f0f0f0'}`,
                           backgroundColor: color,
                           cursor: hasData ? 'pointer' : 'default',
                           transition: 'all 0.2s',

@@ -225,3 +225,229 @@ class PlanVsActualSummary(BaseModel):
     execution_percent: float
     by_month: list[PlanVsActualMonthly]
     by_category: list[PlanVsActualCategory]
+
+
+# ============================================================================
+# Budget Income Statement (БДР) Schemas
+# ============================================================================
+
+class BudgetIncomeStatementMonthly(BaseModel):
+    """Monthly breakdown for budget income statement"""
+    month: int
+    month_name: str
+    revenue_planned: float
+    revenue_actual: float
+    expenses_planned: float
+    expenses_actual: float
+    profit_planned: float
+    profit_actual: float
+    profit_margin_planned: float  # %
+    profit_margin_actual: float   # %
+
+
+class BudgetIncomeStatementCategory(BaseModel):
+    """Category-level breakdown (revenue streams and expense categories)"""
+    category_id: int
+    category_name: str
+    category_type: str  # 'revenue' or 'expense'
+    planned: float
+    actual: float
+    difference: float
+    execution_percent: float
+
+
+class BudgetIncomeStatement(BaseModel):
+    """
+    БДР (Бюджет доходов и расходов) - Budget Income Statement
+
+    Shows the complete financial picture:
+    - Revenue (from revenue_plans and revenue_actuals)
+    - Expenses (from budget_plans and expenses)
+    - Profit (Revenue - Expenses)
+    - Profitability metrics (ROI, Profit Margin)
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Revenue totals
+    revenue_planned: float
+    revenue_actual: float
+    revenue_difference: float
+    revenue_execution_percent: float
+
+    # Expense totals
+    expenses_planned: float
+    expenses_actual: float
+    expenses_difference: float
+    expenses_execution_percent: float
+
+    # Profit calculations
+    profit_planned: float  # Revenue - Expenses (planned)
+    profit_actual: float   # Revenue - Expenses (actual)
+    profit_difference: float
+
+    # Profitability metrics
+    profit_margin_planned: float  # Profit / Revenue * 100 (%)
+    profit_margin_actual: float   # Profit / Revenue * 100 (%)
+    roi_planned: float            # Profit / Expenses * 100 (%)
+    roi_actual: float             # Profit / Expenses * 100 (%)
+
+    # Monthly breakdown
+    by_month: List[BudgetIncomeStatementMonthly]
+
+    # Category breakdown (optional)
+    revenue_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
+    expenses_by_category: Optional[List[BudgetIncomeStatementCategory]] = None
+
+
+# ============================================================================
+# Customer Metrics Analytics
+# ============================================================================
+
+class CustomerMetricsMonthly(BaseModel):
+    """Monthly customer metrics"""
+    month: int
+    month_name: str
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float  # АКБ/ОКБ * 100 (%)
+    avg_order_value: float
+    avg_order_value_regular: float
+    avg_order_value_network: float
+    avg_order_value_new: float
+
+
+class CustomerMetricsByStream(BaseModel):
+    """Customer metrics by revenue stream"""
+    revenue_stream_id: int
+    revenue_stream_name: str
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float
+    avg_order_value: float
+    # Clinic segments
+    regular_clinics: int
+    network_clinics: int
+    new_clinics: int
+
+
+class CustomerMetricsAnalytics(BaseModel):
+    """
+    Customer Metrics Analytics (Аналитика клиентских метрик)
+
+    Aggregated analytics showing:
+    - ОКБ (Общая клиентская база) - Total Customer Base
+    - АКБ (Активная клиентская база) - Active Customer Base
+    - Покрытие (АКБ/ОКБ) - Coverage Rate
+    - Средний чек по сегментам - Average Order Value by segments
+    - Динамика по месяцам - Monthly trends
+    - Разбивка по потокам доходов - Breakdown by revenue streams
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Summary totals
+    total_customer_base: int
+    active_customer_base: int
+    coverage_rate: float  # %
+
+    # Clinic segments totals
+    regular_clinics: int
+    network_clinics: int
+    new_clinics: int
+
+    # Average order values
+    avg_order_value: float
+    avg_order_value_regular: float
+    avg_order_value_network: float
+    avg_order_value_new: float
+
+    # Growth metrics (compared to previous year)
+    customer_base_growth: Optional[float] = None  # %
+    active_base_growth: Optional[float] = None    # %
+    avg_check_growth: Optional[float] = None      # %
+
+    # Monthly breakdown
+    by_month: List[CustomerMetricsMonthly]
+
+    # Breakdown by revenue stream
+    by_stream: Optional[List[CustomerMetricsByStream]] = None
+
+
+# ============================================================================
+# Revenue Analytics
+# ============================================================================
+
+class RevenueAnalyticsMonthly(BaseModel):
+    """Monthly revenue analytics"""
+    month: int
+    month_name: str
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+
+
+class RevenueAnalyticsByStream(BaseModel):
+    """Revenue analytics by stream (regional breakdown)"""
+    revenue_stream_id: int
+    revenue_stream_name: str
+    stream_type: str  # REGIONAL, CHANNEL, PRODUCT
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+    share_of_total: float  # % of total revenue
+
+
+class RevenueAnalyticsByCategory(BaseModel):
+    """Revenue analytics by category (product mix)"""
+    revenue_category_id: int
+    revenue_category_name: str
+    category_type: str  # PRODUCT, SERVICE, EQUIPMENT, TENDER
+    planned: float
+    actual: float
+    variance: float
+    variance_percent: float
+    execution_percent: float
+    share_of_total: float  # % of total revenue
+
+
+class RevenueAnalytics(BaseModel):
+    """
+    Revenue Analytics (Аналитика доходов)
+
+    Comprehensive revenue analytics showing:
+    - Total revenue (planned vs actual)
+    - Региональная разбивка (regional breakdown by revenue streams)
+    - Продуктовый микс (product mix by revenue categories)
+    - Помесячная динамика (monthly trends)
+    - Growth metrics compared to previous year
+    """
+    year: int
+    department_id: Optional[int] = None
+    department_name: Optional[str] = None
+
+    # Summary totals
+    total_planned: float
+    total_actual: float
+    total_variance: float
+    total_variance_percent: float
+    total_execution_percent: float
+
+    # Growth metrics (compared to previous year)
+    planned_growth: Optional[float] = None  # %
+    actual_growth: Optional[float] = None   # %
+
+    # Monthly breakdown
+    by_month: List[RevenueAnalyticsMonthly]
+
+    # Regional breakdown (by revenue streams)
+    by_stream: Optional[List[RevenueAnalyticsByStream]] = None
+
+    # Product mix (by revenue categories)
+    by_category: Optional[List[RevenueAnalyticsByCategory]] = None
