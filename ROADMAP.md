@@ -1,7 +1,7 @@
 # 🗺️ Roadmap - IT Budget Manager
 
-**Последнее обновление**: 2025-11-02 22:30 MSK
-**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (25%)
+**Последнее обновление**: 2025-11-02 23:00 MSK
+**Текущая версия**: v1.0.0 - Revenue Analytics & Integration 🔨 В РАЗРАБОТКЕ (50%)
 **Последняя завершенная**: v0.9.0 - Performance & UX Improvements ✅ (100%)
 
 ---
@@ -760,7 +760,7 @@ ML-прогнозы на основе исторических данных (LIN
 **Оценка**: 4-6 недель → **Факт**: 1 день (основные задачи выполнены) 🚀
 
 ### **v1.0.0 (Q3 2026) - Revenue Analytics & Integration**
-**Статус**: 🔨 В РАЗРАБОТКЕ (25% выполнено)
+**Статус**: 🔨 В РАЗРАБОТКЕ (50% выполнено)
 **Цель**: Полная интеграция с модулем расходов
 
 #### БДР (Бюджет доходов и расходов)
@@ -777,13 +777,25 @@ ML-прогнозы на основе исторических данных (LIN
   - Интегрировано в БДР: Profit Margin = (Profit / Revenue) × 100%
   - ROI = (Profit / Expenses) × 100%
 
+#### Customer Metrics (Клиентские метрики)
+- [x] **Customer Metrics Analytics** ✅ ВЫПОЛНЕНО (2025-11-02)
+  - ✅ Backend API endpoint `/analytics/customer-metrics-analytics`
+  - ✅ Pydantic schemas (CustomerMetricsAnalytics, Monthly, ByStream)
+  - ✅ Aggregation from customer_metrics table
+  - ✅ Key metrics: ОКБ, АКБ, Coverage Rate, Average Order Value
+  - ✅ Growth metrics (year-over-year comparison)
+  - ✅ Frontend page CustomerMetricsAnalyticsPage (~700 lines)
+  - ✅ Monthly trends with charts (LineChart, ComposedChart, AreaChart)
+  - ✅ Breakdown by revenue streams (Bar chart + Table)
+  - ✅ Segment analysis (regular, network, new clinics)
+  - ✅ Multi-tenancy support (department filtering)
+
 #### Revenue Analytics (Remaining)
-- [ ] Customer Metrics (ОКБ, АКБ, покрытие, средний чек)
 - [ ] Revenue Analytics (региональная разбивка, продуктовый микс)
 - [ ] Совмещенный дашборд (Revenue + Expenses)
 - [ ] Экспорт отчетов
 
-**Оценка**: 3-4 недели → **Прогресс**: 2 дня (БДР завершен)
+**Оценка**: 3-4 недели → **Прогресс**: 3 дня (БДР + Customer Metrics завершены)
 
 ### **v1.1.0 (Q4 2026) - ML Forecasting (опционально)**
 **Цель**: ML-прогнозирование доходов
