@@ -1,7 +1,7 @@
 import { Button, message } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { useState } from 'react'
-import { downloadBlob, generateExportFilename } from '@/utils/downloadUtils'
+import { downloadBlob } from '@/utils/downloadUtils'
 
 interface ExportButtonProps {
   exportFn: () => Promise<Blob>

@@ -27,13 +27,11 @@ import {
 } from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useAuth } from '@/contexts/AuthContext'
 import dayjs from 'dayjs'
 import {
   DollarOutlined,
   RiseOutlined,
   FallOutlined,
-  LineChartOutlined,
   PercentageOutlined,
 } from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
@@ -107,7 +105,6 @@ const BudgetIncomeStatementPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const { selectedDepartment } = useDepartment()
-  const { user } = useAuth()
 
   // Fetch БДР data
   const {
