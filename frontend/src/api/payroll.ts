@@ -584,6 +584,7 @@ export const payrollAnalyticsAPI = {
 export interface NDFLCalculationRequest {
   annual_income: number;
   year?: number;
+  calculation_mode?: 'gross' | 'net';  // 'gross' = до налогов, 'net' = на руки
 }
 
 export interface MonthlyNDFLRequest {
@@ -613,10 +614,13 @@ export interface NDFLCalculationResult {
   total_tax: number;
   effective_rate: number;
   net_income: number;
+  gross_income?: number;  // Только для режима 'net'
   breakdown: BracketInfo[];
   details: string[];
   year: number;
   system: string;
+  calculation_mode?: string;  // Режим расчета
+  iterations?: number;  // Количество итераций (для режима 'net')
 }
 
 export interface MonthlyNDFLResult {

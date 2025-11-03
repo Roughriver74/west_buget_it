@@ -362,6 +362,7 @@ class NDFLCalculationRequest(BaseModel):
     """Request schema for НДФЛ calculation"""
     annual_income: Decimal = Field(..., description="Годовой доход для расчета НДФЛ")
     year: Optional[int] = Field(None, description="Год для расчета (2024 или 2025+). Если не указан, используется текущий год")
+    calculation_mode: Optional[str] = Field("gross", description="Режим расчета: 'gross' (до налогов) или 'net' (на руки)")
 
 
 class MonthlyNDFLRequest(BaseModel):

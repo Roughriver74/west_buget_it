@@ -13,8 +13,9 @@ import {
   Col,
   Alert,
   Divider,
+  Radio,
 } from 'antd'
-import { CalculatorOutlined } from '@ant-design/icons'
+import { CalculatorOutlined, SwapOutlined } from '@ant-design/icons'
 import { ndflAPI, type NDFLCalculationResult } from '@/api'
 
 const { Title, Text } = Typography
@@ -33,9 +34,11 @@ const NDFLCalculator = () => {
       const response = await ndflAPI.calculateNDFL({
         annual_income: values.annual_income,
         year: values.year,
+        calculation_mode: values.calculation_mode || 'gross',
       })
 
-      setResult(response)
+      // Backend returns { success, calculation, input }, we need the calculation part
+      setResult((response as any).calculation || response)
     } catch (error) {
       console.error('Calculation failed:', error)
     } finally {
@@ -102,56 +105,116 @@ const NDFLCalculator = () => {
 
         <Form
           form={form}
-          layout="inline"
+          layout="vertical"
           initialValues={{
             year: new Date().getFullYear(),
+            calculation_mode: 'gross',
           }}
         >
           <Form.Item
-            name="annual_income"
-            label="Годовой доход"
-            rules={[{ required: true, message: 'Введите годовой доход' }]}
+            name="calculation_mode"
+            label="Режим расчета"
           >
-            <InputNumber
-              style={{ width: 200 }}
-              placeholder="Например: 6000000"
-              min={0}
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-              parser={(value) => Number(value!.replace(/\s/g, '')) as any}
-              addonAfter="₽"
-            />
+            <Radio.Group buttonStyle="solid">
+              <Radio.Button value="gross">
+                <CalculatorOutlined /> До вычета налогов (Gross)
+              </Radio.Button>
+              <Radio.Button value="net">
+                <SwapOutlined /> На руки (Net)
+              </Radio.Button>
+            </Radio.Group>
           </Form.Item>
 
-          <Form.Item
-            name="year"
-            label="Год"
-            rules={[{ required: true, message: 'Выберите год' }]}
-          >
-            <Select style={{ width: 120 }}>
-              <Option value={2024}>2024</Option>
-              <Option value={2025}>2025</Option>
-              <Option value={2026}>2026</Option>
-            </Select>
-          </Form.Item>
+          <Space size="middle" wrap>
+            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.calculation_mode !== curr.calculation_mode}>
+              {({ getFieldValue }) => (
+                <Form.Item
+                  name="annual_income"
+                  label={
+                    getFieldValue('calculation_mode') === 'net'
+                      ? 'Желаемый доход на руки'
+                      : 'Годовой доход до налогов'
+                  }
+                  rules={[{ required: true, message: 'Введите сумму' }]}
+                >
+                  <InputNumber
+                    style={{ width: 250 }}
+                    placeholder="Например: 6000000"
+                    min={0}
+                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                    parser={(value) => Number(value!.replace(/\s/g, '')) as any}
+                    addonAfter="₽"
+                  />
+                </Form.Item>
+              )}
+            </Form.Item>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              icon={<CalculatorOutlined />}
-              onClick={handleCalculate}
-              loading={loading}
+            <Form.Item
+              name="year"
+              label="Год"
+              rules={[{ required: true, message: 'Выберите год' }]}
             >
-              Рассчитать
-            </Button>
-          </Form.Item>
+              <Select style={{ width: 120 }}>
+                <Option value={2024}>2024</Option>
+                <Option value={2025}>2025</Option>
+                <Option value={2026}>2026</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label=" ">
+              <Button
+                type="primary"
+                icon={<CalculatorOutlined />}
+                onClick={handleCalculate}
+                loading={loading}
+              >
+                Рассчитать
+              </Button>
+            </Form.Item>
+          </Space>
         </Form>
 
         {result && (
           <>
             <Divider />
 
+            {result.calculation_mode === 'net' && result.gross_income && (
+              <Alert
+                message="Обратный расчет"
+                description={
+                  <div>
+                    <Text>
+                      Для получения <Text strong>{result.net_income.toLocaleString('ru-RU')} ₽</Text> на руки,
+                      необходим доход до налогов: <Text strong style={{ color: '#1890ff' }}>{result.gross_income.toLocaleString('ru-RU')} ₽</Text>
+                    </Text>
+                    {result.iterations && (
+                      <div style={{ marginTop: 8, fontSize: '12px', color: '#8c8c8c' }}>
+                        Рассчитано за {result.iterations} итераций
+                      </div>
+                    )}
+                  </div>
+                }
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
             <Row gutter={16}>
-              <Col xs={24} sm={8}>
+              {result.calculation_mode === 'net' && result.gross_income && (
+                <Col xs={24} sm={6}>
+                  <Card>
+                    <Statistic
+                      title="Требуемый доход (Gross)"
+                      value={result.gross_income}
+                      precision={2}
+                      suffix="₽"
+                      valueStyle={{ color: '#1890ff' }}
+                    />
+                  </Card>
+                </Col>
+              )}
+              <Col xs={24} sm={result.calculation_mode === 'net' ? 6 : 8}>
                 <Card>
                   <Statistic
                     title="Итого НДФЛ"
@@ -162,21 +225,21 @@ const NDFLCalculator = () => {
                   />
                 </Card>
               </Col>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={result.calculation_mode === 'net' ? 6 : 8}>
                 <Card>
                   <Statistic
                     title="Эффективная ставка"
                     value={result.effective_rate}
                     precision={2}
                     suffix="%"
-                    valueStyle={{ color: '#1890ff' }}
+                    valueStyle={{ color: '#722ed1' }}
                   />
                 </Card>
               </Col>
-              <Col xs={24} sm={8}>
+              <Col xs={24} sm={result.calculation_mode === 'net' ? 6 : 8}>
                 <Card>
                   <Statistic
-                    title="На руки (чистыми)"
+                    title="На руки (Net)"
                     value={result.net_income}
                     precision={2}
                     suffix="₽"
@@ -216,17 +279,19 @@ const NDFLCalculator = () => {
               }}
             />
 
-            <Alert
-              message="Детальный расчет"
-              description={
-                <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                  {result.details.map((detail: string, idx: number) => (
-                    <div key={idx}>{detail}</div>
-                  ))}
-                </div>
-              }
-              type="success"
-            />
+            {result.details && result.details.length > 0 && (
+              <Alert
+                message="Детальный расчет"
+                description={
+                  <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                    {result.details.map((detail: string, idx: number) => (
+                      <div key={idx}>{detail}</div>
+                    ))}
+                  </div>
+                }
+                type="success"
+              />
+            )}
           </>
         )}
       </Space>

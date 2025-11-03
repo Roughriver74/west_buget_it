@@ -175,6 +175,84 @@ def calculate_monthly_ndfl_withholding(
     }
 
 
+def calculate_gross_from_net(
+    net_income: Decimal,
+    year: int = None,
+    tolerance: Decimal = Decimal('0.01'),
+    max_iterations: int = 50
+) -> Dict[str, any]:
+    """
+    Calculate gross income from desired net income (reverse calculation).
+
+    Uses binary search to find the gross income that results in the desired net income
+    after NDFL deduction.
+
+    Args:
+        net_income: Desired net income (after tax)
+        year: Tax year (defaults to current year)
+        tolerance: Acceptable difference for convergence (default 0.01 RUB)
+        max_iterations: Maximum iterations for binary search
+
+    Returns:
+        Dictionary with:
+        - gross_income: Required gross income
+        - total_tax: NDFL amount
+        - effective_rate: Effective tax rate (as percentage)
+        - net_income: Actual net income (should match input)
+        - breakdown: List of tax amounts per bracket
+        - details: Detailed calculation per bracket
+        - iterations: Number of iterations used
+    """
+    if year is None:
+        year = datetime.now().year
+
+    net_income = Decimal(str(net_income))
+
+    # Initial bounds for binary search
+    # Lower bound: net income itself (assumes 0% tax)
+    # Upper bound: net income / (1 - max_rate) to account for highest tax bracket
+    max_rate = Decimal('0.22') if year >= 2025 else Decimal('0.15')
+    lower_bound = net_income
+    upper_bound = net_income / (Decimal('1') - max_rate)
+
+    best_gross = lower_bound
+    iterations = 0
+
+    # Binary search for the correct gross income
+    while iterations < max_iterations:
+        iterations += 1
+
+        # Try middle point
+        gross_estimate = (lower_bound + upper_bound) / Decimal('2')
+
+        # Calculate tax and net for this gross
+        tax_calc = calculate_progressive_ndfl(gross_estimate, year)
+        calculated_net = Decimal(str(tax_calc['net_income']))
+
+        # Check if we're close enough
+        difference = abs(calculated_net - net_income)
+        if difference <= tolerance:
+            best_gross = gross_estimate
+            break
+
+        # Adjust search bounds
+        if calculated_net < net_income:
+            # Need more gross income
+            lower_bound = gross_estimate
+        else:
+            # Need less gross income
+            upper_bound = gross_estimate
+
+        best_gross = gross_estimate
+
+    # Final calculation with best gross found
+    final_calc = calculate_progressive_ndfl(best_gross, year)
+    final_calc['gross_income'] = float(best_gross)
+    final_calc['iterations'] = iterations
+
+    return final_calc
+
+
 def get_tax_brackets_info(year: int = None) -> Dict[str, any]:
     """
     Get information about tax brackets for a given year.

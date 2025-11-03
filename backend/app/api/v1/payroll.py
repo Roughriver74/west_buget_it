@@ -34,7 +34,7 @@ from app.schemas.payroll import (
     PayrollForecast,
 )
 from app.utils.auth import get_current_active_user
-from app.utils.ndfl_calculator import calculate_progressive_ndfl
+from app.utils.ndfl_calculator import calculate_progressive_ndfl, calculate_gross_from_net
 from app.utils.social_contributions_calculator import (
     calculate_social_contributions,
     calculate_total_tax_burden
@@ -935,19 +935,29 @@ async def get_payroll_dynamics(
         actual = actual_data.get(month)
 
         if plan or actual:
+            # Calculate individual bonus components
+            planned_monthly = plan.planned_monthly_bonus if plan else Decimal(0)
+            planned_quarterly = plan.planned_quarterly_bonus if plan else Decimal(0)
+            planned_annual = plan.planned_annual_bonus if plan else Decimal(0)
+            actual_monthly = actual.actual_monthly_bonus if actual else Decimal(0)
+            actual_quarterly = actual.actual_quarterly_bonus if actual else Decimal(0)
+            actual_annual = actual.actual_annual_bonus if actual else Decimal(0)
+
             dynamics.append(PayrollDynamics(
                 year=year,
                 month=month,
                 planned_base_salary=plan.planned_base_salary if plan else Decimal(0),
-                planned_monthly_bonus=plan.planned_monthly_bonus if plan else Decimal(0),
-                planned_quarterly_bonus=plan.planned_quarterly_bonus if plan else Decimal(0),
-                planned_annual_bonus=plan.planned_annual_bonus if plan else Decimal(0),
+                planned_monthly_bonus=planned_monthly,
+                planned_quarterly_bonus=planned_quarterly,
+                planned_annual_bonus=planned_annual,
+                planned_bonus=planned_monthly + planned_quarterly + planned_annual,  # Total planned bonuses
                 planned_other=plan.planned_other if plan else Decimal(0),
                 planned_total=plan.planned_total if plan else Decimal(0),
                 actual_base_salary=actual.actual_base_salary if actual else Decimal(0),
-                actual_monthly_bonus=actual.actual_monthly_bonus if actual else Decimal(0),
-                actual_quarterly_bonus=actual.actual_quarterly_bonus if actual else Decimal(0),
-                actual_annual_bonus=actual.actual_annual_bonus if actual else Decimal(0),
+                actual_monthly_bonus=actual_monthly,
+                actual_quarterly_bonus=actual_quarterly,
+                actual_annual_bonus=actual_annual,
+                actual_bonus=actual_monthly + actual_quarterly + actual_annual,  # Total actual bonuses
                 actual_other=actual.actual_other if actual else Decimal(0),
                 actual_total=actual.actual_total if actual else Decimal(0),
                 employee_count=plan.employee_count if plan else 0
@@ -1072,14 +1082,20 @@ async def get_payroll_forecast(
         monthly_trend = trend_factor / len(historical_data)
         trend_multiplier = 1 + (monthly_trend * i)
 
+        # Calculate individual bonus components
+        fc_monthly = Decimal(str(avg_monthly_bonus * trend_multiplier))
+        fc_quarterly = Decimal(str(avg_quarterly_bonus * trend_multiplier))
+        fc_annual = Decimal(str(avg_annual_bonus * trend_multiplier))
+
         forecasts.append(PayrollForecast(
             year=forecast_year,
             month=forecast_month,
             forecasted_total=Decimal(str(avg_total * trend_multiplier)),
             forecasted_base_salary=Decimal(str(avg_base_salary * trend_multiplier)),
-            forecasted_monthly_bonus=Decimal(str(avg_monthly_bonus * trend_multiplier)),
-            forecasted_quarterly_bonus=Decimal(str(avg_quarterly_bonus * trend_multiplier)),
-            forecasted_annual_bonus=Decimal(str(avg_annual_bonus * trend_multiplier)),
+            forecasted_monthly_bonus=fc_monthly,
+            forecasted_quarterly_bonus=fc_quarterly,
+            forecasted_annual_bonus=fc_annual,
+            forecasted_bonus=fc_monthly + fc_quarterly + fc_annual,  # Total forecasted bonuses
             forecasted_other=Decimal(str(avg_other * trend_multiplier)),
             employee_count=avg_employee_count,
             confidence=confidence,
@@ -2100,24 +2116,50 @@ def calculate_ndfl(
     - 2024: двухступенчатая шкала (13% / 15%)
     - 2025+: пятиступенчатая шкала (13% / 15% / 18% / 20% / 22%)
 
+    Режимы расчета:
+    - gross (по умолчанию): расчет налога от дохода до налогов
+    - net: обратный расчет - находит необходимый доход до налогов для получения желаемого дохода на руки
+
     Returns:
         - total_tax: Сумма НДФЛ
         - effective_rate: Эффективная ставка (%)
         - net_income: Чистый доход (на руки)
+        - gross_income: Доход до налогов (только для режима 'net')
         - breakdown: Разбивка по ступеням
         - details: Детальный расчет
+        - calculation_mode: Режим расчета
     """
-    result = calculate_progressive_ndfl(
-        annual_income=request.annual_income,
-        year=request.year
-    )
+    # Get calculation mode from request using model_dump to handle defaults properly
+    request_data = request.model_dump()
+    mode = request_data.get('calculation_mode', 'gross') or "gross"
+
+    # Debug logging
+    print(f"[NDFL DEBUG] Request: annual_income={request.annual_income}, year={request.year}, mode={mode}")
+
+    if mode == "net":
+        # Обратный расчет: net -> gross
+        result = calculate_gross_from_net(
+            net_income=request.annual_income,
+            year=request.year
+        )
+        input_label = "desired_net_income"
+    else:
+        # Прямой расчет: gross -> net
+        result = calculate_progressive_ndfl(
+            annual_income=request.annual_income,
+            year=request.year
+        )
+        input_label = "annual_income"
+
+    result['calculation_mode'] = mode
 
     return {
         "success": True,
         "calculation": result,
         "input": {
-            "annual_income": float(request.annual_income),
-            "year": result['year']
+            input_label: float(request.annual_income),
+            "year": result['year'],
+            "calculation_mode": mode
         }
     }
 
