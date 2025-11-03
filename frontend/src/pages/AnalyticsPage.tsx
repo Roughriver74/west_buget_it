@@ -7,6 +7,7 @@ import dayjs from 'dayjs'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -28,6 +29,7 @@ type CategoryChartItem = {
 }
 
 const AnalyticsPage = () => {
+  const { selectedDepartment } = useDepartment()
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState<number | undefined>(undefined)
@@ -40,8 +42,20 @@ const AnalyticsPage = () => {
     error: dashboardError,
     refetch: refetchDashboard,
   } = useQuery({
-    queryKey: ['dashboard', year, month],
-    queryFn: () => analyticsApi.getDashboard({ year, month }),
+    queryKey: ['dashboard', year, month, selectedDepartment?.id],
+    queryFn: () => analyticsApi.getDashboard({ year, month, department_id: selectedDepartment?.id }),
+    enabled: !!selectedDepartment,
+  })
+
+  // Данные исполнения бюджета (для графиков по месяцам и категориям)
+  const {
+    data: executionData,
+    isLoading: executionLoading,
+    error: executionError,
+  } = useQuery({
+    queryKey: ['budget-execution-for-charts', year, selectedDepartment?.id],
+    queryFn: () => analyticsApi.getBudgetExecution({ year, department_id: selectedDepartment?.id }),
+    enabled: !!selectedDepartment && !month, // Только для годового отображения
   })
 
   // Данные для сравнения
@@ -51,23 +65,23 @@ const AnalyticsPage = () => {
     error: comparisonError,
     refetch: refetchComparison,
   } = useQuery({
-    queryKey: ['dashboard-comparison', year, month, comparisonMode],
+    queryKey: ['dashboard-comparison', year, month, comparisonMode, selectedDepartment?.id],
     queryFn: () => {
       if (comparisonMode === 'none') return null
 
       if (comparisonMode === 'previous-year') {
-        return analyticsApi.getDashboard({ year: year - 1, month })
+        return analyticsApi.getDashboard({ year: year - 1, month, department_id: selectedDepartment?.id })
       }
 
       if (comparisonMode === 'previous-period' && month) {
         const prevMonth = month === 1 ? 12 : month - 1
         const prevYear = month === 1 ? year - 1 : year
-        return analyticsApi.getDashboard({ year: prevYear, month: prevMonth })
+        return analyticsApi.getDashboard({ year: prevYear, month: prevMonth, department_id: selectedDepartment?.id })
       }
 
       return null
     },
-    enabled: comparisonMode !== 'none',
+    enabled: comparisonMode !== 'none' && !!selectedDepartment,
   })
 
   const formatCurrency = (value: number) => {
@@ -82,8 +96,8 @@ const AnalyticsPage = () => {
     return new Intl.NumberFormat('ru-RU').format(value)
   }
 
-  const isLoading = dashboardLoading || (comparisonMode !== 'none' && comparisonLoading)
-  const queryError = dashboardError || comparisonError
+  const isLoading = dashboardLoading || executionLoading || (comparisonMode !== 'none' && comparisonLoading)
+  const queryError = dashboardError || executionError || comparisonError
 
   const handleRetry = () => {
     refetchDashboard()
@@ -106,39 +120,65 @@ const AnalyticsPage = () => {
     )
   }
 
-  if (!dashboardData) {
+  if (!selectedDepartment) {
     return (
       <ErrorState
         status="info"
-        title="Нет данных для отображения"
-        description="Попробуйте изменить параметры фильтрации или период."
+        title="Департамент не выбран"
+        description="Пожалуйста, выберите департамент в верхней части страницы для просмотра аналитики."
         fullHeight
       />
     )
   }
 
-  // Подготовка данных для графиков
-  const monthlyData: MonthlyChartItem[] = (dashboardData.by_month ?? []).map((item) => ({
-    month: `${item.month} мес`,
-    'План': item.planned,
-    'Факт': item.actual,
-    'Остаток': item.remaining,
+  if (!dashboardData) {
+    return (
+      <ErrorState
+        status="info"
+        title="Нет данных для отображения"
+        description={`Нет данных для департамента "${selectedDepartment.name}" за ${year} год${month ? ` (${month} месяц)` : ''}. Попробуйте выбрать другой период.`}
+        fullHeight
+      />
+    )
+  }
+
+  // Подготовка данных для графиков из executionData
+  const monthlyData: MonthlyChartItem[] = (executionData?.months ?? []).map((item: any) => ({
+    month: item.month_name || `${item.month} мес`,
+    'План': item.planned || 0,
+    'Факт': item.actual || 0,
+    'Остаток': item.remaining || 0,
   }))
 
-  const categoryData: CategoryChartItem[] = (dashboardData.by_category ?? []).map((item) => {
+  const categoryData: CategoryChartItem[] = ((executionData as any)?.by_category ?? []).map((item: any) => {
+    const categoryName = item.category_name || 'Unknown'
     const truncatedName =
-      item.category_name.length > 20
-        ? `${item.category_name.substring(0, 20)}...`
-        : item.category_name
+      categoryName.length > 20
+        ? `${categoryName.substring(0, 20)}...`
+        : categoryName
 
     return {
       category: truncatedName,
-      fullName: item.category_name,
-      'План': item.planned,
-      'Факт': item.actual,
-      'Остаток': item.remaining,
+      fullName: categoryName,
+      'План': item.planned || 0,
+      'Факт': item.actual || 0,
+      'Остаток': item.remaining || (item.planned - item.actual) || 0,
     }
   })
+
+  // Показать сообщение если нет данных для графиков
+  const hasMonthlyData = monthlyData.length > 0
+  const hasCategoryData = categoryData.length > 0
+
+  // Debug: вывести данные в консоль
+  if (dashboardData && typeof console !== 'undefined') {
+    console.log('[Analytics Debug] Dashboard data:', dashboardData)
+    console.log('[Analytics Debug] Execution data:', executionData)
+    console.log('[Analytics Debug] Selected department:', selectedDepartment)
+    console.log('[Analytics Debug] Year:', year, 'Month:', month)
+    console.log('[Analytics Debug] Monthly data (from execution):', monthlyData)
+    console.log('[Analytics Debug] Category data (from execution):', categoryData)
+  }
 
   // Данные сравнения периодов
   const calculateChange = (current: number, previous: number) => {
@@ -277,8 +317,14 @@ const AnalyticsPage = () => {
               <Row gutter={[16, 16]}>
                 <Col xs={24} lg={12}>
                   <Card title="План vs Факт по месяцам">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <ComposedChart data={monthlyData}>
+                    {!hasMonthlyData ? (
+                      <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>
+                        <p>Нет данных за выбранный период</p>
+                        <p style={{ fontSize: '12px' }}>Выберите другой год или месяц</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={350}>
+                        <ComposedChart data={monthlyData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis tickFormatter={(value) => formatNumber(value)} />
@@ -292,13 +338,19 @@ const AnalyticsPage = () => {
                         <Line type="monotone" dataKey="Остаток" stroke="#ff7875" strokeWidth={2} />
                       </ComposedChart>
                     </ResponsiveContainer>
+                    )}
                   </Card>
                 </Col>
 
                 <Col xs={24} lg={12}>
                   <Card title="Накопительное исполнение">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <AreaChart data={monthlyData}>
+                    {!hasMonthlyData ? (
+                      <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>
+                        <p>Нет данных за выбранный период</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={350}>
+                        <AreaChart data={monthlyData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
                         <YAxis tickFormatter={(value) => formatNumber(value)} />
@@ -311,6 +363,7 @@ const AnalyticsPage = () => {
                         <Area type="monotone" dataKey="Факт" stackId="2" stroke="#1890ff" fill="#1890ff" />
                       </AreaChart>
                     </ResponsiveContainer>
+                    )}
                   </Card>
                 </Col>
               </Row>
@@ -323,8 +376,13 @@ const AnalyticsPage = () => {
               <Row gutter={[16, 16]}>
                 <Col xs={24}>
                   <Card title="Исполнение по статьям расходов">
-                    <ResponsiveContainer width="100%" height={500}>
-                      <BarChart
+                    {!hasCategoryData ? (
+                      <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>
+                        <p>Нет данных по категориям за выбранный период</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={500}>
+                        <BarChart
                         data={categoryData}
                         layout="vertical"
                         margin={{ left: 150 }}
@@ -345,6 +403,7 @@ const AnalyticsPage = () => {
                         <Bar dataKey="Факт" fill="#1890ff" />
                       </BarChart>
                     </ResponsiveContainer>
+                    )}
                   </Card>
                 </Col>
               </Row>
