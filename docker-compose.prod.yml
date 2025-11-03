@@ -49,6 +49,26 @@ services:
     image: it-budget-backend:prod
     container_name: it_budget_backend_prod
     restart: always
+    labels:
+      # Traefik configuration for automatic routing
+      - "traefik.enable=true"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      # HTTP router (redirect to HTTPS)
+      - "traefik.http.routers.backend-http.rule=Host(`api.budget-west.shknv.ru`)"
+      - "traefik.http.routers.backend-http.entrypoints=http"
+      - "traefik.http.routers.backend-http.middlewares=redirect-to-https@file"
+      - "traefik.http.routers.backend-http.service=backend"
+      # HTTPS router
+      - "traefik.http.routers.backend-https.rule=Host(`api.budget-west.shknv.ru`)"
+      - "traefik.http.routers.backend-https.entrypoints=https"
+      - "traefik.http.routers.backend-https.tls=true"
+      - "traefik.http.routers.backend-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-https.middlewares=gzip@file"
+      - "traefik.http.routers.backend-https.service=backend"
+      # Caddy configuration (alternative proxy)
+      - "caddy_0=https://api.budget-west.shknv.ru"
+      - "caddy_0.encode=zstd gzip"
+      - "caddy_0.reverse_proxy={{upstreams}}"
     environment:
       # Database - using individual vars instead of DATABASE_URL for better compatibility
       DB_HOST: db
@@ -111,6 +131,26 @@ services:
     image: it-budget-frontend:prod
     container_name: it_budget_frontend_prod
     restart: always
+    labels:
+      # Traefik configuration for automatic routing
+      - "traefik.enable=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      # HTTP router (redirect to HTTPS)
+      - "traefik.http.routers.frontend-http.rule=Host(`budget-west.shknv.ru`)"
+      - "traefik.http.routers.frontend-http.entrypoints=http"
+      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https@file"
+      - "traefik.http.routers.frontend-http.service=frontend"
+      # HTTPS router
+      - "traefik.http.routers.frontend-https.rule=Host(`budget-west.shknv.ru`)"
+      - "traefik.http.routers.frontend-https.entrypoints=https"
+      - "traefik.http.routers.frontend-https.tls=true"
+      - "traefik.http.routers.frontend-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend-https.middlewares=gzip@file"
+      - "traefik.http.routers.frontend-https.service=frontend"
+      # Caddy configuration (alternative proxy)
+      - "caddy_0=https://budget-west.shknv.ru"
+      - "caddy_0.encode=zstd gzip"
+      - "caddy_0.reverse_proxy={{upstreams}}"
     environment:
       # Runtime env (for docker-entrypoint.sh)
       # Use env variable or default to /api
