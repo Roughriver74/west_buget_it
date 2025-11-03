@@ -98,12 +98,19 @@ const ExtendedAnalyticsPage: React.FC = () => {
     console.log('[ExtendedAnalytics] data.months:', data.months);
     console.log('[ExtendedAnalytics] data.by_category length:', data.by_category?.length);
 
-    const monthlyData = data.months?.map((item: any) => ({
+    // Transform data for grouped column chart
+    const monthlyDataRaw = data.months?.map((item: any) => ({
       month: item.month_name || `${item.month} мес`,
-      plan: item.planned || 0,
-      fact: item.actual || 0,
+      planned: item.planned || 0,
+      actual: item.actual || 0,
       execution: item.execution_percent || 0
     })) || [];
+
+    // Transform to grouped format for Ant Design Column chart
+    const monthlyData = monthlyDataRaw.flatMap((item: any) => [
+      { month: item.month, type: 'План', value: item.planned },
+      { month: item.month, type: 'Факт', value: item.actual }
+    ]);
 
     console.log('[ExtendedAnalytics] monthlyData length:', monthlyData.length);
 
@@ -161,17 +168,32 @@ const ExtendedAnalyticsPage: React.FC = () => {
         </Row>
 
         <Card title="Помесячное исполнение бюджета">
-          <Column
-            data={monthlyData}
-            xField="month"
-            yField="plan"
-            isGroup
-            seriesField="type"
-            label={{
-              position: 'top',
-              formatter: (datum: any) => formatCurrency(datum.plan)
-            }}
-          />
+          {monthlyData.length === 0 ? (
+            <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>
+              <p>Нет данных за выбранный период</p>
+            </div>
+          ) : (
+            <Column
+              data={monthlyData}
+              xField="month"
+              yField="value"
+              seriesField="type"
+              isGroup
+              label={{
+                position: 'top',
+                formatter: (datum: any) => {
+                  const val = datum.value || 0;
+                  return val > 0 ? formatCurrency(val) : '';
+                }
+              }}
+              color={['#1890ff', '#52c41a']}
+              tooltip={{
+                formatter: (datum: any) => {
+                  return { name: datum.type, value: formatCurrency(datum.value || 0) };
+                }
+              }}
+            />
+          )}
         </Card>
       </Space>
     );
@@ -242,11 +264,17 @@ const ExtendedAnalyticsPage: React.FC = () => {
       },
     ];
 
-    const chartData = categoryData.categories.slice(0, 10).map((item: any) => ({
+    // Transform top 10 categories for grouped column chart
+    const topCategories = categoryData.categories.slice(0, 10).map((item: any) => ({
       category: item.category_name.length > 15 ? item.category_name.substring(0, 15) + '...' : item.category_name,
-      plan: item.planned || 0,
-      fact: item.actual || 0
+      planned: item.planned || 0,
+      actual: item.actual || 0
     }));
+
+    const chartData = topCategories.flatMap((item: any) => [
+      { category: item.category, type: 'План', value: item.planned },
+      { category: item.category, type: 'Факт', value: item.actual }
+    ]);
 
     return (
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -284,14 +312,32 @@ const ExtendedAnalyticsPage: React.FC = () => {
         </Row>
 
         <Card title="Топ-10 категорий по бюджету">
-          <Column
-            data={chartData}
-            xField="category"
-            yField="plan"
-            isGroup
-            seriesField="type"
-            color={['#1890ff', '#52c41a']}
-          />
+          {chartData.length === 0 ? (
+            <div style={{ padding: '60px 0', textAlign: 'center', color: '#999' }}>
+              <p>Нет данных по категориям</p>
+            </div>
+          ) : (
+            <Column
+              data={chartData}
+              xField="category"
+              yField="value"
+              seriesField="type"
+              isGroup
+              color={['#1890ff', '#52c41a']}
+              label={{
+                position: 'top',
+                formatter: (datum: any) => {
+                  const val = datum.value || 0;
+                  return val > 0 ? formatCurrency(val) : '';
+                }
+              }}
+              tooltip={{
+                formatter: (datum: any) => {
+                  return { name: datum.type, value: formatCurrency(datum.value || 0) };
+                }
+              }}
+            />
+          )}
         </Card>
 
         <Card title="Детализация по категориям">
