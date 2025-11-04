@@ -769,6 +769,13 @@ async def generate_ai_forecast(
             category_id = request.category_id
             contractor_id = None
 
+            category_hint = item.get("category_hint")
+            if category_hint:
+                try:
+                    category_id = int(category_hint)
+                except (TypeError, ValueError):
+                    category_id = category_hint
+
             if not category_id:
                 # Try to find category from historical expenses matching description
                 keywords = description_lower.split()[:5]  # First 5 words
@@ -853,6 +860,8 @@ async def generate_ai_forecast(
                 ai_created += 1
 
         db.commit()
+
+    ai_result["created_forecast_records"] = ai_created
 
     # Return comprehensive result
     return {

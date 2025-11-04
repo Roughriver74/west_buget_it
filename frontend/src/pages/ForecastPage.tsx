@@ -34,6 +34,9 @@ import ErrorState from '@/components/common/ErrorState'
 const { Title, Paragraph } = Typography
 const { Option } = Select
 
+const currencyFormatter = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' })
+const formatCurrency = (value?: number | null) => currencyFormatter.format(value ?? 0)
+
 const ForecastPage = () => {
   const currentDate = dayjs()
   const nextMonth = currentDate.add(1, 'month')
@@ -48,6 +51,32 @@ const ForecastPage = () => {
   const [addForm] = Form.useForm()
   const [aiResultModalVisible, setAiResultModalVisible] = useState(false)
   const [aiResult, setAiResult] = useState<AIForecastResponse | null>(null)
+
+  const sourceLabels = {
+    plan: 'План',
+    history: 'История',
+    other: 'Другое',
+  } as const
+
+  const sourceColors = {
+    plan: 'blue',
+    history: 'purple',
+    other: 'default',
+  } as const
+
+  const getConfidenceTagColor = (value: number) => {
+    if (value >= 70) return 'success'
+    if (value >= 50) return 'warning'
+    return 'error'
+  }
+
+  const getProbabilityTagColor = (value: number) => {
+    if (value >= 60) return 'success'
+    if (value >= 40) return 'blue'
+    return 'warning'
+  }
+
+  const baseScenario = aiResult?.scenarios?.find(scenario => scenario.name === 'base' || scenario.name === 'baseline') ?? aiResult?.scenarios?.[0] ?? null
 
   const queryClient = useQueryClient()
 
@@ -787,11 +816,10 @@ const ForecastPage = () => {
             Закрыть
           </Button>
         ]}
-        width={800}
+        width={840}
       >
         {aiResult && (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            {/* Status */}
             <Card size="small">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -803,12 +831,29 @@ const ForecastPage = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span><strong>Прогнозная сумма:</strong></span>
                   <span style={{ fontSize: 16, fontWeight: 'bold', color: '#1890ff' }}>
-                    {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(aiResult.forecast_total)}
+                    {formatCurrency(aiResult.forecast_total)}
                   </span>
                 </div>
+                {baseScenario && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span><strong>Базовый сценарий:</strong></span>
+                      <Space size="small">
+                        <Tag color="blue">{baseScenario.label || baseScenario.name}</Tag>
+                        <Tag color={getProbabilityTagColor(baseScenario.probability)}>
+                          {baseScenario.probability}%
+                        </Tag>
+                      </Space>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span><strong>Диапазон:</strong></span>
+                      <span>{formatCurrency(baseScenario.range_min)} – {formatCurrency(baseScenario.range_max)}</span>
+                    </div>
+                  </>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span><strong>Уверенность AI:</strong></span>
-                  <Tag color={aiResult.confidence >= 70 ? 'success' : aiResult.confidence >= 50 ? 'warning' : 'error'}>
+                  <Tag color={getConfidenceTagColor(aiResult.confidence)}>
                     {aiResult.confidence}%
                   </Tag>
                 </div>
@@ -827,12 +872,58 @@ const ForecastPage = () => {
               </Space>
             </Card>
 
-            {/* Summary */}
             <Card size="small" title="Сводка">
-              <Paragraph style={{ marginBottom: 0 }}>{aiResult.summary}</Paragraph>
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Paragraph style={{ marginBottom: aiResult.quality_notes ? 8 : 0 }}>{aiResult.summary}</Paragraph>
+                {aiResult.quality_notes && (
+                  <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                    {aiResult.quality_notes}
+                  </Paragraph>
+                )}
+              </Space>
             </Card>
 
-            {/* Items */}
+            {aiResult.scenarios && aiResult.scenarios.length > 0 && (
+              <Card size="small" title="Сценарии">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {aiResult.scenarios.map((scenario, index) => {
+                    const isBase = scenario.name === 'base' || scenario.name === 'baseline'
+                    const rangeText = `${formatCurrency(scenario.range_min)} – ${formatCurrency(scenario.range_max)}`
+                    return (
+                      <Card
+                        key={`${scenario.name}-${index}`}
+                        size="small"
+                        type="inner"
+                      >
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Space size="small">
+                              <Tag color={isBase ? 'blue' : scenario.name === 'optimistic' ? 'green' : 'volcano'}>
+                                {scenario.label || scenario.name}
+                              </Tag>
+                              <Tag color={getProbabilityTagColor(scenario.probability)}>
+                                {scenario.probability}%
+                              </Tag>
+                            </Space>
+                            <span><strong>Сумма:</strong> {formatCurrency(scenario.total)}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span><strong>Диапазон:</strong></span>
+                            <span>{rangeText}</span>
+                          </div>
+                          {scenario.description && (
+                            <Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+                              {scenario.description}
+                            </Paragraph>
+                          )}
+                        </Space>
+                      </Card>
+                    )
+                  })}
+                </Space>
+              </Card>
+            )}
+
             {aiResult.items && aiResult.items.length > 0 && (
               <Card size="small" title="Детализация прогноза">
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -847,8 +938,23 @@ const ForecastPage = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                           <span><strong>Сумма:</strong></span>
                           <span style={{ fontSize: 15, fontWeight: 'bold' }}>
-                            {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(item.amount)}
+                            {formatCurrency(item.amount)}
                           </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span><strong>Диапазон:</strong></span>
+                          <span>{formatCurrency(item.range_min)} – {formatCurrency(item.range_max)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span><strong>Источник:</strong></span>
+                          <Space size="small">
+                            <Tag color={sourceColors[item.source] ?? 'default'}>
+                              {sourceLabels[item.source] ?? item.source}
+                            </Tag>
+                            <Tag color={getConfidenceTagColor(item.confidence)}>
+                              {item.confidence}%
+                            </Tag>
+                          </Space>
                         </div>
                         <div>
                           <strong>Обоснование:</strong>
@@ -863,7 +969,140 @@ const ForecastPage = () => {
               </Card>
             )}
 
-            {/* Error message if exists */}
+            {aiResult.correlations && aiResult.correlations.length > 0 && (
+              <Card size="small" title="Корреляции и драйверы">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {aiResult.correlations.map((corr, index) => (
+                    <Card key={index} size="small" type="inner">
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <Space size="small">
+                          <Tag color="geekblue">{corr.driver}</Tag>
+                          <Tag color={getConfidenceTagColor(corr.confidence)}>{corr.confidence}%</Tag>
+                          {typeof corr.lag_months === 'number' && (
+                            <Tag color="gold">Лаг: {corr.lag_months} мес.</Tag>
+                          )}
+                        </Space>
+                        <Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+                          {corr.impact}
+                        </Paragraph>
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
+            {aiResult.recommendations && aiResult.recommendations.length > 0 && (
+              <Card size="small" title="Рекомендации действий">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {aiResult.recommendations.map((rec, index) => (
+                    <Card key={index} size="small" type="inner">
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <span style={{ fontWeight: 600 }}>{rec.title}</span>
+                        <Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+                          {rec.description}
+                        </Paragraph>
+                        {rec.potential_saving != null && (
+                          <Tag color="green">Экономия: {formatCurrency(rec.potential_saving)}</Tag>
+                        )}
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
+            {aiResult.baseline_metrics && (
+              <Card size="small" title="Статистические ориентиры">
+                {Object.values(aiResult.baseline_metrics).some(value => value != null) ? (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {aiResult.baseline_metrics.simple_average != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span><strong>Среднее за период:</strong></span>
+                        <span>{formatCurrency(aiResult.baseline_metrics.simple_average)}</span>
+                      </div>
+                    )}
+                    {aiResult.baseline_metrics.moving_average != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span><strong>Скользящее (3 мес):</strong></span>
+                        <span>{formatCurrency(aiResult.baseline_metrics.moving_average)}</span>
+                      </div>
+                    )}
+                    {aiResult.baseline_metrics.seasonal_reference != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span><strong>Сезонный ориентир (прошлый год):</strong></span>
+                        <span>{formatCurrency(aiResult.baseline_metrics.seasonal_reference)}</span>
+                      </div>
+                    )}
+                    {aiResult.baseline_metrics.last_12_months_total != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span><strong>Сумма за 12 мес:</strong></span>
+                        <span>{formatCurrency(aiResult.baseline_metrics.last_12_months_total)}</span>
+                      </div>
+                    )}
+                  </Space>
+                ) : (
+                  <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                    Недостаточно статистики для расчёта базовых ориентиров.
+                  </Paragraph>
+                )}
+              </Card>
+            )}
+
+            {aiResult.anomaly_summary && (
+              <Card size="small" title="Аномалии и выбросы">
+                {aiResult.anomaly_summary.items && aiResult.anomaly_summary.items.length > 0 ? (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {aiResult.anomaly_summary.items.map((anomaly, index) => (
+                      <Paragraph key={index} style={{ marginBottom: 0, fontSize: 13 }}>
+                        <Tag color="volcano">
+                          {`${String(anomaly.month).padStart(2, '0')}.${anomaly.year}`}
+                        </Tag>
+                        {formatCurrency(anomaly.total)} (
+                        {anomaly.deviation_percent > 0 ? '+' : ''}{anomaly.deviation_percent}% к среднему)
+                      </Paragraph>
+                    ))}
+                    {(aiResult.anomaly_summary.mean != null || aiResult.anomaly_summary.threshold != null) && (
+                      <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+                        Среднее: {aiResult.anomaly_summary.mean != null ? formatCurrency(aiResult.anomaly_summary.mean) : 'N/A'} · Порог ±σ: {aiResult.anomaly_summary.threshold != null ? formatCurrency(aiResult.anomaly_summary.threshold) : 'N/A'}
+                      </Paragraph>
+                    )}
+                  </Space>
+                ) : (
+                  <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                    Существенных выбросов не обнаружено.
+                  </Paragraph>
+                )}
+              </Card>
+            )}
+
+            {aiResult.plan_context && aiResult.plan_context.length > 0 && (
+              <Card size="small" title="Контекст утверждённого плана">
+                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                  {aiResult.plan_context.map((ctx, index) => (
+                    <Card key={index} size="small" type="inner">
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span><strong>{ctx.category_name ?? 'Категория'}</strong></span>
+                          {ctx.planned_amount != null && (
+                            <span>{formatCurrency(ctx.planned_amount)}</span>
+                          )}
+                        </div>
+                        {ctx.justification && (
+                          <Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+                            {ctx.justification}
+                          </Paragraph>
+                        )}
+                        {ctx.calculation_method && (
+                          <Tag color="processing">Метод: {ctx.calculation_method}</Tag>
+                        )}
+                      </Space>
+                    </Card>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
             {aiResult.error && (
               <Card size="small" title="Предупреждение" type="inner">
                 <Paragraph type="warning" style={{ marginBottom: 0 }}>
