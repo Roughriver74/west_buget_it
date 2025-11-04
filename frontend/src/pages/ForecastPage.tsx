@@ -34,9 +34,6 @@ import ErrorState from '@/components/common/ErrorState'
 const { Title, Paragraph } = Typography
 const { Option } = Select
 
-const currencyFormatter = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' })
-const formatCurrency = (value?: number | null) => currencyFormatter.format(value ?? 0)
-
 const ForecastPage = () => {
   const currentDate = dayjs()
   const nextMonth = currentDate.add(1, 'month')
