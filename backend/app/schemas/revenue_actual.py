@@ -10,9 +10,9 @@ class RevenueActualBase(BaseModel):
     revenue_category_id: Optional[int] = None
     year: int = Field(..., ge=2020, le=2100)
     month: int = Field(..., ge=1, le=12)
-    planned_amount: Optional[Decimal] = None
-    actual_amount: Decimal
-    notes: Optional[str] = None
+    planned_amount: Optional[Decimal] = Field(None, ge=0)
+    actual_amount: Decimal = Field(..., ge=0)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class RevenueActualCreate(RevenueActualBase):
@@ -22,9 +22,9 @@ class RevenueActualCreate(RevenueActualBase):
 
 class RevenueActualUpdate(BaseModel):
     """Schema for updating revenue actual"""
-    planned_amount: Optional[Decimal] = None
-    actual_amount: Optional[Decimal] = None
-    notes: Optional[str] = None
+    planned_amount: Optional[Decimal] = Field(None, ge=0)
+    actual_amount: Optional[Decimal] = Field(None, ge=0)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class RevenueActualInDB(RevenueActualBase):

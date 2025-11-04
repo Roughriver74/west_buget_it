@@ -188,6 +188,13 @@ from .revenue_forecast import (
     RevenueForecastUpdate,
     RevenueForecastInDB,
 )
+from .api_token import (
+    APITokenCreate,
+    APITokenUpdate,
+    APITokenInDB,
+    APITokenWithKey,
+    APITokenRevoke,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -384,4 +391,10 @@ __all__ = [
     "RevenueForecastCreate",
     "RevenueForecastUpdate",
     "RevenueForecastInDB",
+    # API Token
+    "APITokenCreate",
+    "APITokenUpdate",
+    "APITokenInDB",
+    "APITokenWithKey",
+    "APITokenRevoke",
 ]

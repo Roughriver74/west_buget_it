@@ -130,10 +130,17 @@ def create_revenue_actual(
     )
 
     # Calculate variance if planned_amount is provided
-    if db_actual.planned_amount:
+    if db_actual.planned_amount is not None and db_actual.planned_amount != 0:
         db_actual.variance = db_actual.actual_amount - db_actual.planned_amount
-        if db_actual.planned_amount != 0:
-            db_actual.variance_percent = (db_actual.variance / db_actual.planned_amount) * 100
+        db_actual.variance_percent = (db_actual.variance / db_actual.planned_amount) * 100
+    elif db_actual.planned_amount == 0:
+        # If planned is 0, variance is the actual amount
+        db_actual.variance = db_actual.actual_amount
+        db_actual.variance_percent = None  # Cannot calculate percentage
+    else:
+        # If planned is None, no variance calculation
+        db_actual.variance = None
+        db_actual.variance_percent = None
 
     db.add(db_actual)
     db.commit()
@@ -161,10 +168,17 @@ def update_revenue_actual(
         setattr(db_actual, field, value)
 
     # Recalculate variance
-    if db_actual.planned_amount:
+    if db_actual.planned_amount is not None and db_actual.planned_amount != 0:
         db_actual.variance = db_actual.actual_amount - db_actual.planned_amount
-        if db_actual.planned_amount != 0:
-            db_actual.variance_percent = (db_actual.variance / db_actual.planned_amount) * 100
+        db_actual.variance_percent = (db_actual.variance / db_actual.planned_amount) * 100
+    elif db_actual.planned_amount == 0:
+        # If planned is 0, variance is the actual amount
+        db_actual.variance = db_actual.actual_amount
+        db_actual.variance_percent = None  # Cannot calculate percentage
+    else:
+        # If planned is None, no variance calculation
+        db_actual.variance = None
+        db_actual.variance_percent = None
 
     db.commit()
     db.refresh(db_actual)
