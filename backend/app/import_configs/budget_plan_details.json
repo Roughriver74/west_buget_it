@@ -1,141 +1,80 @@
 {
   "entity": "budget_plan_details",
   "display_name": {
-    "ru": "Детали плана бюджета",
+    "ru": "Детализация бюджета",
     "en": "Budget Plan Details"
   },
   "description": {
-    "ru": "Импорт детального плана бюджета с разбивкой по 12 месяцам",
-    "en": "Import detailed budget plan with 12-month breakdown"
+    "ru": "Детальное планирование бюджета с версионированием",
+    "en": "Detailed budget planning with versioning"
   },
   "fields": [
     {
       "name": "version_id",
-      "display_name": {"ru": "ID версии плана", "en": "Version ID"},
+      "display_name": {
+        "ru": "ID версии",
+        "en": "Version ID"
+      },
       "type": "integer",
       "required": true,
-      "aliases": ["version_id", "версия", "version"]
+      "min": 1,
+      "aliases": ["версия", "version"]
     },
     {
       "name": "category_name",
-      "display_name": {"ru": "Категория", "en": "Category"},
+      "display_name": {
+        "ru": "Категория",
+        "en": "Category"
+      },
       "type": "string",
       "required": true,
       "lookup_entity": "budget_categories",
       "lookup_field": "name",
       "auto_create": false,
-      "aliases": ["категория", "category", "category_name", "статья"]
-    },
-    {
-      "name": "type",
-      "display_name": {"ru": "Тип", "en": "Type"},
-      "type": "enum",
-      "required": true,
-      "enum": ["OPEX", "CAPEX"],
-      "aliases": ["тип", "type", "expense_type"],
-      "case_insensitive": true
+      "aliases": ["категория", "category", "статья"]
     },
     {
       "name": "month",
-      "display_name": {"ru": "Месяц", "en": "Month"},
+      "display_name": {
+        "ru": "Месяц",
+        "en": "Month"
+      },
       "type": "integer",
       "required": true,
       "min": 1,
       "max": 12,
-      "aliases": ["месяц", "month"]
+      "aliases": ["месяц", "period_month"]
     },
     {
       "name": "planned_amount",
-      "display_name": {"ru": "Плановая сумма", "en": "Planned Amount"},
+      "display_name": {
+        "ru": "Плановая сумма",
+        "en": "Planned Amount"
+      },
       "type": "decimal",
       "required": true,
       "min": 0,
-      "aliases": ["плановая_сумма", "planned_amount", "план", "сумма", "amount"]
+      "aliases": ["план", "planned", "бюджет", "budget"]
     },
     {
-      "name": "subcategory",
-      "display_name": {"ru": "Подстатья", "en": "Subcategory"},
+      "name": "notes",
+      "display_name": {
+        "ru": "Примечания",
+        "en": "Notes"
+      },
       "type": "string",
       "required": false,
-      "max_length": 100,
-      "aliases": ["подстатья", "subcategory", "подкатегория"]
-    },
-    {
-      "name": "calculation_method",
-      "display_name": {"ru": "Метод расчёта", "en": "Calculation Method"},
-      "type": "enum",
-      "required": false,
-      "enum": ["AVERAGE", "GROWTH", "MANUAL", "DRIVER_BASED"],
-      "aliases": ["метод_расчёта", "calculation_method", "метод"],
-      "value_mapping": {
-        "среднее": "AVERAGE",
-        "average": "AVERAGE",
-        "рост": "GROWTH",
-        "growth": "GROWTH",
-        "вручную": "MANUAL",
-        "manual": "MANUAL",
-        "драйвер": "DRIVER_BASED",
-        "driver": "DRIVER_BASED"
-      }
-    },
-    {
-      "name": "business_driver",
-      "display_name": {"ru": "Бизнес-драйвер", "en": "Business Driver"},
-      "type": "string",
-      "required": false,
-      "max_length": 100,
-      "aliases": ["бизнес_драйвер", "business_driver", "драйвер", "driver"]
-    },
-    {
-      "name": "justification",
-      "display_name": {"ru": "Обоснование", "en": "Justification"},
-      "type": "string",
-      "required": false,
-      "max_length": 5000,
-      "aliases": ["обоснование", "justification", "причина", "reason"]
-    },
-    {
-      "name": "based_on_year",
-      "display_name": {"ru": "Базовый год", "en": "Based On Year"},
-      "type": "integer",
-      "required": false,
-      "min": 2000,
-      "max": 2100,
-      "aliases": ["базовый_год", "based_on_year", "база"]
-    },
-    {
-      "name": "growth_rate",
-      "display_name": {"ru": "Процент роста", "en": "Growth Rate"},
-      "type": "decimal",
-      "required": false,
-      "min": -100,
-      "max": 1000,
-      "aliases": ["процент_роста", "growth_rate", "рост", "growth"]
+      "max_length": 1000,
+      "aliases": ["примечания", "комментарий", "comment", "description"]
     }
   ],
   "validation_rules": {
-    "cross_field": [
-      {
-        "description": "Category must exist in system",
-        "check": "category_exists"
-      },
-      {
-        "description": "Version must exist and be editable (DRAFT or IN_REVIEW)",
-        "check": "version_editable"
-      }
-    ],
-    "business_rules": [
-      {
-        "description": "Unique combination of (version_id, month, category_id)",
-        "check": "unique_version_month_category"
-      }
-    ]
+    "unique_fields": ["version_id", "category_name", "month"]
   },
   "import_options": {
     "allow_update": true,
-    "update_key": ["version_id", "month", "category_name"],
-    "auto_create_related": false,
-    "skip_duplicates": false,
-    "batch_size": 100
+    "update_key": ["version_id", "category_name", "month"],
+    "batch_size": 100,
+    "auto_create_related": false
   }
 }

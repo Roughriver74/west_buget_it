@@ -5,98 +5,94 @@
     "en": "Employees"
   },
   "description": {
-    "ru": "Импорт данных сотрудников",
-    "en": "Import employee data"
+    "ru": "Справочник сотрудников компании",
+    "en": "Company employees reference"
   },
   "fields": [
     {
       "name": "full_name",
-      "display_name": {"ru": "ФИО", "en": "Full Name"},
+      "display_name": {
+        "ru": "ФИО",
+        "en": "Full Name"
+      },
       "type": "string",
       "required": true,
-      "min_length": 3,
+      "min_length": 1,
       "max_length": 255,
-      "aliases": ["фио", "full_name", "имя", "name", "сотрудник", "employee"]
+      "aliases": ["фио", "имя", "name", "полное_имя"]
     },
     {
       "name": "position",
-      "display_name": {"ru": "Должность", "en": "Position"},
+      "display_name": {
+        "ru": "Должность",
+        "en": "Position"
+      },
       "type": "string",
       "required": true,
       "max_length": 255,
-      "aliases": ["должность", "position", "роль", "role", "title"]
+      "aliases": ["должность", "позиция", "title"]
     },
     {
       "name": "base_salary",
-      "display_name": {"ru": "Базовый оклад", "en": "Base Salary"},
+      "display_name": {
+        "ru": "Базовый оклад",
+        "en": "Base Salary"
+      },
       "type": "decimal",
       "required": true,
       "min": 0,
-      "max": 10000000,
-      "aliases": ["базовый_оклад", "base_salary", "оклад", "salary", "зарплата"]
+      "aliases": ["оклад", "зарплата", "salary", "базовая_зарплата"]
     },
     {
       "name": "hire_date",
-      "display_name": {"ru": "Дата приема", "en": "Hire Date"},
+      "display_name": {
+        "ru": "Дата приема",
+        "en": "Hire Date"
+      },
       "type": "date",
       "required": false,
-      "aliases": ["дата_приема", "hire_date", "дата_найма", "дата приема"]
+      "aliases": ["дата_приема", "дата_найма", "принят", "employment_date"]
     },
     {
-      "name": "employee_number",
-      "display_name": {"ru": "Табельный номер", "en": "Employee Number"},
+      "name": "email",
+      "display_name": {
+        "ru": "Email",
+        "en": "Email"
+      },
       "type": "string",
       "required": false,
-      "max_length": 50,
-      "aliases": ["табельный_номер", "employee_number", "номер", "number"]
+      "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "aliases": ["почта", "e-mail", "электронная_почта"]
     },
     {
-      "name": "monthly_bonus_base",
-      "display_name": {"ru": "Месячная премия", "en": "Monthly Bonus"},
-      "type": "decimal",
+      "name": "phone",
+      "display_name": {
+        "ru": "Телефон",
+        "en": "Phone"
+      },
+      "type": "string",
       "required": false,
-      "min": 0,
-      "max": 5000000,
-      "aliases": ["месячная_премия", "monthly_bonus", "ежемесячная_премия", "месячная премия"]
+      "aliases": ["телефон", "тел", "phone_number"]
     },
     {
-      "name": "quarterly_bonus_base",
-      "display_name": {"ru": "Квартальная премия", "en": "Quarterly Bonus"},
-      "type": "decimal",
+      "name": "is_active",
+      "display_name": {
+        "ru": "Активен",
+        "en": "Is Active"
+      },
+      "type": "boolean",
       "required": false,
-      "min": 0,
-      "max": 5000000,
-      "aliases": ["квартальная_премия", "quarterly_bonus", "квартальная премия"]
-    },
-    {
-      "name": "annual_bonus_base",
-      "display_name": {"ru": "Годовая премия", "en": "Annual Bonus"},
-      "type": "decimal",
-      "required": false,
-      "min": 0,
-      "max": 10000000,
-      "aliases": ["годовая_премия", "annual_bonus", "годовая премия"]
+      "default": true,
+      "aliases": ["активен", "active", "работает"]
     }
   ],
   "validation_rules": {
-    "cross_field": [
-      {
-        "description": "Hire date cannot be in the future",
-        "check": "hire_date_not_future"
-      }
-    ],
-    "business_rules": [
-      {
-        "description": "Full name must be unique within department",
-        "check": "unique_full_name"
-      }
-    ]
+    "unique_fields": ["full_name"]
   },
   "import_options": {
     "allow_update": true,
     "update_key": "full_name",
-    "auto_create_related": false,
-    "skip_duplicates": false,
-    "batch_size": 50
+    "batch_size": 100,
+    "auto_create_related": false
   }
 }
