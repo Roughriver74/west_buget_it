@@ -27,6 +27,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import DepartmentSelector from './DepartmentSelector'
+import ApiTokensDrawer from '../admin/ApiTokensDrawer'
 
 const { Header, Content, Sider } = Layout
 
@@ -38,6 +39,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [apiTokensDrawerOpen, setApiTokensDrawerOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
@@ -313,9 +315,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           label: <Link to="/users">Пользователи</Link>,
         },
         {
-          key: '/api-tokens',
+          key: 'api-tokens',
           icon: <KeyOutlined />,
-          label: <Link to="/api-tokens">API Токены</Link>,
+          label: 'API Токены',
+          onClick: () => setApiTokensDrawerOpen(true),
         },
       ]
     : baseMenuItems
@@ -430,6 +433,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
         </Content>
       </Layout>
+
+      {/* API Tokens Drawer */}
+      <ApiTokensDrawer
+        visible={apiTokensDrawerOpen}
+        onClose={() => setApiTokensDrawerOpen(false)}
+      />
     </Layout>
   )
 }

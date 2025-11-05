@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined, FileTextOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
 import FTPImportModal from '@/components/expenses/FTPImportModal'
 import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPaymentModal'
+import InvoiceProcessingDrawer from '@/components/expenses/InvoiceProcessingDrawer'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
 
@@ -26,6 +27,7 @@ const ExpensesPage = () => {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [importModalVisible, setImportModalVisible] = useState(false)
   const [registerPaymentModalVisible, setRegisterPaymentModalVisible] = useState(false)
+  const [invoiceProcessingDrawerVisible, setInvoiceProcessingDrawerVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
 
   const queryClient = useQueryClient()
@@ -293,6 +295,12 @@ const ExpensesPage = () => {
           Импорт из FTP
         </Button>
         <Button
+          icon={<FileTextOutlined />}
+          onClick={() => setInvoiceProcessingDrawerVisible(true)}
+        >
+          Обработка счетов AI
+        </Button>
+        <Button
           icon={<DollarOutlined />}
           onClick={() => setRegisterPaymentModalVisible(true)}
           type="primary"
@@ -362,6 +370,11 @@ const ExpensesPage = () => {
       <RegisterPayrollPaymentModal
         open={registerPaymentModalVisible}
         onClose={() => setRegisterPaymentModalVisible(false)}
+      />
+
+      <InvoiceProcessingDrawer
+        visible={invoiceProcessingDrawerVisible}
+        onClose={() => setInvoiceProcessingDrawerVisible(false)}
       />
     </div>
   )

@@ -24,3 +24,15 @@ bcrypt==4.0.1  # Pin bcrypt version for passlib compatibility
 redis==5.0.1
 sentry-sdk[fastapi]==1.39.2
 prometheus-fastapi-instrumentator==6.1.0
+
+# OCR и обработка счетов
+pytesseract==0.3.13
+pdf2image==1.17.0
+Pillow==11.0.0
+pypdf==5.1.0
+
+# AI для парсинга счетов (VseGPT через OpenAI API)
+openai==1.54.0
+
+# Логирование
+loguru==0.7.2

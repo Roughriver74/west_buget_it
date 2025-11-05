@@ -116,6 +116,21 @@ class Settings(BaseSettings):
     BASELINE_CACHE_TTL_SECONDS: int = 300
     CACHE_TTL_SECONDS: int = 300
 
+    # AI для обработки счетов (VseGPT)
+    VSEGPT_API_KEY: str | None = None
+    VSEGPT_BASE_URL: str = "https://api.vsegpt.ru/v1"
+    VSEGPT_MODEL: str = "vis-openai/gpt-5-mini"
+
+    # OCR настройки
+    OCR_LANGUAGE: str = "rus+eng"
+    OCR_DPI: int = 300
+
+    # 1С интеграция (опционально)
+    C1_ENABLED: bool = False
+    C1_BASE_URL: str = "http://localhost:8080"
+    C1_USERNAME: str = "api_user"
+    C1_PASSWORD: str = "api_password"
+
     @field_validator('SECRET_KEY')
     @classmethod
     def validate_secret_key(cls, v: str) -> str:

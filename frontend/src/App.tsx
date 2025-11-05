@@ -45,7 +45,8 @@ const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage
 // Admin module
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
 const UsersPage = lazy(() => import('./pages/UsersPage'))
-const ApiTokensPage = lazy(() => import('./pages/ApiTokensPage'))
+// API Tokens now use drawer component instead of full page
+// const ApiTokensPage = lazy(() => import('./pages/ApiTokensPage'))
 
 // Payroll module
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage'))
@@ -176,15 +177,15 @@ function App() {
                           }
                         />
 
-                        {/* API Tokens - Admin only */}
-                        <Route
+                        {/* API Tokens - Now using drawer in AppLayout instead of full page */}
+                        {/* <Route
                           path="/api-tokens"
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN']}>
                               <ApiTokensPage />
                             </ProtectedRoute>
                           }
-                        />
+                        /> */}
 
                         {/* Payroll (FOT) - Admin and Manager only */}
                         <Route

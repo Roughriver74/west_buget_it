@@ -195,6 +195,22 @@ from .api_token import (
     APITokenWithKey,
     APITokenRevoke,
 )
+from .invoice_processing import (
+    SupplierData,
+    InvoiceItem,
+    ParsedInvoiceData,
+    OCRResult,
+    ProcessingError,
+    InvoiceUploadResponse,
+    InvoiceProcessRequest,
+    InvoiceProcessResponse,
+    CreateExpenseFromInvoiceRequest,
+    CreateExpenseFromInvoiceResponse,
+    ProcessedInvoiceListItem,
+    ProcessedInvoiceDetail,
+    ProcessedInvoiceUpdate,
+    InvoiceProcessingStats,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -397,4 +413,19 @@ __all__ = [
     "APITokenInDB",
     "APITokenWithKey",
     "APITokenRevoke",
+    # Invoice Processing
+    "SupplierData",
+    "InvoiceItem",
+    "ParsedInvoiceData",
+    "OCRResult",
+    "ProcessingError",
+    "InvoiceUploadResponse",
+    "InvoiceProcessRequest",
+    "InvoiceProcessResponse",
+    "CreateExpenseFromInvoiceRequest",
+    "CreateExpenseFromInvoiceResponse",
+    "ProcessedInvoiceListItem",
+    "ProcessedInvoiceDetail",
+    "ProcessedInvoiceUpdate",
+    "InvoiceProcessingStats",
 ]

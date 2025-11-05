@@ -1401,6 +1401,16 @@ class APITokenStatusEnum(str, enum.Enum):
     EXPIRED = "EXPIRED"
 
 
+class InvoiceProcessingStatusEnum(str, enum.Enum):
+    """Enum for invoice processing statuses"""
+    PENDING = "PENDING"  # Загружен, ожидает обработки
+    PROCESSING = "PROCESSING"  # В процессе обработки (OCR + AI)
+    PROCESSED = "PROCESSED"  # Успешно распознан
+    ERROR = "ERROR"  # Ошибка обработки
+    MANUAL_REVIEW = "MANUAL_REVIEW"  # Требует ручной проверки
+    EXPENSE_CREATED = "EXPENSE_CREATED"  # Расход создан
+
+
 class RevenueForecast(Base):
     """Revenue Forecast (Прогноз доходов) - ML-прогнозы на основе исторических данных"""
     __tablename__ = "revenue_forecasts"
@@ -1483,3 +1493,102 @@ class APIToken(Base):
 
     def __repr__(self):
         return f"<APIToken {self.name} ({self.status})>"
+
+
+class ProcessedInvoice(Base):
+    """
+    Processed Invoice (Обработанные счета) - история AI-обработки счетов на оплату
+
+    Хранит результаты автоматического распознавания счетов через OCR и AI-парсинг.
+    Используется для создания заявок на расходование (Expenses).
+    """
+    __tablename__ = "processed_invoices"
+    __table_args__ = (
+        Index('idx_processed_invoice_dept', 'department_id'),
+        Index('idx_processed_invoice_status', 'status'),
+        Index('idx_processed_invoice_number', 'invoice_number'),
+        Index('idx_processed_invoice_inn', 'supplier_inn'),
+        Index('idx_processed_invoice_date', 'invoice_date'),
+        Index('idx_processed_invoice_uploaded_at', 'uploaded_at'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Метаданные файла
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=True)  # Путь к файлу в хранилище
+    file_size_kb = Column(Integer, nullable=True)  # Размер файла в КБ
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # OCR результаты
+    ocr_text = Column(Text, nullable=True)  # Полный текст из OCR
+    ocr_confidence = Column(Numeric(5, 2), nullable=True)  # Уверенность OCR (0-100%)
+    ocr_processing_time_sec = Column(Numeric(10, 2), nullable=True)  # Время обработки OCR
+
+    # Распознанные данные счета
+    invoice_number = Column(String(100), nullable=True, index=True)
+    invoice_date = Column(Date, nullable=True)
+
+    # Данные поставщика
+    supplier_name = Column(String(500), nullable=True)
+    supplier_inn = Column(String(12), nullable=True, index=True)
+    supplier_kpp = Column(String(9), nullable=True)
+    supplier_bank_name = Column(String(255), nullable=True)
+    supplier_bik = Column(String(9), nullable=True)
+    supplier_account = Column(String(20), nullable=True)
+
+    # Суммы
+    amount_without_vat = Column(Numeric(15, 2), nullable=True)
+    vat_amount = Column(Numeric(15, 2), nullable=True)
+    total_amount = Column(Numeric(15, 2), nullable=True)
+
+    # Дополнительные данные
+    payment_purpose = Column(Text, nullable=True)
+    contract_number = Column(String(100), nullable=True)
+    contract_date = Column(Date, nullable=True)
+
+    # Статус обработки
+    status = Column(
+        Enum(InvoiceProcessingStatusEnum),
+        nullable=False,
+        default=InvoiceProcessingStatusEnum.PENDING,
+        index=True
+    )
+
+    # Связь с созданным расходом, контрагентом и категорией
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True)
+    contractor_id = Column(Integer, ForeignKey("contractors.id"), nullable=True)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)  # Категория бюджета для 1С
+
+    # 1C Integration tracking
+    external_id_1c = Column(String(100), nullable=True, index=True)  # ID документа в 1С
+    created_in_1c_at = Column(DateTime, nullable=True, index=True)  # Когда создан документ в 1С
+
+    # AI данные (полный JSON с табличной частью и всеми деталями)
+    parsed_data = Column(JSON, nullable=True)
+    ai_processing_time_sec = Column(Numeric(10, 2), nullable=True)  # Время обработки AI
+    ai_model_used = Column(String(100), nullable=True)  # Модель AI (например "gpt-5-mini")
+
+    # Ошибки и предупреждения
+    errors = Column(JSON, nullable=True)  # Список ошибок: [{"field": "inn", "message": "..."}]
+    warnings = Column(JSON, nullable=True)  # Список предупреждений
+
+    # Аудит
+    processed_at = Column(DateTime, nullable=True)  # Когда завершена обработка
+    expense_created_at = Column(DateTime, nullable=True)  # Когда создан expense
+
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    uploaded_by_rel = relationship("User", foreign_keys=[uploaded_by])
+    expense_rel = relationship("Expense", foreign_keys=[expense_id])
+    contractor_rel = relationship("Contractor", foreign_keys=[contractor_id])
+    category_rel = relationship("BudgetCategory", foreign_keys=[category_id])
+
+    def __repr__(self):
+        return f"<ProcessedInvoice {self.invoice_number or self.original_filename} ({self.status})>"
