@@ -5,146 +5,120 @@
     "en": "Expenses"
   },
   "description": {
-    "ru": "Импорт заявок на расходование средств",
-    "en": "Import expense requests"
+    "ru": "Журнал расходов и заявок на оплату",
+    "en": "Expense tracking and payment requests"
   },
   "fields": [
     {
-      "name": "number",
-      "display_name": {"ru": "Номер заявки", "en": "Request Number"},
-      "type": "string",
-      "required": false,
-      "max_length": 50,
-      "aliases": ["номер", "number", "номер_заявки", "request_number", "заявка"]
+      "name": "amount",
+      "display_name": {
+        "ru": "Сумма",
+        "en": "Amount"
+      },
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "aliases": ["сумма", "стоимость", "цена", "price", "cost"]
     },
     {
       "name": "category_name",
-      "display_name": {"ru": "Категория", "en": "Category"},
+      "display_name": {
+        "ru": "Категория",
+        "en": "Category"
+      },
       "type": "string",
       "required": true,
       "lookup_entity": "budget_categories",
       "lookup_field": "name",
       "auto_create": true,
-      "aliases": ["категория", "category", "статья", "category_name"]
+      "aliases": ["категория", "category", "статья", "тип_расхода"]
     },
     {
       "name": "contractor_name",
-      "display_name": {"ru": "Контрагент", "en": "Contractor"},
+      "display_name": {
+        "ru": "Контрагент",
+        "en": "Contractor"
+      },
       "type": "string",
       "required": true,
       "lookup_entity": "contractors",
       "lookup_field": "name",
       "auto_create": true,
-      "aliases": ["контрагент", "contractor", "поставщик", "supplier", "получатель"]
+      "aliases": ["контрагент", "поставщик", "contractor", "vendor", "supplier"]
     },
     {
       "name": "organization_name",
-      "display_name": {"ru": "Организация", "en": "Organization"},
+      "display_name": {
+        "ru": "Организация",
+        "en": "Organization"
+      },
       "type": "string",
-      "required": false,
+      "required": true,
       "lookup_entity": "organizations",
       "lookup_field": "name",
       "auto_create": true,
-      "aliases": ["организация", "organization", "org"]
+      "aliases": ["организация", "organization", "компания", "company"]
     },
     {
-      "name": "amount",
-      "display_name": {"ru": "Сумма", "en": "Amount"},
-      "type": "decimal",
+      "name": "description",
+      "display_name": {
+        "ru": "Описание",
+        "en": "Description"
+      },
+      "type": "string",
       "required": true,
-      "min": 0,
-      "aliases": ["сумма", "amount", "sum", "сумма_документа"]
+      "min_length": 1,
+      "max_length": 1000,
+      "aliases": ["описание", "назначение", "comment", "комментарий"]
     },
     {
       "name": "request_date",
-      "display_name": {"ru": "Дата заявки", "en": "Request Date"},
+      "display_name": {
+        "ru": "Дата заявки",
+        "en": "Request Date"
+      },
       "type": "date",
-      "required": false,
-      "aliases": ["дата_заявки", "request_date", "дата заявки", "желательная_дата_платежа"]
+      "required": true,
+      "aliases": ["дата_заявки", "дата_запроса", "дата", "date"]
     },
     {
       "name": "payment_date",
-      "display_name": {"ru": "Дата оплаты", "en": "Payment Date"},
+      "display_name": {
+        "ru": "Дата оплаты",
+        "en": "Payment Date"
+      },
       "type": "date",
       "required": false,
-      "aliases": ["дата_оплаты", "payment_date", "дата оплаты"]
+      "aliases": ["дата_оплаты", "оплачено", "paid_date"]
     },
     {
       "name": "status",
-      "display_name": {"ru": "Статус", "en": "Status"},
+      "display_name": {
+        "ru": "Статус",
+        "en": "Status"
+      },
       "type": "enum",
       "required": false,
       "enum": ["DRAFT", "PENDING", "APPROVED", "REJECTED", "PAID", "CANCELLED"],
-      "default": "PENDING",
-      "aliases": ["статус", "status"],
-      "value_mapping": {
-        "черновик": "DRAFT",
-        "к оплате": "PENDING",
-        "ожидает": "PENDING",
-        "согласована": "APPROVED",
-        "утверждена": "APPROVED",
-        "отклонена": "REJECTED",
-        "оплачена": "PAID",
-        "оплачено": "PAID",
-        "отменена": "CANCELLED",
-        "draft": "DRAFT",
-        "pending": "PENDING",
-        "approved": "APPROVED",
-        "rejected": "REJECTED",
-        "paid": "PAID",
-        "cancelled": "CANCELLED"
-      }
+      "default": "DRAFT",
+      "aliases": ["статус", "состояние", "state"]
     },
     {
-      "name": "purpose",
-      "display_name": {"ru": "Назначение платежа", "en": "Purpose"},
+      "name": "invoice_number",
+      "display_name": {
+        "ru": "Номер счета",
+        "en": "Invoice Number"
+      },
       "type": "string",
       "required": false,
-      "max_length": 1000,
-      "aliases": ["назначение", "purpose", "назначение_платежа", "описание"]
-    },
-    {
-      "name": "comment",
-      "display_name": {"ru": "Комментарий", "en": "Comment"},
-      "type": "string",
-      "required": false,
-      "max_length": 500,
-      "aliases": ["комментарий", "comment", "примечание", "notes"]
-    },
-    {
-      "name": "requester",
-      "display_name": {"ru": "Кто заявил", "en": "Requester"},
-      "type": "string",
-      "required": false,
-      "max_length": 255,
-      "aliases": ["кто_заявил", "requester", "инициатор", "автор"]
+      "max_length": 100,
+      "aliases": ["номер_счета", "счет", "invoice", "инвойс"]
     }
   ],
-  "validation_rules": {
-    "cross_field": [
-      {
-        "description": "Payment date must be after request date",
-        "check": "payment_after_request"
-      },
-      {
-        "description": "Category must exist in system",
-        "check": "category_exists"
-      }
-    ],
-    "business_rules": [
-      {
-        "description": "PAID status requires payment_date",
-        "check": "paid_requires_date"
-      }
-    ]
-  },
+  "validation_rules": {},
   "import_options": {
-    "allow_update": true,
-    "update_key": "number",
-    "auto_create_related": true,
-    "skip_duplicates": false,
+    "allow_update": false,
     "batch_size": 100,
-    "mark_as_imported": true,
-    "needs_review": false
+    "auto_create_related": true
   }
 }

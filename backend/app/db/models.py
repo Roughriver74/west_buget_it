@@ -1386,6 +1386,21 @@ class SeasonalityCoefficient(Base):
         return f"<SeasonalityCoefficient {self.year} Stream#{self.revenue_stream_id}>"
 
 
+class APITokenScopeEnum(str, enum.Enum):
+    """Enum for API token scopes"""
+    READ = "READ"  # Read-only access
+    WRITE = "WRITE"  # Write access (create, update)
+    DELETE = "DELETE"  # Delete access
+    ADMIN = "ADMIN"  # Full admin access
+
+
+class APITokenStatusEnum(str, enum.Enum):
+    """Enum for API token status"""
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+    EXPIRED = "EXPIRED"
+
+
 class RevenueForecast(Base):
     """Revenue Forecast (Прогноз доходов) - ML-прогнозы на основе исторических данных"""
     __tablename__ = "revenue_forecasts"
@@ -1420,3 +1435,51 @@ class RevenueForecast(Base):
 
     def __repr__(self):
         return f"<RevenueForecast {self.forecast_year}-{self.forecast_month:02d} Amount={self.forecast_amount}>"
+
+
+class APIToken(Base):
+    """
+    API Token (API Токены) - токены для внешней интеграции
+
+    Используется для авторизации внешних систем для доступа к API.
+    Поддерживает различные scope'ы доступа и привязку к департаменту.
+    """
+    __tablename__ = "api_tokens"
+    __table_args__ = (
+        Index('idx_api_token_key', 'token_key'),
+        Index('idx_api_token_dept', 'department_id'),
+        Index('idx_api_token_status', 'status'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Token identification
+    name = Column(String(255), nullable=False)  # Human-readable name
+    description = Column(Text, nullable=True)
+    token_key = Column(String(255), nullable=False, unique=True, index=True)  # Actual token
+
+    # Access control
+    scopes = Column(JSON, nullable=False, default=[])  # List of APITokenScopeEnum
+    status = Column(Enum(APITokenStatusEnum), nullable=False, default=APITokenStatusEnum.ACTIVE)
+
+    # Department isolation (nullable for system-wide tokens)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+
+    # Token lifecycle
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # Null = never expires
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Usage tracking
+    request_count = Column(Integer, nullable=False, default=0)
+
+    # Relationships
+    department_rel = relationship("Department")
+    creator = relationship("User", foreign_keys=[created_by])
+    revoker = relationship("User", foreign_keys=[revoked_by])
+
+    def __repr__(self):
+        return f"<APIToken {self.name} ({self.status})>"

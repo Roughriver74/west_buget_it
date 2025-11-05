@@ -1,117 +1,120 @@
 {
   "entity": "payroll_plans",
   "display_name": {
-    "ru": "Планы по зарплате",
+    "ru": "План ФОТ",
     "en": "Payroll Plans"
   },
   "description": {
-    "ru": "Импорт планов по зарплате с окладами и премиями",
-    "en": "Import payroll plans with salaries and bonuses"
+    "ru": "Планирование фонда оплаты труда",
+    "en": "Payroll planning and budgeting"
   },
   "fields": [
     {
       "name": "year",
-      "display_name": {"ru": "Год", "en": "Year"},
+      "display_name": {
+        "ru": "Год",
+        "en": "Year"
+      },
       "type": "integer",
       "required": true,
-      "min": 2000,
+      "min": 2020,
       "max": 2100,
-      "aliases": ["год", "year"]
+      "aliases": ["год", "period_year"]
     },
     {
       "name": "month",
-      "display_name": {"ru": "Месяц", "en": "Month"},
+      "display_name": {
+        "ru": "Месяц",
+        "en": "Month"
+      },
       "type": "integer",
       "required": true,
       "min": 1,
       "max": 12,
-      "aliases": ["месяц", "month"],
-      "value_mapping": {
-        "январь": 1, "january": 1, "янв": 1, "jan": 1,
-        "февраль": 2, "february": 2, "фев": 2, "feb": 2,
-        "март": 3, "march": 3, "мар": 3, "mar": 3,
-        "апрель": 4, "april": 4, "апр": 4, "apr": 4,
-        "май": 5, "may": 5,
-        "июнь": 6, "june": 6, "июн": 6, "jun": 6,
-        "июль": 7, "july": 7, "июл": 7, "jul": 7,
-        "август": 8, "august": 8, "авг": 8, "aug": 8,
-        "сентябрь": 9, "september": 9, "сен": 9, "sep": 9,
-        "октябрь": 10, "october": 10, "окт": 10, "oct": 10,
-        "ноябрь": 11, "november": 11, "ноя": 11, "nov": 11,
-        "декабрь": 12, "december": 12, "дек": 12, "dec": 12
-      }
+      "aliases": ["месяц", "period_month"]
     },
     {
       "name": "employee_name",
-      "display_name": {"ru": "Сотрудник", "en": "Employee"},
+      "display_name": {
+        "ru": "Сотрудник",
+        "en": "Employee"
+      },
       "type": "string",
       "required": true,
       "lookup_entity": "employees",
       "lookup_field": "full_name",
-      "aliases": ["сотрудник", "employee", "фио", "full_name", "имя"]
+      "auto_create": false,
+      "aliases": ["сотрудник", "фио", "employee", "full_name"]
     },
     {
       "name": "base_salary",
-      "display_name": {"ru": "Оклад", "en": "Base Salary"},
+      "display_name": {
+        "ru": "Оклад",
+        "en": "Base Salary"
+      },
       "type": "decimal",
       "required": true,
       "min": 0,
-      "max": 10000000,
-      "aliases": ["оклад", "base_salary", "базовый_оклад", "зарплата", "salary"]
+      "aliases": ["оклад", "базовая_зарплата", "salary"]
     },
     {
-      "name": "bonus",
-      "display_name": {"ru": "Премия", "en": "Bonus"},
+      "name": "bonus_type",
+      "display_name": {
+        "ru": "Тип премии",
+        "en": "Bonus Type"
+      },
+      "type": "enum",
+      "required": false,
+      "enum": ["FIXED", "PERFORMANCE_BASED", "MIXED"],
+      "default": "FIXED",
+      "aliases": ["тип_премии", "вид_премии", "bonus_kind"]
+    },
+    {
+      "name": "bonus_amount",
+      "display_name": {
+        "ru": "Сумма премии",
+        "en": "Bonus Amount"
+      },
       "type": "decimal",
       "required": false,
       "min": 0,
       "default": 0,
-      "aliases": ["премия", "bonus", "бонус"]
+      "aliases": ["премия", "бонус", "bonus"]
     },
     {
-      "name": "other_payments",
-      "display_name": {"ru": "Прочие выплаты", "en": "Other Payments"},
+      "name": "social_contributions",
+      "display_name": {
+        "ru": "Соц. отчисления",
+        "en": "Social Contributions"
+      },
       "type": "decimal",
       "required": false,
       "min": 0,
       "default": 0,
-      "aliases": ["прочие_выплаты", "other_payments", "прочие", "other", "дополнительные"]
+      "aliases": ["соц_отчисления", "взносы", "contributions", "налоги"]
     },
     {
       "name": "notes",
-      "display_name": {"ru": "Примечания", "en": "Notes"},
+      "display_name": {
+        "ru": "Примечания",
+        "en": "Notes"
+      },
       "type": "string",
       "required": false,
       "max_length": 500,
-      "aliases": ["примечания", "notes", "комментарий", "comment"]
+      "aliases": ["примечания", "комментарий", "comment", "description"]
     }
   ],
   "validation_rules": {
-    "cross_field": [
-      {
-        "description": "Employee must exist in system",
-        "check": "employee_exists"
-      }
-    ],
-    "business_rules": [
-      {
-        "description": "Total must equal base_salary + bonus + other_payments",
-        "check": "total_calculation"
-      },
-      {
-        "description": "Unique combination of (employee, year, month)",
-        "check": "unique_period"
-      }
-    ]
+    "unique_fields": ["year", "month", "employee_name"]
   },
   "import_options": {
     "allow_update": true,
-    "update_key": ["employee_name", "year", "month"],
-    "auto_create_related": false,
-    "skip_duplicates": false,
+    "update_key": ["year", "month", "employee_name"],
     "batch_size": 100,
+    "auto_create_related": false,
     "calculated_fields": {
-      "total": "base_salary + bonus + other_payments"
+      "total_cost": "base_salary + bonus_amount + social_contributions"
     }
   }
 }

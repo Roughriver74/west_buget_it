@@ -5,68 +5,84 @@
     "en": "Contractors"
   },
   "description": {
-    "ru": "Импорт контрагентов и поставщиков",
-    "en": "Import contractors and suppliers"
+    "ru": "Справочник контрагентов и поставщиков",
+    "en": "Contractors and vendors reference"
   },
   "fields": [
     {
       "name": "name",
-      "display_name": {"ru": "Название", "en": "Name"},
+      "display_name": {
+        "ru": "Название",
+        "en": "Name"
+      },
       "type": "string",
       "required": true,
-      "min_length": 2,
+      "min_length": 1,
       "max_length": 255,
-      "aliases": ["название", "name", "наименование", "полное_название", "full_name"]
-    },
-    {
-      "name": "short_name",
-      "display_name": {"ru": "Краткое название", "en": "Short Name"},
-      "type": "string",
-      "required": false,
-      "max_length": 100,
-      "aliases": ["краткое_название", "short_name", "краткое название", "сокращение"]
+      "aliases": ["название", "наименование", "организация", "company"]
     },
     {
       "name": "inn",
-      "display_name": {"ru": "ИНН", "en": "INN"},
+      "display_name": {
+        "ru": "ИНН",
+        "en": "TIN"
+      },
       "type": "string",
       "required": false,
-      "unique": true,
-      "pattern": "^[0-9]{10}$|^[0-9]{12}$",
-      "aliases": ["инн", "inn", "tax_id"]
+      "pattern": "^\\d{10}|\\d{12}$",
+      "aliases": ["ИНН", "tin", "tax_id"]
     },
     {
-      "name": "contact_info",
-      "display_name": {"ru": "Контактная информация", "en": "Contact Info"},
+      "name": "contact_person",
+      "display_name": {
+        "ru": "Контактное лицо",
+        "en": "Contact Person"
+      },
       "type": "string",
       "required": false,
-      "max_length": 500,
-      "aliases": ["контактная_информация", "contact_info", "контакты", "contacts", "телефон", "phone"]
+      "max_length": 255,
+      "aliases": ["контакт", "контактное_лицо", "contact"]
+    },
+    {
+      "name": "email",
+      "display_name": {
+        "ru": "Email",
+        "en": "Email"
+      },
+      "type": "string",
+      "required": false,
+      "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "aliases": ["почта", "e-mail", "электронная_почта"]
+    },
+    {
+      "name": "phone",
+      "display_name": {
+        "ru": "Телефон",
+        "en": "Phone"
+      },
+      "type": "string",
+      "required": false,
+      "aliases": ["телефон", "тел", "phone_number"]
     },
     {
       "name": "is_active",
-      "display_name": {"ru": "Активен", "en": "Active"},
+      "display_name": {
+        "ru": "Активен",
+        "en": "Is Active"
+      },
       "type": "boolean",
       "required": false,
       "default": true,
-      "aliases": ["активен", "is_active", "active", "enabled"]
+      "aliases": ["активен", "active", "действует"]
     }
   ],
   "validation_rules": {
-    "cross_field": [],
-    "business_rules": [
-      {
-        "description": "INN must be unique if provided",
-        "check": "unique_inn"
-      }
-    ]
+    "unique_fields": ["inn"]
   },
   "import_options": {
     "allow_update": true,
     "update_key": "inn",
-    "update_key_fallback": "name",
-    "auto_create_related": false,
-    "skip_duplicates": false,
-    "batch_size": 100
+    "batch_size": 100,
+    "auto_create_related": false
   }
 }

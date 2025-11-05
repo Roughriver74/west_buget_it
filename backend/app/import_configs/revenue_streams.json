@@ -1,0 +1,67 @@
+{
+  "entity": "revenue_streams",
+  "display_name": {
+    "ru": "Потоки доходов",
+    "en": "Revenue Streams"
+  },
+  "description": {
+    "ru": "Справочник источников и потоков доходов",
+    "en": "Revenue sources and streams reference"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "display_name": {
+        "ru": "Название",
+        "en": "Name"
+      },
+      "type": "string",
+      "required": true,
+      "min_length": 1,
+      "max_length": 255,
+      "aliases": ["название", "наименование", "поток", "stream"]
+    },
+    {
+      "name": "stream_type",
+      "display_name": {
+        "ru": "Тип потока",
+        "en": "Stream Type"
+      },
+      "type": "enum",
+      "required": true,
+      "enum": ["RECURRING", "ONE_TIME", "PROJECT_BASED"],
+      "aliases": ["тип", "type", "вид"]
+    },
+    {
+      "name": "description",
+      "display_name": {
+        "ru": "Описание",
+        "en": "Description"
+      },
+      "type": "string",
+      "required": false,
+      "max_length": 1000,
+      "aliases": ["описание", "комментарий", "comment"]
+    },
+    {
+      "name": "is_active",
+      "display_name": {
+        "ru": "Активен",
+        "en": "Is Active"
+      },
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активен", "active", "действует"]
+    }
+  ],
+  "validation_rules": {
+    "unique_fields": ["name"]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "name",
+    "batch_size": 100,
+    "auto_create_related": false
+  }
+}

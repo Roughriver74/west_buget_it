@@ -86,18 +86,18 @@ class RevenuePlanDetailBase(BaseModel):
     """Base schema for revenue plan detail"""
     revenue_stream_id: Optional[int] = None
     revenue_category_id: Optional[int] = None
-    month_01: Decimal = Field(default=Decimal("0.00"))
-    month_02: Decimal = Field(default=Decimal("0.00"))
-    month_03: Decimal = Field(default=Decimal("0.00"))
-    month_04: Decimal = Field(default=Decimal("0.00"))
-    month_05: Decimal = Field(default=Decimal("0.00"))
-    month_06: Decimal = Field(default=Decimal("0.00"))
-    month_07: Decimal = Field(default=Decimal("0.00"))
-    month_08: Decimal = Field(default=Decimal("0.00"))
-    month_09: Decimal = Field(default=Decimal("0.00"))
-    month_10: Decimal = Field(default=Decimal("0.00"))
-    month_11: Decimal = Field(default=Decimal("0.00"))
-    month_12: Decimal = Field(default=Decimal("0.00"))
+    month_01: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_02: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_03: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_04: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_05: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_06: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_07: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_08: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_09: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_10: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_11: Decimal = Field(default=Decimal("0.00"), ge=0)
+    month_12: Decimal = Field(default=Decimal("0.00"), ge=0)
 
 
 class RevenuePlanDetailCreate(RevenuePlanDetailBase):
@@ -110,18 +110,18 @@ class RevenuePlanDetailUpdate(BaseModel):
     """Schema for updating revenue plan detail"""
     revenue_stream_id: Optional[int] = None
     revenue_category_id: Optional[int] = None
-    month_01: Optional[Decimal] = None
-    month_02: Optional[Decimal] = None
-    month_03: Optional[Decimal] = None
-    month_04: Optional[Decimal] = None
-    month_05: Optional[Decimal] = None
-    month_06: Optional[Decimal] = None
-    month_07: Optional[Decimal] = None
-    month_08: Optional[Decimal] = None
-    month_09: Optional[Decimal] = None
-    month_10: Optional[Decimal] = None
-    month_11: Optional[Decimal] = None
-    month_12: Optional[Decimal] = None
+    month_01: Optional[Decimal] = Field(None, ge=0)
+    month_02: Optional[Decimal] = Field(None, ge=0)
+    month_03: Optional[Decimal] = Field(None, ge=0)
+    month_04: Optional[Decimal] = Field(None, ge=0)
+    month_05: Optional[Decimal] = Field(None, ge=0)
+    month_06: Optional[Decimal] = Field(None, ge=0)
+    month_07: Optional[Decimal] = Field(None, ge=0)
+    month_08: Optional[Decimal] = Field(None, ge=0)
+    month_09: Optional[Decimal] = Field(None, ge=0)
+    month_10: Optional[Decimal] = Field(None, ge=0)
+    month_11: Optional[Decimal] = Field(None, ge=0)
+    month_12: Optional[Decimal] = Field(None, ge=0)
 
 
 class RevenuePlanDetailInDB(RevenuePlanDetailBase):
