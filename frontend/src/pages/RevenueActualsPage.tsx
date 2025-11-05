@@ -125,10 +125,16 @@ const RevenueActualsPage = () => {
     try {
       const values = await form.validateFields()
 
+      // Add selected department_id to ensure multi-tenancy
+      const dataWithDepartment = {
+        ...values,
+        department_id: selectedDepartment?.id,
+      }
+
       if (editingActual) {
-        updateMutation.mutate({ id: editingActual.id, data: values })
+        updateMutation.mutate({ id: editingActual.id, data: dataWithDepartment })
       } else {
-        createMutation.mutate(values)
+        createMutation.mutate(dataWithDepartment)
       }
     } catch (error) {
       console.error('Validation failed:', error)

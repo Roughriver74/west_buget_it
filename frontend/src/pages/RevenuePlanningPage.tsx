@@ -156,10 +156,11 @@ const RevenuePlanningPage = () => {
     try {
       const values = await form.validateFields()
 
-      // Convert dayjs year to number for API
+      // Convert dayjs year to number for API and add department_id
       const submitData = {
         ...values,
         year: values.year?.year() || values.year,
+        department_id: selectedDepartment?.id,
       }
 
       if (editingPlan) {
@@ -168,10 +169,7 @@ const RevenuePlanningPage = () => {
           data: submitData,
         })
       } else {
-        createPlanMutation.mutate({
-          ...submitData,
-          department_id: selectedDepartment?.id,
-        })
+        createPlanMutation.mutate(submitData)
       }
     } catch (error) {
       console.error('Validation failed:', error)

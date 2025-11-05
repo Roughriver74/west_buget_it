@@ -125,10 +125,16 @@ const RevenueStreamsPage = () => {
     try {
       const values = await form.validateFields()
 
+      // Add selected department_id to ensure multi-tenancy
+      const dataWithDepartment = {
+        ...values,
+        department_id: selectedDepartment?.id,
+      }
+
       if (editingStream) {
-        updateMutation.mutate({ id: editingStream.id, data: values })
+        updateMutation.mutate({ id: editingStream.id, data: dataWithDepartment })
       } else {
-        createMutation.mutate(values)
+        createMutation.mutate(dataWithDepartment)
       }
     } catch (error) {
       console.error('Validation failed:', error)
