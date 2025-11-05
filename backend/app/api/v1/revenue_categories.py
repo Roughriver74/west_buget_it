@@ -117,11 +117,11 @@ def get_revenue_categories(
 
     categories = query.order_by(RevenueCategory.name).offset(skip).limit(limit).all()
 
-    # Cache the result
+    # Cache the result (serialize to dict for JSON)
     cache_service.set(
         CACHE_NAMESPACE,
         cached_key,
-        [RevenueCategoryInDB.model_validate(cat) for cat in categories],
+        [RevenueCategoryInDB.model_validate(cat).model_dump() for cat in categories],
     )
 
     log_info(f"Retrieved {len(categories)} revenue categories", context=f"User {current_user.id}")
