@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_api_tokens_001'
-down_revision = None  # Will be set by Alembic
+down_revision = 'merge_revenue_orgs'
 branch_labels = None
 depends_on = None
 
