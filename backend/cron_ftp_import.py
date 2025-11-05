@@ -41,7 +41,7 @@ async def run_import():
     db = SessionLocal()
 
     try:
-        # Run import with skip_duplicates=True (don't update existing)
+        # Run import with skip_duplicates=True (updates critical fields like status)
         result = await import_from_ftp(
             db=db,
             host=ftp_host,
@@ -50,7 +50,7 @@ async def run_import():
             remote_path=remote_path,
             delete_from_year=None,  # Don't delete old data
             delete_from_month=None,
-            skip_duplicates=True,  # Skip duplicates
+            skip_duplicates=True,  # Update status, amount, payment_date for existing expenses
             default_department_id=None
         )
 

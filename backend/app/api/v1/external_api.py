@@ -78,7 +78,63 @@ def check_write_access(token: APIToken):
 # ============================================================================
 
 
-@router.get("/export/expenses")
+@router.get(
+    "/export/expenses",
+    summary="Экспорт расходов",
+    description="""
+    Экспортирует данные о расходах в формате JSON или CSV.
+
+    **Требуемый scope:** READ
+
+    **Фильтры:**
+    - `year` - Фильтр по году (например, 2025)
+    - `month` - Фильтр по месяцу (1-12)
+    - `format` - Формат вывода: `json` (по умолчанию) или `csv`
+
+    **Изоляция по департаментам:**
+    Возвращает только расходы департамента, к которому привязан API токен.
+
+    **Примеры использования:**
+    ```bash
+    # JSON формат
+    curl -X GET "http://localhost:8000/api/v1/external/export/expenses?year=2025&format=json" \\
+      -H "Authorization: Bearer itb_your_token_here"
+
+    # CSV формат
+    curl -X GET "http://localhost:8000/api/v1/external/export/expenses?year=2025&month=1&format=csv" \\
+      -H "Authorization: Bearer itb_your_token_here" -o expenses.csv
+    ```
+    """,
+    responses={
+        200: {
+            "description": "Успешный экспорт данных",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": [
+                            {
+                                "id": 1,
+                                "amount": 50000.00,
+                                "category_id": 1,
+                                "contractor_id": 5,
+                                "organization_id": 2,
+                                "description": "Закупка серверного оборудования",
+                                "request_date": "2025-01-15",
+                                "payment_date": "2025-01-20",
+                                "status": "APPROVED",
+                                "department_id": 1
+                            }
+                        ],
+                        "count": 1
+                    }
+                }
+            }
+        },
+        401: {"description": "Отсутствует или недействителен API токен"},
+        403: {"description": "У токена нет READ scope"}
+    },
+    tags=["External API - Экспорт"]
+)
 async def export_expenses(
     year: Optional[int] = None,
     month: Optional[int] = None,
@@ -164,7 +220,61 @@ async def export_expenses(
         return {"data": data, "count": len(data)}
 
 
-@router.get("/export/revenue-actuals")
+@router.get(
+    "/export/revenue-actuals",
+    summary="Экспорт фактических доходов",
+    description="""
+    Экспортирует данные о фактических доходах в формате JSON или CSV.
+
+    **Требуемый scope:** READ
+
+    **Фильтры:**
+    - `year` - Фильтр по году (например, 2025)
+    - `month` - Фильтр по месяцу (1-12)
+    - `format` - Формат вывода: `json` (по умолчанию) или `csv`
+
+    **Изоляция по департаментам:**
+    Возвращает только доходы департамента, к которому привязан API токен.
+
+    **Пример ответа включает:**
+    - `year`, `month` - Период
+    - `revenue_stream_id` - ID потока доходов
+    - `revenue_category_id` - ID категории доходов
+    - `planned_amount` - Плановая сумма
+    - `actual_amount` - Фактическая сумма
+    - `variance` - Отклонение (actual - planned)
+    - `variance_percent` - Отклонение в процентах
+    """,
+    responses={
+        200: {
+            "description": "Успешный экспорт данных",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": [
+                            {
+                                "id": 1,
+                                "year": 2025,
+                                "month": 1,
+                                "revenue_stream_id": 1,
+                                "revenue_category_id": 1,
+                                "planned_amount": 95000.00,
+                                "actual_amount": 100000.00,
+                                "variance": 5000.00,
+                                "variance_percent": 5.26,
+                                "department_id": 1
+                            }
+                        ],
+                        "count": 1
+                    }
+                }
+            }
+        },
+        401: {"description": "Отсутствует или недействителен API токен"},
+        403: {"description": "У токена нет READ scope"}
+    },
+    tags=["External API - Экспорт"]
+)
 async def export_revenue_actuals(
     year: Optional[int] = None,
     month: Optional[int] = None,
@@ -250,7 +360,53 @@ async def export_revenue_actuals(
         return {"data": data, "count": len(data)}
 
 
-@router.get("/export/budget-plans")
+@router.get(
+    "/export/budget-plans",
+    summary="Экспорт планов бюджета",
+    description="""
+    Экспортирует данные о планах бюджета в формате JSON.
+
+    **Требуемый scope:** READ
+
+    **Фильтры:**
+    - `year` - Фильтр по году (например, 2025)
+    - `format` - Формат вывода (только `json` поддерживается)
+
+    **Изоляция по департаментам:**
+    Возвращает только планы департамента, к которому привязан API токен.
+
+    **Пример использования:**
+    ```bash
+    curl -X GET "http://localhost:8000/api/v1/external/export/budget-plans?year=2025" \\
+      -H "Authorization: Bearer itb_your_token_here"
+    ```
+    """,
+    responses={
+        200: {
+            "description": "Успешный экспорт данных",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": [
+                            {
+                                "id": 1,
+                                "year": 2025,
+                                "month": 1,
+                                "category_id": 1,
+                                "planned_amount": 150000.00,
+                                "department_id": 1
+                            }
+                        ],
+                        "count": 1
+                    }
+                }
+            }
+        },
+        401: {"description": "Отсутствует или недействителен API токен"},
+        403: {"description": "У токена нет READ scope"}
+    },
+    tags=["External API - Экспорт"]
+)
 async def export_budget_plans(
     year: Optional[int] = None,
     format: str = Query("json", regex="^(json|csv)$"),
@@ -295,7 +451,54 @@ async def export_budget_plans(
     return {"data": data, "count": len(data)}
 
 
-@router.get("/export/employees")
+@router.get(
+    "/export/employees",
+    summary="Экспорт сотрудников",
+    description="""
+    Экспортирует данные о сотрудниках в формате JSON.
+
+    **Требуемый scope:** READ
+
+    **Особенности:**
+    - Экспортируются только активные сотрудники (`is_active = true`)
+    - Данные автоматически фильтруются по департаменту токена
+
+    **Пример ответа включает:**
+    - `id` - ID сотрудника
+    - `full_name` - Полное имя
+    - `position` - Должность
+    - `base_salary` - Базовый оклад
+    - `hire_date` - Дата найма
+    - `department_id` - ID департамента
+    - `is_active` - Статус активности
+    """,
+    responses={
+        200: {
+            "description": "Успешный экспорт данных",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "data": [
+                            {
+                                "id": 1,
+                                "full_name": "Иванов Иван Иванович",
+                                "position": "Системный администратор",
+                                "base_salary": 120000.00,
+                                "hire_date": "2023-01-15",
+                                "department_id": 1,
+                                "is_active": True
+                            }
+                        ],
+                        "count": 1
+                    }
+                }
+            }
+        },
+        401: {"description": "Отсутствует или недействителен API токен"},
+        403: {"description": "У токена нет READ scope"}
+    },
+    tags=["External API - Экспорт"]
+)
 async def export_employees(
     format: str = Query("json", regex="^(json|csv)$"),
     db: Session = Depends(get_db),
@@ -341,7 +544,62 @@ async def export_employees(
 # ============================================================================
 
 
-@router.post("/import/revenue-actuals")
+@router.post(
+    "/import/revenue-actuals",
+    summary="Массовый импорт фактических доходов",
+    description="""
+    Импортирует фактические доходы с автоматическим расчетом отклонений.
+
+    **Требуемый scope:** WRITE
+
+    **Формат данных:**
+    ```json
+    [
+        {
+            "year": 2025,
+            "month": 1,
+            "revenue_stream_id": 1,
+            "revenue_category_id": 1,
+            "actual_amount": 100000.00,
+            "planned_amount": 95000.00
+        }
+    ]
+    ```
+
+    **Автоматические расчеты:**
+    - `variance` = actual_amount - planned_amount
+    - `variance_percent` = (variance / planned_amount) * 100
+    - `department_id` = из токена
+
+    **Обязательные поля:**
+    - `year`, `month` - Период
+    - `revenue_stream_id` - ID потока доходов
+    - `revenue_category_id` - ID категории
+    - `actual_amount` - Фактическая сумма
+
+    **Опциональные поля:**
+    - `planned_amount` - Плановая сумма (для расчета отклонений)
+    """,
+    responses={
+        200: {
+            "description": "Импорт завершен",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "created_count": 12,
+                        "error_count": 0,
+                        "errors": []
+                    }
+                }
+            }
+        },
+        400: {"description": "Данные не предоставлены"},
+        401: {"description": "Недействительный токен"},
+        403: {"description": "Требуется WRITE scope"}
+    },
+    tags=["External API - Импорт"]
+)
 async def import_revenue_actuals(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -418,7 +676,83 @@ async def import_revenue_actuals(
     }
 
 
-@router.post("/import/expenses")
+@router.post(
+    "/import/expenses",
+    summary="Массовый импорт расходов",
+    description="""
+    Импортирует несколько записей расходов за один запрос.
+
+    **Требуемый scope:** WRITE
+
+    **Формат данных:**
+    ```json
+    [
+        {
+            "amount": 10000.00,
+            "category_id": 1,
+            "contractor_id": 1,
+            "organization_id": 1,
+            "description": "Закупка оборудования",
+            "request_date": "2025-01-15",
+            "payment_date": "2025-01-20",
+            "status": "DRAFT"
+        }
+    ]
+    ```
+
+    **Особенности:**
+    - `department_id` автоматически назначается из токена
+    - Даты принимаются в ISO формате (YYYY-MM-DD)
+    - Частичный успех: продолжает импорт при ошибках в отдельных записях
+    - Возвращает список ошибок с индексами и описаниями
+
+    **Обязательные поля:**
+    - `amount` - Сумма (должна быть больше 0)
+    - `category_id` - ID категории бюджета
+    - `request_date` - Дата запроса
+
+    **Опциональные поля:**
+    - `contractor_id` - ID контрагента
+    - `organization_id` - ID организации
+    - `description` - Описание
+    - `payment_date` - Дата оплаты
+    - `status` - Статус (DRAFT, PENDING, APPROVED, REJECTED, PAID)
+
+    **Пример использования:**
+    ```bash
+    curl -X POST "http://localhost:8000/api/v1/external/import/expenses" \\
+      -H "Authorization: Bearer itb_your_token_here" \\
+      -H "Content-Type: application/json" \\
+      -d '[{"amount": 50000, "category_id": 1, "contractor_id": 5, "description": "Серверы", "request_date": "2025-01-15", "status": "DRAFT"}]'
+    ```
+    """,
+    responses={
+        200: {
+            "description": "Импорт завершен (возможны частичные ошибки)",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "created_count": 45,
+                        "error_count": 2,
+                        "errors": [
+                            {
+                                "index": 15,
+                                "error": "category_id: invalid foreign key",
+                                "data": {"amount": 1000, "category_id": 999}
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        400: {"description": "Данные не предоставлены или неверный формат"},
+        401: {"description": "Отсутствует или недействителен API токен"},
+        403: {"description": "У токена нет WRITE scope"},
+        500: {"description": "Ошибка при сохранении в базу данных"}
+    },
+    tags=["External API - Импорт"]
+)
 async def import_expenses(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -501,7 +835,12 @@ async def import_expenses(
 # ============================================================================
 
 
-@router.get("/reference/categories")
+@router.get(
+    "/reference/categories",
+    summary="Справочник категорий бюджета",
+    description="Получить список всех активных категорий бюджета (OPEX/CAPEX). **Требуемый scope:** READ",
+    tags=["External API - Справочники"]
+)
 async def get_categories(
     db: Session = Depends(get_db),
     token: APIToken = Depends(verify_api_token_dependency)
@@ -529,7 +868,12 @@ async def get_categories(
     }
 
 
-@router.get("/reference/contractors")
+@router.get(
+    "/reference/contractors",
+    summary="Справочник контрагентов",
+    description="Получить список всех активных контрагентов (поставщики, подрядчики). **Требуемый scope:** READ",
+    tags=["External API - Справочники"]
+)
 async def get_contractors(
     db: Session = Depends(get_db),
     token: APIToken = Depends(verify_api_token_dependency)
@@ -557,7 +901,12 @@ async def get_contractors(
     }
 
 
-@router.get("/reference/revenue-streams")
+@router.get(
+    "/reference/revenue-streams",
+    summary="Справочник потоков доходов",
+    description="Получить список всех активных потоков доходов. **Требуемый scope:** READ",
+    tags=["External API - Справочники"]
+)
 async def get_revenue_streams(
     db: Session = Depends(get_db),
     token: APIToken = Depends(verify_api_token_dependency)
@@ -585,7 +934,12 @@ async def get_revenue_streams(
     }
 
 
-@router.get("/reference/revenue-categories")
+@router.get(
+    "/reference/revenue-categories",
+    summary="Справочник категорий доходов",
+    description="Получить список всех активных категорий доходов. **Требуемый scope:** READ",
+    tags=["External API - Справочники"]
+)
 async def get_revenue_categories(
     db: Session = Depends(get_db),
     token: APIToken = Depends(verify_api_token_dependency)
@@ -613,7 +967,12 @@ async def get_revenue_categories(
     }
 
 
-@router.get("/reference/organizations")
+@router.get(
+    "/reference/organizations",
+    summary="Справочник организаций",
+    description="Получить список всех активных организаций (юридических лиц). **Требуемый scope:** READ",
+    tags=["External API - Справочники"]
+)
 async def get_organizations(
     db: Session = Depends(get_db),
     token: APIToken = Depends(verify_api_token_dependency)
@@ -648,7 +1007,43 @@ async def get_organizations(
 # ============================================================================
 
 
-@router.post("/import/contractors")
+@router.post(
+    "/import/contractors",
+    summary="Импорт/обновление контрагентов",
+    description="""
+    Массовый импорт контрагентов с поддержкой upsert (создание или обновление по ИНН).
+
+    **Требуемый scope:** WRITE
+
+    **Логика upsert:**
+    - Если контрагент с таким ИНН существует → обновление
+    - Если не существует → создание нового
+
+    **Обязательные поля:**
+    - `name` - Название контрагента
+    - `inn` - ИНН (используется для поиска дубликатов)
+
+    **Опциональные поля:**
+    - `contact_person`, `email`, `phone`, `address`
+    """,
+    responses={
+        200: {
+            "description": "Импорт завершен",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "created_count": 5,
+                        "updated_count": 3,
+                        "error_count": 0,
+                        "errors": []
+                    }
+                }
+            }
+        }
+    },
+    tags=["External API - Импорт"]
+)
 async def import_contractors(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -735,7 +1130,20 @@ async def import_contractors(
     }
 
 
-@router.post("/import/organizations")
+@router.post(
+    "/import/organizations",
+    summary="Импорт/обновление организаций",
+    description="""
+    Массовый импорт организаций с upsert по ИНН.
+
+    **Требуемый scope:** WRITE
+
+    **Обязательные поля:**  `name`, `inn`
+
+    **Опциональные поля:** `legal_name`, `kpp`, `address`
+    """,
+    tags=["External API - Импорт"]
+)
 async def import_organizations(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -821,7 +1229,20 @@ async def import_organizations(
     }
 
 
-@router.post("/import/budget-categories")
+@router.post(
+    "/import/budget-categories",
+    summary="Импорт/обновление категорий бюджета",
+    description="""
+    Массовый импорт категорий бюджета с upsert по названию.
+
+    **Требуемый scope:** WRITE
+
+    **Обязательные поля:** `name`, `category_type` (OPEX или CAPEX)
+
+    **Опциональные поля:** `description`
+    """,
+    tags=["External API - Импорт"]
+)
 async def import_budget_categories(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -904,7 +1325,22 @@ async def import_budget_categories(
     }
 
 
-@router.post("/import/payroll-plans")
+@router.post(
+    "/import/payroll-plans",
+    summary="Импорт/обновление планов ФОТ",
+    description="""
+    Массовый импорт планов фонда оплаты труда с upsert по (year, month, employee_id).
+
+    **Требуемый scope:** WRITE
+
+    **Обязательные поля:** `year`, `month`, `employee_id`, `base_salary`
+
+    **Опциональные поля:** `bonus_type`, `bonus_amount`, `social_contributions`
+
+    **Типы бонусов:** FIXED, PERFORMANCE_BASED, MIXED
+    """,
+    tags=["External API - Импорт"]
+)
 async def import_payroll_plans(
     data: List[Dict[str, Any]],
     db: Session = Depends(get_db),
@@ -993,7 +1429,12 @@ async def import_payroll_plans(
     }
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Проверка работоспособности API",
+    description="Публичный эндпоинт для проверки доступности External API. **Не требует авторизации.**",
+    tags=["External API - Служебное"]
+)
 async def health_check():
     """Public health check endpoint"""
     return {"status": "ok", "service": "IT Budget Manager External API"}

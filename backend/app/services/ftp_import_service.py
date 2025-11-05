@@ -475,7 +475,8 @@ class FTPImportService:
         Args:
             db: Database session
             expenses_data: List of expense dictionaries
-            skip_duplicates: Whether to skip duplicate expenses
+            skip_duplicates: If True, updates only critical fields (status, amount, payment_date, comment).
+                           If False, performs full update of all fields.
             default_department_id: Default department ID if no mapping found
 
         Returns:
@@ -563,24 +564,32 @@ class FTPImportService:
                 }
 
                 if existing:
+                    # Always update critical fields from FTP (even if skip_duplicates=True)
+                    # This ensures status, amounts, and payment dates stay in sync with FTP
+                    track_cache_invalidation(
+                        existing.category_id,
+                        existing.department_id,
+                        existing.request_date,
+                    )
+
                     if skip_duplicates:
-                        skipped += 1
-                        continue
+                        # Update only critical fields that change frequently
+                        critical_fields = ['status', 'is_paid', 'is_closed', 'amount', 'payment_date', 'comment']
+                        for field in critical_fields:
+                            if field in expense_fields:
+                                setattr(existing, field, expense_fields[field])
+                        updated += 1
                     else:
-                        track_cache_invalidation(
-                            existing.category_id,
-                            existing.department_id,
-                            existing.request_date,
-                        )
-                        # Update existing
+                        # Full update of all fields
                         for key, value in expense_fields.items():
                             setattr(existing, key, value)
-                        track_cache_invalidation(
-                            expense_fields.get('category_id'),
-                            expense_fields.get('department_id'),
-                            expense_fields.get('request_date'),
-                        )
                         updated += 1
+
+                    track_cache_invalidation(
+                        expense_fields.get('category_id'),
+                        expense_fields.get('department_id'),
+                        expense_fields.get('request_date'),
+                    )
                 else:
                     # Create new
                     new_expense = Expense(**expense_fields)
@@ -632,7 +641,8 @@ async def import_from_ftp(
         remote_path: Path to Excel file on FTP
         delete_from_year: Year to start deleting from (None = skip deletion)
         delete_from_month: Month to start deleting from (None = skip deletion)
-        skip_duplicates: Whether to skip duplicate expenses
+        skip_duplicates: If True, updates only critical fields (status, amount, payment_date) for existing expenses.
+                        If False, performs full update of all fields.
         default_department_id: Default department ID if no mapping found
 
     Returns:

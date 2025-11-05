@@ -6,7 +6,7 @@ from sqlalchemy import func, or_
 from datetime import datetime, timezone
 import math
 import os
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db import get_db
 from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum, User, UserRoleEnum
@@ -712,7 +712,11 @@ class FTPImportRequest(BaseModel):
     remote_path: str
     delete_from_year: Optional[int] = None
     delete_from_month: Optional[int] = None
-    skip_duplicates: bool = True
+    skip_duplicates: bool = Field(
+        default=True,
+        description="If True, updates only critical fields (status, amount, payment_date) for existing expenses. "
+                    "If False, performs full update of all fields."
+    )
 
 
 @router.post("/import/ftp")
@@ -726,9 +730,11 @@ async def import_expenses_from_ftp(
 
     This endpoint will:
     1. Download Excel file from FTP
-    2. Delete expenses from specified month onwards (default: July 2025)
+    2. Delete expenses from specified month onwards (if delete_from_year/month provided)
     3. Import new expenses from the file
-    4. Skip duplicates based on expense number
+    4. For existing expenses (matched by number):
+       - If skip_duplicates=True: Update only critical fields (status, amount, payment_date, comment)
+       - If skip_duplicates=False: Update all fields
 
     Note: Only ADMIN can import expenses from FTP
     """

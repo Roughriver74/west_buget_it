@@ -22,6 +22,7 @@ import {
   LineChartOutlined,
   BulbOutlined,
   BulbFilled,
+  KeyOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -310,6 +311,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           key: '/users',
           icon: <UserOutlined />,
           label: <Link to="/users">Пользователи</Link>,
+        },
+        {
+          key: '/api-tokens',
+          icon: <KeyOutlined />,
+          label: <Link to="/api-tokens">API Токены</Link>,
         },
       ]
     : baseMenuItems

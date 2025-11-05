@@ -45,6 +45,7 @@ const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage
 // Admin module
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
 const UsersPage = lazy(() => import('./pages/UsersPage'))
+const ApiTokensPage = lazy(() => import('./pages/ApiTokensPage'))
 
 // Payroll module
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage'))
@@ -171,6 +172,16 @@ function App() {
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN']}>
                               <UsersPage />
+                            </ProtectedRoute>
+                          }
+                        />
+
+                        {/* API Tokens - Admin only */}
+                        <Route
+                          path="/api-tokens"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN']}>
+                              <ApiTokensPage />
                             </ProtectedRoute>
                           }
                         />
