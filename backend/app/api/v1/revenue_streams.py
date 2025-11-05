@@ -254,7 +254,7 @@ def create_revenue_stream(
     db.refresh(db_stream)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Created revenue stream {db_stream.id}: {db_stream.name}", context=f"User {current_user.id}")
     return RevenueStreamInDB.model_validate(db_stream)
@@ -306,7 +306,7 @@ def update_revenue_stream(
     db.refresh(db_stream)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Updated revenue stream {stream_id}", context=f"User {current_user.id}")
     return RevenueStreamInDB.model_validate(db_stream)
@@ -340,7 +340,7 @@ def delete_revenue_stream(
     db.commit()
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Deleted revenue stream {stream_id}", context=f"User {current_user.id}")
     return None
@@ -382,7 +382,7 @@ def bulk_update_revenue_streams(
         db.refresh(stream)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Bulk updated {len(streams)} revenue streams", context=f"User {current_user.id}")
     return [RevenueStreamInDB.model_validate(stream) for stream in streams]
@@ -420,7 +420,7 @@ def bulk_delete_revenue_streams(
     db.commit()
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Bulk deleted {len(streams)} revenue streams", context=f"User {current_user.id}")
     return None

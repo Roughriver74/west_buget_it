@@ -146,7 +146,7 @@ def create_revenue_actual(
     db.commit()
     db.refresh(db_actual)
 
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Created revenue actual {db_actual.id} for {db_actual.year}-{db_actual.month:02d}", context=f"User {current_user.id}")
     return RevenueActualInDB.model_validate(db_actual)
@@ -183,7 +183,7 @@ def update_revenue_actual(
     db.commit()
     db.refresh(db_actual)
 
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Updated revenue actual {actual_id}", context=f"User {current_user.id}")
     return RevenueActualInDB.model_validate(db_actual)
@@ -201,7 +201,7 @@ def delete_revenue_actual(
     db.delete(db_actual)
     db.commit()
 
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Deleted revenue actual {actual_id}", context=f"User {current_user.id}")
     return None

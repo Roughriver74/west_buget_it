@@ -252,7 +252,7 @@ def create_revenue_category(
     db.refresh(db_category)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Created revenue category {db_category.id}: {db_category.name}", context=f"User {current_user.id}")
     return RevenueCategoryInDB.model_validate(db_category)
@@ -303,7 +303,7 @@ def update_revenue_category(
     db.refresh(db_category)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Updated revenue category {category_id}", context=f"User {current_user.id}")
     return RevenueCategoryInDB.model_validate(db_category)
@@ -337,7 +337,7 @@ def delete_revenue_category(
     db.commit()
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Deleted revenue category {category_id}", context=f"User {current_user.id}")
     return None
@@ -383,7 +383,7 @@ def bulk_update_revenue_categories(
         db.refresh(category)
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Bulk updated {len(categories)} revenue categories", context=f"User {current_user.id}")
     return [RevenueCategoryInDB.model_validate(cat) for cat in categories]
@@ -421,7 +421,7 @@ def bulk_delete_revenue_categories(
     db.commit()
 
     # Invalidate cache
-    cache_service.clear_namespace(CACHE_NAMESPACE)
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
     log_info(f"Bulk deleted {len(categories)} revenue categories", context=f"User {current_user.id}")
     return None
