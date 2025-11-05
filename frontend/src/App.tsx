@@ -103,21 +103,21 @@ function App() {
                           }
                         />
 
-                        {/* Budget planning (multi-year) - Admin and Manager only */}
+                        {/* Budget planning (multi-year) - All authenticated users (filtered by department) */}
                         <Route
                           path="/budget/planning"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <BudgetPlanningPage />
                             </ProtectedRoute>
                           }
                         />
 
-                        {/* Reference data - Accountant and Admin only */}
+                        {/* Reference data - All authenticated users can access (filtered by department) */}
                         <Route
                           path="/categories"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <CategoriesPage />
                             </ProtectedRoute>
                           }
@@ -125,7 +125,7 @@ function App() {
                         <Route
                           path="/contractors"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <ContractorsPage />
                             </ProtectedRoute>
                           }
@@ -133,7 +133,7 @@ function App() {
                         <Route
                           path="/contractors/:id"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <ContractorDetailPage />
                             </ProtectedRoute>
                           }
@@ -141,7 +141,7 @@ function App() {
                         <Route
                           path="/organizations"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <OrganizationsPage />
                             </ProtectedRoute>
                           }
@@ -149,7 +149,7 @@ function App() {
                         <Route
                           path="/organizations/:id"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <OrganizationDetailPage />
                             </ProtectedRoute>
                           }
@@ -187,7 +187,7 @@ function App() {
                         <Route
                           path="/employees"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <EmployeesPage />
                             </ProtectedRoute>
                           }
@@ -195,7 +195,7 @@ function App() {
                         <Route
                           path="/payroll/plan"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <PayrollPlanPage />
                             </ProtectedRoute>
                           }
@@ -203,7 +203,7 @@ function App() {
                         <Route
                           path="/payroll/actuals"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <PayrollActualsPage />
                             </ProtectedRoute>
                           }
@@ -211,7 +211,7 @@ function App() {
                         <Route
                           path="/payroll/kpi"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <KpiManagementPage />
                             </ProtectedRoute>
                           }
@@ -219,7 +219,7 @@ function App() {
                         <Route
                           path="/payroll/analytics"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <PayrollAnalyticsPage />
                             </ProtectedRoute>
                           }
@@ -227,7 +227,7 @@ function App() {
                         <Route
                           path="/payroll/ndfl"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT', 'USER']}>
                               <NDFLCalculatorPage />
                             </ProtectedRoute>
                           }
@@ -235,7 +235,7 @@ function App() {
                         <Route
                           path="/kpi/analytics"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <KPIAnalyticsPage />
                             </ProtectedRoute>
                           }
@@ -250,11 +250,11 @@ function App() {
                         <Route path="/revenue/seasonality" element={<SeasonalityPage />} />
                         <Route path="/revenue/analytics" element={<RevenueAnalyticsPage />} />
 
-                        {/* Revenue Planning - Admin and Manager only */}
+                        {/* Revenue Planning - All authenticated users (filtered by department) */}
                         <Route
                           path="/revenue/planning"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <RevenuePlanningPage />
                             </ProtectedRoute>
                           }
@@ -262,7 +262,7 @@ function App() {
                         <Route
                           path="/revenue/planning/:planId"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <RevenuePlanDetailsPage />
                             </ProtectedRoute>
                           }

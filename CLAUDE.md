@@ -233,11 +233,19 @@ const MyPage = () => {
 
 ### 🎭 3. Role-Based Access Control
 
-Three roles with different access levels:
+Four roles with different access levels:
 
-- **USER**: Only sees their own department data
-- **MANAGER**: Can view and filter all departments
-- **ADMIN**: Full system access + user management
+- **USER**: Full access to all features, but **only sees their own department data** (auto-filtered by backend)
+- **MANAGER**: Full access to all features, **can view and filter all departments**
+- **ACCOUNTANT**: Access to reference data (categories, contractors, organizations), NDFL calculator
+- **ADMIN**: Full system access + user management + department management
+
+**Access Control Flow:**
+1. Frontend routes check if user has required role (via `requiredRoles` in `ProtectedRoute`)
+2. Backend API filters data by `department_id` based on user role:
+   - **USER**: queries automatically filtered to `user.department_id`
+   - **MANAGER/ADMIN**: can specify `department_id` parameter to filter or see all departments
+3. All data entities have `department_id` for multi-tenancy isolation
 
 Check roles on both backend (API endpoints) and frontend (UI components).
 
