@@ -83,7 +83,7 @@ const ApiTokensDrawer: React.FC<ApiTokensDrawerProps> = ({ visible, onClose }) =
 
   // Mutation для отзыва токена
   const revokeMutation = useMutation({
-    mutationFn: revokeToken,
+    mutationFn: (tokenId: number) => revokeToken(tokenId),
     onSuccess: () => {
       message.success('Токен успешно отозван!')
       queryClient.invalidateQueries({ queryKey: ['apiTokens'] })
