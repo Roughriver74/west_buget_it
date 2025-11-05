@@ -14,6 +14,30 @@ import './index.css'
 
 dayjs.locale('ru')
 
+// Handle chunk load errors (happens after deployments when old chunks are gone)
+window.addEventListener('error', (event) => {
+  const isChunkLoadError = event.message?.includes('Failed to fetch dynamically imported module') ||
+                          event.message?.includes('Importing a module script failed') ||
+                          event.message?.includes('error loading dynamically imported module')
+
+  if (isChunkLoadError) {
+    // Check if we already tried to reload (avoid infinite loop)
+    const hasReloaded = sessionStorage.getItem('chunk-load-error-reloaded')
+    if (!hasReloaded) {
+      sessionStorage.setItem('chunk-load-error-reloaded', 'true')
+      console.log('Chunk load error detected, reloading page...')
+      window.location.reload()
+    } else {
+      console.error('Chunk load error persists after reload')
+    }
+  }
+})
+
+// Clear reload flag on successful load
+window.addEventListener('load', () => {
+  sessionStorage.removeItem('chunk-load-error-reloaded')
+})
+
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined
 if (sentryDsn) {
   const tracesSampleRate = Number(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE ?? '0')
