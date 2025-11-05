@@ -134,13 +134,13 @@ const RevenuePlanningPage = () => {
       setEditingPlan(plan)
       form.setFieldsValue({
         name: plan.name,
-        year: plan.year,
+        year: dayjs().year(plan.year),
         description: plan.description,
       })
     } else {
       setEditingPlan(null)
       form.setFieldsValue({
-        year: selectedYear,
+        year: dayjs().year(selectedYear),
       })
     }
     setIsModalVisible(true)
@@ -156,14 +156,20 @@ const RevenuePlanningPage = () => {
     try {
       const values = await form.validateFields()
 
+      // Convert dayjs year to number for API
+      const submitData = {
+        ...values,
+        year: values.year?.year() || values.year,
+      }
+
       if (editingPlan) {
         updatePlanMutation.mutate({
           id: editingPlan.id,
-          data: values,
+          data: submitData,
         })
       } else {
         createPlanMutation.mutate({
-          ...values,
+          ...submitData,
           department_id: selectedDepartment?.id,
         })
       }
