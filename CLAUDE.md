@@ -20,6 +20,8 @@ ssh root@93.189.228.52
 
 **Troubleshooting deployment issues**: See [Coolify Fix Guide](docs/COOLIFY_FIX.md) - решение проблем с API URL и CORS
 
+**Auto proxy restart**: See [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
+
 ### Quick Start
 ```bash
 ./run.sh                    # Start all services (PostgreSQL, Backend, Frontend)
