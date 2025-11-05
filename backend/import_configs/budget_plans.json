@@ -1,0 +1,94 @@
+{
+  "entity": "budget_plans",
+  "display_name": {
+    "ru": "План бюджета",
+    "en": "Budget Plans"
+  },
+  "description": {
+    "ru": "Планирование бюджета по категориям и месяцам",
+    "en": "Budget planning by categories and months"
+  },
+  "fields": [
+    {
+      "name": "year",
+      "display_name": {
+        "ru": "Год",
+        "en": "Year"
+      },
+      "type": "integer",
+      "required": true,
+      "min": 2020,
+      "max": 2100,
+      "aliases": ["год", "period_year"]
+    },
+    {
+      "name": "month",
+      "display_name": {
+        "ru": "Месяц",
+        "en": "Month"
+      },
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 12,
+      "aliases": ["месяц", "period_month"]
+    },
+    {
+      "name": "category_name",
+      "display_name": {
+        "ru": "Категория",
+        "en": "Category"
+      },
+      "type": "string",
+      "required": true,
+      "lookup_entity": "budget_categories",
+      "lookup_field": "name",
+      "auto_create": true,
+      "aliases": ["категория", "category", "статья"]
+    },
+    {
+      "name": "planned_amount",
+      "display_name": {
+        "ru": "Плановая сумма",
+        "en": "Planned Amount"
+      },
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "aliases": ["план", "planned", "бюджет", "budget"]
+    },
+    {
+      "name": "capex_planned",
+      "display_name": {
+        "ru": "CAPEX план",
+        "en": "CAPEX Planned"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["capex", "капитальные_расходы", "инвестиции"]
+    },
+    {
+      "name": "opex_planned",
+      "display_name": {
+        "ru": "OPEX план",
+        "en": "OPEX Planned"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["opex", "операционные_расходы", "текущие_расходы"]
+    }
+  ],
+  "validation_rules": {
+    "unique_fields": ["year", "month", "category_name"]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": ["year", "month", "category_name"],
+    "batch_size": 100,
+    "auto_create_related": true
+  }
+}

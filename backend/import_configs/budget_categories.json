@@ -1,0 +1,67 @@
+{
+  "entity": "budget_categories",
+  "display_name": {
+    "ru": "Категории бюджета",
+    "en": "Budget Categories"
+  },
+  "description": {
+    "ru": "Справочник категорий расходов бюджета (OPEX/CAPEX)",
+    "en": "Budget expense categories reference (OPEX/CAPEX)"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "display_name": {
+        "ru": "Название",
+        "en": "Name"
+      },
+      "type": "string",
+      "required": true,
+      "min_length": 1,
+      "max_length": 255,
+      "aliases": ["название", "наименование", "category", "категория"]
+    },
+    {
+      "name": "category_type",
+      "display_name": {
+        "ru": "Тип расхода",
+        "en": "Expense Type"
+      },
+      "type": "enum",
+      "required": true,
+      "enum": ["OPEX", "CAPEX"],
+      "aliases": ["тип", "type", "вид"]
+    },
+    {
+      "name": "description",
+      "display_name": {
+        "ru": "Описание",
+        "en": "Description"
+      },
+      "type": "string",
+      "required": false,
+      "max_length": 1000,
+      "aliases": ["описание", "комментарий", "comment"]
+    },
+    {
+      "name": "is_active",
+      "display_name": {
+        "ru": "Активна",
+        "en": "Is Active"
+      },
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активна", "active", "действует"]
+    }
+  ],
+  "validation_rules": {
+    "unique_fields": ["name"]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "name",
+    "batch_size": 100,
+    "auto_create_related": false
+  }
+}

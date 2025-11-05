@@ -78,7 +78,9 @@ postgresql://budget_user:budget_pass@localhost:54329/it_budget_db
 
 ### Data Import
 
-#### Universal Import System (Recommended)
+Система поддерживает **два метода импорта данных**:
+
+#### 1. Unified Import API (Excel файлы) - Рекомендуется
 ```bash
 # 1. Get available entities
 curl -X GET "http://localhost:8000/api/v1/import/entities" -H "Authorization: Bearer $TOKEN"
@@ -116,9 +118,32 @@ curl -X POST "http://localhost:8000/api/v1/import/execute" \
 - ✅ Multi-language templates (RU/EN)
 - ✅ Auto-create related entities
 
-**Supported entities:** categories, contractors, organizations, employees, payroll_plans, expenses
+**Supported entities:** budget_categories, contractors, organizations, employees, payroll_plans, expenses, budget_plans, budget_plan_details, revenue_streams, revenue_categories, revenue_plan_details
 
-See full documentation: `docs/UNIVERSAL_IMPORT_SYSTEM.md`
+#### 2. External API (JSON/CSV с токенами) - Для автоматизации
+```bash
+# Создать API Token в веб-интерфейсе (раздел "API Tokens")
+
+# Import data
+curl -X POST "http://localhost:8000/api/v1/external/import/expenses" \
+  -H "Authorization: Bearer <api_token>" \
+  -H "Content-Type: application/json" \
+  -d '[{"amount": 50000, "category_id": 1, "contractor_id": 5, ...}]'
+
+# Export data (JSON or CSV)
+curl -X GET "http://localhost:8000/api/v1/external/export/expenses?year=2025&format=csv" \
+  -H "Authorization: Bearer <api_token>" -o expenses.csv
+```
+
+**Supported operations:**
+- ✅ Import: expenses, revenue-actuals, contractors, organizations, budget-categories, payroll-plans
+- ✅ Export: expenses, revenue-actuals, budget-plans, employees
+- ✅ Reference data: categories, contractors, organizations, revenue-streams, revenue-categories
+
+**Полная документация:**
+- 📖 **Подробное руководство:** `docs/API_DATA_IMPORT.md`
+- 🚀 **Быстрый старт (RU):** `docs/DATA_IMPORT_QUICKSTART_RU.md`
+- 🌐 **Swagger UI:** http://localhost:8000/docs
 
 #### Legacy Scripts (Manual)
 ```bash

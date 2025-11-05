@@ -585,6 +585,414 @@ async def get_revenue_streams(
     }
 
 
+@router.get("/reference/revenue-categories")
+async def get_revenue_categories(
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """Get all revenue categories (READ scope)"""
+    check_read_access(token)
+
+    query = db.query(RevenueCategory).filter(RevenueCategory.is_active == True)
+
+    if token.department_id:
+        query = query.filter(RevenueCategory.department_id == token.department_id)
+
+    categories = query.all()
+
+    return {
+        "data": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "description": c.description,
+                "department_id": c.department_id,
+            }
+            for c in categories
+        ]
+    }
+
+
+@router.get("/reference/organizations")
+async def get_organizations(
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """Get all organizations (READ scope)"""
+    check_read_access(token)
+
+    query = db.query(Organization).filter(Organization.is_active == True)
+
+    if token.department_id:
+        query = query.filter(Organization.department_id == token.department_id)
+
+    orgs = query.all()
+
+    return {
+        "data": [
+            {
+                "id": o.id,
+                "name": o.name,
+                "legal_name": o.legal_name,
+                "inn": o.inn,
+                "kpp": o.kpp,
+                "department_id": o.department_id,
+            }
+            for o in orgs
+        ]
+    }
+
+
+# ============================================================================
+# Additional Import Endpoints
+# ============================================================================
+
+
+@router.post("/import/contractors")
+async def import_contractors(
+    data: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """
+    Import contractors data in bulk
+
+    Requires: WRITE scope
+
+    Data format:
+    [
+        {
+            "name": "ООО Поставщик",
+            "inn": "1234567890",
+            "contact_person": "Иванов И.И.",
+            "email": "contact@supplier.ru",
+            "phone": "+7 (495) 123-45-67"
+        },
+        ...
+    ]
+    """
+    check_write_access(token)
+
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data provided"
+        )
+
+    created_count = 0
+    updated_count = 0
+    errors = []
+
+    for idx, item in enumerate(data):
+        try:
+            # Auto-assign department from token
+            item["department_id"] = token.department_id
+
+            # Check if contractor exists by INN
+            existing = None
+            if item.get("inn"):
+                existing = db.query(Contractor).filter(
+                    Contractor.inn == item["inn"],
+                    Contractor.department_id == token.department_id
+                ).first()
+
+            if existing:
+                # Update existing
+                for key, value in item.items():
+                    if key != "id":
+                        setattr(existing, key, value)
+                updated_count += 1
+            else:
+                # Create new
+                contractor = Contractor(**item)
+                db.add(contractor)
+                created_count += 1
+
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "data": item})
+            log_error(f"Error importing contractor at index {idx}: {str(e)}")
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to commit data: {str(e)}"
+        )
+
+    log_info(
+        f"External API: Imported {created_count} contractors, updated {updated_count} ({len(errors)} errors)",
+        context=f"Token: {token.name} (ID: {token.id})"
+    )
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": len(errors),
+        "errors": errors
+    }
+
+
+@router.post("/import/organizations")
+async def import_organizations(
+    data: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """
+    Import organizations data in bulk
+
+    Requires: WRITE scope
+
+    Data format:
+    [
+        {
+            "name": "ООО Компания",
+            "legal_name": "Общество с ограниченной ответственностью Компания",
+            "inn": "1234567890",
+            "kpp": "123456789"
+        },
+        ...
+    ]
+    """
+    check_write_access(token)
+
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data provided"
+        )
+
+    created_count = 0
+    updated_count = 0
+    errors = []
+
+    for idx, item in enumerate(data):
+        try:
+            # Auto-assign department from token
+            item["department_id"] = token.department_id
+
+            # Check if organization exists by INN
+            existing = None
+            if item.get("inn"):
+                existing = db.query(Organization).filter(
+                    Organization.inn == item["inn"],
+                    Organization.department_id == token.department_id
+                ).first()
+
+            if existing:
+                # Update existing
+                for key, value in item.items():
+                    if key != "id":
+                        setattr(existing, key, value)
+                updated_count += 1
+            else:
+                # Create new
+                org = Organization(**item)
+                db.add(org)
+                created_count += 1
+
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "data": item})
+            log_error(f"Error importing organization at index {idx}: {str(e)}")
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to commit data: {str(e)}"
+        )
+
+    log_info(
+        f"External API: Imported {created_count} organizations, updated {updated_count} ({len(errors)} errors)",
+        context=f"Token: {token.name} (ID: {token.id})"
+    )
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": len(errors),
+        "errors": errors
+    }
+
+
+@router.post("/import/budget-categories")
+async def import_budget_categories(
+    data: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """
+    Import budget categories data in bulk
+
+    Requires: WRITE scope
+
+    Data format:
+    [
+        {
+            "name": "Оборудование",
+            "category_type": "CAPEX",
+            "description": "Закупка оборудования"
+        },
+        ...
+    ]
+    """
+    check_write_access(token)
+
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data provided"
+        )
+
+    created_count = 0
+    updated_count = 0
+    errors = []
+
+    for idx, item in enumerate(data):
+        try:
+            # Auto-assign department from token
+            item["department_id"] = token.department_id
+
+            # Check if category exists by name
+            existing = db.query(BudgetCategory).filter(
+                BudgetCategory.name == item["name"],
+                BudgetCategory.department_id == token.department_id
+            ).first()
+
+            if existing:
+                # Update existing
+                for key, value in item.items():
+                    if key != "id":
+                        setattr(existing, key, value)
+                updated_count += 1
+            else:
+                # Create new
+                category = BudgetCategory(**item)
+                db.add(category)
+                created_count += 1
+
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "data": item})
+            log_error(f"Error importing budget category at index {idx}: {str(e)}")
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to commit data: {str(e)}"
+        )
+
+    log_info(
+        f"External API: Imported {created_count} budget categories, updated {updated_count} ({len(errors)} errors)",
+        context=f"Token: {token.name} (ID: {token.id})"
+    )
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": len(errors),
+        "errors": errors
+    }
+
+
+@router.post("/import/payroll-plans")
+async def import_payroll_plans(
+    data: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    token: APIToken = Depends(verify_api_token_dependency)
+):
+    """
+    Import payroll plans data in bulk
+
+    Requires: WRITE scope
+
+    Data format:
+    [
+        {
+            "year": 2025,
+            "month": 1,
+            "employee_id": 1,
+            "base_salary": 100000.00,
+            "bonus_type": "FIXED",
+            "bonus_amount": 20000.00,
+            "social_contributions": 30000.00
+        },
+        ...
+    ]
+    """
+    check_write_access(token)
+
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No data provided"
+        )
+
+    created_count = 0
+    updated_count = 0
+    errors = []
+
+    for idx, item in enumerate(data):
+        try:
+            # Auto-assign department from token
+            item["department_id"] = token.department_id
+
+            # Check if payroll plan exists
+            existing = db.query(PayrollPlan).filter(
+                PayrollPlan.year == item["year"],
+                PayrollPlan.month == item["month"],
+                PayrollPlan.employee_id == item["employee_id"],
+                PayrollPlan.department_id == token.department_id
+            ).first()
+
+            if existing:
+                # Update existing
+                for key, value in item.items():
+                    if key != "id":
+                        setattr(existing, key, value)
+                updated_count += 1
+            else:
+                # Create new
+                plan = PayrollPlan(**item)
+                db.add(plan)
+                created_count += 1
+
+        except Exception as e:
+            errors.append({"index": idx, "error": str(e), "data": item})
+            log_error(f"Error importing payroll plan at index {idx}: {str(e)}")
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to commit data: {str(e)}"
+        )
+
+    log_info(
+        f"External API: Imported {created_count} payroll plans, updated {updated_count} ({len(errors)} errors)",
+        context=f"Token: {token.name} (ID: {token.id})"
+    )
+
+    return {
+        "success": True,
+        "created_count": created_count,
+        "updated_count": updated_count,
+        "error_count": len(errors),
+        "errors": errors
+    }
+
+
 @router.get("/health")
 async def health_check():
     """Public health check endpoint"""

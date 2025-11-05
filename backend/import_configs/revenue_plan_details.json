@@ -1,0 +1,103 @@
+{
+  "entity": "revenue_plan_details",
+  "display_name": {
+    "ru": "Детализация плана доходов",
+    "en": "Revenue Plan Details"
+  },
+  "description": {
+    "ru": "Детальное планирование доходов по потокам и категориям",
+    "en": "Detailed revenue planning by streams and categories"
+  },
+  "fields": [
+    {
+      "name": "version_id",
+      "display_name": {
+        "ru": "ID версии",
+        "en": "Version ID"
+      },
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "aliases": ["версия", "version"]
+    },
+    {
+      "name": "revenue_stream_name",
+      "display_name": {
+        "ru": "Поток доходов",
+        "en": "Revenue Stream"
+      },
+      "type": "string",
+      "required": false,
+      "lookup_entity": "revenue_streams",
+      "lookup_field": "name",
+      "auto_create": false,
+      "aliases": ["поток", "stream", "источник"]
+    },
+    {
+      "name": "revenue_category_name",
+      "display_name": {
+        "ru": "Категория доходов",
+        "en": "Revenue Category"
+      },
+      "type": "string",
+      "required": false,
+      "lookup_entity": "revenue_categories",
+      "lookup_field": "name",
+      "auto_create": false,
+      "aliases": ["категория", "category"]
+    },
+    {
+      "name": "month",
+      "display_name": {
+        "ru": "Месяц",
+        "en": "Month"
+      },
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 12,
+      "aliases": ["месяц", "period_month"]
+    },
+    {
+      "name": "planned_amount",
+      "display_name": {
+        "ru": "Плановая сумма",
+        "en": "Planned Amount"
+      },
+      "type": "decimal",
+      "required": true,
+      "min": 0,
+      "aliases": ["план", "planned", "прогноз", "forecast"]
+    },
+    {
+      "name": "probability",
+      "display_name": {
+        "ru": "Вероятность",
+        "en": "Probability"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "max": 100,
+      "aliases": ["вероятность", "уверенность", "confidence"]
+    },
+    {
+      "name": "notes",
+      "display_name": {
+        "ru": "Примечания",
+        "en": "Notes"
+      },
+      "type": "string",
+      "required": false,
+      "max_length": 1000,
+      "aliases": ["примечания", "комментарий", "comment", "description"]
+    }
+  ],
+  "validation_rules": {},
+  "import_options": {
+    "allow_update": true,
+    "update_key": ["version_id", "month", "revenue_stream_name", "revenue_category_name"],
+    "batch_size": 100,
+    "auto_create_related": false
+  }
+}

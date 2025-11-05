@@ -1,0 +1,78 @@
+{
+  "entity": "organizations",
+  "display_name": {
+    "ru": "Организации",
+    "en": "Organizations"
+  },
+  "description": {
+    "ru": "Справочник внутренних организаций компании",
+    "en": "Internal company organizations reference"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "display_name": {
+        "ru": "Название",
+        "en": "Name"
+      },
+      "type": "string",
+      "required": true,
+      "min_length": 1,
+      "max_length": 255,
+      "aliases": ["название", "наименование", "организация", "company"]
+    },
+    {
+      "name": "legal_name",
+      "display_name": {
+        "ru": "Юридическое название",
+        "en": "Legal Name"
+      },
+      "type": "string",
+      "required": false,
+      "max_length": 500,
+      "aliases": ["юридическое_название", "полное_название", "full_name"]
+    },
+    {
+      "name": "inn",
+      "display_name": {
+        "ru": "ИНН",
+        "en": "TIN"
+      },
+      "type": "string",
+      "required": false,
+      "pattern": "^\\d{10}|\\d{12}$",
+      "aliases": ["ИНН", "tin", "tax_id"]
+    },
+    {
+      "name": "kpp",
+      "display_name": {
+        "ru": "КПП",
+        "en": "KPP"
+      },
+      "type": "string",
+      "required": false,
+      "pattern": "^\\d{9}$",
+      "aliases": ["КПП", "kpp"]
+    },
+    {
+      "name": "is_active",
+      "display_name": {
+        "ru": "Активна",
+        "en": "Is Active"
+      },
+      "type": "boolean",
+      "required": false,
+      "default": true,
+      "aliases": ["активна", "active", "действует"]
+    }
+  ],
+  "validation_rules": {
+    "unique_fields": ["inn"]
+  },
+  "import_options": {
+    "allow_update": true,
+    "update_key": "inn",
+    "batch_size": 100,
+    "auto_create_related": false
+  }
+}
