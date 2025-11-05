@@ -72,3 +72,6 @@ export const departmentsApi = {
 
 // Alias for consistency
 export const departmentsAPI = departmentsApi
+
+// Export shorthand for compatibility
+export const getDepartments = departmentsApi.getAll

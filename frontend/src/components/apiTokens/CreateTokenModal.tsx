@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Modal, Form, Input, Select, DatePicker, Checkbox, Space, Alert } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import type { CreateTokenRequest, APITokenScope } from '../../types/apiToken';
+import type { Department } from '@/contexts/DepartmentContext';
 import { getDepartments } from '../../api/departments';
 import dayjs from 'dayjs';
 
@@ -29,17 +30,15 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({
   loading = false
 }) => {
   const [form] = Form.useForm();
-  const [selectedScopes, setSelectedScopes] = useState<APITokenScope[]>([]);
 
-  const { data: departments } = useQuery({
+  const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ['departments'],
-    queryFn: getDepartments
+    queryFn: () => getDepartments()
   });
 
   useEffect(() => {
     if (!visible) {
       form.resetFields();
-      setSelectedScopes([]);
     }
   }, [visible, form]);
 
@@ -65,10 +64,7 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({
   const handleScopesChange = (scopes: APITokenScope[]) => {
     // If ADMIN is selected, auto-select all scopes
     if (scopes.includes('ADMIN')) {
-      setSelectedScopes(['READ', 'WRITE', 'DELETE', 'ADMIN']);
       form.setFieldsValue({ scopes: ['READ', 'WRITE', 'DELETE', 'ADMIN'] });
-    } else {
-      setSelectedScopes(scopes);
     }
   };
 

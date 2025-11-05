@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Table,
@@ -8,14 +8,12 @@ import {
   Modal,
   message,
   Tooltip,
-  Typography,
-  Descriptions
+  Typography
 } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
   StopOutlined,
-  EyeOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -26,7 +24,6 @@ import 'dayjs/locale/ru';
 import AppLayout from '../components/common/AppLayout';
 import CreateTokenModal from '../components/apiTokens/CreateTokenModal';
 import ShowTokenModal from '../components/apiTokens/ShowTokenModal';
-import { useAuth } from '../contexts/AuthContext';
 import * as apiTokensApi from '../api/apiTokens';
 import type { APIToken, APITokenWithKey, CreateTokenRequest, APITokenStatus, APITokenScope } from '../types/apiToken';
 
@@ -37,7 +34,6 @@ const { Title, Text } = Typography;
 const { confirm } = Modal;
 
 const ApiTokensPage: React.FC = () => {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -289,7 +285,9 @@ const ApiTokensPage: React.FC = () => {
         <CreateTokenModal
           visible={createModalVisible}
           onCancel={() => setCreateModalVisible(false)}
-          onSubmit={(values) => createMutation.mutateAsync(values)}
+          onSubmit={async (values) => {
+            await createMutation.mutateAsync(values);
+          }}
           loading={createMutation.isPending}
         />
 
