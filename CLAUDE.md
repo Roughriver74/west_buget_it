@@ -18,9 +18,11 @@ ssh root@93.189.228.52
 
 **Production deployment**: See [Coolify Setup Guide](docs/COOLIFY_SETUP.md)
 
-**Troubleshooting deployment issues**: See [Coolify Fix Guide](docs/COOLIFY_FIX.md) - решение проблем с API URL и CORS
-
-**Auto proxy restart**: See [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
+**Troubleshooting deployment issues**:
+- [Coolify Fix Guide](docs/COOLIFY_FIX.md) - решение проблем с API URL и CORS
+- [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
+- [Memory Optimization](docs/MEMORY_OPTIMIZATION.md) - решение проблемы потери доступа через 15-20 минут (OOM)
+- [Memory Fix Quick Reference](docs/MEMORY_FIX.md) - краткая памятка по проблеме с памятью
 
 ### Quick Start
 ```bash

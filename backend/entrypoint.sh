@@ -105,12 +105,15 @@ echo ""
 
 # Start the application with Gunicorn
 # Note: Always bind to 8000 inside container, external port mapping is handled by Docker
+# Memory optimization: reduced workers and automatic worker restart to prevent memory leaks
 exec gunicorn app.main:app \
-    --workers "${GUNICORN_WORKERS:-4}" \
+    --workers "${GUNICORN_WORKERS:-2}" \
     --worker-class uvicorn.workers.UvicornWorker \
     --bind "0.0.0.0:8000" \
     --timeout "${GUNICORN_TIMEOUT:-120}" \
     --keep-alive "${GUNICORN_KEEPALIVE:-5}" \
+    --max-requests "${GUNICORN_MAX_REQUESTS:-1000}" \
+    --max-requests-jitter "${GUNICORN_MAX_REQUESTS_JITTER:-50}" \
     --access-logfile - \
     --error-logfile - \
     --log-level "${LOG_LEVEL:-info}"

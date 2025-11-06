@@ -97,6 +97,13 @@ services:
       # Monitoring
       SENTRY_DSN: ${SENTRY_DSN:-}
       PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+
+      # Gunicorn optimization for low-memory servers
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}  # Reduced from 4 to 2 workers
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
+      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}  # Restart workers after 1000 requests to prevent memory leaks
+      GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-50}
     ports:
       - "${BACKEND_PORT:-8888}:8000"
     volumes:
@@ -116,6 +123,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    # Memory limits to prevent OOM kills
+    deploy:
+      resources:
+        limits:
+          memory: 512M  # Hard limit to prevent OOM
+        reservations:
+          memory: 256M  # Minimum guaranteed memory
     # Note: Coolify uses Caddy for proxying, not Traefik
     # CORS should be configured via CORS_ORIGINS environment variable in backend
 
