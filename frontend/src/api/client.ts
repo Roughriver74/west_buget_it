@@ -1,9 +1,8 @@
 import axios from 'axios'
-import { API_BASE_URL } from '../config/api'
+import { getApiBaseUrl } from '../config/api'
 import { logger } from '../utils/logger'
 
 export const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,6 +11,10 @@ export const apiClient = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
+    // IMPORTANT: Set baseURL dynamically on EVERY request to use runtime config
+    // This ensures we always use the latest value from window.ENV_CONFIG
+    config.baseURL = `${getApiBaseUrl()}/`;
+
     // Add auth token from localStorage
     const token = localStorage.getItem('token')
     if (token) {

@@ -28,17 +28,24 @@ const getRawApiUrl = (): string => {
 };
 
 // Build API base URL with /api/v1 prefix
-const rawApiUrl = getRawApiUrl();
+// IMPORTANT: Use getter function to make it dynamic (re-evaluated on each access)
+export const getApiBaseUrl = (): string => {
+  const rawApiUrl = getRawApiUrl();
 
-// If rawApiUrl already contains /api/v1, use it as is
-// Otherwise, append /api/v1
-export const API_BASE_URL = rawApiUrl
-  ? (rawApiUrl.includes('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`)
-  : '/api/v1';
+  // If rawApiUrl already contains /api/v1, use it as is
+  // Otherwise, append /api/v1
+  return rawApiUrl
+    ? (rawApiUrl.includes('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`)
+    : '/api/v1';
+};
+
+// Deprecated: Use getApiBaseUrl() instead for dynamic runtime config
+// This is kept for backwards compatibility but may use stale build-time values
+export const API_BASE_URL = getApiBaseUrl();
 
 export const API_ROOT = import.meta.env.VITE_API_ROOT || '';
 
-// Helper to build API URLs
+// Helper to build API URLs (dynamic)
 export const buildApiUrl = (path: string): string => {
   // Remove leading slash from path if present
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
@@ -48,6 +55,6 @@ export const buildApiUrl = (path: string): string => {
     return `/${cleanPath}`;
   }
 
-  // Otherwise prepend API_BASE_URL
-  return `${API_BASE_URL}/${cleanPath}`;
+  // Otherwise prepend API_BASE_URL (get fresh value)
+  return `${getApiBaseUrl()}/${cleanPath}`;
 };
