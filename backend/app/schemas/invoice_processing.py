@@ -7,7 +7,7 @@ from datetime import date as DateType, datetime
 from decimal import Decimal
 
 
-# ==================== Supplier Data ====================
+# ==================== Supplier & Buyer Data ====================
 
 class SupplierData(BaseModel):
     """Данные поставщика из счета"""
@@ -18,6 +18,22 @@ class SupplierData(BaseModel):
     bik: Optional[str] = Field(None, description="БИК банка", min_length=9, max_length=9)
     account: Optional[str] = Field(None, description="Расчетный счет", min_length=20, max_length=20)
     corr_account: Optional[str] = Field(None, description="Корр. счет")
+
+    @field_validator('inn')
+    @classmethod
+    def validate_inn(cls, v):
+        if v and not v.isdigit():
+            raise ValueError('ИНН должен содержать только цифры')
+        if v and len(v) not in [10, 12]:
+            raise ValueError('ИНН должен быть 10 или 12 цифр')
+        return v
+
+
+class BuyerData(BaseModel):
+    """Данные покупателя из счета"""
+    name: Optional[str] = Field(None, description="Наименование организации")
+    inn: Optional[str] = Field(None, description="ИНН", min_length=10, max_length=12)
+    kpp: Optional[str] = Field(None, description="КПП", min_length=9, max_length=9)
 
     @field_validator('inn')
     @classmethod
@@ -46,6 +62,7 @@ class ParsedInvoiceData(BaseModel):
     invoice_date: Optional[DateType] = Field(None, description="Дата счета")
 
     supplier: Optional[SupplierData] = Field(None, description="Данные поставщика")
+    buyer: Optional[BuyerData] = Field(None, description="Данные покупателя")
 
     # Суммы
     amount_without_vat: Optional[Decimal] = Field(None, description="Сумма без НДС")

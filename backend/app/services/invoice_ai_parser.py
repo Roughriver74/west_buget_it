@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.core.config import settings
-from app.schemas.invoice_processing import ParsedInvoiceData, SupplierData, InvoiceItem
+from app.schemas.invoice_processing import ParsedInvoiceData, SupplierData, BuyerData, InvoiceItem
 
 
 class InvoiceAIParser:
@@ -101,13 +101,29 @@ class InvoiceAIParser:
    - БИК (9 цифр)
    - Расчетный счет (20 цифр)
    - Корреспондентский счет (если есть)
-4. Данные покупателя (Плательщик / Покупатель / Заказчик / Пользователь):
+4. Данные покупателя - КРИТИЧЕСКИ ВАЖНО НАЙТИ:
    - Наименование организации (полное или сокращенное)
    - ИНН (10 или 12 цифр)
    - КПП (9 цифр, если есть)
-   ОБЯЗАТЕЛЬНО найди эту информацию! Ищи строки типа:
-   - "Плательщик:", "Покупатель:", "Заказчик:", "Пользователь:"
-   - В шапке счета может быть указан адресат
+
+   ОБЯЗАТЕЛЬНО ищи покупателя по ВСЕМ возможным вариантам:
+   - "Плательщик:", "Покупатель:", "Заказчик:", "Клиент:"
+   - "Абонент:", "Пользователь:", "Потребитель:"
+   - "Грузополучатель:", "Получатель услуг:", "Получатель:"
+   - "Заявитель:", "Адресат:", "Организация:"
+   - "Для:", "От:", "Кому:", "Счет для:"
+
+   МЕСТА ГДЕ ИСКАТЬ:
+   - В самом начале счета (первые 5-10 строк)
+   - В шапке документа перед "Счет №"
+   - После слов "Договор:" или "Абонент:"
+   - Между адресом и реквизитами поставщика
+   - Строка с адресом часто указывает на покупателя
+
+   ПРИМЕРЫ ФОРМАТОВ:
+   - "Абонент: ООО "КОМПАНИЯ"\nАдрес: 123456, город..."
+   - "Плательщик: ИНН 1234567890 ООО "КОМПАНИЯ""
+   - "Заказчик\nООО "КОМПАНИЯ", ИНН 1234567890"
 5. Суммы:
    - Сумма без НДС
    - Сумма НДС (если есть, если "Без налога НДС" или "НДС не облагается" = 0)
@@ -155,8 +171,15 @@ class InvoiceAIParser:
 - Все числовые значения как числа (не строки)
 - Даты в формате YYYY-MM-DD
 - ИНН, КПП, БИК, счета - только цифры (без пробелов и дефисов)
-- Если данные не найдены - используй null
-- Верни ТОЛЬКО JSON, без дополнительных комментариев и markdown разметки"""
+- ОБЯЗАТЕЛЬНО заполни поле "buyer" - это критически важно!
+- Если ИНН/КПП покупателя не найдены, но есть название - всё равно заполни buyer с name
+- Если данные не найдены - используй null только в крайнем случае
+- Верни ТОЛЬКО JSON, без дополнительных комментариев и markdown разметки
+
+ПРОВЕРКА:
+- Убедись что поле "buyer" заполнено (не null)!
+- Если не можешь найти явного указания покупателя, посмотри на адрес в начале счета
+- Часто покупатель указан в первых строках документа без явного маркера"""
 
     def _extract_json(self, text: str) -> str:
         """Извлечение JSON из ответа (может быть обернут в markdown)"""
@@ -181,6 +204,11 @@ class InvoiceAIParser:
         supplier = None
         if data.get('supplier'):
             supplier = SupplierData(**data['supplier'])
+
+        # Преобразуем покупателя
+        buyer = None
+        if data.get('buyer'):
+            buyer = BuyerData(**data['buyer'])
 
         # Преобразуем позиции
         items = []
@@ -211,6 +239,7 @@ class InvoiceAIParser:
             invoice_number=data.get('invoice_number'),
             invoice_date=invoice_date,
             supplier=supplier,
+            buyer=buyer,
             amount_without_vat=Decimal(str(data['amount_without_vat'])) if data.get('amount_without_vat') is not None else None,
             vat_amount=Decimal(str(data['vat_amount'])) if data.get('vat_amount') is not None else None,
             total_amount=Decimal(str(data['total_amount'])) if data.get('total_amount') is not None else None,

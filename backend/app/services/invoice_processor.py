@@ -271,6 +271,14 @@ class InvoiceProcessorService:
                 severity="warning"
             ))
 
+        # ВАЖНО: Проверяем наличие покупателя
+        if not parsed_data.buyer or not parsed_data.buyer.name:
+            errors.append(ProcessingError(
+                field="buyer.name",
+                message="Не удалось распознать покупателя (Плательщик/Абонент)",
+                severity="warning"
+            ))
+
         if not parsed_data.items or len(parsed_data.items) == 0:
             errors.append(ProcessingError(
                 field="items",
