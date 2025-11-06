@@ -32,11 +32,23 @@ const getRawApiUrl = (): string => {
 export const getApiBaseUrl = (): string => {
   const rawApiUrl = getRawApiUrl();
 
-  // If rawApiUrl already contains /api/v1, use it as is
-  // Otherwise, append /api/v1
-  return rawApiUrl
-    ? (rawApiUrl.includes('/api/v1') ? rawApiUrl : `${rawApiUrl}/api/v1`)
-    : '/api/v1';
+  // If empty, use default
+  if (!rawApiUrl) {
+    return '/api/v1';
+  }
+
+  // If already contains /api/v1, use it as is
+  if (rawApiUrl.includes('/api/v1')) {
+    return rawApiUrl;
+  }
+
+  // If ends with /api, just append /v1 (avoid double /api)
+  if (rawApiUrl.endsWith('/api')) {
+    return `${rawApiUrl}/v1`;
+  }
+
+  // Otherwise append full /api/v1
+  return `${rawApiUrl}/api/v1`;
 };
 
 // Deprecated: Use getApiBaseUrl() instead for dynamic runtime config
