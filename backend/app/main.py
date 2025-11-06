@@ -241,5 +241,11 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint (root path for Docker/Coolify)"""
+    return {"status": "healthy"}
+
+
+@app.get(f"{settings.API_PREFIX}/health")
+async def health_check_api():
+    """Health check endpoint (with API prefix for frontend)"""
     return {"status": "healthy"}
