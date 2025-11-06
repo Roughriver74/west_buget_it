@@ -28,15 +28,29 @@ class InvoiceOCRService:
         try:
             # Сначала пробуем извлечь текстовый слой
             import pypdf
+            import re
+
             with open(pdf_path, 'rb') as file:
                 pdf_reader = pypdf.PdfReader(file)
                 text = ""
                 for page in pdf_reader.pages:
                     text += page.extract_text()
 
-                # Если текст извлечен успешно (не пустой и не мусор)
+                # Проверяем качество извлеченного текста
                 if len(text.strip()) > 100:
-                    logger.info(f"Текст извлечен из PDF напрямую: {len(text)} символов")
+                    # ВАЖНО: Проверяем наличие русских букв (проблема с кодировкой)
+                    cyrillic_chars = re.findall(r'[а-яА-ЯёЁ]', text)
+                    cyrillic_ratio = len(cyrillic_chars) / len(text.replace(' ', '').replace('\n', ''))
+
+                    # Если кириллицы меньше 10% - скорее всего проблема с кодировкой
+                    if cyrillic_ratio < 0.1:
+                        logger.warning(
+                            f"Текст извлечен, но кириллицы мало ({cyrillic_ratio:.1%}). "
+                            f"Возможна проблема с кодировкой, используем OCR"
+                        )
+                        return self._ocr_from_pdf(pdf_path)
+
+                    logger.info(f"Текст извлечен из PDF напрямую: {len(text)} символов (кириллица: {cyrillic_ratio:.1%})")
                     return text
 
             # Если текста нет - используем OCR

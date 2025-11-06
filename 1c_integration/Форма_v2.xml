@@ -59,23 +59,6 @@
 					</v8:StringQualifiers>
 				</Type>
 			</Attribute>
-			<Attribute>
-				<Name>ИдентификаторОтдела</Name>
-				<Title>
-					<v8:item>
-						<v8:lang>ru</v8:lang>
-						<v8:content>ID отдела</v8:content>
-					</v8:item>
-				</Title>
-				<Type>
-					<v8:Type>xs:decimal</v8:Type>
-					<v8:NumberQualifiers>
-						<v8:Digits>10</v8:Digits>
-						<v8:FractionDigits>0</v8:FractionDigits>
-						<v8:AllowedSign>Nonnegative</v8:AllowedSign>
-					</v8:NumberQualifiers>
-				</Type>
-			</Attribute>
 			<!-- Таблица счетов -->
 			<Attribute>
 				<Name>СписокСчетов</Name>
@@ -346,14 +329,6 @@
 						<DataPath>Объект.APIToken</DataPath>
 						<TitleLocation>Left</TitleLocation>
 						<Width>60</Width>
-						<Type>InputField</Type>
-					</Item>
-					<Item xsi:type="FormField">
-						<Name>ИдентификаторОтдела</Name>
-						<id>4</id>
-						<DataPath>Объект.ИдентификаторОтдела</DataPath>
-						<TitleLocation>Left</TitleLocation>
-						<Width>20</Width>
 						<Type>InputField</Type>
 					</Item>
 				</ChildItems>
