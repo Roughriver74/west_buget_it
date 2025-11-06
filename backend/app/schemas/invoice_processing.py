@@ -163,6 +163,10 @@ class ProcessedInvoiceListItem(BaseModel):
     expense_id: Optional[int] = None
     contractor_id: Optional[int] = None
 
+    # 1C Integration
+    external_id_1c: Optional[str] = None
+    created_in_1c_at: Optional[datetime] = None
+
     has_errors: bool = False
     has_warnings: bool = False
 
@@ -212,6 +216,10 @@ class ProcessedInvoiceDetail(BaseModel):
     expense_id: Optional[int] = None
     contractor_id: Optional[int] = None
     expense_created_at: Optional[datetime] = None
+
+    # 1C Integration
+    external_id_1c: Optional[str] = None
+    created_in_1c_at: Optional[datetime] = None
 
     # AI metadata
     parsed_data: Optional[dict] = None  # Полный JSON

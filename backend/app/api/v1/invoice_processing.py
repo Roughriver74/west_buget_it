@@ -264,6 +264,8 @@ async def get_invoices(
             total_amount=invoice.total_amount,
             expense_id=invoice.expense_id,
             contractor_id=invoice.contractor_id,
+            external_id_1c=invoice.external_id_1c,
+            created_in_1c_at=invoice.created_in_1c_at,
             has_errors=bool(invoice.errors),
             has_warnings=bool(invoice.warnings)
         ))
@@ -334,6 +336,8 @@ async def get_invoice_detail(
         expense_id=invoice.expense_id,
         contractor_id=invoice.contractor_id,
         expense_created_at=invoice.expense_created_at,
+        external_id_1c=invoice.external_id_1c,
+        created_in_1c_at=invoice.created_in_1c_at,
         parsed_data=invoice.parsed_data,
         ai_processing_time_sec=invoice.ai_processing_time_sec,
         ai_model_used=invoice.ai_model_used,

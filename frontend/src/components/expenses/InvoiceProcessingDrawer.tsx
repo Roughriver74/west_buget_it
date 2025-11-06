@@ -279,6 +279,18 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
       render: (status: InvoiceProcessingStatus) => getStatusTag(status),
     },
     {
+      title: '1С',
+      key: '1c_status',
+      width: 80,
+      render: (_: any, record: ProcessedInvoiceListItem) => (
+        record.external_id_1c ? (
+          <Tag color="blue" icon={<CheckCircleOutlined />}>
+            Создан
+          </Tag>
+        ) : null
+      ),
+    },
+    {
       title: '№ Счета',
       dataIndex: 'invoice_number',
       key: 'invoice_number',
@@ -520,7 +532,14 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
 
                     <Descriptions bordered column={2} size="small">
                       <Descriptions.Item label="Статус" span={2}>
-                        {getStatusTag(selectedInvoice.status)}
+                        <Space>
+                          {getStatusTag(selectedInvoice.status)}
+                          {selectedInvoice.external_id_1c && (
+                            <Tag color="blue" icon={<CheckCircleOutlined />}>
+                              Создан в 1С
+                            </Tag>
+                          )}
+                        </Space>
                       </Descriptions.Item>
                       <Descriptions.Item label="Номер счета">
                         {selectedInvoice.invoice_number || '-'}
@@ -578,6 +597,32 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
                         type="info"
                         message={`Расход создан (ID: ${selectedInvoice.expense_id})`}
                         style={{ marginTop: 16 }}
+                      />
+                    )}
+
+                    {selectedInvoice.external_id_1c && (
+                      <Alert
+                        type="success"
+                        message="Создан в 1С"
+                        description={
+                          <>
+                            <Text strong>UUID документа: </Text>
+                            <Text code copyable>{selectedInvoice.external_id_1c}</Text>
+                            <br />
+                            {selectedInvoice.created_in_1c_at && (
+                              <>
+                                <Text strong>Дата создания: </Text>
+                                <Text>
+                                  {dayjs(selectedInvoice.created_in_1c_at).format(
+                                    'DD.MM.YYYY HH:mm:ss'
+                                  )}
+                                </Text>
+                              </>
+                            )}
+                          </>
+                        }
+                        style={{ marginTop: 16 }}
+                        icon={<CheckCircleOutlined />}
                       />
                     )}
                   </div>

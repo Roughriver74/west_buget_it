@@ -83,6 +83,10 @@ export interface ProcessedInvoice {
   expense_id?: number | null
   contractor_id?: number | null
 
+  // 1C Integration
+  external_id_1c?: string | null
+  created_in_1c_at?: string | null
+
   // AI metadata
   parsed_data?: ParsedInvoiceData | null
   ai_processing_time_sec?: number | null
@@ -131,6 +135,8 @@ export interface ProcessedInvoiceListItem {
   supplier_name?: string | null
   total_amount?: number | null
   expense_id?: number | null
+  external_id_1c?: string | null
+  created_in_1c_at?: string | null
   created_at: string
   processed_at?: string | null
 }
