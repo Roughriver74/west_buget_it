@@ -536,15 +536,28 @@ class FTPImportService:
                     expense_data.get('subdivision_name')
                 )
 
-                # Skip if department not found (no fallback to default)
+                # Fallback to "Общий" department if not found
                 if not department:
-                    logger.warning(f"No department mapping found for subdivision '{expense_data.get('subdivision_name')}' in expense {expense_data.get('number')}, skipping")
-                    skipped += 1
-                    continue
+                    logger.info(f"No department mapping found for subdivision '{expense_data.get('subdivision_name')}', using fallback 'Общий' department")
+                    # Find "Общий" department as fallback
+                    department = db.query(Department).filter(
+                        Department.name == 'Общий',
+                        Department.is_active == True
+                    ).first()
+
+                    if not department:
+                        logger.warning(f"Fallback 'Общий' department not found, skipping expense {expense_data.get('number')}")
+                        skipped += 1
+                        continue
 
                 # Find/create related entities
-                # Don't auto-assign category - leave it None for manual assignment
+                # Use department's default category if available
                 category = None
+                if department.default_category_id:
+                    category = db.query(BudgetCategory).filter(
+                        BudgetCategory.id == department.default_category_id,
+                        BudgetCategory.is_active == True
+                    ).first()
 
                 contractor = self.find_or_create_contractor(
                     db,

@@ -146,6 +146,7 @@ class Department(Base):
 
     # FTP import mapping
     ftp_subdivision_name = Column(String(255), nullable=True, index=True)  # Название подразделения из FTP для сопоставления
+    default_category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True)  # Категория по умолчанию для импорта
 
     # Contact info
     manager_name = Column(String(255), nullable=True)  # Имя руководителя
@@ -159,6 +160,7 @@ class Department(Base):
     # Relationships
     users = relationship("User", back_populates="department_rel")
     budget_categories = relationship("BudgetCategory", back_populates="department_rel")
+    default_category = relationship("BudgetCategory", foreign_keys=[default_category_id])
     contractors = relationship("Contractor", back_populates="department_rel")
     expenses = relationship("Expense", back_populates="department_rel")
     budget_plans = relationship("BudgetPlan", back_populates="department_rel")
