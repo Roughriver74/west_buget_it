@@ -23,6 +23,7 @@ ssh root@93.189.228.52
 - [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
 - [Memory Optimization](docs/MEMORY_OPTIMIZATION.md) - решение проблемы потери доступа через 15-20 минут (OOM)
 - [Memory Fix Quick Reference](docs/MEMORY_FIX.md) - краткая памятка по проблеме с памятью
+- [Traefik 504 Fix](docs/TRAEFIK_504_FIX.md) - исправление периодических ошибок 504 Gateway Timeout
 
 ### Quick Start
 ```bash

@@ -53,6 +53,9 @@ services:
       # Traefik configuration for automatic routing
       - "traefik.enable=true"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      # Timeout configuration - prevent 504 Gateway Timeout
+      - "traefik.http.services.backend.loadbalancer.responseHeaderTimeout=180s"
+      - "traefik.http.services.backend.loadbalancer.healthcheck.timeout=10s"
       # HTTP router (redirect to HTTPS)
       - "traefik.http.routers.backend-http.rule=Host(`api.budget-west.shknv.ru`)"
       - "traefik.http.routers.backend-http.entrypoints=http"
