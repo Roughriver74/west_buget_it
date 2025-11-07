@@ -13,6 +13,7 @@ class DepartmentBase(BaseModel):
     code: str = Field(..., min_length=2, max_length=50)
     description: Optional[str] = None
     ftp_subdivision_name: Optional[str] = Field(None, max_length=255, description="Название подразделения из FTP для сопоставления")
+    default_category_id: Optional[int] = Field(None, description="Категория по умолчанию для FTP импорта")
     manager_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -31,6 +32,7 @@ class DepartmentUpdate(BaseModel):
     code: Optional[str] = Field(None, min_length=2, max_length=50)
     description: Optional[str] = None
     ftp_subdivision_name: Optional[str] = Field(None, max_length=255, description="Название подразделения из FTP для сопоставления")
+    default_category_id: Optional[int] = Field(None, description="Категория по умолчанию для FTP импорта")
     manager_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -57,6 +59,7 @@ class DepartmentListItem(BaseModel):
     code: str
     description: Optional[str] = None
     ftp_subdivision_name: Optional[str] = None
+    default_category_id: Optional[int] = None
     manager_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None

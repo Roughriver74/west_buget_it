@@ -1,7 +1,9 @@
 import React from 'react'
 import { Form, Input, Radio, Checkbox, Select, FormInstance } from 'antd'
 import { useQuery } from '@tanstack/react-query'
-import { categoriesApi } from '@/api'
+import { categoriesApi, departmentsApi } from '@/api'
+import { useAuth } from '@/contexts/AuthContext'
+import { useDepartment } from '@/contexts/DepartmentContext'
 import type { BudgetCategory } from '@/types'
 
 const { TextArea } = Input
@@ -15,14 +17,27 @@ interface CategoryFormProps {
 }
 
 const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFinish, currentCategoryId }) => {
+  const { user } = useAuth()
+  const { selectedDepartment } = useDepartment()
+
   // Загружаем все активные категории для выбора родителя
   const { data: categories } = useQuery({
     queryKey: ['categories', { is_active: true }],
     queryFn: () => categoriesApi.getAll({ is_active: true }),
   })
 
+  // Загружаем отделы для ADMIN/MANAGER
+  const { data: departments } = useQuery({
+    queryKey: ['departments', { is_active: true }],
+    queryFn: () => departmentsApi.getAll({ is_active: true }),
+    enabled: user?.role === 'ADMIN' || user?.role === 'MANAGER',
+  })
+
   // Фильтруем категории: исключаем текущую категорию (чтобы не создать циклическую ссылку)
   const availableParents = categories?.filter(cat => cat.id !== currentCategoryId) || []
+
+  // Показываем поле department_id только для ADMIN/MANAGER
+  const canSelectDepartment = user?.role === 'ADMIN' || user?.role === 'MANAGER'
 
   return (
     <Form
@@ -31,6 +46,7 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFini
       initialValues={{
         is_active: true,
         parent_id: null,
+        department_id: selectedDepartment?.id || user?.department_id,
         ...initialValues,
       }}
       onFinish={onFinish}
@@ -45,6 +61,27 @@ const CategoryForm: React.FC<CategoryFormProps> = ({ form, initialValues, onFini
       >
         <Input placeholder="Например: Серверы и хостинг" />
       </Form.Item>
+
+      {canSelectDepartment && (
+        <Form.Item
+          name="department_id"
+          label="Отдел"
+          rules={[{ required: true, message: 'Выберите отдел' }]}
+          tooltip="Статья будет привязана к выбранному отделу"
+        >
+          <Select
+            placeholder="Выберите отдел"
+            showSearch
+            optionFilterProp="children"
+          >
+            {departments?.map((dept) => (
+              <Option key={dept.id} value={dept.id}>
+                {dept.name}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+      )}
 
       <Form.Item
         name="type"

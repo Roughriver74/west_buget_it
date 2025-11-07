@@ -9,6 +9,7 @@ export interface Department {
   code: string;
   description: string | null;
   ftp_subdivision_name: string | null;
+  default_category_id: number | null;
   manager_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;

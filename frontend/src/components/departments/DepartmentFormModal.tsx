@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
-import { Modal, Form, Input, message, Switch } from 'antd'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { departmentsApi } from '@/api'
+import { Modal, Form, Input, message, Switch, Select } from 'antd'
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { departmentsApi, categoriesApi } from '@/api'
 import type { Department } from '@/contexts/DepartmentContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { TextArea } = Input
+const { Option } = Select
 
 interface DepartmentFormModalProps {
   visible: boolean
@@ -24,6 +25,13 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
   const queryClient = useQueryClient()
   const { refreshDepartments } = useDepartment()
 
+  // Load all active categories for default category selection
+  const { data: categories } = useQuery({
+    queryKey: ['categories', { is_active: true, department_id: department?.id }],
+    queryFn: () => categoriesApi.getAll({ is_active: true, department_id: department?.id }),
+    enabled: visible && mode === 'edit' && !!department,
+  })
+
   // Reset form when department changes
   useEffect(() => {
     if (visible && department && mode === 'edit') {
@@ -32,6 +40,7 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
         code: department.code,
         description: department.description || '',
         ftp_subdivision_name: department.ftp_subdivision_name || '',
+        default_category_id: department.default_category_id || undefined,
         manager_name: department.manager_name || '',
         contact_email: department.contact_email || '',
         contact_phone: department.contact_phone || '',
@@ -160,6 +169,26 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
           ]}
         >
           <Input placeholder="Например: (ВЕСТ) IT" />
+        </Form.Item>
+
+        <Form.Item
+          name="default_category_id"
+          label="Категория по умолчанию для импорта"
+          tooltip="Категория, которая будет автоматически присваиваться заявкам при импорте с FTP, если категория не указана в файле"
+        >
+          <Select
+            placeholder="Не выбрано (категория не будет присваиваться)"
+            allowClear
+            showSearch
+            optionFilterProp="children"
+            loading={!categories}
+          >
+            {categories?.map((cat) => (
+              <Option key={cat.id} value={cat.id}>
+                {cat.name} ({cat.type})
+              </Option>
+            ))}
+          </Select>
         </Form.Item>
 
         <Form.Item
