@@ -159,7 +159,7 @@ class Department(Base):
 
     # Relationships
     users = relationship("User", back_populates="department_rel")
-    budget_categories = relationship("BudgetCategory", back_populates="department_rel")
+    budget_categories = relationship("BudgetCategory", foreign_keys="BudgetCategory.department_id", back_populates="department_rel")
     default_category = relationship("BudgetCategory", foreign_keys=[default_category_id])
     contractors = relationship("Contractor", back_populates="department_rel")
     expenses = relationship("Expense", back_populates="department_rel")
