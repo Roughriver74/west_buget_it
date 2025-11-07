@@ -185,9 +185,20 @@ class FTPImportService:
                         dt = expense['payment_date'].to_pydatetime()
                         expense['payment_date'] = dt.replace(hour=12, minute=0, second=0, microsecond=0)
 
-                # Parse amount
-                if expense.get('amount'):
-                    expense['amount'] = Decimal(str(expense['amount']))
+                # Parse amount - IMPORTANT: Skip if amount is empty/invalid
+                if expense.get('amount') is not None and expense.get('amount') != '':
+                    try:
+                        expense['amount'] = Decimal(str(expense['amount']))
+                        # Skip if amount is 0 or negative
+                        if expense['amount'] <= 0:
+                            logger.warning(f"Skipping expense {expense.get('number')} with zero/negative amount: {expense['amount']}")
+                            continue
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Skipping expense {expense.get('number')} with invalid amount: {expense.get('amount')}")
+                        continue
+                else:
+                    logger.warning(f"Skipping expense {expense.get('number')} with empty amount")
+                    continue
 
                 expenses.append(expense)
 
@@ -467,10 +478,11 @@ class FTPImportService:
         db: Session,
         expenses_data: List[Dict],
         skip_duplicates: bool = True,
-        default_department_id: Optional[int] = None
+        default_department_id: Optional[int] = None,
+        batch_size: int = 50  # Commit every N records to avoid memory issues
     ) -> Tuple[int, int, int]:
         """
-        Import expenses to database
+        Import expenses to database with batched commits
 
         Args:
             db: Database session
@@ -478,6 +490,7 @@ class FTPImportService:
             skip_duplicates: If True, updates only critical fields (status, amount, payment_date, comment).
                            If False, performs full update of all fields.
             default_department_id: Default department ID if no mapping found
+            batch_size: Number of records to process before committing (default: 50)
 
         Returns:
             Tuple of (created, updated, skipped) counts
@@ -486,6 +499,7 @@ class FTPImportService:
         updated = 0
         skipped = 0
         impacted_cache_keys: Set[Tuple[int, int, int]] = set()
+        processed_in_batch = 0
 
         def track_cache_invalidation(
             category_id: Optional[int],
@@ -498,8 +512,19 @@ class FTPImportService:
                 (category_id, department_id, request_date_value.year)
             )
 
-        for expense_data in expenses_data:
+        for idx, expense_data in enumerate(expenses_data):
             try:
+                # Validate required fields
+                if not expense_data.get('number'):
+                    logger.warning(f"Skipping expense without number at index {idx}")
+                    skipped += 1
+                    continue
+
+                if not expense_data.get('amount'):
+                    logger.warning(f"Skipping expense {expense_data.get('number')} without amount")
+                    skipped += 1
+                    continue
+
                 # Check for existing expense by number
                 existing = db.query(Expense).filter(
                     Expense.number == expense_data.get('number')
@@ -544,14 +569,14 @@ class FTPImportService:
                 # Map status
                 status = self.map_status(expense_data.get('status'))
 
-                # Prepare expense fields
+                # Prepare expense fields with validation
                 expense_fields = {
                     'number': expense_data.get('number'),
-                    'department_id': department.id,  # Add department mapping
+                    'department_id': department.id,
                     'category_id': category.id if category else None,
                     'contractor_id': contractor.id if contractor else None,
                     'organization_id': organization.id,
-                    'amount': expense_data.get('amount', Decimal('0')),
+                    'amount': expense_data.get('amount'),  # Already validated above
                     'request_date': expense_data.get('request_date') or datetime.now(),
                     'payment_date': expense_data.get('payment_date'),
                     'status': status,
@@ -559,13 +584,12 @@ class FTPImportService:
                     'is_closed': status == ExpenseStatusEnum.CLOSED,
                     'comment': expense_data.get('comment'),
                     'requester': expense_data.get('requester'),
-                    'imported_from_ftp': True,  # Помечаем как импортированную из FTP
-                    'needs_review': True,  # Требует проверки категории
+                    'imported_from_ftp': True,
+                    'needs_review': True,
                 }
 
                 if existing:
                     # Always update critical fields from FTP (even if skip_duplicates=True)
-                    # This ensures status, amounts, and payment dates stay in sync with FTP
                     track_cache_invalidation(
                         existing.category_id,
                         existing.department_id,
@@ -601,13 +625,36 @@ class FTPImportService:
                     )
                     created += 1
 
+                processed_in_batch += 1
+
+                # Commit in batches to avoid memory issues with large imports
+                if processed_in_batch >= batch_size:
+                    try:
+                        db.commit()
+                        logger.info(f"Batch commit: {created} created, {updated} updated so far (processed {idx + 1}/{len(expenses_data)})")
+                        processed_in_batch = 0
+                    except Exception as commit_error:
+                        logger.error(f"Batch commit failed at record {idx}: {commit_error}")
+                        db.rollback()
+                        # Continue with next batch
+                        processed_in_batch = 0
+
             except Exception as e:
                 logger.error(f"Failed to import expense {expense_data.get('number')}: {e}")
+                # Rollback this record and continue
+                db.rollback()
                 skipped += 1
+                processed_in_batch = 0
                 continue
 
-        db.commit()
-        logger.info(f"Import completed: {created} created, {updated} updated, {skipped} skipped")
+        # Final commit for remaining records
+        try:
+            if processed_in_batch > 0:
+                db.commit()
+                logger.info(f"Final commit: {created} created, {updated} updated, {skipped} skipped")
+        except Exception as final_commit_error:
+            logger.error(f"Final commit failed: {final_commit_error}")
+            db.rollback()
 
         for category_id, department_id, year in impacted_cache_keys:
             baseline_bus.invalidate(
