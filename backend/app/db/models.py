@@ -196,7 +196,7 @@ class BudgetCategory(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    department_rel = relationship("Department", back_populates="budget_categories")
+    department_rel = relationship("Department", foreign_keys=[department_id], back_populates="budget_categories")
     expenses = relationship("Expense", back_populates="category")
     budget_plans = relationship("BudgetPlan", back_populates="category")
 
