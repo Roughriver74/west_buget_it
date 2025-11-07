@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm } from 'antd'
-import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined, FileTextOutlined } from '@ant-design/icons'
-import { expensesApi, categoriesApi } from '@/api'
+import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm, Modal } from 'antd'
+import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons'
+import { expensesApi, categoriesApi, departmentsApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import ExpenseFormModal from '@/components/expenses/ExpenseFormModal'
@@ -29,6 +29,8 @@ const ExpensesPage = () => {
   const [registerPaymentModalVisible, setRegisterPaymentModalVisible] = useState(false)
   const [invoiceProcessingDrawerVisible, setInvoiceProcessingDrawerVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+  const [transferModalVisible, setTransferModalVisible] = useState(false)
+  const [targetDepartmentId, setTargetDepartmentId] = useState<number | undefined>()
 
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
@@ -58,6 +60,11 @@ const ExpensesPage = () => {
     queryFn: () => categoriesApi.getAll({ is_active: true }),
   })
 
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsApi.getAll({ is_active: true }),
+  })
+
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: (ids: number[]) => expensesApi.bulkDelete(ids),
@@ -72,12 +79,48 @@ const ExpensesPage = () => {
     },
   })
 
+  // Bulk transfer department mutation
+  const bulkTransferMutation = useMutation({
+    mutationFn: ({ expenseIds, targetDepartmentId }: { expenseIds: number[]; targetDepartmentId: number }) =>
+      expensesApi.bulkTransferDepartment(expenseIds, targetDepartmentId),
+    onSuccess: (data) => {
+      message.success(data.message || `Переведено заявок: ${data.transferred_count}`)
+      setSelectedRowKeys([])
+      setTransferModalVisible(false)
+      setTargetDepartmentId(undefined)
+      queryClient.invalidateQueries({ queryKey: ['expenses'] })
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || error.message
+      message.error(`Ошибка при переносе: ${errorMessage}`)
+    },
+  })
+
   const handleBulkDelete = () => {
     if (selectedRowKeys.length === 0) {
       message.warning('Выберите заявки для удаления')
       return
     }
     bulkDeleteMutation.mutate(selectedRowKeys)
+  }
+
+  const handleBulkTransfer = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите заявки для переноса')
+      return
+    }
+    setTransferModalVisible(true)
+  }
+
+  const handleTransferConfirm = () => {
+    if (!targetDepartmentId) {
+      message.warning('Выберите целевой отдел')
+      return
+    }
+    bulkTransferMutation.mutate({
+      expenseIds: selectedRowKeys,
+      targetDepartmentId,
+    })
   }
 
   const handleExport = () => {
@@ -310,6 +353,13 @@ const ExpensesPage = () => {
         <Button icon={<DownloadOutlined />} onClick={handleExport}>
           Экспорт в Excel
         </Button>
+        <Button
+          icon={<SwapOutlined />}
+          onClick={handleBulkTransfer}
+          disabled={selectedRowKeys.length === 0}
+        >
+          Перенести в отдел ({selectedRowKeys.length})
+        </Button>
         <Popconfirm
           title="Удалить выбранные заявки?"
           description={`Вы действительно хотите удалить ${selectedRowKeys.length} заявок?`}
@@ -376,6 +426,34 @@ const ExpensesPage = () => {
         visible={invoiceProcessingDrawerVisible}
         onClose={() => setInvoiceProcessingDrawerVisible(false)}
       />
+
+      <Modal
+        title="Перенос заявок в другой отдел"
+        open={transferModalVisible}
+        onOk={handleTransferConfirm}
+        onCancel={() => {
+          setTransferModalVisible(false)
+          setTargetDepartmentId(undefined)
+        }}
+        okText="Перенести"
+        cancelText="Отмена"
+        confirmLoading={bulkTransferMutation.isPending}
+      >
+        <p>
+          Вы собираетесь перенести <strong>{selectedRowKeys.length}</strong> заявок в другой отдел.
+        </p>
+        <p>Выберите целевой отдел:</p>
+        <Select
+          style={{ width: '100%' }}
+          placeholder="Выберите отдел"
+          value={targetDepartmentId}
+          onChange={setTargetDepartmentId}
+          options={departments?.map((dept) => ({
+            label: dept.name,
+            value: dept.id,
+          }))}
+        />
+      </Modal>
     </div>
   )
 }

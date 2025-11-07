@@ -773,3 +773,120 @@ async def import_expenses_from_ftp(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Import failed: {str(e)}"
         )
+
+
+class BulkDepartmentTransferRequest(BaseModel):
+    """Request model for bulk department transfer"""
+    expense_ids: List[int] = Field(..., description="List of expense IDs to transfer")
+    target_department_id: int = Field(..., description="Target department ID")
+
+
+@router.post("/bulk/transfer-department")
+def bulk_transfer_department(
+    request: BulkDepartmentTransferRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Transfer multiple expenses to another department
+
+    - **ADMIN/MANAGER**: Can transfer any expenses between departments
+    - **USER**: Can only transfer expenses from their own department
+
+    This endpoint will:
+    1. Validate that all expense IDs exist
+    2. Check permissions (USER can only transfer from their department)
+    3. Transfer expenses to target department
+    4. Invalidate affected baseline caches
+    """
+    # Only ADMIN and MANAGER can transfer between any departments
+    # USER can only transfer from their own department
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER, UserRoleEnum.USER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to transfer expenses"
+        )
+
+    # Validate target department exists
+    from app.db.models import Department
+    target_department = db.query(Department).filter(
+        Department.id == request.target_department_id,
+        Department.is_active == True
+    ).first()
+
+    if not target_department:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Target department {request.target_department_id} not found"
+        )
+
+    # Get expenses to transfer
+    expenses_query = db.query(Expense).filter(
+        Expense.id.in_(request.expense_ids)
+    )
+
+    # USER can only transfer from their own department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no department assigned"
+            )
+        expenses_query = expenses_query.filter(
+            Expense.department_id == current_user.department_id
+        )
+
+    expenses = expenses_query.all()
+
+    if not expenses:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No expenses found with provided IDs (or no permission to transfer them)"
+        )
+
+    # Track affected cache keys for invalidation
+    affected_cache_keys = set()
+
+    # Transfer expenses
+    transferred_count = 0
+    for expense in expenses:
+        # Track old department for cache invalidation
+        if expense.category_id and expense.department_id and expense.request_date:
+            affected_cache_keys.add((
+                expense.category_id,
+                expense.department_id,
+                expense.request_date.year
+            ))
+
+        # Update department
+        old_department_id = expense.department_id
+        expense.department_id = request.target_department_id
+        transferred_count += 1
+
+        # Track new department for cache invalidation
+        if expense.category_id and expense.request_date:
+            affected_cache_keys.add((
+                expense.category_id,
+                request.target_department_id,
+                expense.request_date.year
+            ))
+
+    db.commit()
+
+    # Invalidate affected baseline caches
+    for category_id, department_id, year in affected_cache_keys:
+        baseline_bus.invalidate(
+            category_id=category_id,
+            department_id=department_id,
+            year=year
+        )
+
+    return {
+        "success": True,
+        "message": f"Successfully transferred {transferred_count} expense(s) to department '{target_department.name}'",
+        "transferred_count": transferred_count,
+        "target_department": {
+            "id": target_department.id,
+            "name": target_department.name
+        }
+    }

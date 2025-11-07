@@ -49,6 +49,17 @@ export const expensesApi = {
     return data
   },
 
+  bulkTransferDepartment: async (
+    expenseIds: number[],
+    targetDepartmentId: number
+  ): Promise<{ success: boolean; message: string; transferred_count: number; target_department: { id: number; name: string } }> => {
+    const { data } = await apiClient.post('expenses/bulk/transfer-department', {
+      expense_ids: expenseIds,
+      target_department_id: targetDepartmentId,
+    })
+    return data
+  },
+
   getTotals: async (filters?: { year?: number; month?: number; category_id?: number }) => {
     const { data } = await apiClient.get('expenses/stats/totals', { params: filters })
     return data
