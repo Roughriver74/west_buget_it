@@ -66,9 +66,9 @@ RUN chmod +x /app/entrypoint.sh && \
     chown appuser:appuser /app/entrypoint.sh
 
 # Copy crontab file for automated FTP import
+# Note: Files in /etc/cron.d/ are automatically loaded by cron daemon
 COPY backend/crontab /etc/cron.d/ftp-import
-RUN chmod 0644 /etc/cron.d/ftp-import && \
-    crontab /etc/cron.d/ftp-import
+RUN chmod 0644 /etc/cron.d/ftp-import
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/uploads /app/logs /app/templates && \
