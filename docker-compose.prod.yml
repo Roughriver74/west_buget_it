@@ -127,9 +127,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M  # Hard limit to prevent OOM
+          memory: 768M  # Increased from 512M - allows 2 workers + overhead
         reservations:
-          memory: 256M  # Minimum guaranteed memory
+          memory: 384M  # Minimum guaranteed memory
     # Note: Coolify uses Caddy for proxying, not Traefik
     # CORS should be configured via CORS_ORIGINS environment variable in backend
 
