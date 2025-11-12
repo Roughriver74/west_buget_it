@@ -220,7 +220,7 @@ def get_budget_by_department_report(
     return report
 
 
-@router.get("/expenses/export-by-department", response_class=StreamingResponse)
+@router.get("/expenses/export-by-department")
 def export_expenses_by_department(
     year: Optional[int] = Query(None, description="Filter by year"),
     month: Optional[int] = Query(None, ge=1, le=12, description="Filter by month"),

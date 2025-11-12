@@ -6,10 +6,31 @@ from io import BytesIO
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 from pathlib import Path
+import urllib.parse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from calendar import monthrange
+
+
+def encode_filename_header(filename: str) -> Dict[str, str]:
+    """
+    Generate RFC 5987 compliant Content-Disposition header for non-ASCII filenames
+
+    Args:
+        filename: Filename with potential non-ASCII characters (e.g., Cyrillic)
+
+    Returns:
+        Dict with Content-Disposition header
+
+    Example:
+        >>> encode_filename_header("Экспорт_Категории.xlsx")
+        {"Content-Disposition": "attachment; filename*=UTF-8''%D0%AD..."}
+    """
+    encoded_filename = urllib.parse.quote(filename)
+    return {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+    }
 
 
 class ExcelExporter:

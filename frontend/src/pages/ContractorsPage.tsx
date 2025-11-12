@@ -74,15 +74,41 @@ const ContractorsPage = () => {
     message.success('Экспорт начат. Файл скоро будет загружен.')
   }
 
-  const handleDownloadTemplate = () => {
-    const url = `${API_BASE}/templates/download/contractors`
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'Шаблон_Контрагенты.xlsx'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    message.success('Скачивание шаблона начато')
+  const handleDownloadTemplate = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const url = `${API_URL}/api/v1/templates/download/contractors`
+
+      // Get token from localStorage
+      const token = localStorage.getItem('token')
+
+      // Fetch with authentication
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Не удалось скачать шаблон')
+      }
+
+      // Create blob and download
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = 'Шаблон_Контрагенты.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+
+      message.success('Шаблон успешно скачан')
+    } catch (error) {
+      console.error('Template download error:', error)
+      message.error('Ошибка при скачивании шаблона')
+    }
   }
 
   const uploadProps: UploadProps = {

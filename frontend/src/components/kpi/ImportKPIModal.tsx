@@ -50,19 +50,41 @@ const ImportKPIModal: React.FC<ImportKPIModalProps> = ({ visible, onCancel }) =>
     },
   })
 
-  const handleDownloadTemplate = () => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${API_URL}/api/v1/templates/download/kpi`
+  const handleDownloadTemplate = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const url = `${API_URL}/api/v1/templates/download/kpi`
 
-    // Create temporary link and trigger download
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'Шаблон_КПИ.xlsx'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+      // Get token from localStorage
+      const token = localStorage.getItem('token')
 
-    message.success('Скачивание шаблона начато')
+      // Fetch with authentication
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Не удалось скачать шаблон')
+      }
+
+      // Create blob and download
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = 'Шаблон_КПИ.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+
+      message.success('Шаблон успешно скачан')
+    } catch (error) {
+      console.error('Template download error:', error)
+      message.error('Ошибка при скачивании шаблона')
+    }
   }
 
   const handleSubmit = async () => {

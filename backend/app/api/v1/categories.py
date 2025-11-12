@@ -12,6 +12,7 @@ from app.schemas import BudgetCategoryCreate, BudgetCategoryUpdate, BudgetCatego
 from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
+from app.utils.excel_export import encode_filename_header
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -339,7 +340,7 @@ def bulk_delete_categories(
     }
 
 
-@router.get("/export", response_class=StreamingResponse)
+@router.get("/export")
 def export_categories(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -383,7 +384,7 @@ def export_categories(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=categories_export.xlsx"}
+        headers=encode_filename_header("Экспорт_Категории.xlsx")
     )
 
 

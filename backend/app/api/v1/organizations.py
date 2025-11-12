@@ -198,7 +198,7 @@ def bulk_delete_organizations(
     }
 
 
-@router.get("/export", response_class=StreamingResponse)
+@router.get("/export")
 def export_organizations(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)

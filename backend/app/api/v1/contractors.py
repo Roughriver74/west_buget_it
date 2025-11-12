@@ -12,6 +12,7 @@ from app.schemas import ContractorCreate, ContractorUpdate, ContractorInDB
 from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
+from app.utils.excel_export import encode_filename_header
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -308,7 +309,7 @@ def bulk_delete_contractors(
     }
 
 
-@router.get("/export", response_class=StreamingResponse)
+@router.get("/export")
 def export_contractors(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -349,7 +350,7 @@ def export_contractors(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=contractors.xlsx"}
+        headers=encode_filename_header("Экспорт_Контрагенты.xlsx")
     )
 
 

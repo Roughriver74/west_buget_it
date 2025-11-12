@@ -400,7 +400,7 @@ async def add_salary_history(
 
 # ==================== Export Endpoints ====================
 
-@router.get("/export", response_class=StreamingResponse)
+@router.get("/export")
 async def export_employees(
     department_id: Optional[int] = None,
     status: Optional[str] = None,

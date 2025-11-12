@@ -1885,7 +1885,7 @@ def get_revenue_analytics(
 
 # ==================== EXPORT ENDPOINTS ====================
 
-@router.get("/budget-income-statement/export", response_class=StreamingResponse)
+@router.get("/budget-income-statement/export")
 def export_budget_income_statement(
     year: int = Query(..., description="Year for the budget income statement"),
     department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
@@ -2266,7 +2266,7 @@ def export_budget_income_statement(
     )
 
 
-@router.get("/customer-metrics-analytics/export", response_class=StreamingResponse)
+@router.get("/customer-metrics-analytics/export")
 def export_customer_metrics_analytics(
     year: int = Query(..., description="Year for customer metrics analytics"),
     department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
@@ -2487,7 +2487,7 @@ def export_customer_metrics_analytics(
     )
 
 
-@router.get("/revenue-analytics/export", response_class=StreamingResponse)
+@router.get("/revenue-analytics/export")
 def export_revenue_analytics(
     year: int = Query(..., description="Year for revenue analytics"),
     department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),

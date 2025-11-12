@@ -604,7 +604,7 @@ async def get_payroll_summary(
 
 # ==================== Export Endpoints ====================
 
-@router.get("/plans/export", response_class=StreamingResponse)
+@router.get("/plans/export")
 async def export_payroll_plans(
     year: Optional[int] = None,
     month: Optional[int] = None,
@@ -671,7 +671,7 @@ async def export_payroll_plans(
     )
 
 
-@router.get("/actuals/export", response_class=StreamingResponse)
+@router.get("/actuals/export")
 async def export_payroll_actuals(
     year: Optional[int] = None,
     month: Optional[int] = None,
