@@ -1,596 +1,293 @@
 # IT Budget Manager - Production Deployment Guide
 
-Руководство по развертыванию приложения IT Budget Manager в production-окружении с использованием Docker.
+## Проблемы, которые были исправлены
 
-## 🚀 Рекомендуемый способ деплоя: Coolify
+### 1. Mixed Content Error
+**Проблема**: HTTPS сайт (https://budget-west.shknv.ru) пытался обращаться к HTTP API (http://localhost:8888), браузер блокировал запросы.
 
-**Для максимально простого развертывания рекомендуется использовать [Coolify](https://coolify.io)** - self-hosted PaaS платформу.
+**Решение**: 
+- Nginx фронтенда теперь проксирует `/api/*` запросы к бэкенду
+- Фронтенд использует относительный путь `/api` вместо абсолютного URL
+- Все запросы идут через один домен по HTTPS
 
-**Преимущества Coolify:**
-- ✅ Автоматический деплой из GitHub
-- ✅ SSL сертификаты из коробки (Let's Encrypt)
-- ✅ Управление через веб-интерфейс
-- ✅ Встроенный мониторинг и логи
-- ✅ Rollback в один клик
-- ✅ Zero-downtime deployments
+### 2. Localhost в Production
+**Проблема**: Фронтенд был собран с `VITE_API_URL=http://localhost:8888`.
 
-**📖 Полное руководство:** [COOLIFY_DEPLOYMENT.md](COOLIFY_DEPLOYMENT.md)
+**Решение**:
+- Изменен default в `Dockerfile.prod`: `VITE_API_URL=/api`
+- Обновлен `docker-compose.prod.yml` для передачи правильного значения
+- Обновлен `docker-entrypoint.sh` с правильным default
 
----
+## Быстрый деплой
 
-## Альтернативный способ: Ручной деплой с Docker Compose
-
-Если вы предпочитаете полный контроль или не используете Coolify, следуйте инструкциям ниже.
-
-## Содержание
-
-1. [Требования](#требования)
-2. [Быстрый старт](#быстрый-старт)
-3. [Конфигурация](#конфигурация)
-4. [Развертывание](#развертывание)
-5. [Мониторинг и обслуживание](#мониторинг-и-обслуживание)
-6. [Безопасность](#безопасность)
-7. [Резервное копирование](#резервное-копирование)
-8. [Устранение неполадок](#устранение-неполадок)
-
----
-
-## Требования
-
-### Системные требования
-
-- **ОС**: Linux (Ubuntu 20.04+, Debian 11+, CentOS 8+) или Windows Server
-- **Docker**: версия 20.10 или выше
-- **Docker Compose**: версия 2.0 или выше
-- **RAM**: минимум 2GB, рекомендуется 4GB+
-- **Диск**: минимум 10GB свободного места
-- **CPU**: минимум 2 ядра, рекомендуется 4+
-
-### Проверка установки Docker
+### Шаг 1: Настройте .env.production
 
 ```bash
-docker --version
-docker-compose --version
+# Скопируйте и отредактируйте файл
+cp .env.production .env.production.local
+nano .env.production
+
+# ОБЯЗАТЕЛЬНО измените:
+# 1. DB_PASSWORD - сильный пароль для БД
+# 2. SECRET_KEY - случайная строка минимум 32 символа
 ```
 
-Если Docker не установлен, следуйте [официальной документации](https://docs.docker.com/engine/install/).
-
----
-
-## Быстрый старт
-
-### 1. Клонирование репозитория
-
+Генерация SECRET_KEY:
 ```bash
-git clone https://github.com/your-org/it-budget-manager.git
-cd it-budget-manager
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### 2. Настройка переменных окружения
+### Шаг 2: Запустите деплой
 
 ```bash
-# Скопируйте пример конфигурации
-cp .env.prod.example .env
-
-# Отредактируйте файл .env
-nano .env  # или vim .env
+./deploy.sh
 ```
 
-**Обязательно измените следующие переменные:**
+Скрипт автоматически:
+1. ✅ Проверит конфигурацию
+2. ✅ Создаст deployment пакет
+3. ✅ Загрузит файлы на сервер
+4. ✅ Соберет Docker образы
+5. ✅ Запустит сервисы
+
+### Шаг 3: Проверьте статус
 
 ```bash
-# Генерация SECRET_KEY
-openssl rand -hex 32
+# Подключитесь к серверу
+ssh root@93.189.228.52
 
-# Сильный пароль для БД
-DB_PASSWORD=your_strong_password_here
+# Перейдите в директорию проекта
+cd /root/it_budget
 
-# SECRET_KEY для JWT
-SECRET_KEY=your_generated_secret_key_here
-
-# Домен вашего приложения
-CORS_ORIGINS='["https://yourdomain.com","https://www.yourdomain.com"]'
-```
-
-### 3. Сборка и запуск
-
-```bash
-# Сборка Docker-образов
-docker-compose -f docker-compose.prod.yml build
-
-# Запуск всех сервисов
-docker-compose -f docker-compose.prod.yml up -d
-
-# Проверка статуса
+# Проверьте статус контейнеров
 docker-compose -f docker-compose.prod.yml ps
-```
 
-### 4. Инициализация базы данных
-
-```bash
-# Применение миграций
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
-
-# Создание администратора
-docker-compose -f docker-compose.prod.yml exec backend python create_admin.py
-```
-
-### 5. Проверка работоспособности
-
-```bash
-# Backend health check
-curl http://localhost:8000/health
-
-# Frontend health check
-curl http://localhost/health
-
-# API documentation
-curl http://localhost:8000/docs
-```
-
-**Приложение доступно по адресу:** `http://localhost`
-**API:** `http://localhost:8000`
-**Swagger UI:** `http://localhost:8000/docs`
-
----
-
-## Конфигурация
-
-### Структура файлов конфигурации
-
-```
-.
-├── .env                        # Переменные окружения (НЕ коммитить!)
-├── .env.prod.example           # Пример конфигурации
-├── docker-compose.prod.yml     # Production Docker Compose
-├── backend/
-│   ├── Dockerfile.prod         # Production Dockerfile для backend
-│   └── .dockerignore          # Исключения для Docker build
-└── frontend/
-    ├── Dockerfile.prod         # Production Dockerfile для frontend
-    ├── nginx.conf             # Конфигурация Nginx
-    └── .dockerignore          # Исключения для Docker build
-```
-
-### Основные переменные окружения
-
-#### База данных
-
-```bash
-DB_USER=budget_user              # Имя пользователя PostgreSQL
-DB_PASSWORD=strong_password      # Пароль БД (обязательно изменить!)
-DB_NAME=it_budget_db            # Имя базы данных
-DB_PORT=54329                   # Внешний порт PostgreSQL
-```
-
-#### Backend
-
-```bash
-SECRET_KEY=minimum_32_chars     # JWT секретный ключ (обязательно изменить!)
-ALGORITHM=HS256                 # Алгоритм шифрования JWT
-ACCESS_TOKEN_EXPIRE_MINUTES=30  # Время жизни токена
-DEBUG=False                     # ВСЕГДА False в production!
-```
-
-#### CORS
-
-```bash
-# Разрешенные домены для CORS
-CORS_ORIGINS='["https://yourdomain.com"]'
-```
-
-#### Порты
-
-```bash
-BACKEND_PORT=8000               # Внешний порт backend API
-FRONTEND_PORT=80                # Внешний порт frontend (HTTP)
-```
-
-#### Мониторинг (опционально)
-
-```bash
-SENTRY_DSN=your_sentry_dsn      # Sentry для отслеживания ошибок
-PROMETHEUS_ENABLED=true         # Включить Prometheus метрики
-```
-
----
-
-## Развертывание
-
-### Сценарий 1: Локальный сервер
-
-```bash
-# 1. Подготовка окружения
-cp .env.prod.example .env
-# Отредактируйте .env с правильными значениями
-
-# 2. Сборка образов
-docker-compose -f docker-compose.prod.yml build --no-cache
-
-# 3. Запуск сервисов
-docker-compose -f docker-compose.prod.yml up -d
-
-# 4. Инициализация БД
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
-docker-compose -f docker-compose.prod.yml exec backend python create_admin.py
-
-# 5. Проверка логов
+# Посмотрите логи
 docker-compose -f docker-compose.prod.yml logs -f
 ```
 
-### Сценарий 2: С обратным прокси (Nginx/Traefik)
+## Архитектура Production
 
-Если используется внешний reverse proxy (рекомендуется для SSL):
+```
+[Браузер] HTTPS
+    ↓
+[budget-west.shknv.ru] (Caddy/Cloudflare)
+    ↓
+[Frontend Container:80] Nginx
+    ├─→ /api/* → proxy_pass http://backend:8000/api/v1
+    └─→ /* → React SPA (static files)
+    
+[Backend Container:8000] FastAPI
+    ↓
+[Database Container:5432] PostgreSQL
+```
 
+## Ключевые изменения
+
+### 1. frontend/nginx.conf
+Добавлено проксирование API:
 ```nginx
-# /etc/nginx/sites-available/it-budget-manager
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com;
-
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/key.pem;
-
-    # Frontend
-    location / {
-        proxy_pass http://localhost:80;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Backend API
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Увеличить timeout для загрузки файлов
-        proxy_read_timeout 300s;
-        proxy_connect_timeout 75s;
-    }
-}
-
-# Redirect HTTP to HTTPS
-server {
-    listen 80;
-    server_name yourdomain.com;
-    return 301 https://$server_name$request_uri;
+location /api/ {
+    proxy_pass http://backend:8000;
+    # ... proxy headers
 }
 ```
 
-Обновите `.env`:
-
-```bash
-VITE_API_URL=https://yourdomain.com
-CORS_ORIGINS='["https://yourdomain.com"]'
+### 2. frontend/Dockerfile.prod
+```dockerfile
+ARG VITE_API_URL=/api  # Изменено с http://localhost:8888
 ```
 
-### Сценарий 3: Docker Swarm / Kubernetes
-
-Для масштабирования на несколько узлов:
-
+### 3. frontend/docker-entrypoint.sh
 ```bash
-# Docker Swarm
-docker swarm init
-docker stack deploy -c docker-compose.prod.yml it-budget-manager
-
-# Kubernetes
-# Требуется конвертация docker-compose.yml в k8s manifests
-# Используйте Kompose: kompose convert -f docker-compose.prod.yml
+VITE_API_URL=${VITE_API_URL:-"/api"}  # Изменено с http://localhost:8888
 ```
 
----
+### 4. docker-compose.prod.yml
+```yaml
+frontend:
+  build:
+    args:
+      VITE_API_URL: /api  # Используем относительный путь
+  environment:
+    VITE_API_URL: /api
+```
 
-## Мониторинг и обслуживание
+## Проверка конфигурации
+
+### Проверить API URL фронтенда
+```bash
+# На сервере
+curl http://localhost:3001/config-check
+```
+
+Должен вернуть:
+```javascript
+window.ENV_CONFIG = {
+  VITE_API_URL: '/api'
+};
+```
+
+### Проверить проксирование Nginx
+```bash
+# Внутри frontend контейнера
+docker exec -it it_budget_frontend_prod sh
+
+# Проверить конфиг
+cat /etc/nginx/conf.d/default.conf | grep -A 10 "location /api/"
+```
+
+### Проверить работу API через фронтенд
+```bash
+# Должно вернуть данные от бэкенда
+curl http://localhost:3001/api/v1/health
+```
+
+## Управление сервисами
+
+### Перезапуск
+```bash
+cd /root/it_budget
+docker-compose -f docker-compose.prod.yml restart
+```
+
+### Остановка
+```bash
+docker-compose -f docker-compose.prod.yml down
+```
+
+### Пересборка (после изменений кода)
+```bash
+docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml build --no-cache
+docker-compose -f docker-compose.prod.yml up -d
+```
 
 ### Просмотр логов
-
 ```bash
 # Все сервисы
 docker-compose -f docker-compose.prod.yml logs -f
 
-# Конкретный сервис
-docker-compose -f docker-compose.prod.yml logs -f backend
+# Только фронтенд
 docker-compose -f docker-compose.prod.yml logs -f frontend
-docker-compose -f docker-compose.prod.yml logs -f db
 
-# Последние N строк
-docker-compose -f docker-compose.prod.yml logs --tail=100 backend
+# Только бэкенд
+docker-compose -f docker-compose.prod.yml logs -f backend
 ```
 
-### Проверка health checks
+## Миграции БД
+
+После первого деплоя или изменений в моделях:
 
 ```bash
-# Backend
-curl http://localhost:8000/health
-# Ожидается: {"status":"healthy"}
+# Зайти в контейнер бэкенда
+docker exec -it it_budget_backend_prod bash
 
-# Frontend
-curl http://localhost/health
-# Ожидается: healthy
+# Применить миграции
+cd /app
+alembic upgrade head
 
-# Docker health status
-docker ps
-# Проверьте колонку STATUS - должно быть "healthy"
+# Создать админа (если нужно)
+python create_admin.py
 ```
 
-### Обновление приложения
+## Troubleshooting
 
-```bash
-# 1. Получить последние изменения
-git pull origin main
+### Фронтенд не может подключиться к API
 
-# 2. Остановить сервисы
-docker-compose -f docker-compose.prod.yml down
+1. Проверьте, что бэкенд запущен:
+   ```bash
+   docker-compose -f docker-compose.prod.yml ps backend
+   ```
 
-# 3. Пересобрать образы
-docker-compose -f docker-compose.prod.yml build --no-cache
+2. Проверьте API URL в env-config.js:
+   ```bash
+   curl http://localhost:3001/config-check
+   ```
 
-# 4. Запустить сервисы
-docker-compose -f docker-compose.prod.yml up -d
+3. Проверьте логи Nginx:
+   ```bash
+   docker-compose -f docker-compose.prod.yml logs frontend | grep -i error
+   ```
 
-# 5. Применить миграции БД
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
+### Mixed Content Error в браузере
 
-# 6. Проверить логи
-docker-compose -f docker-compose.prod.yml logs -f
-```
+Убедитесь, что:
+- `VITE_API_URL=/api` (НЕ http://...)
+- Nginx проксирует `/api/*` к бэкенду
+- Фронтенд собран с правильным VITE_API_URL
 
-### Масштабирование backend
+### 401 Unauthorized при логине
 
-```bash
-# Увеличить количество backend-инстансов
-docker-compose -f docker-compose.prod.yml up -d --scale backend=3
+1. Проверьте CORS в бэкенде:
+   ```bash
+   docker exec -it it_budget_backend_prod env | grep CORS
+   ```
 
-# Требуется настройка load balancer (nginx, traefik)
-```
+2. Должно быть:
+   ```
+   CORS_ORIGINS=["https://budget-west.shknv.ru",...]
+   ```
 
-### Очистка неиспользуемых ресурсов
+### База данных не запускается
 
-```bash
-# Удалить неиспользуемые образы
-docker image prune -a
+1. Проверьте логи:
+   ```bash
+   docker-compose -f docker-compose.prod.yml logs db
+   ```
 
-# Удалить неиспользуемые volumes
-docker volume prune
+2. Проверьте права на volume:
+   ```bash
+   ls -la /var/lib/docker/volumes/
+   ```
 
-# Полная очистка (осторожно!)
-docker system prune -a --volumes
-```
+## Мониторинг
 
----
+### Health Checks
+
+- Frontend: http://localhost:3001/health
+- Backend: http://localhost:8888/health
+- Database: через `pg_isready`
+
+### Метрики (если Prometheus включен)
+
+- http://localhost:8888/metrics
 
 ## Безопасность
 
-### Чек-лист безопасности
+✅ HTTPS через Caddy/Cloudflare
+✅ Security headers в Nginx
+✅ CORS настроен только для домена
+✅ JWT токены с истечением
+✅ PostgreSQL не доступен извне (только через Docker network)
+✅ Пароли в .env (не в коде)
 
-- [ ] **SECRET_KEY** изменен на уникальное случайное значение (минимум 32 символа)
-- [ ] **DB_PASSWORD** установлен сильный пароль
-- [ ] **DEBUG=False** в production
-- [ ] **CORS_ORIGINS** содержит только разрешенные домены
-- [ ] **SSL/HTTPS** настроен через reverse proxy
-- [ ] **Firewall** настроен (открыты только необходимые порты)
-- [ ] **Регулярные обновления** Docker-образов и зависимостей
-- [ ] **Резервное копирование** БД настроено
-- [ ] **Логирование** и мониторинг настроены
-
-### Настройка Firewall (UFW)
-
-```bash
-# Установка UFW (Ubuntu/Debian)
-sudo apt-get install ufw
-
-# Разрешить SSH
-sudo ufw allow 22/tcp
-
-# Разрешить HTTP/HTTPS
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-
-# Запретить прямой доступ к backend (если есть reverse proxy)
-# sudo ufw deny 8000/tcp
-
-# Включить firewall
-sudo ufw enable
-
-# Проверить статус
-sudo ufw status
-```
-
-### Ограничение доступа к PostgreSQL
-
-```bash
-# В docker-compose.prod.yml закомментируйте ports для db:
-# db:
-#   ports:
-#     - "54329:5432"  # Удалите эту строку для production!
-```
-
-### Настройка SSL сертификатов (Let's Encrypt)
-
-```bash
-# Установка certbot
-sudo apt-get update
-sudo apt-get install certbot python3-certbot-nginx
-
-# Получение сертификата
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
-
-# Автообновление
-sudo certbot renew --dry-run
-```
-
----
-
-## Резервное копирование
+## Backup
 
 ### Бэкап базы данных
-
 ```bash
-# Создать резервную копию
-docker-compose -f docker-compose.prod.yml exec -T db pg_dump -U budget_user it_budget_db > backup_$(date +%Y%m%d_%H%M%S).sql
+# Создать бэкап
+docker exec it_budget_db pg_dump -U budget_user it_budget_db > backup_$(date +%Y%m%d).sql
 
-# Или с использованием pg_dump из Docker volume
-docker run --rm \
-  --volumes-from it_budget_db_prod \
-  -v $(pwd):/backup \
-  postgres:15-alpine \
-  pg_dump -U budget_user -d it_budget_db -f /backup/backup_$(date +%Y%m%d).sql
+# Восстановить бэкап
+cat backup_20250102.sql | docker exec -i it_budget_db psql -U budget_user -d it_budget_db
 ```
 
-### Восстановление из бэкапа
-
+### Бэкап volumes
 ```bash
-# Остановить backend
-docker-compose -f docker-compose.prod.yml stop backend
+# Остановить сервисы
+docker-compose -f docker-compose.prod.yml down
 
-# Восстановить БД
-cat backup_20231215.sql | docker-compose -f docker-compose.prod.yml exec -T db psql -U budget_user it_budget_db
+# Бэкап
+tar -czf volumes_backup_$(date +%Y%m%d).tar.gz /var/lib/docker/volumes/it-budget-prod*
 
-# Запустить backend
-docker-compose -f docker-compose.prod.yml start backend
-```
-
-### Автоматизация бэкапов (cron)
-
-```bash
-# Создать скрипт бэкапа
-cat > /opt/backup-it-budget.sh << 'EOF'
-#!/bin/bash
-BACKUP_DIR="/opt/backups/it-budget"
-DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p $BACKUP_DIR
-
-cd /opt/it-budget-manager
-docker-compose -f docker-compose.prod.yml exec -T db pg_dump -U budget_user it_budget_db > $BACKUP_DIR/backup_$DATE.sql
-
-# Удалить бэкапы старше 30 дней
-find $BACKUP_DIR -name "backup_*.sql" -mtime +30 -delete
-EOF
-
-# Сделать скрипт исполняемым
-chmod +x /opt/backup-it-budget.sh
-
-# Добавить в cron (ежедневно в 3:00)
-crontab -e
-# 0 3 * * * /opt/backup-it-budget.sh >> /var/log/it-budget-backup.log 2>&1
-```
-
-### Бэкап файлов (загруженные данные)
-
-```bash
-# Создать архив uploads
-tar -czf uploads_backup_$(date +%Y%m%d).tar.gz backend/uploads/
-
-# Восстановить uploads
-tar -xzf uploads_backup_20231215.tar.gz
-```
-
----
-
-## Устранение неполадок
-
-### Проблема: Backend не запускается
-
-```bash
-# Проверить логи
-docker-compose -f docker-compose.prod.yml logs backend
-
-# Типичные причины:
-# 1. БД не доступна
-docker-compose -f docker-compose.prod.yml ps db
-
-# 2. Неправильные переменные окружения
-docker-compose -f docker-compose.prod.yml exec backend env | grep DATABASE_URL
-
-# 3. Проблемы с миграциями
-docker-compose -f docker-compose.prod.yml exec backend alembic current
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
-```
-
-### Проблема: Frontend показывает ошибки API
-
-```bash
-# Проверить VITE_API_URL в frontend
-docker-compose -f docker-compose.prod.yml exec frontend env | grep VITE_API_URL
-
-# Проверить CORS в backend
-docker-compose -f docker-compose.prod.yml exec backend env | grep CORS_ORIGINS
-
-# Пересобрать frontend с правильными переменными
-docker-compose -f docker-compose.prod.yml build --no-cache frontend
-docker-compose -f docker-compose.prod.yml up -d frontend
-```
-
-### Проблема: Ошибка при загрузке файлов
-
-```bash
-# Проверить права на директорию uploads
-docker-compose -f docker-compose.prod.yml exec backend ls -la /app/uploads
-
-# Если проблемы с правами:
-docker-compose -f docker-compose.prod.yml exec -u root backend chown -R appuser:appuser /app/uploads
-```
-
-### Проблема: Высокое потребление памяти
-
-```bash
-# Проверить использование ресурсов
-docker stats
-
-# Уменьшить количество workers в backend (docker-compose.prod.yml)
-# CMD ["gunicorn", "app.main:app", "--workers", "2", ...]
-
-# Пересобрать и перезапустить
-docker-compose -f docker-compose.prod.yml up -d --build backend
-```
-
-### Проблема: БД переполнена
-
-```bash
-# Проверить размер БД
-docker-compose -f docker-compose.prod.yml exec db psql -U budget_user -d it_budget_db -c "SELECT pg_size_pretty(pg_database_size('it_budget_db'));"
-
-# Очистить старые логи audit
-docker-compose -f docker-compose.prod.yml exec db psql -U budget_user -d it_budget_db -c "DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '90 days';"
-
-# VACUUM БД
-docker-compose -f docker-compose.prod.yml exec db psql -U budget_user -d it_budget_db -c "VACUUM FULL ANALYZE;"
-```
-
-### Полный перезапуск с очисткой
-
-```bash
-# ВНИМАНИЕ: Это удалит все данные!
-docker-compose -f docker-compose.prod.yml down -v
+# Запустить сервисы
 docker-compose -f docker-compose.prod.yml up -d
-docker-compose -f docker-compose.prod.yml exec backend alembic upgrade head
-docker-compose -f docker-compose.prod.yml exec backend python create_admin.py
 ```
 
----
+## Контакты
 
-## Дополнительные ресурсы
-
-- [README.md](README.md) - Общая информация о проекте
-- [DEVELOPMENT_PRINCIPLES.md](docs/DEVELOPMENT_PRINCIPLES.md) - Принципы разработки
-- [ROADMAP.md](ROADMAP.md) - Дорожная карта развития
-- [API Documentation](http://localhost:8000/docs) - Swagger UI (после запуска)
-
-## Поддержка
-
-При возникновении проблем:
-
-1. Проверьте [раздел Устранение неполадок](#устранение-неполадок)
-2. Изучите логи: `docker-compose -f docker-compose.prod.yml logs`
-3. Создайте issue в репозитории с подробным описанием проблемы
-
----
-
-**Версия документа**: 1.0
-**Дата обновления**: 2025-10-28
-**Приложение**: IT Budget Manager v0.5.0
+- Фронтенд: https://budget-west.shknv.ru
+- API: http://93.189.228.52:8888
+- API Docs: http://93.189.228.52:8888/docs
+- Server: ssh root@93.189.228.52
