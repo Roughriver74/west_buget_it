@@ -13,6 +13,7 @@ import pandas as pd
 import io
 
 from app.db.session import get_db
+from app.utils.excel_export import encode_filename_header
 from app.db.models import (
     PayrollPlan, PayrollActual, Employee, User, UserRoleEnum, Department, EmployeeKPI, EmployeeStatusEnum
 )
@@ -160,7 +161,7 @@ async def export_payroll_plans(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=payroll_plans_export.xlsx"}
+        headers=encode_filename_header("payroll_plans_export.xlsx")
     )
 
 
@@ -735,7 +736,7 @@ async def export_payroll_actuals(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=payroll_actuals_export.xlsx"}
+        headers=encode_filename_header("payroll_actuals_export.xlsx")
     )
 
 

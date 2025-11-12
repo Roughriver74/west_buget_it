@@ -123,20 +123,46 @@ const ExpensesPage = () => {
     })
   }
 
-  const handleExport = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const params = new URLSearchParams()
+  const handleExport = async () => {
+    try {
+      const params = new URLSearchParams()
 
-    if (status) params.append('status', status)
-    if (categoryId) params.append('category_id', categoryId.toString())
-    if (selectedDepartment?.id) params.append('department_id', selectedDepartment.id.toString())
-    if (search) params.append('search', search)
-    if (dateRange?.[0]) params.append('date_from', dateRange[0].toISOString())
-    if (dateRange?.[1]) params.append('date_to', dateRange[1].toISOString())
+      if (status) params.append('status', status)
+      if (categoryId) params.append('category_id', categoryId.toString())
+      if (selectedDepartment?.id) params.append('department_id', selectedDepartment.id.toString())
+      if (search) params.append('search', search)
+      if (dateRange?.[0]) params.append('date_from', dateRange[0].toISOString())
+      if (dateRange?.[1]) params.append('date_to', dateRange[1].toISOString())
 
-    const url = `${apiUrl}/api/v1/expenses/export?${params.toString()}`
-    window.open(url, '_blank')
-    message.success('Экспорт начат. Файл скоро будет загружен.')
+      const token = localStorage.getItem('token')
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const url = `${apiUrl}/api/v1/expenses/export?${params.toString()}`
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Ошибка экспорта: ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `expenses_export_${new Date().toISOString().slice(0, 10)}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+
+      message.success('Файл успешно экспортирован')
+    } catch (error: any) {
+      console.error('Export error:', error)
+      message.error(error.message || 'Ошибка при экспорте данных')
+    }
   }
 
   const handleCreate = () => {

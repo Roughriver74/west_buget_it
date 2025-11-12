@@ -12,6 +12,7 @@ import pandas as pd
 import io
 
 from app.db.session import get_db
+from app.utils.excel_export import encode_filename_header
 from app.db.models import (
     Employee, User, UserRoleEnum, Department, SalaryHistory, EmployeeStatusEnum,
     PayrollPlan, PayrollActual, EmployeeKPI
@@ -158,7 +159,7 @@ async def export_employees(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=employees_export.xlsx"}
+        headers=encode_filename_header("employees_export.xlsx")
     )
 
 

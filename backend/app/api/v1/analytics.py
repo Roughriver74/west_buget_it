@@ -17,6 +17,7 @@ from app.db.models import (
 )
 from app.services.forecast_service import PaymentForecastService, ForecastMethod
 from app.utils.auth import get_current_active_user
+from app.utils.excel_export import encode_filename_header
 from app.schemas.analytics import (
     DashboardData,
     DashboardTotals,
@@ -2262,7 +2263,7 @@ def export_budget_income_statement(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )
 
 
@@ -2483,7 +2484,7 @@ def export_customer_metrics_analytics(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )
 
 
@@ -2761,5 +2762,5 @@ def export_revenue_analytics(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )

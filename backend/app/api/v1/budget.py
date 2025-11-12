@@ -9,7 +9,7 @@ from decimal import Decimal
 from app.db import get_db
 from app.db.models import User, BudgetPlan, BudgetCategory, Expense, ExpenseTypeEnum, UserRoleEnum
 from app.schemas import BudgetPlanCreate, BudgetPlanUpdate, BudgetPlanInDB
-from app.utils.excel_export import ExcelExporter
+from app.utils.excel_export import ExcelExporter, encode_filename_header
 from app.utils.auth import get_current_active_user
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
@@ -896,7 +896,7 @@ def export_budget_plan_to_excel(
     return StreamingResponse(
         excel_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=budget_plan_{year}.xlsx"}
+        headers=encode_filename_header(f"budget_plan_{year}.xlsx")
     )
 
 
@@ -925,5 +925,5 @@ def export_budget_overview_to_excel(
     return StreamingResponse(
         excel_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )

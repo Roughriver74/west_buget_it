@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.db import get_db
 from app.db.models import Expense, BudgetCategory, Contractor, Organization, ExpenseStatusEnum, User, UserRoleEnum
 from app.schemas import ExpenseCreate, ExpenseUpdate, ExpenseInDB, ExpenseList, ExpenseStatusUpdate
-from app.utils.excel_export import ExcelExporter
+from app.utils.excel_export import ExcelExporter, encode_filename_header
 from app.services.ftp_import_service import import_from_ftp
 from app.services.baseline_bus import baseline_bus
 from app.utils.auth import get_current_active_user
@@ -149,7 +149,7 @@ def export_expenses_to_excel(
     return StreamingResponse(
         excel_file,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )
 
 

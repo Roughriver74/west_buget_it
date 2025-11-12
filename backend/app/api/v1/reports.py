@@ -11,6 +11,7 @@ import pandas as pd
 import io
 
 from app.db import get_db
+from app.utils.excel_export import encode_filename_header
 from app.db.models import (
     Expense, BudgetCategory, Contractor, Organization,
     Department, User, UserRoleEnum, ExpenseStatusEnum, BudgetPlan
@@ -294,5 +295,5 @@ def export_expenses_by_department(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=encode_filename_header(filename)
     )

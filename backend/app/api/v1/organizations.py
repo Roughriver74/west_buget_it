@@ -7,6 +7,7 @@ import pandas as pd
 import io
 
 from app.db import get_db
+from app.utils.excel_export import encode_filename_header
 from app.db.models import Organization, User
 from app.schemas import OrganizationCreate, OrganizationUpdate, OrganizationInDB
 from app.services.cache import cache_service
@@ -226,7 +227,7 @@ def export_organizations(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=organizations.xlsx"}
+        headers=encode_filename_header("organizations.xlsx")
     )
 
 
