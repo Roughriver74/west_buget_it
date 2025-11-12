@@ -127,7 +127,7 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
   const handleDownloadTemplate = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${API_URL}/import/template/employees?language=ru&include_examples=true`;
+      const url = `${API_URL}/api/v1/import/template/employees?language=ru&include_examples=true`;
 
       // Get token from localStorage
       const token = localStorage.getItem('token');

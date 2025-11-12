@@ -88,6 +88,80 @@ async def list_employees(
     return employees
 
 
+# ==================== Export Endpoints ====================
+
+@router.get("/export")
+async def export_employees(
+    department_id: Optional[int] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export employees list to Excel
+    """
+    query = db.query(Employee).join(Department)
+
+    # Apply department filter based on user role
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        query = query.filter(Employee.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(Employee.department_id == department_id)
+
+    # Apply status filter
+    if status:
+        query = query.filter(Employee.status == status)
+
+    employees = query.all()
+
+    # Define status labels
+    status_labels = {
+        "ACTIVE": "Активен",
+        "ON_VACATION": "В отпуске",
+        "ON_LEAVE": "В отпуске/Больничный",
+        "FIRED": "Уволен",
+    }
+
+    # Convert to DataFrame
+    data = []
+    for emp in employees:
+        data.append({
+            "ID": emp.id,
+            "ФИО": emp.full_name,
+            "Должность": emp.position,
+            "Табельный номер": emp.employee_number or "",
+            "Оклад": float(emp.base_salary),
+            "Отдел": emp.department_rel.name if emp.department_rel else "",
+            "Статус": status_labels.get(emp.status, emp.status),
+            "Дата приема": emp.hire_date.strftime("%Y-%m-%d") if emp.hire_date else "",
+            "Дата увольнения": emp.fire_date.strftime("%Y-%m-%d") if emp.fire_date else "",
+            "Email": emp.email or "",
+            "Телефон": emp.phone or "",
+            "Примечания": emp.notes or "",
+            "Дата создания": emp.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
+    df = pd.DataFrame(data)
+
+    # Create Excel file in memory
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Сотрудники')
+
+    output.seek(0)
+
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=employees_export.xlsx"}
+    )
+
+
 @router.get("/{employee_id}", response_model=EmployeeWithSalaryHistory)
 async def get_employee(
     employee_id: int,
@@ -396,77 +470,3 @@ async def add_salary_history(
     db.refresh(new_history)
 
     return new_history
-
-
-# ==================== Export Endpoints ====================
-
-@router.get("/export")
-async def export_employees(
-    department_id: Optional[int] = None,
-    status: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Export employees list to Excel
-    """
-    query = db.query(Employee).join(Department)
-
-    # Apply department filter based on user role
-    if current_user.role == UserRoleEnum.USER:
-        if not current_user.department_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User has no assigned department"
-            )
-        query = query.filter(Employee.department_id == current_user.department_id)
-    elif department_id:
-        query = query.filter(Employee.department_id == department_id)
-
-    # Apply status filter
-    if status:
-        query = query.filter(Employee.status == status)
-
-    employees = query.all()
-
-    # Define status labels
-    status_labels = {
-        "ACTIVE": "Активен",
-        "ON_VACATION": "В отпуске",
-        "ON_LEAVE": "В отпуске/Больничный",
-        "FIRED": "Уволен",
-    }
-
-    # Convert to DataFrame
-    data = []
-    for emp in employees:
-        data.append({
-            "ID": emp.id,
-            "ФИО": emp.full_name,
-            "Должность": emp.position,
-            "Табельный номер": emp.employee_number or "",
-            "Оклад": float(emp.base_salary),
-            "Отдел": emp.department_rel.name if emp.department_rel else "",
-            "Статус": status_labels.get(emp.status, emp.status),
-            "Дата приема": emp.hire_date.strftime("%Y-%m-%d") if emp.hire_date else "",
-            "Дата увольнения": emp.fire_date.strftime("%Y-%m-%d") if emp.fire_date else "",
-            "Email": emp.email or "",
-            "Телефон": emp.phone or "",
-            "Примечания": emp.notes or "",
-            "Дата создания": emp.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        })
-
-    df = pd.DataFrame(data)
-
-    # Create Excel file in memory
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Сотрудники')
-
-    output.seek(0)
-
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=employees_export.xlsx"}
-    )
