@@ -47,7 +47,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-budget_user}:${POSTGRES_PASSWORD:-budget_pass}@db:5432/${POSTGRES_DB:-it_budget_db}
       - REDIS_URL=redis://redis:6379
       - DEBUG=False
-      - CORS_ORIGINS=https://budget-west.shknv.ru
+      - CORS_ORIGINS=${CORS_ORIGINS}
     depends_on:
       db:
         condition: service_healthy
