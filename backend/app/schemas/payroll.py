@@ -27,8 +27,12 @@ class EmployeeBase(BaseModel):
 
 
 class EmployeeCreate(EmployeeBase):
-    """Schema for creating employee - department_id auto-assigned from current_user"""
-    pass
+    """Schema for creating employee
+
+    - USER: department_id is auto-assigned from user's department (cannot be specified)
+    - MANAGER/ADMIN: department_id can be specified or auto-assigned from user's department
+    """
+    department_id: Optional[int] = Field(None, description="Department ID (optional for ADMIN/MANAGER, auto-assigned for USER)")
 
 
 class EmployeeUpdate(BaseModel):

@@ -202,7 +202,7 @@ export interface EmployeeCreate {
   monthly_bonus_base?: number;
   quarterly_bonus_base?: number;
   annual_bonus_base?: number;
-  // department_id is auto-assigned from current_user on backend
+  department_id?: number; // Optional - for ADMIN/MANAGER to specify department
   email?: string;
   phone?: string;
   notes?: string;

@@ -197,17 +197,30 @@ async def create_employee(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new employee (ADMIN/MANAGER only)
-    """
-    # Only ADMIN and MANAGER can create employees
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators and managers can create employees"
-        )
+    Create a new employee
 
-    # Auto-assign department_id from current_user
-    department_id = current_user.department_id
+    - **USER**: Can create employees only in their own department (auto-assigned)
+    - **MANAGER/ADMIN**: Can specify department_id in request, or uses their own department_id
+    """
+    # Determine department_id based on user role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only create employees in their own department
+        department_id = current_user.department_id
+        if not department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your user account has no assigned department. Contact administrator."
+            )
+    else:
+        # ADMIN/MANAGER: use provided department_id or fall back to current_user.department_id
+        department_id = employee_data.department_id if employee_data.department_id else current_user.department_id
+
+    # Validate that department_id is set
+    if not department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department ID must be specified. Either provide department_id in request or ensure your user account has an assigned department."
+        )
 
     # Check if department exists
     department = db.query(Department).filter(
@@ -216,7 +229,7 @@ async def create_employee(
     if not department:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Department not found"
+            detail=f"Department with ID {department_id} not found"
         )
 
     # Check if employee number already exists (if provided)
@@ -231,8 +244,8 @@ async def create_employee(
                 detail="Employee number already exists in this department"
             )
 
-    # Create new employee with auto-assigned department_id
-    employee_dict = employee_data.model_dump()
+    # Create new employee with assigned department_id
+    employee_dict = employee_data.model_dump(exclude={'department_id'})
     employee_dict['department_id'] = department_id
     new_employee = Employee(**employee_dict)
     db.add(new_employee)

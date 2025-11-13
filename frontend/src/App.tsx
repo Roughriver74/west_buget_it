@@ -95,11 +95,11 @@ function App() {
                           <Route path="/budget" element={<BudgetOverviewPage />} />
                           <Route path="/expenses" element={<ExpensesPage />} />
 
-                        {/* Budget planning - Accountant and Admin only */}
+                        {/* Budget planning - All authenticated users (filtered by department) */}
                         <Route
                           path="/budget/plan"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER', 'ACCOUNTANT']}>
                               <BudgetPlanPage />
                             </ProtectedRoute>
                           }
@@ -187,11 +187,11 @@ function App() {
                           }
                         /> */}
 
-                        {/* Payroll (FOT) - Admin and Manager only */}
+                        {/* Payroll (FOT) - All authenticated users (filtered by department) */}
                         <Route
                           path="/employees/:id"
                           element={
-                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <EmployeeDetailPage />
                             </ProtectedRoute>
                           }

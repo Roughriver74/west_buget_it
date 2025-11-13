@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, Select, DatePicker, message } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeAPI, Employee, EmployeeCreate, EmployeeUpdate } from '../../api/payroll';
+import { useDepartment } from '../../contexts/DepartmentContext';
+import { useAuth } from '../../contexts/AuthContext';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -23,7 +25,12 @@ const STATUS_OPTIONS = [
 export default function EmployeeFormModal({ visible, employee, onCancel }: EmployeeFormModalProps) {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
+  const { departments, selectedDepartment } = useDepartment();
+  const { user } = useAuth();
   const isEdit = !!employee;
+
+  // Check if user can select department (ADMIN/MANAGER)
+  const canSelectDepartment = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   // Create mutation
   const createMutation = useMutation({
@@ -66,9 +73,14 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
       });
     } else if (visible) {
       form.resetFields();
-      form.setFieldsValue({ status: 'ACTIVE' });
+      // Set default values for new employee
+      form.setFieldsValue({
+        status: 'ACTIVE',
+        // Set default department to selected one
+        department_id: selectedDepartment?.id,
+      });
     }
-  }, [visible, employee, form]);
+  }, [visible, employee, form, selectedDepartment]);
 
   const handleClose = () => {
     form.resetFields();
@@ -117,6 +129,30 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
         >
           <Input placeholder="Иванов Иван Иванович" />
         </Form.Item>
+
+        {/* Department selector - visible only for ADMIN/MANAGER when creating new employee */}
+        {!isEdit && canSelectDepartment && (
+          <Form.Item
+            name="department_id"
+            label="Отдел"
+            rules={[{ required: true, message: 'Выберите отдел' }]}
+          >
+            <Select
+              placeholder="Выберите отдел"
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {departments.map((dept) => (
+                <Option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        )}
 
         <Form.Item
           name="position"
