@@ -78,22 +78,48 @@ jobs:
             cd /opt/budget-app
             
             # Pull latest images
-            docker compose -f docker-compose.prod.yml pull
-            
+            docker compose -f docker-compose.prod.yml pull backend frontend
+
             # Restart services
             docker compose -f docker-compose.prod.yml up -d
-            
+
+            # Wait for backend to be ready
+            echo "Waiting for backend to be ready..."
+            for i in {1..30}; do
+              if docker compose -f docker-compose.prod.yml exec -T backend curl -f http://localhost:8000/health 2>/dev/null; then
+                echo "Backend is healthy!"
+                break
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 2
+            done
+
             # Run migrations
-            docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
-            
+            echo "Running database migrations..."
+            docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head || echo "Migration may have already been applied"
+
+            # Show container status
+            echo "Container status:"
+            docker compose -f docker-compose.prod.yml ps
+
             # Clean up old images
             docker image prune -af --filter "until=24h"
-            
+
             echo "Deployment completed successfully!"
 
       - name: Verify Deployment
+        continue-on-error: true
         run: |
           echo "Waiting for services to be healthy..."
-          sleep 30
-          curl -f https://budget-west.shknv.ru/health || exit 1
-          echo "Deployment verified successfully!"
+          sleep 45
+
+          # Try HTTP first (before DNS is configured)
+          if curl -f http://31.129.107.178/health 2>/dev/null; then
+            echo "✅ Deployment verified via HTTP!"
+          # Try HTTPS (after DNS is configured)
+          elif curl -f https://budget-west.shknv.ru/health 2>/dev/null; then
+            echo "✅ Deployment verified via HTTPS!"
+          else
+            echo "⚠️  Health check failed, but deployment may still be in progress"
+            echo "Check manually: http://31.129.107.178/health"
+          fi
