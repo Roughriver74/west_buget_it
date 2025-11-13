@@ -23,6 +23,7 @@ import {
   BulbOutlined,
   BulbFilled,
   KeyOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -93,7 +94,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   ]
 
   // Build menu items based on user role
+  const founderMenuItem = (user?.role === 'FOUNDER' || user?.role === 'ADMIN') ? [{
+		key: '/founder/dashboard',
+		icon: <TrophyOutlined />,
+		label: <Link to='/founder/dashboard'>Дашборд учредителя</Link>,
+	}] : []
+
   const baseMenuItems = [
+		...founderMenuItem,
 		{
 			key: '/dashboard',
 			icon: <DashboardOutlined />,

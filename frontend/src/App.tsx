@@ -15,6 +15,9 @@ import UnauthorizedPage from './pages/UnauthorizedPage'
 // Core pages - load immediately (frequently accessed)
 import DashboardPage from './pages/DashboardPage'
 
+// Founder module
+const FounderDashboardPage = lazy(() => import('./pages/FounderDashboardPage'))
+
 // Lazy-loaded pages (code splitting by module)
 
 // Budget module
@@ -92,6 +95,17 @@ function App() {
                           <Route path="/" element={<Navigate to="/dashboard" replace />} />
                           <Route path="/dashboard" element={<DashboardPage />} />
                           <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
+
+                          {/* Founder dashboard - FOUNDER and ADMIN only */}
+                          <Route
+                            path="/founder/dashboard"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'FOUNDER']}>
+                                <FounderDashboardPage />
+                              </ProtectedRoute>
+                            }
+                          />
+
                           <Route path="/budget" element={<BudgetOverviewPage />} />
                           <Route path="/expenses" element={<ExpensesPage />} />
 

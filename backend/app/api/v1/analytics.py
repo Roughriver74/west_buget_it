@@ -70,7 +70,7 @@ router = APIRouter(dependencies=[Depends(get_current_active_user)])
 def get_dashboard_data(
     year: Optional[int] = None,
     month: Optional[int] = None,
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -78,7 +78,7 @@ def get_dashboard_data(
     Get dashboard data with key metrics
 
     - USER: Can only see dashboard data for their own department
-    - MANAGER/ADMIN: Can see dashboard data for all departments or filter by department
+    - FOUNDER/MANAGER/ADMIN: Can see dashboard data for all departments or filter by department
     """
     if not year:
         year = datetime.now().year
@@ -92,8 +92,8 @@ def get_dashboard_data(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
-        # MANAGER and ADMIN can filter by department or see all
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        # FOUNDER, MANAGER and ADMIN can filter by department or see all
         pass
 
     # Get total planned from BudgetPlan
@@ -265,7 +265,7 @@ def get_dashboard_data(
 @router.get("/budget-execution")
 def get_budget_execution(
     year: int,
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -284,7 +284,7 @@ def get_budget_execution(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -406,7 +406,7 @@ def get_budget_execution(
 def get_analytics_by_category(
     year: int,
     month: Optional[int] = None,
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -425,7 +425,7 @@ def get_analytics_by_category(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -497,7 +497,7 @@ def get_analytics_by_category(
 def get_trends(
     year: int,
     category_id: Optional[int] = None,
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -516,7 +516,7 @@ def get_trends(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -583,7 +583,7 @@ def get_payment_calendar(
                 detail="User has no assigned department"
             )
         dept_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         dept_id = department_id if department_id else None
     else:
@@ -688,7 +688,7 @@ def get_payments_by_day(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -790,7 +790,7 @@ def get_payment_forecast(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -864,7 +864,7 @@ def get_payment_forecast_summary(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -1143,7 +1143,7 @@ def validate_expense(
 @router.get("/budget-income-statement", response_model=BudgetIncomeStatement)
 def get_budget_income_statement(
     year: int = Query(..., description="Year for the budget income statement"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -1168,7 +1168,7 @@ def get_budget_income_statement(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         pass  # Can filter by department or see all
 
     # Get department name if specific department
@@ -1405,7 +1405,7 @@ def get_budget_income_statement(
 @router.get("/customer-metrics-analytics", response_model=CustomerMetricsAnalytics)
 def get_customer_metrics_analytics(
     year: int = Query(..., description="Year for customer metrics analytics"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -1657,7 +1657,7 @@ def get_customer_metrics_analytics(
 @router.get("/revenue-analytics", response_model=RevenueAnalytics)
 def get_revenue_analytics(
     year: int = Query(..., description="Year for revenue analytics"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -1889,7 +1889,7 @@ def get_revenue_analytics(
 @router.get("/budget-income-statement/export")
 def export_budget_income_statement(
     year: int = Query(..., description="Year for the budget income statement"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -2270,7 +2270,7 @@ def export_budget_income_statement(
 @router.get("/customer-metrics-analytics/export")
 def export_customer_metrics_analytics(
     year: int = Query(..., description="Year for customer metrics analytics"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -2491,7 +2491,7 @@ def export_customer_metrics_analytics(
 @router.get("/revenue-analytics/export")
 def export_revenue_analytics(
     year: int = Query(..., description="Year for revenue analytics"),
-    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/MANAGER only)"),
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):

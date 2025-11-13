@@ -53,7 +53,7 @@ def export_expenses_to_excel(
                 detail="User has no assigned department"
             )
         query = query.filter(Expense.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         if department_id is not None:
             query = query.filter(Expense.department_id == department_id)
@@ -188,7 +188,7 @@ def get_expenses(
                 detail="User has no assigned department"
             )
         query = query.filter(Expense.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         if department_id is not None:
             query = query.filter(Expense.department_id == department_id)
@@ -687,7 +687,7 @@ def get_expense_totals(
                 detail="User has no assigned department"
             )
         query = query.filter(Expense.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         if department_id is not None:
             query = query.filter(Expense.department_id == department_id)

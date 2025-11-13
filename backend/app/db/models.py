@@ -80,6 +80,7 @@ class ApprovalActionEnum(str, enum.Enum):
 class UserRoleEnum(str, enum.Enum):
     """Enum for user roles in BDR (Budget Department Reporting)"""
     ADMIN = "ADMIN"  # Администратор - управление системой и пользователями
+    FOUNDER = "FOUNDER"  # Учредитель - дашборд с ключевыми показателями по всем отделам
     MANAGER = "MANAGER"  # Руководитель - доступ ко всем отделам, сводная аналитика
     USER = "USER"  # Пользователь отдела - доступ только к своему отделу
 

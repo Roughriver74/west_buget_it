@@ -19,3 +19,4 @@ export {
 } from './payroll'
 export { revenueApi, revenueStreamsApi, revenueCategoriesApi, revenueActualsApi } from './revenue'
 export { invoiceProcessingApi } from './invoiceProcessing'
+export { founderDashboardApi } from './founderDashboard'

@@ -56,7 +56,7 @@ def get_budget_plans(
                 detail="User has no assigned department"
             )
         query = query.filter(BudgetPlan.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         if department_id is not None:
             query = query.filter(BudgetPlan.department_id == department_id)
@@ -251,7 +251,7 @@ def get_budget_summary(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -345,7 +345,7 @@ def get_budget_plan_for_year(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -707,7 +707,7 @@ def get_budget_overview(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
@@ -838,7 +838,7 @@ def export_budget_plan_to_excel(
                 detail="User has no assigned department"
             )
         department_id = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
 
