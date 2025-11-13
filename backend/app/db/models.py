@@ -135,6 +135,22 @@ class RevenueVersionStatusEnum(str, enum.Enum):
     ARCHIVED = "ARCHIVED"  # Архивный
 
 
+class BankTransactionTypeEnum(str, enum.Enum):
+    """Enum for bank transaction types"""
+    DEBIT = "DEBIT"  # Списание (расход)
+    CREDIT = "CREDIT"  # Поступление (доход)
+
+
+class BankTransactionStatusEnum(str, enum.Enum):
+    """Enum for bank transaction processing statuses"""
+    NEW = "NEW"  # Новая, не обработана
+    CATEGORIZED = "CATEGORIZED"  # Категория назначена
+    MATCHED = "MATCHED"  # Связана с заявкой
+    APPROVED = "APPROVED"  # Проверена и одобрена
+    NEEDS_REVIEW = "NEEDS_REVIEW"  # Требует ручной проверки
+    IGNORED = "IGNORED"  # Проигнорирована (не относится к учету)
+
+
 class Department(Base):
     """Departments (отделы компании) - основа multi-tenancy"""
     __tablename__ = "departments"
@@ -1595,3 +1611,97 @@ class ProcessedInvoice(Base):
 
     def __repr__(self):
         return f"<ProcessedInvoice {self.invoice_number or self.original_filename} ({self.status})>"
+
+
+class BankTransaction(Base):
+    """
+    Bank Transactions (Банковские операции)
+    Списания и поступления из банковских выписок
+    """
+    __tablename__ = "bank_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Основная информация о транзакции
+    transaction_date = Column(Date, nullable=False, index=True)  # Дата операции
+    amount = Column(Numeric(15, 2), nullable=False)  # Сумма
+    transaction_type = Column(
+        Enum(BankTransactionTypeEnum),
+        nullable=False,
+        default=BankTransactionTypeEnum.DEBIT,
+        index=True
+    )  # Тип операции: списание или поступление
+
+    # Контрагент
+    counterparty_name = Column(String(500), nullable=True, index=True)  # Наименование контрагента
+    counterparty_inn = Column(String(12), nullable=True, index=True)  # ИНН контрагента
+    counterparty_kpp = Column(String(9), nullable=True)  # КПП контрагента
+    counterparty_account = Column(String(20), nullable=True)  # Счет контрагента
+    counterparty_bank = Column(String(500), nullable=True)  # Банк контрагента
+    counterparty_bik = Column(String(9), nullable=True)  # БИК банка контрагента
+
+    # Назначение платежа
+    payment_purpose = Column(Text, nullable=True)  # Назначение платежа (основа для AI классификации)
+
+    # Наша организация
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    account_number = Column(String(20), nullable=True)  # Наш счет
+
+    # Банковские реквизиты документа
+    document_number = Column(String(50), nullable=True, index=True)  # Номер платежного документа
+    document_date = Column(Date, nullable=True)  # Дата платежного документа
+
+    # Классификация (AI и ручная)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)  # Статья расходов
+    category_confidence = Column(Numeric(5, 4), nullable=True)  # Уверенность AI в категории (0-1)
+    suggested_category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True)  # Предложенная AI категория
+
+    # Связь с заявками
+    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True, index=True)  # Связанная заявка
+    matching_score = Column(Numeric(5, 2), nullable=True)  # Степень совпадения с заявкой (0-100)
+    suggested_expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True)  # Предложенная заявка
+
+    # Статус обработки
+    status = Column(
+        Enum(BankTransactionStatusEnum),
+        nullable=False,
+        default=BankTransactionStatusEnum.NEW,
+        index=True
+    )
+
+    # Дополнительные данные
+    notes = Column(Text, nullable=True)  # Примечания финансиста
+    is_regular_payment = Column(Boolean, default=False, nullable=False, index=True)  # Регулярный платеж
+    regular_payment_pattern_id = Column(Integer, nullable=True)  # ID паттерна регулярного платежа
+
+    # Обработка и аудит
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Кто проверил
+    reviewed_at = Column(DateTime, nullable=True)  # Когда проверено
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Импорт
+    import_source = Column(String(50), nullable=True)  # Источник: "FTP", "MANUAL_UPLOAD", "API"
+    import_file_name = Column(String(255), nullable=True)  # Имя файла импорта
+    imported_at = Column(DateTime, nullable=True)  # Когда импортировано
+
+    # External ID (для связи с 1С)
+    external_id_1c = Column(String(100), nullable=True, index=True, unique=True)  # ID в 1С
+
+    # Системные поля
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    organization_rel = relationship("Organization", foreign_keys=[organization_id])
+    category_rel = relationship("BudgetCategory", foreign_keys=[category_id])
+    suggested_category_rel = relationship("BudgetCategory", foreign_keys=[suggested_category_id])
+    expense_rel = relationship("Expense", foreign_keys=[expense_id])
+    suggested_expense_rel = relationship("Expense", foreign_keys=[suggested_expense_id])
+    reviewed_by_rel = relationship("User", foreign_keys=[reviewed_by])
+
+    def __repr__(self):
+        return f"<BankTransaction {self.transaction_date} {self.counterparty_name} {self.amount}>"
