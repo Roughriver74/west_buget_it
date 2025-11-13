@@ -140,13 +140,12 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
             <Select
               placeholder="Выберите отдел"
               showSearch
-              optionFilterProp="children"
               filterOption={(input, option) =>
-                (option?.children as string)?.toLowerCase().includes(input.toLowerCase())
+                (option?.label?.toString() ?? '').toLowerCase().includes(input.toLowerCase())
               }
             >
               {departments.map((dept) => (
-                <Option key={dept.id} value={dept.id}>
+                <Option key={dept.id} value={dept.id} label={dept.name}>
                   {dept.name}
                 </Option>
               ))}
