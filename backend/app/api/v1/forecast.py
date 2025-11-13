@@ -12,7 +12,7 @@ from sqlalchemy import func, extract, and_, or_
 from pydantic import BaseModel, Field
 
 from app.db import get_db
-from app.db.models import User, UserRoleEnum, ForecastExpense, Expense, BudgetCategory, Contractor, Organization
+from app.db.models import User, UserRoleEnum, ForecastExpense, Expense, BudgetCategory, Contractor, Organization, PayrollPlan
 from app.utils.excel_export import ExcelExporter
 from app.utils.auth import get_current_active_user
 from app.services.ai_forecast_service import AIForecastService
@@ -61,16 +61,9 @@ def get_previous_workday(date_obj: date) -> date:
 def adjust_to_workday(date_obj: date) -> date:
     """
     Переносит дату на рабочий день согласно правилам:
-    1. Если дата на выходные - переносит на предыдущий рабочий день
-    2. Если дата 10 число или 25 число - переносит на предыдущий рабочий день
-    3. Если предыдущий день от 10/25 тоже выходной - переносит еще раньше
+    - Если дата попадает на выходные (суббота или воскресенье) - переносит на предыдущий рабочий день
+    - Если дата - рабочий день, оставляет как есть
     """
-    day = date_obj.day
-
-    # Правило для 10 и 25 числа: всегда переносим на предыдущий рабочий день
-    if day in (10, 25):
-        return get_previous_workday(date_obj)
-
     # Если дата на выходные, переносим на предыдущий рабочий день
     if is_weekend(date_obj):
         return get_previous_workday(date_obj)
@@ -215,8 +208,18 @@ def generate_forecast(
             if expenses:
                 avg_day = sum(e.request_date.day for e in expenses) / len(expenses)
                 day_of_month = round(avg_day)
+                # Берем комментарий из самой свежей заявки с описанием
+                comment = None
+                for exp in sorted(expenses, key=lambda x: x.request_date, reverse=True):
+                    if exp.comment and exp.comment.strip():
+                        comment = exp.comment.strip()
+                        break
+                # Если нет комментария, используем простое описание
+                if not comment:
+                    comment = "Регулярная оплата"
             else:
                 day_of_month = 15
+                comment = "Регулярная оплата"
 
             # Проверяем, что день существует в целевом месяце
             max_day = calendar.monthrange(request.target_year, request.target_month)[1]
@@ -240,7 +243,7 @@ def generate_forecast(
                 forecast_date=adjusted_date,
                 amount=rounded_amount,
                 is_regular=True,
-                comment=f"Автоматически: регулярный расход (среднее за 3 месяца, обычно ~{day_of_month} числа)"
+                comment=comment
             )
             db.add(forecast)
             created_count += 1
@@ -301,8 +304,20 @@ def generate_forecast(
             if expenses:
                 avg_day = sum(e.request_date.day for e in expenses) / len(expenses)
                 day_of_month = round(avg_day)
+                # Берем комментарий из самой свежей заявки с описанием
+                comment = None
+                for exp in sorted(expenses, key=lambda x: x.request_date, reverse=True):
+                    if exp.comment and exp.comment.strip():
+                        comment = exp.comment.strip()
+                        break
+                # Если нет комментария, используем название категории
+                if not comment:
+                    category = db.query(BudgetCategory).filter(BudgetCategory.id == avg.category_id).first()
+                    comment = category.name if category else "Прочие расходы"
             else:
                 day_of_month = 20
+                category = db.query(BudgetCategory).filter(BudgetCategory.id == avg.category_id).first()
+                comment = category.name if category else "Прочие расходы"
 
             # Проверяем, что день существует в целевом месяце
             max_day = calendar.monthrange(request.target_year, request.target_month)[1]
@@ -326,7 +341,7 @@ def generate_forecast(
                 forecast_date=adjusted_date,
                 amount=rounded_amount,
                 is_regular=False,
-                comment=f"Автоматически: средний расход по категории ({avg.count} раз за 6 мес., обычно ~{day_of_month} числа)"
+                comment=comment
             )
             db.add(forecast)
             created_count += 1
@@ -597,6 +612,106 @@ def export_forecast_calendar(
         }
         forecast_dicts.append(forecast_dict)
 
+    # Добавляем ФОТ (фонд оплаты труда)
+    if dept_id:
+        # Получаем планы по зарплате за этот месяц
+        payroll_plans = db.query(PayrollPlan).filter(
+            PayrollPlan.department_id == dept_id,
+            PayrollPlan.year == year,
+            PayrollPlan.month == month
+        ).all()
+
+        if payroll_plans:
+            # Суммируем все выплаты по всем сотрудникам
+            total_payroll = sum(float(p.total_planned) for p in payroll_plans)
+
+            if total_payroll > 0:
+                # Найдем или создадим категорию "ФОТ"
+                fot_category = db.query(BudgetCategory).filter(
+                    BudgetCategory.department_id == dept_id,
+                    BudgetCategory.name.ilike("%фот%")
+                ).first()
+
+                if not fot_category:
+                    # Используем первую активную категорию как fallback
+                    fot_category = db.query(BudgetCategory).filter(
+                        BudgetCategory.department_id == dept_id,
+                        BudgetCategory.is_active == True
+                    ).first()
+
+                # Получаем первую активную организацию
+                default_org = db.query(Organization).filter(
+                    Organization.is_active == True
+                ).first()
+                org_id = default_org.id if default_org else 1
+
+                # Делим на аванс и оклад+премия (по 50%)
+                advance_amount = round_to_hundreds(Decimal(str(total_payroll * 0.5)))
+                salary_bonus_amount = round_to_hundreds(Decimal(str(total_payroll * 0.5)))
+
+                # НДФЛ = 13% от общей суммы
+                ndfl_amount = round_to_hundreds(Decimal(str(total_payroll * 0.13)))
+
+                # Даты выплат с учетом рабочих дней
+                # Аванс - 10 число
+                max_day_in_month = calendar.monthrange(year, month)[1]
+                advance_day = min(10, max_day_in_month)
+                advance_date = adjust_to_workday(date(year, month, advance_day))
+
+                # Оклад + премия - 25 число
+                salary_day = min(25, max_day_in_month)
+                salary_date = adjust_to_workday(date(year, month, salary_day))
+
+                # НДФЛ - платится вместе с зарплатой (25 число)
+                ndfl_date = salary_date
+
+                # Добавляем 3 строки ФОТ
+                if fot_category:
+                    # 1. Аванс
+                    forecast_dicts.append({
+                        "id": -1,
+                        "category_id": fot_category.id,
+                        "contractor_id": None,
+                        "organization_id": org_id,
+                        "date": advance_date,
+                        "amount": float(advance_amount),
+                        "comment": "Аванс сотрудникам",
+                        "is_regular": True,
+                        "category": {"id": fot_category.id, "name": fot_category.name},
+                        "contractor": None,
+                        "organization": {"id": org_id, "name": default_org.name} if default_org else None,
+                    })
+
+                    # 2. Оклад + премия
+                    forecast_dicts.append({
+                        "id": -2,
+                        "category_id": fot_category.id,
+                        "contractor_id": None,
+                        "organization_id": org_id,
+                        "date": salary_date,
+                        "amount": float(salary_bonus_amount),
+                        "comment": "Оклад и премии сотрудникам",
+                        "is_regular": True,
+                        "category": {"id": fot_category.id, "name": fot_category.name},
+                        "contractor": None,
+                        "organization": {"id": org_id, "name": default_org.name} if default_org else None,
+                    })
+
+                    # 3. НДФЛ
+                    forecast_dicts.append({
+                        "id": -3,
+                        "category_id": fot_category.id,
+                        "contractor_id": None,
+                        "organization_id": org_id,
+                        "date": ndfl_date,
+                        "amount": float(ndfl_amount),
+                        "comment": "НДФЛ с заработной платы",
+                        "is_regular": True,
+                        "category": {"id": fot_category.id, "name": fot_category.name},
+                        "contractor": None,
+                        "organization": {"id": org_id, "name": default_org.name} if default_org else None,
+                    })
+
     # Get department name for template sheet selection
     department_name = "Шикунов"  # Default to IT department
     if dept_id:
@@ -698,8 +813,17 @@ async def generate_ai_forecast(
         if expenses:
             avg_day = sum(e.request_date.day for e in expenses) / len(expenses)
             day_of_month = round(avg_day)
+            # Берем комментарий из самой свежей заявки с описанием
+            comment = None
+            for exp in sorted(expenses, key=lambda x: x.request_date, reverse=True):
+                if exp.comment and exp.comment.strip():
+                    comment = exp.comment.strip()
+                    break
+            if not comment:
+                comment = "Регулярная оплата"
         else:
             day_of_month = 15
+            comment = "Регулярная оплата"
 
         max_day = calendar.monthrange(request.target_year, request.target_month)[1]
         if day_of_month > max_day:
@@ -721,7 +845,7 @@ async def generate_ai_forecast(
             forecast_date=adjusted_date,
             amount=rounded_amount,
             is_regular=True,
-            comment=f"Регулярный расход (среднее за 3 месяца)"
+            comment=comment
         )
         db.add(forecast)
         base_created += 1
@@ -854,7 +978,7 @@ async def generate_ai_forecast(
                     forecast_date=adjusted_date,
                     amount=rounded_amount,
                     is_regular=False,
-                    comment=f"AI: {description[:80]} | {item.get('reasoning', '')[:100]}"
+                    comment=description[:150] if description else "Прогнозируемый расход"
                 )
                 db.add(forecast)
                 ai_created += 1

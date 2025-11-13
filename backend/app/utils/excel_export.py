@@ -722,17 +722,27 @@ class ExcelExporter:
             ws.cell(row=4, column=col, value=None)
 
         # Заполняем дни и даты
+        weekend_columns = []  # Список колонок с выходными днями
+        gray_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+
         for day in range(1, num_days + 1):
             col = 7 + day  # H=8, I=9, J=10, ...
             day_date = date(year, month, day)
+            is_weekend = day_date.weekday() in (5, 6)  # 5=суббота, 6=воскресенье
 
             # Строка 3: День недели
             weekday_name = day_names_ru[day_date.weekday()]
-            ws.cell(row=3, column=col, value=weekday_name)
+            cell_weekday = ws.cell(row=3, column=col, value=weekday_name)
 
             # Строка 4: Дата в формате DD/MM/YY
             date_str = day_date.strftime('%d/%m/%y')
-            ws.cell(row=4, column=col, value=date_str)
+            cell_date = ws.cell(row=4, column=col, value=date_str)
+
+            # Если выходной - сохраняем колонку и применяем серый фон к заголовкам
+            if is_weekend:
+                weekend_columns.append(col)
+                cell_weekday.fill = gray_fill
+                cell_date.fill = gray_fill
 
         # Группируем прогнозы по уникальной комбинации
         grouped_forecasts = {}
@@ -823,6 +833,11 @@ class ExcelExporter:
 
             current_row += 1
             row_number += 1
+
+        # Применяем серый фон к колонкам выходных дней для всех строк с данными
+        for row in range(data_start_row, current_row):
+            for col in weekend_columns:
+                ws.cell(row=row, column=col).fill = gray_fill
 
         # Сохраняем в BytesIO
         output = BytesIO()
