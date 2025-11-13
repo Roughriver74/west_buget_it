@@ -694,7 +694,7 @@ class ExcelExporter:
         if template_path is None:
             # Используем путь относительно backend директории
             # backend/app/utils/excel_export.py -> backend/xls/
-            template_path = Path(__file__).parent.parent.parent / "xls" / "Планирование_10.2025-3.xlsx"
+            template_path = Path(__file__).parent.parent.parent / "xls" / "Planning_Template_10.2025-3.xlsx"
 
         if not template_path.exists():
             raise FileNotFoundError(f"Шаблон не найден: {template_path}")
