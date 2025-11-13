@@ -346,6 +346,103 @@ def generate_forecast(
             db.add(forecast)
             created_count += 1
 
+    # 3. Добавляем ФОТ (фонд оплаты труда) из планов по зарплате
+    payroll_plans = db.query(PayrollPlan).filter(
+        PayrollPlan.department_id == request.department_id,
+        PayrollPlan.year == request.target_year,
+        PayrollPlan.month == request.target_month
+    ).all()
+
+    if payroll_plans:
+        # Суммируем все выплаты по всем сотрудникам
+        total_payroll = sum(float(p.total_planned) for p in payroll_plans)
+
+        if total_payroll > 0:
+            # Найдем категорию "ФОТ"
+            fot_category = db.query(BudgetCategory).filter(
+                BudgetCategory.department_id == request.department_id,
+                BudgetCategory.name.ilike("%фот%")
+            ).first()
+
+            if not fot_category:
+                # Используем первую активную категорию как fallback
+                fot_category = db.query(BudgetCategory).filter(
+                    BudgetCategory.department_id == request.department_id,
+                    BudgetCategory.is_active == True
+                ).first()
+
+            # Получаем первую активную организацию
+            default_org = db.query(Organization).filter(
+                Organization.is_active == True
+            ).first()
+            org_id = default_org.id if default_org else 1
+
+            if fot_category:
+                # Расчет сумм: итого = 100% от total_payroll
+                # Аванс: 40% (выплата сотрудникам)
+                advance_amount = round_to_hundreds(Decimal(str(total_payroll * 0.40)))
+                # Зарплата + премия: 47% (выплата сотрудникам)
+                salary_bonus_amount = round_to_hundreds(Decimal(str(total_payroll * 0.47)))
+                # НДФЛ: 13% (перечисление в налоговую)
+                ndfl_amount = round_to_hundreds(Decimal(str(total_payroll * 0.13)))
+
+                # Даты выплат с учетом рабочих дней
+                max_day_in_month = calendar.monthrange(request.target_year, request.target_month)[1]
+
+                # Аванс - 10 число
+                advance_day = min(10, max_day_in_month)
+                advance_date = adjust_to_workday(date(request.target_year, request.target_month, advance_day))
+
+                # Оклад + премия - 25 число
+                salary_day = min(25, max_day_in_month)
+                salary_date = adjust_to_workday(date(request.target_year, request.target_month, salary_day))
+
+                # НДФЛ - платится вместе с зарплатой
+                ndfl_date = salary_date
+
+                # Добавляем 3 прогноза ФОТ
+                # 1. Аванс
+                forecast_advance = ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=advance_date,
+                    amount=advance_amount,
+                    is_regular=True,
+                    comment="Аванс сотрудникам"
+                )
+                db.add(forecast_advance)
+                created_count += 1
+
+                # 2. Оклад + премия
+                forecast_salary = ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=salary_date,
+                    amount=salary_bonus_amount,
+                    is_regular=True,
+                    comment="Оклад и премии сотрудникам"
+                )
+                db.add(forecast_salary)
+                created_count += 1
+
+                # 3. НДФЛ
+                forecast_ndfl = ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=ndfl_date,
+                    amount=ndfl_amount,
+                    is_regular=True,
+                    comment="НДФЛ с заработной платы"
+                )
+                db.add(forecast_ndfl)
+                created_count += 1
+
     db.commit()
 
     return {
@@ -645,11 +742,12 @@ def export_forecast_calendar(
                 ).first()
                 org_id = default_org.id if default_org else 1
 
-                # Делим на аванс и оклад+премия (по 50%)
-                advance_amount = round_to_hundreds(Decimal(str(total_payroll * 0.5)))
-                salary_bonus_amount = round_to_hundreds(Decimal(str(total_payroll * 0.5)))
-
-                # НДФЛ = 13% от общей суммы
+                # Расчет сумм: итого = 100% от total_payroll
+                # Аванс: 40% (выплата сотрудникам)
+                advance_amount = round_to_hundreds(Decimal(str(total_payroll * 0.40)))
+                # Зарплата + премия: 47% (выплата сотрудникам)
+                salary_bonus_amount = round_to_hundreds(Decimal(str(total_payroll * 0.47)))
+                # НДФЛ: 13% (перечисление в налоговую)
                 ndfl_amount = round_to_hundreds(Decimal(str(total_payroll * 0.13)))
 
                 # Даты выплат с учетом рабочих дней
@@ -849,6 +947,87 @@ async def generate_ai_forecast(
         )
         db.add(forecast)
         base_created += 1
+
+    # 2b. Добавляем ФОТ (фонд оплаты труда) из планов по зарплате
+    payroll_plans = db.query(PayrollPlan).filter(
+        PayrollPlan.department_id == request.department_id,
+        PayrollPlan.year == request.target_year,
+        PayrollPlan.month == request.target_month
+    ).all()
+
+    if payroll_plans:
+        # Суммируем все выплаты по всем сотрудникам
+        total_payroll = sum(float(p.total_planned) for p in payroll_plans)
+
+        if total_payroll > 0:
+            # Найдем категорию "ФОТ"
+            fot_category = db.query(BudgetCategory).filter(
+                BudgetCategory.department_id == request.department_id,
+                BudgetCategory.name.ilike("%фот%")
+            ).first()
+
+            if not fot_category:
+                fot_category = db.query(BudgetCategory).filter(
+                    BudgetCategory.department_id == request.department_id,
+                    BudgetCategory.is_active == True
+                ).first()
+
+            default_org = db.query(Organization).filter(
+                Organization.is_active == True
+            ).first()
+            org_id = default_org.id if default_org else 1
+
+            if fot_category:
+                # Расчет сумм: итого = 100% от total_payroll
+                advance_amount = round_to_hundreds(Decimal(str(total_payroll * 0.40)))
+                salary_bonus_amount = round_to_hundreds(Decimal(str(total_payroll * 0.47)))
+                ndfl_amount = round_to_hundreds(Decimal(str(total_payroll * 0.13)))
+
+                max_day_in_month = calendar.monthrange(request.target_year, request.target_month)[1]
+                advance_day = min(10, max_day_in_month)
+                advance_date = adjust_to_workday(date(request.target_year, request.target_month, advance_day))
+                salary_day = min(25, max_day_in_month)
+                salary_date = adjust_to_workday(date(request.target_year, request.target_month, salary_day))
+                ndfl_date = salary_date
+
+                # Аванс
+                db.add(ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=advance_date,
+                    amount=advance_amount,
+                    is_regular=True,
+                    comment="Аванс сотрудникам"
+                ))
+                base_created += 1
+
+                # Оклад + премия
+                db.add(ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=salary_date,
+                    amount=salary_bonus_amount,
+                    is_regular=True,
+                    comment="Оклад и премии сотрудникам"
+                ))
+                base_created += 1
+
+                # НДФЛ
+                db.add(ForecastExpense(
+                    department_id=request.department_id,
+                    category_id=fot_category.id,
+                    contractor_id=None,
+                    organization_id=org_id,
+                    forecast_date=ndfl_date,
+                    amount=ndfl_amount,
+                    is_regular=True,
+                    comment="НДФЛ с заработной платы"
+                ))
+                base_created += 1
 
     db.commit()
 
