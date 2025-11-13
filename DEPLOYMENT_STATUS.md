@@ -2,21 +2,25 @@
 
 **Last Updated**: 2025-11-13
 **Server**: 31.129.107.178
-**Domain**: budget-west.shknv.ru (not configured yet)
+**Domain**: budget-west.shknv.ru ✅
 
-## ✅ Current Status: DEPLOYED & WORKING
+## ✅ Current Status: FULLY DEPLOYED & WORKING
 
-### HTTP Access (Working Now)
+### HTTPS Access (✅ Working!)
+
+- ✅ **Frontend**: https://budget-west.shknv.ru/
+- ✅ **Login Page**: https://budget-west.shknv.ru/login
+- ✅ **Backend API**: https://budget-west.shknv.ru/api/v1/health
+- ✅ **Health Check**: https://budget-west.shknv.ru/health
+- ✅ **API Docs**: https://budget-west.shknv.ru/docs
+- ✅ **HTTP → HTTPS**: Auto-redirect enabled
+
+### HTTP Access (IP-based, also working)
 
 - ✅ **Frontend**: http://31.129.107.178/
 - ✅ **Backend API**: http://31.129.107.178/api/v1/health
 - ✅ **Health Check**: http://31.129.107.178/health
 - ✅ **API Docs**: http://31.129.107.178/docs
-
-### HTTPS Access (Pending DNS Setup)
-
-- ❌ **HTTPS**: Not working yet (DNS not configured)
-- 📋 **Action Required**: Follow [DNS_SSL_SETUP.md](docs/DNS_SSL_SETUP.md)
 
 ## 🎯 Completed Setup
 
@@ -45,21 +49,24 @@
 
 ### Security
 - [x] Rate limiting enabled (10 req/s API, 5 req/min login)
-- [x] Security headers configured
+- [x] Security headers configured (HSTS, X-Frame-Options, CSP, etc.)
 - [x] Non-root user in containers
 - [x] Proper CORS configuration
-- [ ] SSL certificate (pending DNS setup)
+- [x] SSL certificate (Let's Encrypt, valid until 2026-02-11)
+- [x] HTTPS enabled with HTTP redirect
+- [x] TLS 1.2/1.3 encryption
 
 ## 📊 Service Status
 
 ```
-Service          Status      Port    Health
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Backend          ✅ Healthy   8888    ✅ OK
-Frontend         ✅ Running   8080    ✅ OK
-PostgreSQL       ✅ Healthy   5432    ✅ OK
-Redis            ✅ Healthy   6379    ✅ OK
-Nginx            ✅ Running   80      ✅ OK
+Service          Status      Port        Health
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Backend          ✅ Healthy   8888        ✅ OK
+Frontend         ✅ Running   8080        ✅ OK
+PostgreSQL       ✅ Healthy   5432        ✅ OK
+Redis            ✅ Healthy   6379        ✅ OK
+Nginx HTTP       ✅ Running   80          ✅ OK
+Nginx HTTPS      ✅ Running   443         ✅ OK
 ```
 
 ## 🔄 Deployment Workflow
@@ -78,28 +85,9 @@ Every `git push` to `main` branch automatically:
 
 **Average deployment time**: 3-5 minutes
 
-## 📝 Next Steps
+## 📝 Recommended Next Steps
 
-### 1. Configure DNS (Required for HTTPS)
-
-Add A record in your DNS provider:
-```
-Type: A
-Name: budget-west.shknv.ru
-Value: 31.129.107.178
-TTL: 300
-```
-
-**Guide**: [DNS_SSL_SETUP.md](docs/DNS_SSL_SETUP.md)
-
-### 2. Install SSL Certificate (After DNS)
-
-```bash
-ssh root@31.129.107.178
-certbot --nginx -d budget-west.shknv.ru
-```
-
-### 3. Change Default Passwords (Recommended)
+### 1. Change Default Passwords (Important!)
 
 Current passwords are defaults and should be changed for production:
 
@@ -228,7 +216,8 @@ docker compose -f /opt/budget-app/docker-compose.prod.yml exec backend alembic u
 
 ## 🎉 Success Criteria
 
-All checks passed:
+✅ All checks passed:
+- ✅ Application accessible via HTTPS
 - ✅ Application accessible via HTTP
 - ✅ Backend API responding
 - ✅ Frontend loading
@@ -236,7 +225,9 @@ All checks passed:
 - ✅ Redis working
 - ✅ CI/CD pipeline working
 - ✅ Health checks passing
-- ⏳ SSL certificate (pending DNS setup)
+- ✅ SSL certificate installed and valid
+- ✅ HTTP to HTTPS redirect working
+- ✅ DNS configured correctly
 
 ## 📞 Support
 
@@ -248,15 +239,19 @@ For issues:
 
 ## 🔐 Security Checklist
 
-Before going live:
-- [ ] Change POSTGRES_PASSWORD
-- [ ] Update SECRET_KEY
-- [ ] Review CORS_ORIGINS
-- [ ] Install SSL certificate
-- [ ] Enable firewall (ufw)
-- [ ] Setup backup strategy
-- [ ] Configure monitoring
-- [ ] Review Nginx rate limits
+Production security status:
+- ✅ SSL certificate installed
+- ✅ HTTPS enabled
+- ✅ HTTP to HTTPS redirect
+- ✅ Rate limiting configured
+- ✅ Security headers configured
+- [ ] Change POSTGRES_PASSWORD (currently: budget_pass)
+- [ ] Update SECRET_KEY (needs strong random value)
+- [ ] Review CORS_ORIGINS (currently allows multiple origins)
+- [ ] Enable firewall (ufw) - Optional
+- [ ] Setup backup strategy - Recommended
+- [ ] Configure monitoring (Prometheus/Grafana) - Optional
+- [ ] Review and adjust Nginx rate limits if needed
 
 ---
 
