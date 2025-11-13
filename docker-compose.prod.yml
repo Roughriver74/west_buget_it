@@ -4,115 +4,50 @@ services:
   # PostgreSQL Database
   db:
     image: postgres:15-alpine
-    container_name: it_budget_db_prod
-    restart: always
+    container_name: budget_db_prod
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:-budget_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-budget_pass}
-      POSTGRES_DB: ${DB_NAME:-it_budget_db}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: ${POSTGRES_DB:-it_budget_db}
+      POSTGRES_USER: ${POSTGRES_USER:-budget_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-budget_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT:-54329}:5432"
+    networks:
+      - budget_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-budget_user} -d ${DB_NAME:-it_budget_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-budget_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - budget_network
 
-  # Redis (optional, for caching and rate limiting)
+  # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: it_budget_redis_prod
-    restart: always
+    container_name: budget_redis_prod
+    restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    networks:
+      - budget_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 5
-    networks:
-      - budget_network
 
-  # Backend API
+  # Backend API (FastAPI)
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.prod
-    image: it-budget-backend:prod
-    container_name: it_budget_backend_prod
-    restart: always
-    labels:
-      # Traefik configuration for automatic routing
-      - "traefik.enable=true"
-      - "traefik.http.services.backend.loadbalancer.server.port=8000"
-      # Timeout configuration - prevent 504 Gateway Timeout
-      - "traefik.http.services.backend.loadbalancer.responseHeaderTimeout=180s"
-      - "traefik.http.services.backend.loadbalancer.healthcheck.timeout=10s"
-      # HTTP router (redirect to HTTPS)
-      - "traefik.http.routers.backend-http.rule=Host(`api.budget-west.shknv.ru`)"
-      - "traefik.http.routers.backend-http.entrypoints=http"
-      - "traefik.http.routers.backend-http.middlewares=redirect-to-https@file"
-      - "traefik.http.routers.backend-http.service=backend"
-      # HTTPS router
-      - "traefik.http.routers.backend-https.rule=Host(`api.budget-west.shknv.ru`)"
-      - "traefik.http.routers.backend-https.entrypoints=https"
-      - "traefik.http.routers.backend-https.tls=true"
-      - "traefik.http.routers.backend-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.backend-https.middlewares=gzip@file"
-      - "traefik.http.routers.backend-https.service=backend"
-      # Caddy configuration (alternative proxy)
-      - "caddy_0=https://api.budget-west.shknv.ru"
-      - "caddy_0.encode=zstd gzip"
-      - "caddy_0.reverse_proxy={{upstreams}}"
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/west-budget-backend:${VERSION:-latest}
+    container_name: budget_backend_prod
+    restart: unless-stopped
+    env_file:
+      - .env.prod
     environment:
-      # Database - using individual vars instead of DATABASE_URL for better compatibility
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-it_budget_db}
-      DB_USER: ${DB_USER:-budget_user}
-      DB_PASSWORD: ${DB_PASSWORD:-budget_pass}
-
-      # Application
-      DEBUG: "False"
-      APP_NAME: "IT Budget Manager"
-      APP_VERSION: "0.5.0"
-      API_PREFIX: /api/v1
-
-      # Security
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-'["https://budget-west.shknv.ru","https://api.budget-west.shknv.ru","http://localhost:5173"]'}
-
-      # Redis (if using)
-      REDIS_URL: redis://redis:6379
-
-      # Monitoring
-      SENTRY_DSN: ${SENTRY_DSN:-}
-      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
-
-      # Gunicorn optimization for low-memory servers
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}  # Reduced from 4 to 2 workers
-      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
-      GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-5}
-      GUNICORN_MAX_REQUESTS: ${GUNICORN_MAX_REQUESTS:-1000}  # Restart workers after 1000 requests to prevent memory leaks
-      GUNICORN_MAX_REQUESTS_JITTER: ${GUNICORN_MAX_REQUESTS_JITTER:-50}
-    ports:
-      - "${BACKEND_PORT:-8888}:8000"
-    volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
-      - ./backend/templates:/app/templates
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-budget_user}:${POSTGRES_PASSWORD:-budget_pass}@db:5432/${POSTGRES_DB:-it_budget_db}
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=False
+      - CORS_ORIGINS=https://budget-west.shknv.ru
     depends_on:
       db:
         condition: service_healthy
@@ -126,73 +61,47 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Memory limits to prevent OOM kills
-    deploy:
-      resources:
-        limits:
-          memory: 768M  # Increased from 512M - allows 2 workers + overhead
-        reservations:
-          memory: 384M  # Minimum guaranteed memory
-    # Note: Coolify uses Caddy for proxying, not Traefik
-    # CORS should be configured via CORS_ORIGINS environment variable in backend
-
-  # Frontend
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        # API URL - can be relative (/api) or full URL (https://api.domain.com)
-        # Defaults to /api if not set (nginx will proxy to backend)
-        VITE_API_URL: ${VITE_API_URL:-/api}
-    image: it-budget-frontend:prod
-    container_name: it_budget_frontend_prod
-    restart: always
     labels:
-      # Traefik configuration for automatic routing
-      - "traefik.enable=true"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-      # HTTP router (redirect to HTTPS)
-      - "traefik.http.routers.frontend-http.rule=Host(`budget-west.shknv.ru`)"
-      - "traefik.http.routers.frontend-http.entrypoints=http"
-      - "traefik.http.routers.frontend-http.middlewares=redirect-to-https@file"
-      - "traefik.http.routers.frontend-http.service=frontend"
-      # HTTPS router
-      - "traefik.http.routers.frontend-https.rule=Host(`budget-west.shknv.ru`)"
-      - "traefik.http.routers.frontend-https.entrypoints=https"
-      - "traefik.http.routers.frontend-https.tls=true"
-      - "traefik.http.routers.frontend-https.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.frontend-https.middlewares=gzip@file"
-      - "traefik.http.routers.frontend-https.service=frontend"
-      # Caddy configuration (alternative proxy)
-      - "caddy_0=https://budget-west.shknv.ru"
-      - "caddy_0.encode=zstd gzip"
-      - "caddy_0.reverse_proxy={{upstreams}}"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Frontend (React)
+  frontend:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/west-budget-frontend:${VERSION:-latest}
+    container_name: budget_frontend_prod
+    restart: unless-stopped
     environment:
-      # Runtime env (for docker-entrypoint.sh)
-      # Use env variable or default to /api
-      VITE_API_URL: ${VITE_API_URL:-/api}
-    ports:
-      - "${FRONTEND_PORT:-3001}:80"
-    depends_on:
-      - backend
+      - VITE_API_URL=https://budget-west.shknv.ru
     networks:
       - budget_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 10s
-    # Note: If VITE_API_URL=/api, nginx proxies /api/* to backend:8000
-    # If VITE_API_URL=https://api.domain.com, frontend makes direct requests
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Watchtower - automatic updates
+  watchtower:
+    image: containrrr/watchtower
+    container_name: budget_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_POLL_INTERVAL=300
+    command: --interval 300 --cleanup
+
+networks:
+  budget_network:
+    driver: bridge
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-
-networks:
-  budget_network:
-    driver: bridge

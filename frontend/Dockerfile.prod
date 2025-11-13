@@ -1,7 +1,5 @@
-# ============================================
-# Stage 1: Builder - Build React application
-# ============================================
-FROM node:18-alpine as builder
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -9,57 +7,32 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build application
-# IMPORTANT: Set this to your production API URL
-# For separate domains: https://api.budget-west.shknv.ru/api/v1
-# For nginx proxy: /api/v1
-ARG VITE_API_URL=https://api.budget-west.shknv.ru/api/v1
+# Build argument for API URL
+ARG VITE_API_URL=https://budget-west.shknv.ru
 ENV VITE_API_URL=$VITE_API_URL
 
+# Build application
 RUN npm run build
 
-# ============================================
-# Stage 2: Runtime - Nginx server
-# ============================================
-FROM nginx:1.25-alpine
+# Production stage
+FROM nginx:alpine
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Clean old files and copy fresh build
-# This ensures no stale assets remain from previous deployments
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy docker entrypoint script
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
-# Install curl for healthcheck
-RUN apk add --no-cache curl
-
-# Prepare directories for nginx
-# Master process runs as root, workers run as nginx (configured in nginx.conf)
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx
-
-# Link nginx logs to stdout/stderr for Docker logging
-RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
-    ln -sf /dev/stderr /var/log/nginx/error.log
-
 # Expose port
 EXPOSE 80
 
-# Health check - use curl instead of wget (wget not included in nginx:alpine by default)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://127.0.0.1/ || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
 
-# Use custom entrypoint to inject runtime env vars
-ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
