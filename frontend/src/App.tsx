@@ -72,6 +72,9 @@ const CustomerMetricsPage = lazy(() => import('./pages/CustomerMetricsPage'))
 const SeasonalityPage = lazy(() => import('./pages/SeasonalityPage'))
 const RevenueAnalyticsPage = lazy(() => import('./pages/RevenueAnalyticsPage'))
 
+// Bank Transactions module
+const BankTransactionsPage = lazy(() => import('./pages/BankTransactionsPage'))
+
 function App() {
   return (
     <ThemeProvider>
@@ -108,6 +111,16 @@ function App() {
 
                           <Route path="/budget" element={<BudgetOverviewPage />} />
                           <Route path="/expenses" element={<ExpensesPage />} />
+
+                          {/* Bank Transactions - All authenticated users (filtered by department) */}
+                          <Route
+                            path="/bank-transactions"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'FOUNDER', 'MANAGER', 'USER']}>
+                                <BankTransactionsPage />
+                              </ProtectedRoute>
+                            }
+                          />
 
                         {/* Budget planning - All authenticated users (filtered by department) */}
                         <Route

@@ -153,6 +153,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					label: <Link to='/expenses'>Заявки</Link>,
 				},
 				{
+					key: '/bank-transactions',
+					icon: <BankOutlined />,
+					label: <Link to='/bank-transactions'>Банковские операции</Link>,
+				},
+				{
 					key: '/budget',
 					icon: <DollarOutlined />,
 					label: <Link to='/budget'>Бюджет</Link>,
