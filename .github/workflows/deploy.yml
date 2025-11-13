@@ -76,7 +76,13 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             cd /opt/budget-app
-            
+
+            # Ensure .env symlink exists (Docker Compose needs it for variable substitution)
+            if [ ! -L .env ]; then
+              echo "Creating .env symlink..."
+              ln -sf .env.prod .env
+            fi
+
             # Pull latest images
             docker compose -f docker-compose.prod.yml pull backend frontend
 
