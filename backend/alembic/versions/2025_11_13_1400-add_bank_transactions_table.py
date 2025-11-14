@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column('transaction_date', sa.Date(), nullable=False),
         sa.Column('amount', sa.Numeric(precision=15, scale=2), nullable=False),
         sa.Column('transaction_type',
-                  postgresql.ENUM('DEBIT', 'CREDIT', name='banktransactiontypeenum'),
+                  postgresql.ENUM('DEBIT', 'CREDIT', name='banktransactiontypeenum', create_type=False),
                   nullable=False, server_default='DEBIT'),
 
         # Контрагент
@@ -83,7 +83,7 @@ def upgrade() -> None:
         # Статус обработки
         sa.Column('status',
                   postgresql.ENUM('NEW', 'CATEGORIZED', 'MATCHED', 'APPROVED', 'NEEDS_REVIEW', 'IGNORED',
-                                 name='banktransactionstatusenum'),
+                                 name='banktransactionstatusenum', create_type=False),
                   nullable=False, server_default='NEW'),
 
         # Дополнительные данные
