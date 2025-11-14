@@ -49,7 +49,7 @@ from app.services.transaction_classifier import TransactionClassifier, RegularPa
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
-@router.get("/", response_model=BankTransactionList)
+@router.get("", response_model=BankTransactionList)
 def get_bank_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),

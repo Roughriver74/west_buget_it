@@ -13,7 +13,8 @@ from app.db import get_db
 from app.db.models import (
     Expense, BudgetCategory, BudgetPlan, Department,
     ExpenseStatusEnum, ExpenseTypeEnum, User, UserRoleEnum,
-    PayrollPlan, PayrollActual, Employee, EmployeeKPI, KPIGoal
+    PayrollPlan, PayrollActual, Employee, EmployeeKPI, KPIGoal,
+    EmployeeStatusEnum
 )
 from app.utils.auth import get_current_active_user
 from app.schemas.founder_dashboard import (
@@ -136,7 +137,7 @@ def get_founder_dashboard(
         # Employee count
         employees_count = db.query(func.count(Employee.id)).filter(
             Employee.department_id == dept_id,
-            Employee.is_active == True
+            Employee.status == EmployeeStatusEnum.ACTIVE
         ).scalar() or 0
 
         # KPI metrics
@@ -359,7 +360,7 @@ def _get_department_kpis(
         # Get employees in this department
         total_employees = db.query(func.count(Employee.id)).filter(
             Employee.department_id == dept.id,
-            Employee.is_active == True
+            Employee.status == EmployeeStatusEnum.ACTIVE
         ).scalar() or 0
 
         # Get employees with KPI data
