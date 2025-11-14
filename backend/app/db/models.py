@@ -1806,7 +1806,7 @@ class FinReceipt(Base):
     __tablename__ = "fin_receipts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    operation_id = Column(String(255), nullable=False, index=True)
+    operation_id = Column(String(255), unique=True, nullable=False, index=True)
 
     # Foreign keys
     organization_id = Column(Integer, ForeignKey("fin_organizations.id"), index=True, nullable=False)
@@ -1857,7 +1857,7 @@ class FinExpense(Base):
     __tablename__ = "fin_expenses"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    operation_id = Column(String(255), nullable=False, index=True)
+    operation_id = Column(String(255), unique=True, nullable=False, index=True)
 
     # Foreign keys
     organization_id = Column(Integer, ForeignKey("fin_organizations.id"), index=True, nullable=False)

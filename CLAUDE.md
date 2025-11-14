@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Deploy server
 
 ```bash
-ssh root@93.189.228.52
+ssh root@31.129.107.178
 ```
 
 **Production deployment**: See [Coolify Setup Guide](docs/COOLIFY_SETUP.md)

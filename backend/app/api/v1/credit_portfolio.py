@@ -809,6 +809,103 @@ async def trigger_ftp_import(
 
 # ==================== Advanced Analytics ====================
 
+@router.get("/monthly-stats", response_model=list[MonthlyStats])
+async def get_monthly_stats(
+    department_id: Optional[int] = None,
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить помесячную статистику (поступления vs списания)
+
+    Возвращает данные по месяцам:
+    - month: месяц (YYYY-MM-01)
+    - receipts: сумма поступлений
+    - expenses: сумма списаний
+    - net: чистый баланс (receipts - expenses)
+
+    Доступ: только MANAGER, ADMIN
+    """
+    if not check_finance_access(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Determine department_id based on role
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        target_department_id = current_user.department_id
+    elif not target_department_id and current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        target_department_id = current_user.department_id
+
+    # Parse dates
+    from datetime import datetime as dt
+    date_from_obj = dt.strptime(date_from, '%Y-%m-%d').date() if date_from else None
+    date_to_obj = dt.strptime(date_to, '%Y-%m-%d').date() if date_to else None
+
+    # Receipts by month
+    receipts_month_col = func.date_trunc('month', FinReceipt.document_date)
+    receipts_query = db.query(
+        receipts_month_col.label('month'),
+        func.sum(FinReceipt.amount).label('receipts')
+    ).filter(FinReceipt.is_active == True)
+
+    if target_department_id:
+        receipts_query = receipts_query.filter(FinReceipt.department_id == target_department_id)
+    if date_from_obj:
+        receipts_query = receipts_query.filter(FinReceipt.document_date >= date_from_obj)
+    if date_to_obj:
+        receipts_query = receipts_query.filter(FinReceipt.document_date <= date_to_obj)
+
+    receipts_subq = receipts_query.group_by(receipts_month_col).subquery()
+
+    # Expenses by month
+    expenses_month_col = func.date_trunc('month', FinExpense.document_date)
+    expenses_query = db.query(
+        expenses_month_col.label('month'),
+        func.sum(FinExpense.amount).label('expenses')
+    ).filter(FinExpense.is_active == True)
+
+    if target_department_id:
+        expenses_query = expenses_query.filter(FinExpense.department_id == target_department_id)
+    if date_from_obj:
+        expenses_query = expenses_query.filter(FinExpense.document_date >= date_from_obj)
+    if date_to_obj:
+        expenses_query = expenses_query.filter(FinExpense.document_date <= date_to_obj)
+
+    expenses_subq = expenses_query.group_by(expenses_month_col).subquery()
+
+    # Combine receipts and expenses
+    query = db.query(
+        func.coalesce(receipts_subq.c.month, expenses_subq.c.month).label('month'),
+        func.coalesce(receipts_subq.c.receipts, 0).label('receipts'),
+        func.coalesce(expenses_subq.c.expenses, 0).label('expenses')
+    ).select_from(receipts_subq).outerjoin(
+        expenses_subq,
+        receipts_subq.c.month == expenses_subq.c.month,
+        full=True
+    ).order_by(func.coalesce(receipts_subq.c.month, expenses_subq.c.month))
+
+    results = query.all()
+
+    # Format response
+    data = []
+    for row in results:
+        month_str = row.month.strftime('%Y-%m-%d') if row.month else None
+        receipts = float(row.receipts) if row.receipts else 0
+        expenses = float(row.expenses) if row.expenses else 0
+        net = receipts - expenses
+
+        data.append({
+            "month": month_str,
+            "receipts": receipts,
+            "expenses": expenses,
+            "net": net
+        })
+
+    return data
+
+
 @router.get("/analytics/monthly-efficiency")
 async def get_monthly_efficiency(
     department_id: Optional[int] = None,
