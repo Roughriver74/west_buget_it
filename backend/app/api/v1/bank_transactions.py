@@ -44,6 +44,7 @@ from app.schemas.bank_transaction import (
 from app.utils.auth import get_current_active_user
 from app.utils.excel_export import encode_filename_header
 from app.services.bank_transaction_import import BankTransactionImporter
+from app.services.transaction_classifier import TransactionClassifier, RegularPaymentDetector
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -524,6 +525,80 @@ def get_matching_expenses(
     suggestions.sort(key=lambda x: x.matching_score, reverse=True)
 
     return suggestions[:limit]
+
+
+@router.get("/{transaction_id}/category-suggestions", response_model=List[CategorySuggestion])
+def get_category_suggestions(
+    transaction_id: int,
+    top_n: int = Query(3, ge=1, le=10),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get AI-powered category suggestions for transaction
+    Uses keyword matching and historical data
+    """
+    tx = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Check department access
+    if current_user.role == UserRoleEnum.USER:
+        if tx.department_id != current_user.department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get suggestions from AI classifier
+    classifier = TransactionClassifier(db)
+    suggestions = classifier.get_category_suggestions(
+        payment_purpose=tx.payment_purpose,
+        counterparty_name=tx.counterparty_name,
+        counterparty_inn=tx.counterparty_inn,
+        amount=tx.amount,
+        department_id=tx.department_id,
+        top_n=top_n
+    )
+
+    return [
+        CategorySuggestion(
+            category_id=s['category_id'],
+            category_name=s['category_name'],
+            confidence=s['confidence'],
+            reasoning=s['reasoning']
+        )
+        for s in suggestions
+    ]
+
+
+@router.get("/regular-patterns", response_model=List[dict])
+def get_regular_payment_patterns(
+    department_id: Optional[int] = Query(None, description="Filter by department (ADMIN/FOUNDER/MANAGER only)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Detect regular payment patterns (subscriptions, rent, etc.)
+    Returns patterns with frequency and last payment date
+    """
+    # Determine department
+    if current_user.role == UserRoleEnum.USER:
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    elif department_id:
+        target_department_id = department_id
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="department_id is required for non-USER roles"
+        )
+
+    detector = RegularPaymentDetector(db)
+    patterns = detector.detect_patterns(target_department_id)
+
+    return patterns
 
 
 @router.delete("/{transaction_id}")

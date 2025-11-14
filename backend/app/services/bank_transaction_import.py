@@ -16,6 +16,7 @@ from app.db.models import (
     Organization,
     Department,
 )
+from app.services.transaction_classifier import TransactionClassifier
 
 
 class BankTransactionImporter:
@@ -26,6 +27,7 @@ class BankTransactionImporter:
 
     def __init__(self, db: Session):
         self.db = db
+        self.classifier = TransactionClassifier(db)
 
     def import_from_excel(
         self,
@@ -139,6 +141,32 @@ class BankTransactionImporter:
                         import_file_name=filename,
                         imported_at=datetime.utcnow(),
                     )
+
+                    # AI Classification (only for DEBIT transactions - expenses)
+                    if transaction_type == BankTransactionTypeEnum.DEBIT:
+                        try:
+                            category_id, confidence, reasoning = self.classifier.classify(
+                                payment_purpose=payment_purpose,
+                                counterparty_name=counterparty_name,
+                                counterparty_inn=counterparty_inn,
+                                amount=amount,
+                                department_id=department_id
+                            )
+
+                            if category_id:
+                                transaction.suggested_category_id = category_id
+                                transaction.category_confidence = float(confidence)
+
+                                # Auto-apply if high confidence (>90%)
+                                if confidence >= 0.9:
+                                    transaction.category_id = category_id
+                                    transaction.status = BankTransactionStatusEnum.CATEGORIZED
+                                # Mark for review if medium confidence (50-90%)
+                                elif confidence >= 0.5:
+                                    transaction.status = BankTransactionStatusEnum.NEW
+                        except Exception as e:
+                            # If classification fails, just continue without it
+                            pass
 
                     self.db.add(transaction)
                     imported += 1

@@ -9,6 +9,8 @@ import type {
   BankTransactionStats,
   BankTransactionImportResult,
   MatchingSuggestion,
+  CategorySuggestion,
+  RegularPaymentPattern,
   BulkCategorizeRequest,
   BulkStatusUpdateRequest,
   BankTransactionStatus,
@@ -93,6 +95,22 @@ export const bankTransactionsApi = {
   getMatchingExpenses: async (id: number, limit?: number): Promise<MatchingSuggestion[]> => {
     const { data } = await apiClient.get(`/bank-transactions/${id}/matching-expenses`, {
       params: { limit },
+    })
+    return data
+  },
+
+  // Get AI category suggestions
+  getCategorySuggestions: async (id: number, topN?: number): Promise<CategorySuggestion[]> => {
+    const { data } = await apiClient.get(`/bank-transactions/${id}/category-suggestions`, {
+      params: { top_n: topN },
+    })
+    return data
+  },
+
+  // Get regular payment patterns
+  getRegularPatterns: async (departmentId?: number): Promise<RegularPaymentPattern[]> => {
+    const { data } = await apiClient.get('/bank-transactions/regular-patterns', {
+      params: { department_id: departmentId },
     })
     return data
   },

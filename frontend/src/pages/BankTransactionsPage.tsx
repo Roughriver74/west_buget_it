@@ -40,6 +40,7 @@ import type {
   BankTransactionStatus,
   BankTransactionType,
   MatchingSuggestion,
+  CategorySuggestion,
 } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import LoadingState from '@/components/common/LoadingState'
@@ -118,6 +119,16 @@ const BankTransactionsPage = () => {
         ? bankTransactionsApi.getMatchingExpenses(selectedTransaction.id, 10)
         : Promise.resolve([]),
     enabled: !!selectedTransaction && matchingDrawerOpen,
+  })
+
+  // Fetch AI category suggestions
+  const { data: categorySuggestions, isLoading: suggestionsLoading } = useQuery({
+    queryKey: ['categorySuggestions', selectedTransaction?.id],
+    queryFn: () =>
+      selectedTransaction
+        ? bankTransactionsApi.getCategorySuggestions(selectedTransaction.id, 3)
+        : Promise.resolve([]),
+    enabled: !!selectedTransaction && categorizeDrawerOpen,
   })
 
   // Import mutation
@@ -554,6 +565,47 @@ const BankTransactionsPage = () => {
                 <div><strong>Назначение:</strong> {selectedTransaction.payment_purpose}</div>
               )}
             </div>
+
+            {/* AI Suggestions */}
+            {suggestionsLoading ? (
+              <div style={{ textAlign: 'center', padding: 16 }}>
+                <span>Поиск подходящих категорий...</span>
+              </div>
+            ) : categorySuggestions && categorySuggestions.length > 0 ? (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 8, fontWeight: 500 }}>
+                  🤖 AI рекомендует:
+                </div>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {categorySuggestions.map((suggestion) => (
+                    <Card
+                      key={suggestion.category_id}
+                      size="small"
+                      hoverable
+                      style={{
+                        borderColor: suggestion.confidence >= 0.9 ? '#52c41a' : suggestion.confidence >= 0.7 ? '#1890ff' : '#faad14',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        categorizeForm.setFieldsValue({ category_id: suggestion.category_id })
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{suggestion.category_name}</div>
+                          <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                            {suggestion.reasoning.join(', ')}
+                          </div>
+                        </div>
+                        <Tag color={suggestion.confidence >= 0.9 ? 'green' : suggestion.confidence >= 0.7 ? 'blue' : 'orange'}>
+                          {Math.round(suggestion.confidence * 100)}%
+                        </Tag>
+                      </div>
+                    </Card>
+                  ))}
+                </Space>
+              </div>
+            ) : null}
 
             <Form form={categorizeForm} layout="vertical" onFinish={handleCategorize}>
               <Form.Item
