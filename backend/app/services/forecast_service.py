@@ -98,6 +98,60 @@ class PaymentForecastService:
                 'payment_type': 'payroll_actual',
             })
 
+        # Query PENDING expenses (к оплате) - planned payments
+        # Use request_date for PENDING expenses as planned payment date
+        planned_filters = [
+            extract('year', Expense.request_date) == year,
+            extract('month', Expense.request_date) == month,
+            Expense.status == ExpenseStatusEnum.PENDING,
+            Expense.is_paid == False,
+        ]
+
+        if department_id:
+            planned_filters.append(Expense.department_id == department_id)
+        if category_id:
+            planned_filters.append(Expense.category_id == category_id)
+        if organization_id:
+            planned_filters.append(Expense.organization_id == organization_id)
+
+        planned_query = (
+            self.db.query(
+                func.date(Expense.request_date).label('planned_day'),
+                func.sum(Expense.amount).label('planned_amount'),
+                func.count(Expense.id).label('planned_count'),
+            )
+            .filter(and_(*planned_filters))
+            .group_by(func.date(Expense.request_date))
+            .order_by(func.date(Expense.request_date))
+        )
+
+        planned_results = planned_query.all()
+
+        # Create a map of planned amounts by date
+        planned_map = {}
+        for row in planned_results:
+            planned_map[row.planned_day.isoformat()] = {
+                'planned_amount': float(row.planned_amount),
+                'planned_count': row.planned_count,
+            }
+
+        # Merge planned amounts into calendar data
+        for item in calendar_data:
+            if item['date'] in planned_map:
+                item.update(planned_map[item['date']])
+
+        # Add dates that have only planned payments (no actual payments yet)
+        for date_str, planned_data in planned_map.items():
+            if not any(item['date'] == date_str for item in calendar_data):
+                calendar_data.append({
+                    'date': date_str,
+                    'total_amount': 0,
+                    'payment_count': 0,
+                    'planned_amount': planned_data['planned_amount'],
+                    'planned_count': planned_data['planned_count'],
+                    'is_forecast': False,
+                })
+
         # Sort by date
         calendar_data.sort(key=lambda x: x['date'])
 
@@ -113,8 +167,9 @@ class PaymentForecastService:
     ):
         """
         Get all payments for a specific day
-        Returns: dict with 'expenses' list and optional 'payroll_forecast' data
+        Returns: dict with 'expenses' list, 'planned_expenses' list, and optional 'payroll_forecast' data
         """
+        # Query actual paid expenses by payment_date
         filters = [
             func.date(Expense.payment_date) == date.date(),
             Expense.is_paid == True,
@@ -129,8 +184,25 @@ class PaymentForecastService:
 
         expenses = self.db.query(Expense).filter(and_(*filters)).all()
 
+        # Query PENDING expenses (planned payments) by request_date
+        planned_filters = [
+            func.date(Expense.request_date) == date.date(),
+            Expense.status == ExpenseStatusEnum.PENDING,
+            Expense.is_paid == False,
+        ]
+
+        if department_id:
+            planned_filters.append(Expense.department_id == department_id)
+        if category_id:
+            planned_filters.append(Expense.category_id == category_id)
+        if organization_id:
+            planned_filters.append(Expense.organization_id == organization_id)
+
+        planned_expenses = self.db.query(Expense).filter(and_(*planned_filters)).all()
+
         result = {
             'expenses': expenses,
+            'planned_expenses': planned_expenses,
             'payroll_forecast': None
         }
 

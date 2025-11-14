@@ -105,6 +105,8 @@ class PaymentCalendarDay(BaseModel):
     date: date
     total_amount: float
     payment_count: int
+    planned_amount: Optional[float] = None  # Amount from PENDING expenses (к оплате)
+    planned_count: Optional[int] = None  # Count of PENDING expenses
     baseline_amount: Optional[float] = None  # Planned amount from baseline budget
     forecast_amount: Optional[float] = None   # Forecasted amount
 

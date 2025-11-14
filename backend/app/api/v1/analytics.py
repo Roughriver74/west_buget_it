@@ -645,6 +645,8 @@ def get_payment_calendar(
             date=day_data['date'],
             total_amount=day_data['total_amount'],
             payment_count=day_data['payment_count'],
+            planned_amount=day_data.get('planned_amount'),
+            planned_count=day_data.get('planned_count'),
             baseline_amount=baseline_amt,
             forecast_amount=None  # Can be populated with forecast data if needed
         ))
@@ -701,9 +703,10 @@ def get_payments_by_day(
     )
 
     payments = result['expenses']
+    planned_payments = result['planned_expenses']
     payroll_forecast = result['payroll_forecast']
 
-    # Convert expenses to dict format
+    # Convert actual paid expenses to dict format
     payments_data = [
         {
             "id": payment.id,
@@ -722,13 +725,35 @@ def get_payments_by_day(
         for payment in payments
     ]
 
-    # Add payroll actual payments as a "virtual" payment if exists
+    # Convert planned expenses (PENDING status) to dict format
+    planned_data = [
+        {
+            "id": -1000 - payment.id,  # Negative ID to distinguish from actual payments
+            "number": f"{payment.number} (К ОПЛАТЕ)",
+            "amount": float(payment.amount),
+            "payment_date": payment.request_date.isoformat() if payment.request_date else None,
+            "category_id": payment.category_id,
+            "category_name": payment.category.name if payment.category else None,
+            "contractor_id": payment.contractor_id,
+            "contractor_name": payment.contractor.name if payment.contractor else None,
+            "organization_id": payment.organization_id,
+            "organization_name": payment.organization.name if payment.organization else None,
+            "status": "PLANNED",  # Custom status for frontend
+            "comment": payment.comment or "Запланировано к оплате",
+        }
+        for payment in planned_payments
+    ]
+
+    # Combine actual and planned payments
+    all_payments = payments_data + planned_data
+
+    # Calculate totals (separate actual and planned)
     total_amount = sum(p["amount"] for p in payments_data)
     total_count = len(payments_data)
 
     if payroll_forecast and payroll_forecast['type'] == 'payroll_actual':
         # Add actual payroll payment as a virtual payment entry (only if actual, not forecast)
-        payments_data.append({
+        all_payments.append({
             "id": -1,  # Virtual ID for payroll
             "number": f"ФОТ-{payment_date.year}-{payment_date.month:02d}-{payment_date.day:02d}",
             "amount": payroll_forecast['amount'],
@@ -749,7 +774,7 @@ def get_payments_by_day(
         date=payment_date.date(),
         total_count=total_count,
         total_amount=total_amount,
-        payments=[PaymentDetail(**item) for item in payments_data],
+        payments=[PaymentDetail(**item) for item in all_payments],
     )
 
 

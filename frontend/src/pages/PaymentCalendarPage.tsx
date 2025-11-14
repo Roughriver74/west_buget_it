@@ -18,7 +18,7 @@ import {
   Tooltip,
   Tag,
 } from 'antd'
-import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi, forecastApi } from '@/api'
 import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types'
@@ -115,6 +115,8 @@ const PaymentCalendarPage = () => {
   const monthStats = {
     totalAmount: calendarData?.days.reduce((sum, day) => sum + day.total_amount, 0) || 0,
     totalPayments: calendarData?.days.reduce((sum, day) => sum + day.payment_count, 0) || 0,
+    totalPlanned: calendarData?.days.reduce((sum, day) => sum + (day.planned_amount || 0), 0) || 0,
+    totalPlannedCount: calendarData?.days.reduce((sum, day) => sum + (day.planned_count || 0), 0) || 0,
     daysWithPayments: calendarData?.days.length || 0,
   }
 
@@ -155,11 +157,32 @@ const PaymentCalendarPage = () => {
           </Tooltip>
         )}
 
+        {/* Planned payments (PENDING expenses) */}
+        {payment.planned_amount && payment.planned_count ? (
+          <Tooltip title={`${payment.planned_count} запланированных платежей на сумму ${formatCurrency(payment.planned_amount)} (заявки к оплате)`}>
+            <div style={{
+              marginTop: payment.total_amount > 0 ? 4 : 0,
+              padding: '2px 4px',
+              backgroundColor: '#fff7e6',
+              borderRadius: '2px',
+              border: '1px solid #ffd591'
+            }}>
+              <Space size={4}>
+                <CalendarOutlined style={{ color: '#fa8c16', fontSize: '10px' }} />
+                <span style={{ fontSize: '10px', color: '#fa8c16' }}>{payment.planned_count} запл.</span>
+              </Space>
+              <div style={{ fontWeight: 'bold', color: '#fa8c16' }}>
+                {formatCurrency(payment.planned_amount)}
+              </div>
+            </div>
+          </Tooltip>
+        ) : null}
+
         {/* Forecast expenses */}
         {forecast && (
           <Tooltip title={`${forecast.count} прогнозных расходов на сумму ${formatCurrency(forecast.total)} (автоматический расчет)`}>
             <div style={{
-              marginTop: payment ? 4 : 0,
+              marginTop: payment || payment.planned_amount ? 4 : 0,
               padding: '2px 4px',
               backgroundColor: '#e6f7ff',
               borderRadius: '2px',
@@ -306,32 +329,54 @@ const PaymentCalendarPage = () => {
         <>
           {/* Filters and Statistics */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col xs={24} md={6}>
+            <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Всего оплат за месяц"
-                  value={monthStats.totalPayments}
-                  prefix={<FileTextOutlined />}
+                  title="Фактически оплачено"
+                  value={monthStats.totalAmount}
+                  valueStyle={{ color: '#52c41a' }}
+                  prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                  formatter={(value) => formatCurrency(value as number)}
                 />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {monthStats.totalPayments} платежей
+                </Text>
               </Card>
             </Col>
-            <Col xs={24} md={6}>
+            <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Дней с оплатами"
+                  title="Запланировано к оплате"
+                  value={monthStats.totalPlanned}
+                  valueStyle={{ color: '#fa8c16' }}
+                  prefix={<CalendarOutlined style={{ color: '#fa8c16' }} />}
+                  formatter={(value) => formatCurrency(value as number)}
+                />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {monthStats.totalPlannedCount} заявок
+                </Text>
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Дней с платежами"
                   value={monthStats.daysWithPayments}
                   prefix={<CalendarOutlined />}
                 />
               </Card>
             </Col>
-            <Col xs={24} md={12}>
+            <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Общая сумма за месяц"
-                  value={monthStats.totalAmount}
+                  title="Общая сумма"
+                  value={monthStats.totalAmount + monthStats.totalPlanned}
                   prefix={<DollarOutlined />}
                   formatter={(value) => formatCurrency(value as number)}
                 />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  Оплачено + запланировано
+                </Text>
               </Card>
             </Col>
           </Row>
@@ -379,13 +424,22 @@ const PaymentCalendarPage = () => {
               borderRadius: '4px',
               border: '1px solid #d9d9d9'
             }}>
-              <Space size="large">
+              <Space size="large" wrap>
                 <Tooltip title="Подтвержденные платежи с фактическими датами">
                   <Space>
                     <Badge status="success" />
                     <Text strong style={{ fontSize: '14px', color: '#262626' }}>
                       Фактические оплаты
                     </Text>
+                  </Space>
+                </Tooltip>
+                <Tooltip title="Заявки к оплате со статусом PENDING">
+                  <Space>
+                    <CalendarOutlined style={{ color: '#fa8c16', fontSize: '14px' }} />
+                    <Text strong style={{ fontSize: '14px', color: '#262626' }}>
+                      Запланировано
+                    </Text>
+                    <Tag color="orange" style={{ margin: 0 }}>К оплате</Tag>
                   </Space>
                 </Tooltip>
                 <Tooltip title="Прогнозируемые расходы на основе исторических данных">
@@ -444,28 +498,137 @@ const PaymentCalendarPage = () => {
         ]}
         width={1000}
       >
-        {selectedDayData && (
-          <>
-            <div style={{ marginBottom: 16 }}>
-              <Statistic
-                title="Всего оплат"
-                value={selectedDayData.length}
-                suffix={`на сумму ${formatCurrency(
-                  selectedDayData.reduce((sum, p) => sum + p.amount, 0)
-                )}`}
-              />
-            </div>
-            <Table
-              dataSource={selectedDayData}
-              columns={columns}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              size="small"
-              rowClassName={(record: any) => record.is_forecast ? 'forecast-row' : ''}
-            />
-          </>
-        )}
+        {selectedDayData && (() => {
+          // Separate actual, planned, and forecast payments
+          const actualPayments = selectedDayData.filter((p: any) => p.status !== 'PLANNED' && !p.is_forecast)
+          const plannedPayments = selectedDayData.filter((p: any) => p.status === 'PLANNED')
+          const forecastPayments = selectedDayData.filter((p: any) => p.is_forecast)
+
+          const actualTotal = actualPayments.reduce((sum, p) => sum + p.amount, 0)
+          const plannedTotal = plannedPayments.reduce((sum, p) => sum + p.amount, 0)
+          const forecastTotal = forecastPayments.reduce((sum, p) => sum + p.amount, 0)
+
+          return (
+            <>
+              {/* Summary Statistics */}
+              <Row gutter={16} style={{ marginBottom: 24 }}>
+                {actualPayments.length > 0 && (
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic
+                        title="Фактически оплачено"
+                        value={actualPayments.length}
+                        suffix={`на ${formatCurrency(actualTotal)}`}
+                        valueStyle={{ color: '#52c41a' }}
+                        prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                      />
+                    </Card>
+                  </Col>
+                )}
+                {plannedPayments.length > 0 && (
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic
+                        title="Запланировано к оплате"
+                        value={plannedPayments.length}
+                        suffix={`на ${formatCurrency(plannedTotal)}`}
+                        valueStyle={{ color: '#fa8c16' }}
+                        prefix={<CalendarOutlined style={{ color: '#fa8c16' }} />}
+                      />
+                    </Card>
+                  </Col>
+                )}
+                {forecastPayments.length > 0 && (
+                  <Col span={8}>
+                    <Card size="small">
+                      <Statistic
+                        title="Прогнозные расходы"
+                        value={forecastPayments.length}
+                        suffix={`на ${formatCurrency(forecastTotal)}`}
+                        valueStyle={{ color: '#1890ff' }}
+                        prefix={<RiseOutlined style={{ color: '#1890ff' }} />}
+                      />
+                    </Card>
+                  </Col>
+                )}
+              </Row>
+
+              {/* Actual Payments */}
+              {actualPayments.length > 0 && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: '16px', color: '#52c41a' }}>
+                      <CheckCircleOutlined /> Фактически оплачено ({actualPayments.length})
+                    </Text>
+                  </div>
+                  <Table
+                    dataSource={actualPayments}
+                    columns={columns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    style={{ marginBottom: 24 }}
+                  />
+                </>
+              )}
+
+              {/* Planned Payments */}
+              {plannedPayments.length > 0 && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: '16px', color: '#fa8c16' }}>
+                      <CalendarOutlined /> Запланировано к оплате ({plannedPayments.length})
+                    </Text>
+                  </div>
+                  <Table
+                    dataSource={plannedPayments}
+                    columns={columns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    style={{ marginBottom: 24 }}
+                    rowClassName={() => 'planned-row'}
+                  />
+                </>
+              )}
+
+              {/* Forecast Payments */}
+              {forecastPayments.length > 0 && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: '16px', color: '#1890ff' }}>
+                      <RiseOutlined /> Прогнозные расходы ({forecastPayments.length})
+                    </Text>
+                  </div>
+                  <Table
+                    dataSource={forecastPayments}
+                    columns={columns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    rowClassName={() => 'forecast-row'}
+                  />
+                </>
+              )}
+            </>
+          )
+        })()}
       </Modal>
+
+      <style>{`
+        .forecast-row {
+          background-color: #e6f7ff !important;
+        }
+        .forecast-row:hover {
+          background-color: #bae7ff !important;
+        }
+        .planned-row {
+          background-color: #fff7e6 !important;
+        }
+        .planned-row:hover {
+          background-color: #ffd591 !important;
+        }
+      `}</style>
     </div>
   )
 }
