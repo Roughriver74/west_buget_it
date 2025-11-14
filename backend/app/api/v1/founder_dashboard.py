@@ -141,7 +141,7 @@ def get_founder_dashboard(
         ).scalar() or 0
 
         # KPI metrics
-        kpi_query = db.query(func.avg(EmployeeKPI.achievement_percent)).filter(
+        kpi_query = db.query(func.avg(EmployeeKPI.kpi_percentage)).filter(
             EmployeeKPI.year == year,
             Employee.department_id == dept_id
         ).join(Employee, EmployeeKPI.employee_id == Employee.id)
@@ -366,7 +366,7 @@ def _get_department_kpis(
         # Get employees with KPI data
         kpi_query = db.query(
             func.count(func.distinct(EmployeeKPI.employee_id)),
-            func.avg(EmployeeKPI.achievement_percent)
+            func.avg(EmployeeKPI.kpi_percentage)
         ).join(
             Employee, EmployeeKPI.employee_id == Employee.id
         ).filter(
