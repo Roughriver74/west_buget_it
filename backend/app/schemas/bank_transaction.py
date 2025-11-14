@@ -2,7 +2,7 @@
 Pydantic schemas for Bank Transactions
 """
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
@@ -105,7 +105,7 @@ class BankTransactionWithRelations(BankTransactionInDB):
 class BankTransactionList(BaseModel):
     """List of bank transactions with pagination"""
     total: int
-    items: list[BankTransactionWithRelations]
+    items: List[BankTransactionWithRelations]
     page: int
     page_size: int
     pages: int
@@ -129,8 +129,8 @@ class BankTransactionImportResult(BaseModel):
     total_rows: int
     imported: int
     skipped: int
-    errors: list[dict]
-    warnings: list[dict]
+    errors: List[dict]
+    warnings: List[dict]
 
 
 class MatchingSuggestion(BaseModel):
@@ -142,7 +142,7 @@ class MatchingSuggestion(BaseModel):
     expense_category_id: Optional[int] = None
     expense_contractor_name: Optional[str] = None
     matching_score: float
-    match_reasons: list[str]
+    match_reasons: List[str]
 
 
 class CategorySuggestion(BaseModel):
@@ -150,7 +150,7 @@ class CategorySuggestion(BaseModel):
     category_id: int
     category_name: str
     confidence: float
-    reasoning: list[str]
+    reasoning: List[str]
 
 
 class RegularPaymentPattern(BaseModel):
@@ -168,17 +168,17 @@ class RegularPaymentPattern(BaseModel):
 
 class BulkCategorizeRequest(BaseModel):
     """Request for bulk categorization"""
-    transaction_ids: list[int]
+    transaction_ids: List[int]
     category_id: int
     notes: Optional[str] = None
 
 
 class BulkLinkRequest(BaseModel):
     """Request for bulk linking to expenses"""
-    links: list[dict]  # [{"transaction_id": 1, "expense_id": 10}, ...]
+    links: List[dict]  # [{"transaction_id": 1, "expense_id": 10}, ...]
 
 
 class BulkStatusUpdateRequest(BaseModel):
     """Request for bulk status update"""
-    transaction_ids: list[int]
+    transaction_ids: List[int]
     status: str
