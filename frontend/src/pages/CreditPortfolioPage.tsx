@@ -11,7 +11,6 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
-import type { CreditPortfolioSummary, MonthlyStats, FinReceipt, FinExpense } from '@/api/creditPortfolio'
 import dayjs, { Dayjs } from 'dayjs'
 
 const { RangePicker } = DatePicker

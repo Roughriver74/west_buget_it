@@ -36,7 +36,7 @@ export default function CreditPortfolioContractsPage() {
   })
 
   // Filter contracts by search text
-  const filteredContracts = contracts?.filter((contract) => {
+  const filteredContracts = contracts?.filter((contract: FinContract) => {
     if (!searchText) return true
     const searchLower = searchText.toLowerCase()
     return (
@@ -101,7 +101,7 @@ export default function CreditPortfolioContractsPage() {
         { text: 'Активные', value: true },
         { text: 'Закрытые', value: false },
       ],
-      onFilter: (value: boolean | string | number, record: FinContract) =>
+      onFilter: (value: any, record: FinContract) =>
         record.is_active === value,
     },
   ]

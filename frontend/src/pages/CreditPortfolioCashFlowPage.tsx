@@ -1,6 +1,5 @@
 import { Card, Table, Empty, Spin } from 'antd'
 import {
-  BarChart,
   Bar,
   XAxis,
   YAxis,
@@ -14,7 +13,6 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
-import type { MonthlyStats } from '@/api/creditPortfolio'
 
 export default function CreditPortfolioCashFlowPage() {
   const { selectedDepartment } = useDepartment()
