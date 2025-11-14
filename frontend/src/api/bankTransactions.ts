@@ -1,7 +1,6 @@
 import apiClient from './client'
 import type {
   BankTransaction,
-  BankTransactionCreate,
   BankTransactionUpdate,
   BankTransactionCategorize,
   BankTransactionLink,
