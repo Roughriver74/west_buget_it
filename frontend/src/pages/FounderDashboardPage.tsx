@@ -16,13 +16,12 @@ import {
 import {
   DollarOutlined,
   TeamOutlined,
-  WarningOutlined,
   TrophyOutlined,
   BankOutlined,
   RiseOutlined,
   FallOutlined,
 } from '@ant-design/icons'
-import { founderDashboardApi, type DepartmentSummary, type BudgetAlert } from '@/api/founderDashboard'
+import { founderDashboardApi } from '@/api/founderDashboard'
 import {
   BarChart,
   Bar,
@@ -84,7 +83,7 @@ const FounderDashboardPage = () => {
       case 'low_utilization':
         return 'info'
       default:
-        return 'default'
+        return 'info'
     }
   }
 
