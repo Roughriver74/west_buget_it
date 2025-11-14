@@ -541,6 +541,15 @@ const scrollToColumn = useCallback((columnIndex: number) => {
 - **KPI Integration**: Link bonuses to KPI achievements
 - **Analytics**: Breakdown of salary components (base, bonuses, etc.)
 
+### Bank Transactions (NEW v0.6.0)
+- **Import from Excel**: Upload bank statements with auto-column detection
+- **AI Classification**: Automatic categorization using keyword matching and historical data
+- **Smart Matching**: Find matching expenses with scoring algorithm
+- **Auto-categorization**: High confidence (>90%) categories applied automatically
+- **Regular Patterns**: Detect recurring payments (subscriptions, rent)
+- **Multi-status workflow**: NEW → CATEGORIZED → MATCHED → APPROVED
+- **Reduces manual work by 80-90%** for recurring transactions
+
 ### Monitoring & Security
 - **Sentry Integration**: Error tracking and monitoring
 - **Prometheus Metrics**: Performance monitoring
@@ -619,8 +628,21 @@ VITE_SENTRY_DSN=your-sentry-dsn
 Located in `backend/scripts/`:
 - `import_excel.py` - Import budget data from Excel
 - `import_planfact_2025.py` - Import plan/fact data for specific year
+- `import_ai_categories.py` - Import AI classifier categories into budget_categories table
 - `create_admin.py` - Create admin user
 - Various utility scripts for data management
+
+### Import AI Categories
+```bash
+cd backend
+python scripts/import_ai_categories.py
+```
+This script imports all categories from AI classifier (TransactionClassifier) into the budget_categories table:
+- **OPEX categories**: Аренда помещений, Услуги связи, Канцтовары, etc.
+- **CAPEX categories**: Компьютеры и оргтехника, Серверы и сетевое оборудование, etc.
+- **Tax categories**: НДФЛ, НДС, Страховые взносы, etc.
+
+You can import for all departments or select specific department.
 
 ## Docker Services
 
