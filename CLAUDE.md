@@ -265,6 +265,7 @@ api/v1/              # API endpoints (20+ modules)
 ├── payroll.py       # Payroll & employee management
 ├── kpi.py           # KPI system for performance bonuses
 ├── analytics.py     # Analytics & reporting
+├── bank_transactions.py  # Bank transactions (NEW v0.6.0) 🏦
 ├── departments.py   # Department management
 ├── audit.py         # Audit logging
 └── ...              # Other endpoints
@@ -332,6 +333,7 @@ hooks/               # Custom React hooks
 - `employee_kpis` - KPI tracking per employee
 - `kpi_goals` - KPI goals and targets
 - `goal_achievements` - KPI achievement tracking
+- `bank_transactions` - Bank statement operations (NEW v0.6.0) 🏦
 - `audit_logs` - Audit trail (department_id nullable)
 - `attachments` - File attachments (linked via expense_id)
 
@@ -356,6 +358,561 @@ hooks/               # Custom React hooks
 **Bulk Operations**: Mass activate/deactivate/delete for reference data
 **Excel Export/Import**: Available for categories, contractors, organizations, payroll plans
 **Versioning**: Budget plans support versioning with approval workflow
+
+---
+
+## 🏦 Bank Transactions - Подробная документация
+
+### Обзор функционала
+
+**Bank Transactions** - модуль для автоматизации обработки банковских выписок с AI-классификацией и smart-matching.
+
+**Ключевые возможности:**
+- ✅ Импорт банковских выписок из Excel (авто-определение колонок)
+- ✅ AI-классификация по категориям (keyword matching + исторические данные)
+- ✅ Smart-matching с заявками на расход (scoring algorithm)
+- ✅ Автоматическое назначение категорий (confidence > 90%)
+- ✅ Определение регулярных платежей (подписки, аренда и т.д.)
+- ✅ Workflow обработки: NEW → CATEGORIZED → MATCHED → APPROVED
+- ✅ Сокращает ручную работу на 80-90% для регулярных операций
+
+### Модель данных (BankTransaction)
+
+```python
+class BankTransaction(Base):
+    __tablename__ = "bank_transactions"
+
+    # Основная информация
+    transaction_date: Date              # Дата операции
+    amount: Decimal                     # Сумма
+    transaction_type: Enum              # DEBIT (списание) / CREDIT (поступление)
+
+    # Контрагент
+    counterparty_name: String           # Наименование контрагента
+    counterparty_inn: String(12)        # ИНН контрагента
+    counterparty_kpp: String(9)         # КПП
+    counterparty_account: String(20)    # Счет контрагента
+    counterparty_bank: String(500)      # Банк контрагента
+    counterparty_bik: String(9)         # БИК банка
+
+    # Назначение платежа (основа для AI)
+    payment_purpose: Text               # Назначение платежа (ключ для классификации)
+
+    # Наша организация
+    organization_id: FK(organizations)  # Наша организация
+    account_number: String(20)          # Наш счет
+
+    # Банковские реквизиты
+    document_number: String(50)         # Номер платежного документа
+    document_date: Date                 # Дата документа
+
+    # AI Классификация
+    category_id: FK(budget_categories)  # Назначенная статья расходов
+    category_confidence: Decimal(5,4)   # Уверенность AI (0-1)
+    suggested_category_id: FK           # Предложенная AI категория
+
+    # Smart Matching с заявками
+    expense_id: FK(expenses)            # Связанная заявка на расход
+    matching_score: Decimal(5,2)        # Степень совпадения (0-100)
+    suggested_expense_id: FK            # Предложенная заявка
+
+    # Статус обработки
+    status: Enum                        # NEW/CATEGORIZED/MATCHED/APPROVED/NEEDS_REVIEW/IGNORED
+
+    # Регулярные платежи
+    is_regular_payment: Boolean         # Признак регулярного платежа
+    regular_payment_pattern_id: Int     # ID паттерна
+
+    # Обработка
+    notes: Text                         # Примечания финансиста
+    reviewed_by: FK(users)              # Кто проверил
+    reviewed_at: DateTime               # Когда проверено
+
+    # Multi-tenancy
+    department_id: FK(departments)      # ОБЯЗАТЕЛЬНО для multi-tenancy
+
+    # Импорт
+    import_source: String               # "FTP" / "MANUAL_UPLOAD" / "API"
+    import_file_name: String            # Имя файла
+    imported_at: DateTime               # Когда импортировано
+
+    # Интеграция с 1С
+    external_id_1c: String(100)         # ID в 1С (unique)
+```
+
+### Справочники
+
+#### 1. Типы транзакций (BankTransactionTypeEnum)
+```python
+DEBIT = "DEBIT"      # Списание (расход) - деньги ушли
+CREDIT = "CREDIT"    # Поступление (доход) - деньги пришли
+```
+
+#### 2. Статусы обработки (BankTransactionStatusEnum)
+```python
+NEW = "NEW"                    # 🆕 Новая, не обработана
+CATEGORIZED = "CATEGORIZED"    # 📋 Категория назначена (вручную или AI)
+MATCHED = "MATCHED"            # 🔗 Связана с заявкой на расход
+APPROVED = "APPROVED"          # ✅ Проверена и одобрена финансистом
+NEEDS_REVIEW = "NEEDS_REVIEW"  # ⚠️ Требует ручной проверки (низкая уверенность AI)
+IGNORED = "IGNORED"            # 🚫 Проигнорирована (не относится к учету)
+```
+
+#### 3. Категории расходов (из budget_categories)
+Используются существующие категории бюджета:
+- **OPEX**: Аренда помещений, Услуги связи, Канцтовары, Хозтовары, и т.д.
+- **CAPEX**: Компьютеры и оргтехника, Серверы, Лицензии и т.д.
+- **Налоги**: НДФЛ, НДС, Страховые взносы и т.д.
+
+Импорт AI-категорий:
+```bash
+cd backend
+python scripts/import_ai_categories.py
+```
+
+### API Endpoints
+
+**Base path**: `/api/v1/bank-transactions`
+
+#### Основные операции
+```bash
+# Получить список транзакций (с фильтрами)
+GET /api/v1/bank-transactions
+  ?department_id=1
+  &status=NEW
+  &transaction_type=DEBIT
+  &date_from=2025-01-01
+  &date_to=2025-12-31
+  &search=Яндекс
+  &only_unprocessed=true
+  &has_expense=false
+
+# Получить статистику
+GET /api/v1/bank-transactions/stats?department_id=1
+
+# Получить одну транзакцию
+GET /api/v1/bank-transactions/{id}
+
+# Назначить категорию
+PUT /api/v1/bank-transactions/{id}/categorize
+{
+  "category_id": 15,
+  "notes": "Аренда офиса за январь"
+}
+
+# Связать с заявкой
+PUT /api/v1/bank-transactions/{id}/link
+{
+  "expense_id": 42
+}
+
+# Получить предложенные заявки для связывания
+GET /api/v1/bank-transactions/{id}/matching-expenses
+
+# Получить предложенные категории
+GET /api/v1/bank-transactions/{id}/category-suggestions
+
+# Массовая категоризация
+POST /api/v1/bank-transactions/bulk-categorize
+{
+  "transaction_ids": [1, 2, 3],
+  "category_id": 15
+}
+
+# Массовое обновление статуса
+POST /api/v1/bank-transactions/bulk-status-update
+{
+  "transaction_ids": [1, 2, 3],
+  "status": "APPROVED"
+}
+
+# Получить паттерны регулярных платежей
+GET /api/v1/bank-transactions/regular-patterns?department_id=1
+
+# Удалить транзакцию
+DELETE /api/v1/bank-transactions/{id}
+```
+
+#### Импорт из Excel
+```bash
+# Импорт банковской выписки
+POST /api/v1/bank-transactions/import
+  -F "file=@bank_statement.xlsx"
+  -F "department_id=1"
+  -F "auto_classify=true"
+  -F "auto_match=true"
+
+Response:
+{
+  "total_rows": 150,
+  "imported": 148,
+  "errors": 2,
+  "auto_categorized": 120,
+  "auto_matched": 85,
+  "needs_review": 28
+}
+```
+
+### Workflow обработки транзакций
+
+```
+1. ИМПОРТ
+   ↓
+   Excel файл → BankTransactionImporter
+   ↓
+   Создание записей со статусом NEW
+
+2. AI КЛАССИФИКАЦИЯ (если auto_classify=true)
+   ↓
+   TransactionClassifier анализирует payment_purpose
+   ↓
+   - Keyword matching (с весами)
+   - Исторические данные (прошлые назначения)
+   - Контрагент (по ИНН)
+   ↓
+   Если confidence > 90% → category_id назначается, статус = CATEGORIZED
+   Если confidence < 90% → suggested_category_id, статус = NEEDS_REVIEW
+
+3. SMART MATCHING (если auto_match=true)
+   ↓
+   Поиск подходящих заявок (expenses) по:
+   - Контрагент (ИНН)
+   - Сумма (±5%)
+   - Дата (±30 дней)
+   - Категория
+   ↓
+   Scoring algorithm (0-100)
+   ↓
+   Если score > 85 → expense_id назначается, статус = MATCHED
+   Если score < 85 → suggested_expense_id
+
+4. ОПРЕДЕЛЕНИЕ РЕГУЛЯРНЫХ ПЛАТЕЖЕЙ
+   ↓
+   RegularPaymentDetector анализирует:
+   - Одинаковые контрагенты
+   - Близкие суммы
+   - Регулярные интервалы (месяц, квартал)
+   ↓
+   is_regular_payment = true
+   regular_payment_pattern_id = N
+
+5. РУЧНАЯ ПРОВЕРКА
+   ↓
+   Финансист проверяет:
+   - Транзакции со статусом NEEDS_REVIEW
+   - Предложения AI (suggested_category_id, suggested_expense_id)
+   ↓
+   Утверждает или корректирует
+   ↓
+   Статус = APPROVED
+
+6. ЗАВЕРШЕНИЕ
+   ↓
+   Транзакция связана с категорией и/или заявкой
+   ↓
+   Используется для аналитики и отчетов
+```
+
+### Интеграция с другими модулями
+
+#### 1. Budget Categories (Категории бюджета)
+```python
+# Связь: BankTransaction.category_id → BudgetCategory.id
+# Используется для классификации расходов
+
+# Пример: найти все транзакции по категории "Аренда"
+category = db.query(BudgetCategory).filter_by(name="Аренда помещений").first()
+transactions = db.query(BankTransaction).filter_by(category_id=category.id).all()
+```
+
+#### 2. Expenses (Заявки на расход)
+```python
+# Связь: BankTransaction.expense_id → Expense.id
+# Связывает оплату с заявкой
+
+# Пример: найти оплату для заявки
+expense = db.query(Expense).get(42)
+payment = db.query(BankTransaction).filter_by(expense_id=expense.id).first()
+```
+
+#### 3. Organizations (Организации)
+```python
+# Связь: BankTransaction.organization_id → Organization.id
+# Определяет нашу организацию (плательщика)
+
+# Пример: все транзакции организации "ООО Вест"
+org = db.query(Organization).filter_by(short_name="Вест").first()
+transactions = db.query(BankTransaction).filter_by(organization_id=org.id).all()
+```
+
+#### 4. Departments (Multi-tenancy)
+```python
+# Связь: BankTransaction.department_id → Department.id
+# ОБЯЗАТЕЛЬНАЯ связь для изоляции данных
+
+# USER видит только свой отдел
+if current_user.role == UserRoleEnum.USER:
+    query = query.filter(BankTransaction.department_id == current_user.department_id)
+```
+
+### Frontend интеграция
+
+**Страница**: `frontend/src/pages/BankTransactionsPage.tsx` (если существует)
+
+**API клиент**: `frontend/src/api/bankTransactions.ts`
+
+```typescript
+// Пример использования
+import { useDepartment } from '@/contexts/DepartmentContext'
+import { useQuery } from '@tanstack/react-query'
+import * as bankTransactionsApi from '@/api/bankTransactions'
+
+const BankTransactionsPage = () => {
+  const { selectedDepartment } = useDepartment()
+
+  const { data } = useQuery({
+    queryKey: ['bank-transactions', selectedDepartment?.id, filters],
+    queryFn: () => bankTransactionsApi.getBankTransactions({
+      department_id: selectedDepartment?.id,
+      only_unprocessed: true
+    })
+  })
+
+  // Назначение категории
+  const handleCategorize = async (transactionId: number, categoryId: number) => {
+    await bankTransactionsApi.categorizeTransaction(transactionId, {
+      category_id: categoryId
+    })
+    queryClient.invalidateQueries(['bank-transactions'])
+  }
+}
+```
+
+### Сервисы и утилиты
+
+#### TransactionClassifier (AI-классификация)
+**Файл**: `backend/app/services/transaction_classifier.py`
+
+```python
+classifier = TransactionClassifier(db, department_id)
+
+# Классифицировать транзакцию
+result = classifier.classify_transaction(
+    payment_purpose="Оплата за аренду офиса Москва январь 2025",
+    amount=150000.0,
+    counterparty_inn="7727563778"
+)
+# → { category_id: 5, confidence: 0.95, reasoning: [...] }
+
+# Предложить категории (топ-3)
+suggestions = classifier.suggest_categories(payment_purpose, amount)
+# → [{ category_id: 5, confidence: 0.95 }, { category_id: 8, confidence: 0.75 }, ...]
+```
+
+**Keyword matching** с весами:
+- Точное совпадение (exact): вес 10
+- Начало строки (startswith): вес 8
+- Содержит (contains): вес 5
+
+**Исторические данные**:
+- Анализирует прошлые назначения категорий
+- Увеличивает уверенность для повторяющихся паттернов
+
+#### RegularPaymentDetector (Регулярные платежи)
+**Файл**: `backend/app/services/transaction_classifier.py`
+
+```python
+detector = RegularPaymentDetector(db, department_id)
+
+# Найти регулярные паттерны
+patterns = detector.detect_patterns()
+# → [{ counterparty_inn, avg_amount, frequency, count, pattern_type: "MONTHLY" }, ...]
+
+# Проверить, является ли транзакция регулярной
+is_regular = detector.is_regular_payment(
+    counterparty_inn="7727563778",
+    amount=50000.0
+)
+```
+
+#### BankTransactionImporter (Импорт из Excel)
+**Файл**: `backend/app/services/bank_transaction_import.py`
+
+```python
+importer = BankTransactionImporter(db, department_id, current_user.id)
+
+# Импортировать файл
+result = await importer.import_from_excel(
+    file_content=file.file.read(),
+    auto_classify=True,
+    auto_match=True
+)
+# → BankTransactionImportResult
+```
+
+**Авто-определение колонок** (поддерживаемые заголовки):
+- Дата: "Дата операции", "Дата", "Date", "Transaction Date"
+- Сумма: "Сумма", "Amount", "Sum"
+- Контрагент: "Контрагент", "Counterparty", "Наименование"
+- ИНН: "ИНН", "INN"
+- Назначение: "Назначение платежа", "Purpose", "Description"
+- И т.д.
+
+### Ключевые слова для классификации
+
+**Примеры категорий и ключевых слов:**
+
+```python
+KEYWORDS = {
+    "Аренда помещений": [
+        "аренд", "rent", "офис", "помещен", "площад"
+    ],
+    "Услуги связи": [
+        "связь", "интернет", "телефон", "мобильн", "сотов", "МТС", "Билайн", "Мегафон"
+    ],
+    "Канцтовары": [
+        "канцтовар", "бумага", "ручк", "папк", "stationery"
+    ],
+    "Компьютеры и оргтехника": [
+        "компьютер", "ноутбук", "монитор", "клавиатур", "мышь", "laptop", "computer"
+    ],
+    "Лицензии ПО": [
+        "лицензи", "подписк", "subscription", "Microsoft", "Adobe", "1С"
+    ],
+    "НДФЛ": [
+        "НДФЛ", "налог на доходы"
+    ],
+    "Страховые взносы": [
+        "страхов", "взнос", "ПФР", "ФСС", "ФФОМС"
+    ]
+}
+```
+
+### Создание новых полей (Регион, Вид документа)
+
+Если нужно добавить дополнительные поля (например, из импортируемого Excel):
+
+```python
+# 1. Добавить enum для справочника
+class RegionEnum(str, enum.Enum):
+    MOSCOW = "MOSCOW"
+    SPB = "SPB"
+    REGIONS = "REGIONS"
+
+class DocumentTypeEnum(str, enum.Enum):
+    PAYMENT_ORDER = "PAYMENT_ORDER"     # Платежное поручение
+    CASH_ORDER = "CASH_ORDER"           # Кассовый ордер
+    INVOICE = "INVOICE"                 # Счет
+
+# 2. Добавить поля в модель BankTransaction
+region = Column(Enum(RegionEnum), nullable=True, index=True)
+document_type = Column(Enum(DocumentTypeEnum), nullable=True)
+
+# 3. Создать миграцию
+alembic revision --autogenerate -m "add region and document_type to bank_transactions"
+alembic upgrade head
+
+# 4. Обновить Pydantic schemas
+class BankTransactionCreate(BaseModel):
+    region: Optional[RegionEnum]
+    document_type: Optional[DocumentTypeEnum]
+
+# 5. Обновить BankTransactionImporter для маппинга колонок
+COLUMN_MAPPING = {
+    "Регион": "region",
+    "Вид документа": "document_type"
+}
+```
+
+### Производительность и оптимизация
+
+**Индексы** (уже созданы):
+```sql
+CREATE INDEX ON bank_transactions(department_id);
+CREATE INDEX ON bank_transactions(status);
+CREATE INDEX ON bank_transactions(transaction_date);
+CREATE INDEX ON bank_transactions(transaction_type);
+CREATE INDEX ON bank_transactions(counterparty_inn);
+CREATE INDEX ON bank_transactions(category_id);
+CREATE INDEX ON bank_transactions(expense_id);
+CREATE INDEX ON bank_transactions(is_regular_payment);
+CREATE INDEX ON bank_transactions(document_number);
+CREATE UNIQUE INDEX ON bank_transactions(external_id_1c);
+```
+
+**Оптимизация запросов**:
+```python
+# Используйте joinedload для загрузки связей
+query = db.query(BankTransaction).options(
+    joinedload(BankTransaction.category_rel),
+    joinedload(BankTransaction.expense_rel),
+    joinedload(BankTransaction.organization_rel),
+)
+
+# Пагинация обязательна для больших выборок
+query = query.offset(skip).limit(min(limit, 500))
+```
+
+### Типичные сценарии использования
+
+#### 1. Импорт месячной выписки
+```bash
+curl -X POST "http://localhost:8000/api/v1/bank-transactions/import" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@january_2025.xlsx" \
+  -F "department_id=1" \
+  -F "auto_classify=true" \
+  -F "auto_match=true"
+```
+
+#### 2. Проверка необработанных транзакций
+```bash
+curl "http://localhost:8000/api/v1/bank-transactions?only_unprocessed=true" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### 3. Массовое утверждение
+```bash
+curl -X POST "http://localhost:8000/api/v1/bank-transactions/bulk-status-update" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_ids": [1, 2, 3, 4, 5],
+    "status": "APPROVED"
+  }'
+```
+
+#### 4. Поиск регулярных платежей
+```bash
+curl "http://localhost:8000/api/v1/bank-transactions/regular-patterns?department_id=1" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Отладка и логи
+
+```python
+# Включить подробное логирование классификатора
+import logging
+logging.getLogger("app.services.transaction_classifier").setLevel(logging.DEBUG)
+
+# Анализ результатов классификации
+classifier = TransactionClassifier(db, department_id)
+result = classifier.classify_transaction(payment_purpose, amount, counterparty_inn)
+print(f"Category: {result['category_id']}, Confidence: {result['confidence']}")
+print(f"Reasoning: {result['reasoning']}")
+```
+
+### Тестирование
+
+```bash
+# Запуск тестов
+pytest tests/test_bank_transactions.py -v
+
+# Тесты для классификатора
+pytest tests/test_transaction_classifier.py -v
+```
+
+---
 
 ## Important Development Patterns
 
@@ -606,6 +1163,9 @@ VITE_SENTRY_DSN=your-sentry-dsn
 - `backend/app/api/v1/expenses.py` - Complete CRUD with roles & filtering
 - `backend/app/api/v1/budget_plan_details.py` - Versioning and approval workflow
 - `backend/app/api/v1/kpi.py` - KPI system with calculations
+- `backend/app/api/v1/bank_transactions.py` - Bank transactions with AI classification 🏦
+- `backend/app/services/transaction_classifier.py` - AI classifier implementation 🏦
+- `backend/app/services/bank_transaction_import.py` - Excel import service 🏦
 - `backend/app/api/v1/analytics.py` - Complex queries with aggregations
 - `backend/app/db/models.py` - All database models
 
@@ -620,6 +1180,9 @@ VITE_SENTRY_DSN=your-sentry-dsn
 **Documentation**:
 - `docs/DEVELOPMENT_PRINCIPLES.md` - Mandatory security & architecture rules
 - `docs/MULTI_TENANCY_ARCHITECTURE.md` - Multi-tenancy implementation details
+- `docs/BANK_TRANSACTIONS_STATUSES.md` - Bank transaction statuses reference 🏦
+- `docs/BANK_TRANSACTIONS_KEYWORDS.md` - AI classification keywords reference 🏦
+- `docs/BANK_TRANSACTIONS_IMPORT_GUIDE.md` - Complete import guide 🏦
 - `ROADMAP.md` - Project history and future plans
 - `README.md` - Quick start guide
 
