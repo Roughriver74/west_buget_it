@@ -139,8 +139,10 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
       {!shouldFetch ? (
         <Alert message="Выберите две версии для сравнения" type="info" showIcon />
       ) : isLoading ? (
-        <div style={{ textAlign: 'center', padding: '40px 0' }}>
-          <Spin size="large" tip="Загрузка сравнения..." />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
+          <Spin size="large" tip="Загрузка сравнения...">
+            <div style={{ minHeight: 200 }} />
+          </Spin>
         </div>
       ) : isError || !comparison ? (
         <Alert

@@ -232,8 +232,10 @@ const RevenueAnalyticsPage = () => {
 
   if (!selectedDepartment) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin tip="Загрузка данных отдела..." />
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <Spin tip="Загрузка данных отдела...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }
@@ -335,8 +337,10 @@ const RevenueAnalyticsPage = () => {
               children: (
                 <div>
                   {isLoadingTrends ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}>
-                      <Spin tip="Загрузка данных..." />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                      <Spin tip="Загрузка данных...">
+                        <div style={{ minHeight: 200 }} />
+                      </Spin>
                     </div>
                   ) : trendsData ? (
                     <ResponsiveContainer width="100%" height={400}>
@@ -386,8 +390,10 @@ const RevenueAnalyticsPage = () => {
               children: (
                 <div>
                   {isLoadingRegional ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}>
-                      <Spin tip="Загрузка данных..." />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                      <Spin tip="Загрузка данных...">
+                        <div style={{ minHeight: 200 }} />
+                      </Spin>
                     </div>
                   ) : regionalData && regionalData.regions.length > 0 ? (
                     <>
@@ -435,8 +441,10 @@ const RevenueAnalyticsPage = () => {
               children: (
                 <div>
                   {isLoadingProductMix ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}>
-                      <Spin tip="Загрузка данных..." />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                      <Spin tip="Загрузка данных...">
+                        <div style={{ minHeight: 200 }} />
+                      </Spin>
                     </div>
                   ) : productMixData && productMixData.categories.length > 0 ? (
                     <>
@@ -514,8 +522,10 @@ const RevenueAnalyticsPage = () => {
               children: (
                 <div>
                   {isLoadingTopPerformers ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}>
-                      <Spin tip="Загрузка данных..." />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+                      <Spin tip="Загрузка данных...">
+                        <div style={{ minHeight: 200 }} />
+                      </Spin>
                     </div>
                   ) : topPerformersData ? (
                     <Row gutter={16}>

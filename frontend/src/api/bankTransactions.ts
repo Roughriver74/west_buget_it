@@ -52,10 +52,10 @@ export const bankTransactionsApi = {
     return data
   },
 
-  // Update transaction
+  // Update transaction (category, status, notes)
   updateTransaction: async (
     id: number,
-    updates: BankTransactionUpdate
+    updates: Partial<{ category_id?: number; status?: string; notes?: string }>
   ): Promise<BankTransaction> => {
     const { data } = await apiClient.put(`/bank-transactions/${id}`, updates)
     return data
@@ -120,18 +120,53 @@ export const bankTransactionsApi = {
     return data
   },
 
+  // Bulk delete transactions
+  bulkDelete: async (transactionIds: number[]): Promise<{ message: string; deleted: number }> => {
+    const { data } = await apiClient.post('/bank-transactions/bulk-delete', transactionIds)
+    return data
+  },
+
+  // Preview import from Excel
+  previewImport: async (file: File): Promise<{
+    success: boolean
+    columns: string[]
+    detected_mapping: Record<string, string>
+    sample_data: Record<string, any>[]
+    total_rows: number
+    required_fields: Record<string, string>
+    error?: string
+  }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { data } = await apiClient.post('/bank-transactions/import/preview', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return data
+  },
+
   // Import from Excel
   importFromExcel: async (
     file: File,
-    departmentId?: number
+    departmentId?: number,
+    columnMapping?: Record<string, string>
   ): Promise<BankTransactionImportResult> => {
     const formData = new FormData()
     formData.append('file', file)
+
+    // department_id и column_mapping должны быть query параметрами
+    const params = new URLSearchParams()
     if (departmentId) {
-      formData.append('department_id', departmentId.toString())
+      params.append('department_id', departmentId.toString())
+    }
+    if (columnMapping) {
+      params.append('column_mapping', JSON.stringify(columnMapping))
     }
 
-    const { data } = await apiClient.post('/bank-transactions/import', formData, {
+    const url = `/bank-transactions/import${params.toString() ? `?${params.toString()}` : ''}`
+    const { data } = await apiClient.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

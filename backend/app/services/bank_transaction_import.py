@@ -29,12 +29,86 @@ class BankTransactionImporter:
         self.db = db
         self.classifier = TransactionClassifier(db)
 
+    def preview_import(
+        self,
+        file_content: bytes,
+        filename: str
+    ) -> Dict[str, Any]:
+        """
+        Preview Excel file for import
+        Returns:
+        - Available columns
+        - Auto-detected column mapping
+        - First 5 rows as sample data
+        """
+        try:
+            # Read Excel file
+            df = pd.read_excel(io.BytesIO(file_content))
+
+            # Normalize column names
+            df.columns = df.columns.str.strip()
+
+            # Auto-detect columns
+            detected_mapping = self._detect_columns(df.columns)
+
+            # Get sample data (first 5 rows)
+            sample_data = []
+            for idx, row in df.head(5).iterrows():
+                sample_row = {}
+                for col in df.columns:
+                    value = row[col]
+                    # Convert to JSON-serializable format
+                    if pd.isna(value):
+                        sample_row[col] = None
+                    elif isinstance(value, (date, datetime)):
+                        sample_row[col] = value.strftime('%Y-%m-%d')
+                    elif isinstance(value, (int, float, Decimal)):
+                        sample_row[col] = float(value)
+                    else:
+                        sample_row[col] = str(value)
+                sample_data.append(sample_row)
+
+            return {
+                'success': True,
+                'columns': list(df.columns),
+                'detected_mapping': detected_mapping,
+                'sample_data': sample_data,
+                'total_rows': len(df),
+                'required_fields': {
+                    'date': 'Дата (обязательно)',
+                    'payer': 'Кто (наша организация)',
+                    'counterparty': 'Кому (контрагент)',
+                    'payment_purpose': 'За что',
+                    'category': 'Статья расходов',
+                    'region': 'Регион',
+                    'exhibition': 'Выставка/мероприятие',
+                    'amount_rub_credit': 'Приход руб',
+                    'amount_eur_credit': 'Приход EUR',
+                    'amount_rub_debit': 'Расход руб',
+                    'amount_eur_debit': 'Расход EUR',
+                    'document_type': 'Вид документа',
+                    'notes': 'Примечание',
+                    'status': 'Статус согласования',
+                    'transaction_month': 'МЕС',
+                    'expense_acceptance_month': 'Мес принятия к расходу',
+                    'department': 'Отдел',
+                    'inn': 'ИНН контрагента',
+                    'document_number': 'Номер документа'
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def import_from_excel(
         self,
         file_content: bytes,
         filename: str,
         department_id: int,
-        user_id: int
+        user_id: int,
+        column_mapping: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """
         Import bank transactions from Excel file
@@ -56,12 +130,23 @@ class BankTransactionImporter:
             df.columns = df.columns.str.strip()
 
             # Map columns to our schema
-            column_mapping = self._detect_columns(df.columns)
+            if not column_mapping:
+                column_mapping = self._detect_columns(df.columns)
 
-            if not column_mapping.get('date') or not column_mapping.get('amount'):
+            # Check required fields: date is required, amount OR extended amount fields
+            has_date = column_mapping.get('date')
+            has_amount = (
+                column_mapping.get('amount') or
+                column_mapping.get('amount_rub_credit') or
+                column_mapping.get('amount_rub_debit') or
+                column_mapping.get('amount_eur_credit') or
+                column_mapping.get('amount_eur_debit')
+            )
+
+            if not has_date or not has_amount:
                 return {
                     'success': False,
-                    'error': 'Required columns not found. Need at least: Date and Amount',
+                    'error': 'Required columns not found. Need at least: Date and Amount (or Приход руб/Расход руб)',
                     'imported': 0,
                     'skipped': 0,
                     'errors': []
@@ -83,8 +168,57 @@ class BankTransactionImporter:
                         skipped += 1
                         continue
 
-                    # Parse amount
-                    amount = self._parse_amount(row[column_mapping['amount']])
+                    # Parse amount (support both single 'amount' column and extended split columns)
+                    amount = None
+                    transaction_type = None
+                    amount_rub_credit = None
+                    amount_eur_credit = None
+                    amount_rub_debit = None
+                    amount_eur_debit = None
+
+                    # If we have extended fields (Приход/Расход), use them
+                    if column_mapping.get('amount_rub_credit') or column_mapping.get('amount_rub_debit'):
+                        # Parse extended amount fields
+                        if column_mapping.get('amount_rub_credit'):
+                            amount_rub_credit = self._parse_amount(row.get(column_mapping['amount_rub_credit']))
+                        if column_mapping.get('amount_eur_credit'):
+                            amount_eur_credit = self._parse_amount(row.get(column_mapping['amount_eur_credit']))
+                        if column_mapping.get('amount_rub_debit'):
+                            amount_rub_debit = self._parse_amount(row.get(column_mapping['amount_rub_debit']))
+                        if column_mapping.get('amount_eur_debit'):
+                            amount_eur_debit = self._parse_amount(row.get(column_mapping['amount_eur_debit']))
+
+                        # Determine main amount and type based on which field has value
+                        if amount_rub_credit and amount_rub_credit > 0:
+                            amount = amount_rub_credit
+                            transaction_type = BankTransactionTypeEnum.CREDIT
+                        elif amount_rub_debit and amount_rub_debit > 0:
+                            amount = amount_rub_debit
+                            transaction_type = BankTransactionTypeEnum.DEBIT
+                        elif amount_eur_credit and amount_eur_credit > 0:
+                            amount = amount_eur_credit
+                            transaction_type = BankTransactionTypeEnum.CREDIT
+                        elif amount_eur_debit and amount_eur_debit > 0:
+                            amount = amount_eur_debit
+                            transaction_type = BankTransactionTypeEnum.DEBIT
+
+                    # Fallback to single 'amount' column if no extended fields or they're empty
+                    if amount is None and column_mapping.get('amount'):
+                        amount = self._parse_amount(row[column_mapping['amount']])
+                        # Determine type from 'type' column or amount sign
+                        transaction_type = BankTransactionTypeEnum.DEBIT  # Default to debit (expense)
+                        if column_mapping.get('type'):
+                            type_value = str(row[column_mapping['type']]).strip().lower()
+                            if 'кредит' in type_value or 'credit' in type_value or 'приход' in type_value:
+                                transaction_type = BankTransactionTypeEnum.CREDIT
+                            elif 'дебет' in type_value or 'debit' in type_value or 'расход' in type_value:
+                                transaction_type = BankTransactionTypeEnum.DEBIT
+                        # If amount is negative, it's a debit
+                        if amount and amount < 0:
+                            transaction_type = BankTransactionTypeEnum.DEBIT
+                            amount = abs(amount)
+
+                    # Validate we have amount
                     if amount is None or amount == 0:
                         errors.append({
                             'row': idx + 2,
@@ -93,19 +227,9 @@ class BankTransactionImporter:
                         skipped += 1
                         continue
 
-                    # Determine transaction type
-                    transaction_type = BankTransactionTypeEnum.DEBIT  # Default to debit (expense)
-                    if column_mapping.get('type'):
-                        type_value = str(row[column_mapping['type']]).strip().lower()
-                        if 'кредит' in type_value or 'credit' in type_value or 'приход' in type_value:
-                            transaction_type = BankTransactionTypeEnum.CREDIT
-                        elif 'дебет' in type_value or 'debit' in type_value or 'расход' in type_value:
-                            transaction_type = BankTransactionTypeEnum.DEBIT
-
-                    # If amount is negative, it's a debit
-                    if amount < 0:
+                    # Ensure transaction_type is set
+                    if transaction_type is None:
                         transaction_type = BankTransactionTypeEnum.DEBIT
-                        amount = abs(amount)
 
                     # Extract other fields
                     counterparty_name = self._get_value(row, column_mapping.get('counterparty'))
@@ -126,6 +250,16 @@ class BankTransactionImporter:
                         skipped += 1
                         continue
 
+                    # Extract additional extended fields if available
+                    region_raw = self._get_value(row, column_mapping.get('region'))
+                    region = self._map_region(region_raw)  # Map Cyrillic to Latin enum
+                    exhibition = self._get_value(row, column_mapping.get('exhibition'))
+                    document_type_raw = self._get_value(row, column_mapping.get('document_type'))
+                    document_type = self._map_document_type(document_type_raw)  # Map to valid enum or None
+                    notes = self._get_value(row, column_mapping.get('notes'))
+                    transaction_month = self._parse_int(self._get_value(row, column_mapping.get('transaction_month')))
+                    expense_acceptance_month = self._parse_int(self._get_value(row, column_mapping.get('expense_acceptance_month')))
+
                     # Create new transaction
                     transaction = BankTransaction(
                         transaction_date=transaction_date,
@@ -135,6 +269,18 @@ class BankTransactionImporter:
                         counterparty_inn=counterparty_inn,
                         payment_purpose=payment_purpose,
                         document_number=document_number,
+                        # Extended fields
+                        amount_rub_credit=amount_rub_credit,
+                        amount_eur_credit=amount_eur_credit,
+                        amount_rub_debit=amount_rub_debit,
+                        amount_eur_debit=amount_eur_debit,
+                        region=region,
+                        exhibition=exhibition,
+                        document_type=document_type,
+                        notes=notes,
+                        transaction_month=transaction_month,
+                        expense_acceptance_month=expense_acceptance_month,
+                        # System fields
                         department_id=department_id,
                         status=BankTransactionStatusEnum.NEW,
                         import_source='MANUAL_UPLOAD',
@@ -252,8 +398,98 @@ class BankTransactionImporter:
         # Transaction type
         type_keywords = ['тип', 'type', 'дебет', 'debit', 'кредит', 'credit']
         for col, norm in normalized.items():
-            if any(kw in norm for kw in type_keywords):
+            if any(kw in norm for kw in type_keywords) and 'документ' not in norm:
                 mapping['type'] = col
+                break
+
+        # Payer (Кто)
+        payer_keywords = ['кто']
+        for col, norm in normalized.items():
+            if norm in payer_keywords:
+                mapping['payer'] = col
+                break
+
+        # Category (статья)
+        category_keywords = ['статья', 'category']
+        for col, norm in normalized.items():
+            if any(kw in norm for kw in category_keywords):
+                mapping['category'] = col
+                break
+
+        # Region
+        region_keywords = ['регион', 'region']
+        for col, norm in normalized.items():
+            if any(kw in norm for kw in region_keywords):
+                mapping['region'] = col
+                break
+
+        # Exhibition
+        exhibition_keywords = ['выставка', 'exhibition']
+        for col, norm in normalized.items():
+            if any(kw in norm for kw in exhibition_keywords):
+                mapping['exhibition'] = col
+                break
+
+        # Income RUB
+        for col, norm in normalized.items():
+            if 'приход' in norm and 'руб' in norm:
+                mapping['amount_rub_credit'] = col
+                break
+
+        # Income EUR
+        for col, norm in normalized.items():
+            if 'приход' in norm and 'eur' in norm:
+                mapping['amount_eur_credit'] = col
+                break
+
+        # Expense RUB
+        for col, norm in normalized.items():
+            if 'расход' in norm and 'руб' in norm:
+                mapping['amount_rub_debit'] = col
+                break
+
+        # Expense EUR
+        for col, norm in normalized.items():
+            if 'расход' in norm and 'eur' in norm:
+                mapping['amount_eur_debit'] = col
+                break
+
+        # Document type (вид)
+        for col, norm in normalized.items():
+            if norm == 'вид' or (norm == 'вид документа'):
+                mapping['document_type'] = col
+                break
+
+        # Month (МЕС)
+        for col, norm in normalized.items():
+            if norm == 'мес' or norm == 'месяц':
+                mapping['transaction_month'] = col
+                break
+
+        # Expense acceptance month
+        for col, norm in normalized.items():
+            if 'мес принятия' in norm or 'месяц принятия' in norm:
+                mapping['expense_acceptance_month'] = col
+                break
+
+        # Department
+        department_keywords = ['отдел', 'department']
+        for col, norm in normalized.items():
+            if any(kw in norm for kw in department_keywords):
+                mapping['department'] = col
+                break
+
+        # Notes (Примечание)
+        notes_keywords = ['примечание', 'note']
+        for col, norm in normalized.items():
+            if any(kw in norm for kw in notes_keywords):
+                mapping['notes'] = col
+                break
+
+        # Status
+        for col, norm in normalized.items():
+            if 'статус согласования' in norm or 'статус' in norm:
+                mapping['status'] = col
                 break
 
         return mapping
@@ -299,3 +535,71 @@ class BankTransactionImporter:
             return None
 
         return str(value).strip() if value else None
+
+    def _parse_int(self, value: Optional[str]) -> Optional[int]:
+        """Parse integer from string value"""
+        if not value:
+            return None
+
+        try:
+            # Remove spaces and convert to int
+            if isinstance(value, str):
+                value = value.replace(' ', '')
+            return int(float(value))  # Convert via float to handle decimals like "8.0"
+        except:
+            return None
+
+    def _map_region(self, value: Optional[str]) -> Optional[str]:
+        """Map region value to enum (convert Cyrillic to Latin)"""
+        if not value:
+            return None
+
+        # Normalize value
+        normalized = value.strip().upper()
+
+        # Mapping dictionary (Cyrillic -> Latin enum)
+        region_mapping = {
+            'СПБ': 'SPB',
+            'САНКТ-ПЕТЕРБУРГ': 'SPB',
+            'ПЕТЕРБУРГ': 'SPB',
+            'MOSCOW': 'MOSCOW',
+            'МОСКВА': 'MOSCOW',
+            'МСК': 'MOSCOW',
+            'РЕГИОНЫ': 'REGIONS',
+            'REGIONS': 'REGIONS',
+            'ЗАРУБЕЖ': 'FOREIGN',
+            'FOREIGN': 'FOREIGN',
+        }
+
+        # Return mapped value or None if not found
+        return region_mapping.get(normalized)
+
+    def _map_document_type(self, value: Optional[str]) -> Optional[str]:
+        """Map document type value to enum"""
+        if not value:
+            return None
+
+        # Normalize value
+        normalized = value.strip().upper()
+
+        # Mapping dictionary
+        doc_type_mapping = {
+            'ПЛАТЕЖНОЕ ПОРУЧЕНИЕ': 'PAYMENT_ORDER',
+            'ПЛАТЕЖКА': 'PAYMENT_ORDER',
+            'ПП': 'PAYMENT_ORDER',
+            'PAYMENT_ORDER': 'PAYMENT_ORDER',
+            'КАССОВЫЙ ОРДЕР': 'CASH_ORDER',
+            'КО': 'CASH_ORDER',
+            'CASH_ORDER': 'CASH_ORDER',
+            'СЧЕТ': 'INVOICE',
+            'INVOICE': 'INVOICE',
+            'АКТ': 'ACT',
+            'ACT': 'ACT',
+            'ДОГОВОР': 'CONTRACT',
+            'CONTRACT': 'CONTRACT',
+            'ДРУГОЕ': 'OTHER',
+            'OTHER': 'OTHER',
+        }
+
+        # Return mapped value or None if not a valid document type
+        return doc_type_mapping.get(normalized)

@@ -268,6 +268,48 @@ def get_bank_transaction(
     )
 
 
+@router.put("/{transaction_id}", response_model=BankTransactionWithRelations)
+def update_transaction(
+    transaction_id: int,
+    data: BankTransactionUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update transaction (category, status, notes)
+    """
+    tx = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Check department access
+    if current_user.role == UserRoleEnum.USER:
+        if tx.department_id != current_user.department_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Update fields if provided
+    if data.category_id is not None:
+        category = db.query(BudgetCategory).filter(BudgetCategory.id == data.category_id).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        tx.category_id = data.category_id
+
+    if data.status is not None:
+        tx.status = BankTransactionStatusEnum(data.status)
+
+    if data.notes is not None:
+        tx.notes = data.notes
+
+    tx.reviewed_by = current_user.id
+    tx.reviewed_at = datetime.utcnow()
+    tx.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(tx)
+
+    return get_bank_transaction(transaction_id, current_user, db)
+
+
 @router.put("/{transaction_id}/categorize", response_model=BankTransactionWithRelations)
 def categorize_transaction(
     transaction_id: int,
@@ -630,10 +672,77 @@ def delete_transaction(
     return {"message": "Transaction deleted successfully"}
 
 
+@router.post("/bulk-delete")
+def bulk_delete_transactions(
+    transaction_ids: List[int],
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk soft delete transactions (set is_active=False)
+    Only ADMIN and MANAGER can delete
+    """
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(status_code=403, detail="Only ADMIN and MANAGER can delete transactions")
+
+    # Get transactions
+    query = db.query(BankTransaction).filter(BankTransaction.id.in_(transaction_ids))
+
+    # Department filtering for MANAGER
+    if current_user.role == UserRoleEnum.MANAGER:
+        query = query.filter(BankTransaction.department_id == current_user.department_id)
+
+    transactions = query.all()
+
+    if not transactions:
+        raise HTTPException(status_code=404, detail="No transactions found")
+
+    # Soft delete all
+    deleted_count = 0
+    for tx in transactions:
+        tx.is_active = False
+        tx.updated_at = datetime.utcnow()
+        deleted_count += 1
+
+    db.commit()
+
+    return {"message": f"Successfully deleted {deleted_count} transactions", "deleted": deleted_count}
+
+
+@router.post("/import/preview")
+async def preview_import(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Preview Excel file for import
+    Returns available columns, auto-detected mapping, and sample data
+    """
+    # Read file content
+    content = await file.read()
+
+    # Preview
+    importer = BankTransactionImporter(db)
+    result = importer.preview_import(
+        file_content=content,
+        filename=file.filename
+    )
+
+    if not result.get('success'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get('error', 'Failed to preview file')
+        )
+
+    return result
+
+
 @router.post("/import", response_model=BankTransactionImportResult)
 async def import_transactions(
     file: UploadFile = File(...),
-    department_id: Optional[int] = Query(None, description="Department ID (required for USER role)"),
+    department_id: Optional[int] = Query(None, description="Department ID (required for MANAGER/ADMIN roles, auto-detected for USER)"),
+    column_mapping: Optional[str] = Query(None, description="JSON string with column mapping"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -672,13 +781,26 @@ async def import_transactions(
     # Read file content
     content = await file.read()
 
+    # Parse column mapping if provided
+    parsed_mapping = None
+    if column_mapping:
+        import json
+        try:
+            parsed_mapping = json.loads(column_mapping)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid column_mapping JSON format"
+            )
+
     # Import
     importer = BankTransactionImporter(db)
     result = importer.import_from_excel(
         file_content=content,
         filename=file.filename,
         department_id=target_department_id,
-        user_id=current_user.id
+        user_id=current_user.id,
+        column_mapping=parsed_mapping
     )
 
     if not result['success']:

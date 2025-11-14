@@ -237,8 +237,8 @@ export const creditPortfolioApi = {
     organization_id?: number
     bank_account_id?: number
   }) => {
-    const { data } = await apiClient.get('/credit-portfolio/analytics/monthly-efficiency', { params })
-    return data
+    const response = await apiClient.get('/credit-portfolio/analytics/monthly-efficiency', { params })
+    return response.data.data || []
   },
 
   getOrgEfficiency: async (params?: {
@@ -247,8 +247,8 @@ export const creditPortfolioApi = {
     date_to?: string
     organization_id?: number
   }) => {
-    const { data } = await apiClient.get('/credit-portfolio/analytics/org-efficiency', { params })
-    return data
+    const response = await apiClient.get('/credit-portfolio/analytics/org-efficiency', { params })
+    return response.data.data || []
   },
 
   getCashflowMonthly: async (params?: {
@@ -257,8 +257,8 @@ export const creditPortfolioApi = {
     date_to?: string
     organization_id?: number
   }) => {
-    const { data } = await apiClient.get('/credit-portfolio/analytics/cashflow-monthly', { params })
-    return data
+    const response = await apiClient.get('/credit-portfolio/analytics/cashflow-monthly', { params })
+    return response.data.data || []
   },
 
   getYearlyComparison: async (params?: {
@@ -267,8 +267,8 @@ export const creditPortfolioApi = {
     date_to?: string
     exclude_contracts?: string
   }) => {
-    const { data } = await apiClient.get('/credit-portfolio/analytics/yearly-comparison', { params })
-    return data
+    const response = await apiClient.get('/credit-portfolio/analytics/yearly-comparison', { params })
+    return response.data.data || []
   },
 
   // ==================== Import ====================
@@ -283,6 +283,14 @@ export const creditPortfolioApi = {
     department_id?: number
   }) => {
     const { data } = await apiClient.get('/credit-portfolio/import/logs', { params })
+    return data
+  },
+
+  // ==================== Test Data ====================
+  loadTestData: async (force: boolean = false) => {
+    const { data } = await apiClient.post('/credit-portfolio/load-test-data', null, {
+      params: { force }
+    })
     return data
   },
 }

@@ -280,8 +280,10 @@ const CustomerMetricsPage = () => {
 
   if (!selectedDepartment) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin tip="Загрузка данных отдела..." />
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <Spin tip="Загрузка данных отдела...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }

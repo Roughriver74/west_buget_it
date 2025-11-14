@@ -29,13 +29,42 @@ from app.schemas.credit_portfolio import (
     MonthlyStats,
 )
 from app.utils.auth import get_current_active_user
+from app.services.cache import cache_service
 
 router = APIRouter()
 
 
+FINANCE_DEPARTMENT_ID = 8  # ID отдела "Финансы"
+FINANCE_DEPARTMENT_CODE = "FIN"
+
+# Cache namespace for credit portfolio analytics
+CACHE_NAMESPACE = "credit_portfolio"
+
+
 def check_finance_access(user: User) -> bool:
-    """Check if user has access to finance features"""
-    return user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]
+    """
+    Check if user has access to credit portfolio features
+
+    Access rules:
+    - ADMIN: ALWAYS has access (regardless of department)
+    - MANAGER: Must belong to Finance department (ID=8)
+    - USER: No access
+    """
+    # ADMIN sees everything
+    if user.role == UserRoleEnum.ADMIN:
+        return True
+
+    # MANAGER must be from Finance department
+    if user.role == UserRoleEnum.MANAGER:
+        return user.department_id == FINANCE_DEPARTMENT_ID
+
+    # USER has no access
+    return False
+
+
+def invalidate_analytics_cache():
+    """Invalidate all analytics cache when data changes"""
+    cache_service.invalidate_namespace(CACHE_NAMESPACE)
 
 
 # ==================== Organizations ====================
@@ -84,13 +113,8 @@ async def create_organization(
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Determine department_id
-    department_id = org_data.department_id if org_data.department_id else current_user.department_id
-    if not department_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department ID must be specified"
-        )
+    # Credit portfolio is ALWAYS tied to Finance department
+    department_id = FINANCE_DEPARTMENT_ID
 
     # Create organization
     new_org = FinOrganization(
@@ -167,9 +191,8 @@ async def create_bank_account(
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    department_id = account_data.department_id if account_data.department_id else current_user.department_id
-    if not department_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department ID required")
+    # Credit portfolio is ALWAYS tied to Finance department
+    department_id = FINANCE_DEPARTMENT_ID
 
     new_account = FinBankAccount(
         account_number=account_data.account_number,
@@ -220,9 +243,8 @@ async def create_contract(
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    department_id = contract_data.department_id if contract_data.department_id else current_user.department_id
-    if not department_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department ID required")
+    # Credit portfolio is ALWAYS tied to Finance department
+    department_id = FINANCE_DEPARTMENT_ID
 
     new_contract = FinContract(
         contract_number=contract_data.contract_number,
@@ -381,6 +403,56 @@ async def get_contracts_summary(
             "total": total,
             "pages": (total + limit - 1) // limit
         }
+    }
+
+
+@router.get("/contract-stats")
+async def get_contract_stats(
+    department_id: Optional[int] = None,
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить базовую статистику по договорам
+
+    Возвращает:
+    - total_count: всего договоров
+    - active_count: активных договоров
+    - closed_count: закрытых договоров
+
+    Доступ: только MANAGER, ADMIN
+    """
+    if not check_finance_access(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Determine department_id based on role
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        target_department_id = current_user.department_id
+    elif not target_department_id and current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        target_department_id = current_user.department_id
+
+    # Build base query
+    query = db.query(FinContract)
+
+    if target_department_id:
+        query = query.filter(FinContract.department_id == target_department_id)
+
+    # Total count
+    total_count = query.count()
+
+    # Active count
+    active_count = query.filter(FinContract.is_active == True).count()
+
+    # Closed count
+    closed_count = total_count - active_count
+
+    return {
+        "total_count": total_count,
+        "active_count": active_count,
+        "closed_count": closed_count
     }
 
 
@@ -656,6 +728,19 @@ async def get_summary(
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
+    # Build cache key
+    cache_key = cache_service.build_key(
+        "summary",
+        department_id,
+        date_from.isoformat() if date_from else None,
+        date_to.isoformat() if date_to else None
+    )
+
+    # Try to get from cache
+    cached_result = cache_service.get(CACHE_NAMESPACE, cache_key)
+    if cached_result is not None:
+        return CreditPortfolioSummary(**cached_result)
+
     # Receipts query
     receipts_query = db.query(func.sum(FinReceipt.amount)).filter(FinReceipt.is_active == True)
     if department_id:
@@ -707,7 +792,7 @@ async def get_summary(
     )
     total_interest = interest_query.scalar() or 0
 
-    return CreditPortfolioSummary(
+    result = CreditPortfolioSummary(
         total_receipts=total_receipts,
         total_expenses=total_expenses,
         net_balance=total_receipts - total_expenses,
@@ -715,6 +800,11 @@ async def get_summary(
         total_principal=total_principal,
         total_interest=total_interest
     )
+
+    # Cache the result (5 minutes)
+    cache_service.set(CACHE_NAMESPACE, cache_key, result.model_dump())
+
+    return result
 
 
 # ==================== Import Logs ====================
@@ -763,13 +853,8 @@ async def trigger_ftp_import(
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Determine department_id (общий FTP для всех отделов по умолчанию)
-    target_department_id = department_id if department_id else current_user.department_id
-    if not target_department_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Department ID must be specified"
-        )
+    # Credit portfolio is ALWAYS tied to Finance department
+    target_department_id = FINANCE_DEPARTMENT_ID
 
     try:
         from app.services.credit_portfolio_ftp import download_credit_portfolio_files
@@ -789,6 +874,11 @@ async def trigger_ftp_import(
         # Step 2: Import files
         importer = CreditPortfolioImporter(db, target_department_id)
         summary = importer.import_files(downloaded_files)
+
+        # Invalidate analytics cache after successful import
+        if summary["success"] > 0:
+            invalidate_analytics_cache()
+            logger.info(f"Invalidated analytics cache after importing {summary['success']} files")
 
         return {
             "success": summary["success"] > 0,
@@ -830,6 +920,19 @@ async def get_monthly_stats(
     """
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Build cache key
+    cache_key = cache_service.build_key(
+        "monthly_stats",
+        department_id,
+        date_from,
+        date_to
+    )
+
+    # Try to get from cache
+    cached_result = cache_service.get(CACHE_NAMESPACE, cache_key)
+    if cached_result is not None:
+        return [MonthlyStats(**item) for item in cached_result]
 
     # Determine department_id based on role
     target_department_id = department_id
@@ -903,6 +1006,9 @@ async def get_monthly_stats(
             "net": net
         })
 
+    # Cache the result (5 minutes)
+    cache_service.set(CACHE_NAMESPACE, cache_key, data)
+
     return data
 
 
@@ -929,6 +1035,21 @@ async def get_monthly_efficiency(
     """
     if not check_finance_access(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Build cache key
+    cache_key = cache_service.build_key(
+        "monthly_efficiency",
+        department_id,
+        date_from,
+        date_to,
+        organization_id,
+        bank_account_id
+    )
+
+    # Try to get from cache
+    cached_result = cache_service.get(CACHE_NAMESPACE, cache_key)
+    if cached_result is not None:
+        return cached_result
 
     # Determine department_id based on role
     target_department_id = department_id
@@ -998,7 +1119,12 @@ async def get_monthly_efficiency(
                 "efficiency": round(efficiency, 2)
             })
 
-    return {"data": data}
+    result = {"data": data}
+
+    # Cache the result (5 minutes)
+    cache_service.set(CACHE_NAMESPACE, cache_key, result)
+
+    return result
 
 
 @router.get("/analytics/org-efficiency")
@@ -1379,3 +1505,388 @@ async def get_yearly_comparison(
         current['paidGrowth'] = round(paid_growth, 2)
 
     return {"data": data}
+
+
+# ==================== Test Data ====================
+
+@router.post("/load-test-data")
+async def load_test_data(
+    force: bool = Query(False, description="Force reload, deleting existing data"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Загрузить тестовые данные для кредитного портфеля
+
+    Создает:
+    - 3 организации (Сбербанк, ВТБ, Альфа-Банк)
+    - 3 банковских счета
+    - 3 кредитных договора
+    - Поступления (получение кредитов) за 2023-2025
+    - Списания (погашение кредитов) за 2023-2025
+    - Детализацию платежей (тело/проценты)
+
+    Доступ: только ADMIN
+    """
+    # Only ADMIN can load test data
+    if current_user.role != UserRoleEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN can load test data"
+        )
+
+    try:
+        # Use Finance department (ID=8)
+        department_id = FINANCE_DEPARTMENT_ID
+
+        # Check if test data already exists
+        existing_orgs = db.query(FinOrganization).filter(
+            FinOrganization.department_id == department_id,
+            FinOrganization.inn.in_(['7707083893', '7702070139', '7728168971'])  # Test INNs
+        ).count()
+
+        if existing_orgs > 0 and not force:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Test data already exists ({existing_orgs} test organizations found). Use force=true to reload."
+            )
+
+        if existing_orgs > 0 and force:
+            logger.info(f"Deleting existing test data for department {department_id}...")
+
+            # Get test organization IDs
+            test_org_ids = [org.id for org in db.query(FinOrganization).filter(
+                FinOrganization.department_id == department_id,
+                FinOrganization.inn.in_(['7707083893', '7702070139', '7728168971'])
+            ).all()]
+
+            # Delete in correct order (respecting foreign keys)
+            db.query(FinExpenseDetail).filter(
+                FinExpenseDetail.expense_operation_id.in_(
+                    db.query(FinExpense.operation_id).filter(
+                        FinExpense.organization_id.in_(test_org_ids)
+                    )
+                )
+            ).delete(synchronize_session=False)
+
+            db.query(FinExpense).filter(
+                FinExpense.organization_id.in_(test_org_ids)
+            ).delete(synchronize_session=False)
+
+            db.query(FinReceipt).filter(
+                FinReceipt.organization_id.in_(test_org_ids)
+            ).delete(synchronize_session=False)
+
+            db.query(FinContract).filter(
+                FinContract.department_id == department_id,
+                FinContract.counterparty.in_(['ПАО Сбербанк', 'ВТБ (ПАО)', "АО 'Альфа-Банк'"])
+            ).delete(synchronize_session=False)
+
+            db.query(FinBankAccount).filter(
+                FinBankAccount.department_id == department_id,
+                FinBankAccount.account_number.like('4070281000000000%')
+            ).delete(synchronize_session=False)
+
+            db.query(FinOrganization).filter(
+                FinOrganization.id.in_(test_org_ids)
+            ).delete(synchronize_session=False)
+
+            db.commit()
+            logger.info("Deleted existing test data")
+
+        # Import the test data creation function
+        from datetime import timedelta
+        from decimal import Decimal
+
+        logger.info(f"Creating test data for department_id={department_id}")
+
+        # 1. Create Organizations
+        organizations = []
+        org_data = [
+            {"name": "ПАО Сбербанк", "inn": "7707083893"},
+            {"name": "ВТБ (ПАО)", "inn": "7702070139"},
+            {"name": "АО 'Альфа-Банк'", "inn": "7728168971"},
+        ]
+
+        for data in org_data:
+            org = FinOrganization(
+                name=data["name"],
+                inn=data["inn"],
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(org)
+            organizations.append(org)
+
+        db.commit()
+        db.refresh(organizations[0])
+        db.refresh(organizations[1])
+        db.refresh(organizations[2])
+
+        # 2. Create Bank Accounts
+        bank_accounts = []
+        bank_names = ["Сбербанк", "ВТБ", "Альфа-Банк"]
+        for i, org in enumerate(organizations, 1):
+            account = FinBankAccount(
+                account_number=f"4070281000000000{i:04d}",
+                bank_name=bank_names[i-1],
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(account)
+            bank_accounts.append(account)
+
+        db.commit()
+        db.refresh(bank_accounts[0])
+        db.refresh(bank_accounts[1])
+        db.refresh(bank_accounts[2])
+
+        # 3. Create Contracts
+        contracts = []
+        contract_data = [
+            {"number": "КД-001/2023", "date": "2023-01-15", "type": "Кредитный договор", "counterparty": "ПАО Сбербанк"},
+            {"number": "КД-002/2023", "date": "2023-06-20", "type": "Кредитный договор", "counterparty": "ВТБ (ПАО)"},
+            {"number": "КД-003/2024", "date": "2024-01-10", "type": "Кредитный договор", "counterparty": "АО 'Альфа-Банк'"},
+        ]
+
+        for data in contract_data:
+            contract = FinContract(
+                contract_number=data["number"],
+                contract_date=datetime.strptime(data["date"], "%Y-%m-%d").date(),
+                contract_type=data["type"],
+                counterparty=data["counterparty"],
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(contract)
+            contracts.append(contract)
+
+        db.commit()
+        db.refresh(contracts[0])
+        db.refresh(contracts[1])
+        db.refresh(contracts[2])
+
+        # 4. Create Receipts
+        receipts_count = 0
+
+        # Contract 1 - 2023
+        for date_str, amount in [("2023-02-01", 5000000), ("2023-07-01", 3000000)]:
+            receipt = FinReceipt(
+                operation_id=f"RCP-{date_str}-001",
+                organization_id=organizations[0].id,
+                bank_account_id=bank_accounts[0].id,
+                contract_id=contracts[0].id,
+                operation_type="Получение кредита",
+                document_number=f"ПП-{date_str}",
+                document_date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                payer=organizations[0].name,
+                payment_purpose=f"Предоставление кредита по договору {contracts[0].contract_number}",
+                currency="RUB",
+                amount=Decimal(str(amount)),
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(receipt)
+            receipts_count += 1
+
+        # Contract 2 - 2023
+        receipt = FinReceipt(
+            operation_id="RCP-2023-08-01-002",
+            organization_id=organizations[1].id,
+            bank_account_id=bank_accounts[1].id,
+            contract_id=contracts[1].id,
+            operation_type="Получение кредита",
+            document_number="ПП-2023-08-01",
+            document_date=datetime.strptime("2023-08-01", "%Y-%m-%d").date(),
+            payer=organizations[1].name,
+            payment_purpose=f"Предоставление кредита по договору {contracts[1].contract_number}",
+            currency="RUB",
+            amount=Decimal("4000000"),
+            is_active=True,
+            department_id=department_id,
+        )
+        db.add(receipt)
+        receipts_count += 1
+
+        # Contract 3 - 2024
+        for date_str, amount in [("2024-02-01", 6000000), ("2024-08-01", 2000000)]:
+            receipt = FinReceipt(
+                operation_id=f"RCP-{date_str}-003",
+                organization_id=organizations[2].id,
+                bank_account_id=bank_accounts[2].id,
+                contract_id=contracts[2].id,
+                operation_type="Получение кредита",
+                document_number=f"ПП-{date_str}",
+                document_date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                payer=organizations[2].name,
+                payment_purpose=f"Предоставление кредита по договору {contracts[2].contract_number}",
+                currency="RUB",
+                amount=Decimal(str(amount)),
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(receipt)
+            receipts_count += 1
+
+        # 2025 data
+        receipt = FinReceipt(
+            operation_id="RCP-2025-01-15-001",
+            organization_id=organizations[0].id,
+            bank_account_id=bank_accounts[0].id,
+            contract_id=contracts[0].id,
+            operation_type="Получение кредита",
+            document_number="ПП-2025-01-15",
+            document_date=datetime.strptime("2025-01-15", "%Y-%m-%d").date(),
+            payer=organizations[0].name,
+            payment_purpose=f"Предоставление кредита по договору {contracts[0].contract_number}",
+            currency="RUB",
+            amount=Decimal("3500000"),
+            is_active=True,
+            department_id=department_id,
+        )
+        db.add(receipt)
+        receipts_count += 1
+
+        db.commit()
+
+        # 5. Create Expenses (simplified version)
+        expenses_count = 0
+        details_count = 0
+
+        # Contract 1 - 2024 payments (12 months)
+        start_date = datetime(2024, 1, 1)
+        for month in range(12):
+            payment_date = start_date + timedelta(days=30 * month)
+            expense = FinExpense(
+                operation_id=f"EXP-{payment_date.strftime('%Y-%m-%d')}-001",
+                organization_id=organizations[0].id,
+                bank_account_id=bank_accounts[0].id,
+                contract_id=contracts[0].id,
+                operation_type="Погашение кредита",
+                document_number=f"ПП-{payment_date.strftime('%Y-%m-%d')}",
+                document_date=payment_date.date(),
+                recipient=organizations[0].name,
+                payment_purpose=f"Погашение кредита по договору {contracts[0].contract_number}",
+                currency="RUB",
+                amount=Decimal("420000"),
+                expense_article="Погашение кредитов",
+                unconfirmed_by_bank=False,
+                is_active=True,
+                department_id=department_id,
+            )
+            db.add(expense)
+            db.flush()
+
+            # Add details
+            total = 420000
+            principal_amount = total * 0.75
+            interest_amount = total * 0.25
+
+            detail_principal = FinExpenseDetail(
+                expense_operation_id=expense.operation_id,
+                payment_type="тело",
+                payment_amount=Decimal(str(principal_amount)),
+                settlement_amount=Decimal(str(principal_amount)),
+                expense_amount=Decimal(str(principal_amount)),
+                department_id=department_id,
+            )
+            db.add(detail_principal)
+
+            detail_interest = FinExpenseDetail(
+                expense_operation_id=expense.operation_id,
+                payment_type="проценты",
+                payment_amount=Decimal(str(interest_amount)),
+                settlement_amount=Decimal(str(interest_amount)),
+                expense_amount=Decimal(str(interest_amount)),
+                department_id=department_id,
+            )
+            db.add(detail_interest)
+
+            expenses_count += 1
+            details_count += 2
+
+        # 2025 payments for all contracts
+        start_date = datetime(2025, 1, 1)
+        for month in range(3):  # January to March 2025
+            for contract_idx, org in enumerate(organizations):
+                payment_date = start_date + timedelta(days=30 * month)
+                amounts = [400000, 350000, 480000]
+
+                expense = FinExpense(
+                    operation_id=f"EXP-{payment_date.strftime('%Y-%m-%d')}-{contract_idx+1:03d}",
+                    organization_id=org.id,
+                    bank_account_id=bank_accounts[contract_idx].id,
+                    contract_id=contracts[contract_idx].id,
+                    operation_type="Погашение кредита",
+                    document_number=f"ПП-{payment_date.strftime('%Y-%m-%d')}-{contract_idx+1}",
+                    document_date=payment_date.date(),
+                    recipient=org.name,
+                    payment_purpose=f"Погашение кредита по договору {contracts[contract_idx].contract_number}",
+                    currency="RUB",
+                    amount=Decimal(str(amounts[contract_idx])),
+                    expense_article="Погашение кредитов",
+                    unconfirmed_by_bank=False,
+                    is_active=True,
+                    department_id=department_id,
+                )
+                db.add(expense)
+                db.flush()
+
+                # Add details
+                total = amounts[contract_idx]
+                principal_amount = total * 0.75
+                interest_amount = total * 0.25
+
+                detail_principal = FinExpenseDetail(
+                    expense_operation_id=expense.operation_id,
+                    payment_type="тело",
+                    payment_amount=Decimal(str(principal_amount)),
+                    settlement_amount=Decimal(str(principal_amount)),
+                    expense_amount=Decimal(str(principal_amount)),
+                    department_id=department_id,
+                )
+                db.add(detail_principal)
+
+                detail_interest = FinExpenseDetail(
+                    expense_operation_id=expense.operation_id,
+                    payment_type="проценты",
+                    payment_amount=Decimal(str(interest_amount)),
+                    settlement_amount=Decimal(str(interest_amount)),
+                    expense_amount=Decimal(str(interest_amount)),
+                    department_id=department_id,
+                )
+                db.add(detail_interest)
+
+                expenses_count += 1
+                details_count += 2
+
+        db.commit()
+
+        # Invalidate cache
+        invalidate_analytics_cache()
+
+        logger.info(f"Test data created successfully: {len(organizations)} orgs, {len(bank_accounts)} accounts, "
+                   f"{len(contracts)} contracts, {receipts_count} receipts, {expenses_count} expenses, {details_count} details")
+
+        return {
+            "success": True,
+            "message": "Test data loaded successfully",
+            "data": {
+                "organizations": len(organizations),
+                "bank_accounts": len(bank_accounts),
+                "contracts": len(contracts),
+                "receipts": receipts_count,
+                "expenses": expenses_count,
+                "expense_details": details_count
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error loading test data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load test data: {str(e)}"
+        )

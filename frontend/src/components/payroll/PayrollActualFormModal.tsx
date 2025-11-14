@@ -572,8 +572,10 @@ export default function PayrollActualFormModal({
         />
 
         {loadingYtd && (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <Spin tip="Загрузка данных о доходе сотрудника..." />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <Spin tip="Загрузка данных о доходе сотрудника...">
+              <div style={{ minHeight: 100 }} />
+            </Spin>
           </div>
         )}
 
@@ -588,8 +590,10 @@ export default function PayrollActualFormModal({
         )}
 
         {calculatingNdfl && (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <Spin tip="Расчет НДФЛ по прогрессивной шкале..." />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <Spin tip="Расчет НДФЛ по прогрессивной шкале...">
+              <div style={{ minHeight: 100 }} />
+            </Spin>
           </div>
         )}
 

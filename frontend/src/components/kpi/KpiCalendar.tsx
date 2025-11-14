@@ -143,7 +143,9 @@ export const KpiCalendar: React.FC<KpiCalendarProps> = ({ departmentId }) => {
             minHeight: 400,
           }}
         >
-          <Spin size="large" tip="Загрузка данных..." />
+          <Spin size="large" tip="Загрузка данных...">
+            <div style={{ minHeight: 200 }} />
+          </Spin>
         </div>
       ) : (
         <>

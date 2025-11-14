@@ -11,13 +11,14 @@ import {
   Space,
   Modal,
   Upload,
-  message,
+  message as messageStatic,
   Statistic,
   Row,
   Col,
   Drawer,
   Form,
   Tooltip,
+  App,
 } from 'antd'
 import {
   UploadOutlined,
@@ -29,6 +30,7 @@ import {
   ExclamationCircleOutlined,
   DollarOutlined,
   FileTextOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -38,8 +40,10 @@ import type {
   BankTransactionStatus,
 } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useAuth } from '@/contexts/AuthContext'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
+import ColumnMappingModal from '@/components/bank/ColumnMappingModal'
 
 const { RangePicker } = DatePicker
 const { Search } = Input
@@ -47,6 +51,9 @@ const { Search } = Input
 const BankTransactionsPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+  const { user } = useAuth()
+  const { modal } = App.useApp()
+  const { message } = App.useApp()
 
   // Filters
   const [status, setStatus] = useState<BankTransactionStatus | undefined>()
@@ -58,13 +65,24 @@ const BankTransactionsPage = () => {
 
   // Modals
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [mappingModalOpen, setMappingModalOpen] = useState(false)
   const [categorizeDrawerOpen, setCategorizeDrawerOpen] = useState(false)
   const [matchingDrawerOpen, setMatchingDrawerOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<BankTransaction | null>(null)
 
+  // Import state
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [previewData, setPreviewData] = useState<any>(null)
+
+  // Selection state
+  const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([])
+
+  // Editable state
+  const [editingKey, setEditingKey] = useState<number | null>(null)
+  const [editForm] = Form.useForm()
+
   // Forms
   const [categorizeForm] = Form.useForm()
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
 
   // Fetch transactions
   const { data, isLoading, error, refetch } = useQuery({
@@ -126,10 +144,23 @@ const BankTransactionsPage = () => {
     enabled: !!selectedTransaction && categorizeDrawerOpen,
   })
 
+  // Preview mutation
+  const previewMutation = useMutation({
+    mutationFn: (file: File) => bankTransactionsApi.previewImport(file),
+    onSuccess: (result) => {
+      setPreviewData(result)
+      setImportModalOpen(false)
+      setMappingModalOpen(true)
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка чтения файла: ${error.response?.data?.detail || error.message}`)
+    },
+  })
+
   // Import mutation
   const importMutation = useMutation({
-    mutationFn: (file: File) =>
-      bankTransactionsApi.importFromExcel(file, selectedDepartment?.id),
+    mutationFn: ({ file, mapping }: { file: File; mapping: Record<string, string> }) =>
+      bankTransactionsApi.importFromExcel(file, selectedDepartment?.id, mapping),
     onSuccess: (result) => {
       message.success(
         `Импортировано: ${result.imported}, пропущено: ${result.skipped} транзакций`
@@ -137,8 +168,9 @@ const BankTransactionsPage = () => {
       if (result.errors.length > 0) {
         message.warning(`Ошибок при импорте: ${result.errors.length}`)
       }
-      setImportModalOpen(false)
+      setMappingModalOpen(false)
       setUploadFile(null)
+      setPreviewData(null)
       queryClient.invalidateQueries({ queryKey: ['bankTransactions'] })
       queryClient.invalidateQueries({ queryKey: ['bankTransactionsStats'] })
     },
@@ -177,6 +209,36 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка: ${error.response?.data?.detail || error.message}`)
+    },
+  })
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (transactionIds: number[]) => bankTransactionsApi.bulkDelete(transactionIds),
+    onSuccess: (result) => {
+      message.success(`Удалено транзакций: ${result.deleted}`)
+      setSelectedRowKeys([])
+      queryClient.invalidateQueries({ queryKey: ['bankTransactions'] })
+      queryClient.invalidateQueries({ queryKey: ['bankTransactionsStats'] })
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка удаления: ${error.response?.data?.detail || error.message}`)
+    },
+  })
+
+  // Quick update mutation for inline editing
+  const quickUpdateMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: number; updates: any }) =>
+      bankTransactionsApi.updateTransaction(id, updates),
+    onSuccess: () => {
+      message.success('Транзакция обновлена')
+      setEditingKey(null)
+      editForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['bankTransactions'] })
+      queryClient.invalidateQueries({ queryKey: ['bankTransactionsStats'] })
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка обновления: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -239,6 +301,7 @@ const BankTransactionsPage = () => {
       title: 'Контрагент',
       dataIndex: 'counterparty_name',
       key: 'counterparty_name',
+      width: 280,
       ellipsis: true,
       render: (name: string, record) => (
         <Tooltip title={record.payment_purpose}>
@@ -262,8 +325,34 @@ const BankTransactionsPage = () => {
       title: 'Категория',
       dataIndex: 'category_name',
       key: 'category_name',
-      width: 180,
+      width: 250,
       render: (name: string, record) => {
+        const editable = isEditing(record)
+        if (editable) {
+          return (
+            <Form.Item
+              name="category_id"
+              style={{ margin: 0 }}
+              rules={[{ required: false }]}
+            >
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Выберите категорию"
+                allowClear
+                loading={!categories}
+                options={(categories?.items || []).map(cat => ({
+                  value: cat.id,
+                  label: cat.name,
+                }))}
+                showSearch
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+          )
+        }
+
         if (name) {
           return (
             <Tag color="blue">
@@ -313,10 +402,33 @@ const BankTransactionsPage = () => {
       title: 'Статус',
       dataIndex: 'status',
       key: 'status',
-      width: 140,
-      render: (status: BankTransactionStatus) => (
-        <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
-      ),
+      width: 180,
+      render: (status: BankTransactionStatus, record) => {
+        const editable = isEditing(record)
+        if (editable) {
+          return (
+            <Form.Item
+              name="status"
+              style={{ margin: 0 }}
+              rules={[{ required: false }]}
+            >
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Выберите статус"
+                options={[
+                  { value: 'NEW', label: 'Новая' },
+                  { value: 'CATEGORIZED', label: 'Категоризирована' },
+                  { value: 'MATCHED', label: 'Связана' },
+                  { value: 'APPROVED', label: 'Одобрена' },
+                  { value: 'NEEDS_REVIEW', label: 'Требует проверки' },
+                  { value: 'IGNORED', label: 'Игнорируется' },
+                ]}
+              />
+            </Form.Item>
+          )
+        }
+        return <Tag color={getStatusColor(status)}>{getStatusText(status)}</Tag>
+      },
       filters: [
         { text: 'Новая', value: 'NEW' },
         { text: 'Категоризирована', value: 'CATEGORIZED' },
@@ -329,37 +441,53 @@ const BankTransactionsPage = () => {
       title: 'Действия',
       key: 'actions',
       fixed: 'right',
-      width: 160,
-      render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<TagsOutlined />}
-            onClick={() => {
-              setSelectedTransaction(record)
-              setCategorizeDrawerOpen(true)
-              if (record.category_id) {
-                categorizeForm.setFieldsValue({
-                  category_id: record.category_id,
-                  notes: record.notes,
-                })
-              }
-            }}
-          >
-            Категория
-          </Button>
-          <Button
-            size="small"
-            icon={<LinkOutlined />}
-            onClick={() => {
-              setSelectedTransaction(record)
-              setMatchingDrawerOpen(true)
-            }}
-          >
-            Связать
-          </Button>
-        </Space>
-      ),
+      width: 240,
+      render: (_, record) => {
+        const editable = isEditing(record)
+        return editable ? (
+          <Space size="small">
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleSave(record.id)}
+              loading={quickUpdateMutation.isPending}
+            >
+              Сохранить
+            </Button>
+            <Button
+              size="small"
+              onClick={handleCancel}
+            >
+              Отмена
+            </Button>
+          </Space>
+        ) : (
+          <Space size="small">
+            <Tooltip title={editingKey !== null ? 'Завершите редактирование другой строки' : 'Редактировать категорию и статус'}>
+              <Button
+                size="small"
+                onClick={() => handleEdit(record)}
+                disabled={editingKey !== null}
+              >
+                Редактировать
+              </Button>
+            </Tooltip>
+            <Tooltip title="Связать с заявкой на расход">
+              <Button
+                size="small"
+                icon={<LinkOutlined />}
+                onClick={() => {
+                  setSelectedTransaction(record)
+                  setMatchingDrawerOpen(true)
+                }}
+                disabled={editingKey !== null}
+              >
+                Связать
+              </Button>
+            </Tooltip>
+          </Space>
+        )
+      },
     },
   ]
 
@@ -368,7 +496,22 @@ const BankTransactionsPage = () => {
       message.warning('Выберите файл для импорта')
       return
     }
-    importMutation.mutate(uploadFile)
+
+    // Для MANAGER и ADMIN требуется выбрать отдел
+    if (user && ['MANAGER', 'ADMIN'].includes(user.role)) {
+      if (!selectedDepartment) {
+        message.error('Выберите отдел для импорта данных')
+        return
+      }
+    }
+
+    // Start with preview
+    previewMutation.mutate(uploadFile)
+  }
+
+  const handleConfirmMapping = (mapping: Record<string, string>) => {
+    if (!uploadFile) return
+    importMutation.mutate({ file: uploadFile, mapping })
   }
 
   const handleCategorize = (values: any) => {
@@ -386,6 +529,68 @@ const BankTransactionsPage = () => {
       id: selectedTransaction.id,
       expenseId,
     })
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Выберите транзакции для удаления')
+      return
+    }
+
+    modal.confirm({
+      title: 'Подтверждение удаления',
+      content: `Вы уверены, что хотите удалить ${selectedRowKeys.length} транзакций? Это действие нельзя отменить.`,
+      okText: 'Удалить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: () => {
+        bulkDeleteMutation.mutate(selectedRowKeys)
+      },
+    })
+  }
+
+  const handleDeleteAll = () => {
+    const allIds = data?.items.map(item => item.id) || []
+    if (allIds.length === 0) {
+      message.warning('Нет транзакций для удаления')
+      return
+    }
+
+    modal.confirm({
+      title: 'Удалить все транзакции?',
+      content: `Вы уверены, что хотите удалить ВСЕ ${allIds.length} транзакций на текущей странице? Это действие нельзя отменить.`,
+      okText: 'Удалить всё',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: () => {
+        bulkDeleteMutation.mutate(allIds)
+      },
+    })
+  }
+
+  const isEditing = (record: BankTransaction) => record.id === editingKey
+
+  const handleEdit = (record: BankTransaction) => {
+    editForm.setFieldsValue({
+      category_id: record.category_id,
+      status: record.status,
+      notes: record.notes,
+    })
+    setEditingKey(record.id)
+  }
+
+  const handleCancel = () => {
+    setEditingKey(null)
+    editForm.resetFields()
+  }
+
+  const handleSave = async (id: number) => {
+    try {
+      const values = await editForm.validateFields()
+      quickUpdateMutation.mutate({ id, updates: values })
+    } catch (error) {
+      console.error('Validation failed:', error)
+    }
   }
 
   if (isLoading) {
@@ -456,6 +661,16 @@ const BankTransactionsPage = () => {
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
             Обновить
           </Button>
+          {user && ['MANAGER', 'ADMIN'].includes(user.role) && data?.items && data.items.length > 0 && (
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={handleDeleteAll}
+              loading={bulkDeleteMutation.isPending}
+            >
+              Удалить все ({data.items.length})
+            </Button>
+          )}
           <Select
             style={{ width: 180 }}
             placeholder="Статус"
@@ -493,23 +708,53 @@ const BankTransactionsPage = () => {
 
       {/* Table */}
       <Card>
-        <Table
-          columns={columns}
-          dataSource={data?.items || []}
-          rowKey="id"
-          scroll={{ x: 1400 }}
-          pagination={{
-            current: page,
-            pageSize,
-            total: data?.total || 0,
-            showSizeChanger: true,
-            showTotal: (total) => `Всего ${total} транзакций`,
-            onChange: (newPage, newPageSize) => {
-              setPage(newPage)
-              setPageSize(newPageSize)
-            },
-          }}
-        />
+        {/* Bulk actions */}
+        {selectedRowKeys.length > 0 && (
+          <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
+            <Space>
+              <span>Выбрано: {selectedRowKeys.length}</span>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleBulkDelete}
+                loading={bulkDeleteMutation.isPending}
+                disabled={!user || !['MANAGER', 'ADMIN'].includes(user.role)}
+              >
+                Удалить выбранные
+              </Button>
+              <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                Отменить выбор
+              </Button>
+            </Space>
+          </div>
+        )}
+
+        <Form form={editForm} component={false}>
+          <Table
+            columns={columns}
+            dataSource={data?.items || []}
+            rowKey="id"
+            scroll={{ x: 1900 }}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys as number[]),
+              getCheckboxProps: () => ({
+                disabled: !user || !['MANAGER', 'ADMIN'].includes(user.role),
+              }),
+            }}
+            pagination={{
+              current: page,
+              pageSize,
+              total: data?.total || 0,
+              showSizeChanger: true,
+              showTotal: (total) => `Всего ${total} транзакций`,
+              onChange: (newPage, newPageSize) => {
+                setPage(newPage)
+                setPageSize(newPageSize)
+              },
+            }}
+          />
+        </Form>
       </Card>
 
       {/* Import Modal */}
@@ -521,8 +766,32 @@ const BankTransactionsPage = () => {
           setImportModalOpen(false)
           setUploadFile(null)
         }}
-        confirmLoading={importMutation.isPending}
+        confirmLoading={previewMutation.isPending}
+        okText="Далее"
       >
+        {/* Department info for MANAGER/ADMIN */}
+        {user && ['MANAGER', 'ADMIN'].includes(user.role) && (
+          <div style={{
+            marginBottom: 16,
+            padding: 12,
+            background: selectedDepartment ? '#f6ffed' : '#fff7e6',
+            border: `1px solid ${selectedDepartment ? '#b7eb8f' : '#ffd591'}`,
+            borderRadius: 4,
+          }}>
+            {selectedDepartment ? (
+              <div>
+                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                <strong>Отдел:</strong> {selectedDepartment.name}
+              </div>
+            ) : (
+              <div>
+                <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                <strong>Внимание:</strong> Выберите отдел в фильтрах для импорта данных
+              </div>
+            )}
+          </div>
+        )}
+
         <p>
           Загрузите файл Excel с банковской выпиской. Система автоматически определит колонки.
         </p>
@@ -704,6 +973,19 @@ const BankTransactionsPage = () => {
           </div>
         )}
       </Drawer>
+
+      {/* Column Mapping Modal */}
+      <ColumnMappingModal
+        open={mappingModalOpen}
+        onCancel={() => {
+          setMappingModalOpen(false)
+          setPreviewData(null)
+          setUploadFile(null)
+        }}
+        onConfirm={handleConfirmMapping}
+        previewData={previewData}
+        loading={importMutation.isPending}
+      />
     </div>
   )
 }

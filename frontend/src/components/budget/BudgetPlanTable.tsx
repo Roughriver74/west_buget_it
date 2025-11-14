@@ -236,8 +236,10 @@ const BudgetPlanTable = React.forwardRef<
   // Условные возвраты ПОСЛЕ всех хуков
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '50px', minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" tip="Загрузка плана..." />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400, padding: 50 }}>
+        <Spin size="large" tip="Загрузка плана...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }

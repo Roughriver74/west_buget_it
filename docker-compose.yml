@@ -21,6 +21,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis (for caching and rate limiting)
+  redis:
+    image: redis:7-alpine
+    container_name: it_budget_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Backend API
   backend:
     build:
@@ -37,12 +53,17 @@ services:
       DB_PASSWORD: budget_pass
       DEBUG: "True"
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      USE_REDIS: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -66,4 +87,6 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local

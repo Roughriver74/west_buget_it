@@ -138,6 +138,12 @@ class Settings(BaseSettings):
     CREDIT_PORTFOLIO_FTP_REMOTE_DIR: str = "/"
     CREDIT_PORTFOLIO_FTP_LOCAL_DIR: str = "data/credit_portfolio"
 
+    # Background Scheduler
+    SCHEDULER_ENABLED: bool = True
+    CREDIT_PORTFOLIO_IMPORT_ENABLED: bool = True
+    CREDIT_PORTFOLIO_IMPORT_HOUR: int = 6  # 0-23
+    CREDIT_PORTFOLIO_IMPORT_MINUTE: int = 0  # 0-59
+
     @field_validator('SECRET_KEY')
     @classmethod
     def validate_secret_key(cls, v: str) -> str:

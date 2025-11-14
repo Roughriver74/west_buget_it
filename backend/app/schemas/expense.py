@@ -61,6 +61,11 @@ class ExpenseInDB(ExpenseBase):
     organization: Optional[OrganizationInDB] = None
     attachments: List["AttachmentInDB"] = []
 
+    # Bitrix24 integration
+    bitrix_task_id: Optional[int] = None
+    bitrix_task_url: Optional[str] = None
+    bitrix_sync_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 

@@ -151,6 +151,24 @@ class BankTransactionStatusEnum(str, enum.Enum):
     IGNORED = "IGNORED"  # Проигнорирована (не относится к учету)
 
 
+class RegionEnum(str, enum.Enum):
+    """Enum for regions"""
+    MOSCOW = "MOSCOW"  # Москва
+    SPB = "SPB"  # Санкт-Петербург
+    REGIONS = "REGIONS"  # Регионы
+    FOREIGN = "FOREIGN"  # Зарубеж
+
+
+class DocumentTypeEnum(str, enum.Enum):
+    """Enum for document types"""
+    PAYMENT_ORDER = "PAYMENT_ORDER"  # Платежное поручение
+    CASH_ORDER = "CASH_ORDER"  # Кассовый ордер
+    INVOICE = "INVOICE"  # Счет
+    ACT = "ACT"  # Акт
+    CONTRACT = "CONTRACT"  # Договор
+    OTHER = "OTHER"  # Другое
+
+
 class Department(Base):
     """Departments (отделы компании) - основа multi-tenancy"""
     __tablename__ = "departments"
@@ -238,6 +256,9 @@ class Contractor(Base):
     contact_info = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
 
+    # Bitrix24 integration
+    bitrix_company_id = Column(Integer, nullable=True, index=True)  # ID компании в Битрикс24
+
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
@@ -307,6 +328,11 @@ class Expense(Base):
     # Import tracking
     imported_from_ftp = Column(Boolean, default=False, nullable=False)  # Загружена из FTP
     needs_review = Column(Boolean, default=False, nullable=False)  # Требует проверки категории
+
+    # Bitrix24 integration
+    bitrix_task_id = Column(Integer, nullable=True, index=True)  # ID задачи в Битрикс24
+    bitrix_task_url = Column(String(500), nullable=True)  # URL задачи в Битрикс24
+    bitrix_sync_at = Column(DateTime, nullable=True)  # Когда синхронизировано с Битрикс24
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -1673,6 +1699,23 @@ class BankTransaction(Base):
     notes = Column(Text, nullable=True)  # Примечания финансиста
     is_regular_payment = Column(Boolean, default=False, nullable=False, index=True)  # Регулярный платеж
     regular_payment_pattern_id = Column(Integer, nullable=True)  # ID паттерна регулярного платежа
+
+    # Расширенные поля (для детализации операций)
+    region = Column(Enum(RegionEnum), nullable=True, index=True)  # Регион
+    exhibition = Column(String(255), nullable=True)  # Выставка/мероприятие
+    document_type = Column(Enum(DocumentTypeEnum), nullable=True)  # Тип документа
+
+    # Детализация сумм по валютам и типам
+    amount_rub_credit = Column(Numeric(15, 2), nullable=True)  # Приход в рублях
+    amount_eur_credit = Column(Numeric(15, 2), nullable=True)  # Приход в евро
+    amount_rub_debit = Column(Numeric(15, 2), nullable=True)  # Расход в рублях
+    amount_eur_debit = Column(Numeric(15, 2), nullable=True)  # Расход в евро
+
+    # Временные метки
+    transaction_month = Column(Integer, nullable=True, index=True)  # Месяц операции (1-12)
+    transaction_year = Column(Integer, nullable=True, index=True)  # Год операции
+    expense_acceptance_month = Column(Integer, nullable=True)  # Месяц принятия к расходу (1-12)
+    expense_acceptance_year = Column(Integer, nullable=True)  # Год принятия к расходу
 
     # Обработка и аудит
     reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Кто проверил

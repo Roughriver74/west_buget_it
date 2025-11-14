@@ -99,8 +99,10 @@ const RevenuePlanDetailsPage = () => {
 
   if (!selectedDepartment || isPlanLoading || isVersionsLoading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin size="large" tip="Загрузка данных плана..." />
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <Spin size="large" tip="Загрузка данных плана...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }

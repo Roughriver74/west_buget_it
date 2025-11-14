@@ -551,6 +551,40 @@ def get_trends(
     )
 
 
+def is_finance_department(db: Session, department_id: int) -> bool:
+    """
+    Проверяет, является ли отдел финансовым.
+    Финансовый отдел должен видеть все заявки со всех отделов.
+
+    Проверка по названию или коду отдела (case-insensitive):
+    - "Финансы", "Финанс", "Finance"
+    - Код содержит "FIN", "FINANCE"
+    """
+    if not department_id:
+        return False
+
+    department = db.query(Department).filter(Department.id == department_id).first()
+    if not department:
+        return False
+
+    # Проверяем название и код отдела (case-insensitive)
+    name_lower = department.name.lower() if department.name else ""
+    code_upper = department.code.upper() if department.code else ""
+
+    finance_keywords = ["финанс", "finance", "фин"]
+
+    # Проверка названия
+    for keyword in finance_keywords:
+        if keyword in name_lower:
+            return True
+
+    # Проверка кода
+    if "FIN" in code_upper or "FINANCE" in code_upper:
+        return True
+
+    return False
+
+
 @router.get("/payment-calendar", response_model=PaymentCalendar)
 def get_payment_calendar(
     year: int = Query(default=None, description="Year for calendar"),
@@ -567,6 +601,7 @@ def get_payment_calendar(
 
     - USER: Can only see payment calendar for their own department
     - MANAGER/ADMIN: Can see payment calendar for all departments or filter by department
+    - Finance Department: Can see all expenses from all departments (special privilege)
     """
     # Use current year/month if not provided
     if not year:
@@ -588,6 +623,10 @@ def get_payment_calendar(
         dept_id = department_id if department_id else None
     else:
         dept_id = None
+
+    # Special case: If Finance department is selected, show all departments' data
+    if department_id and is_finance_department(db, department_id):
+        dept_id = None  # Show all departments
 
     # Get calendar data from forecast service
     forecast_service = PaymentForecastService(db)
@@ -675,6 +714,7 @@ def get_payments_by_day(
 
     - USER: Can only see payments for their own department
     - MANAGER/ADMIN: Can see payments for all departments or filter by department
+    - Finance Department: Can see all expenses from all departments (special privilege)
     """
     try:
         payment_date = datetime.fromisoformat(date)
@@ -693,6 +733,10 @@ def get_payments_by_day(
     elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         # MANAGER and ADMIN can filter by department or see all
         pass
+
+    # Special case: If Finance department is selected, show all departments' data
+    if department_id and is_finance_department(db, department_id):
+        department_id = None  # Show all departments
 
     forecast_service = PaymentForecastService(db)
     result = forecast_service.get_payments_by_day(

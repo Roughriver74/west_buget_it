@@ -57,8 +57,10 @@ export default function CreditPortfolioAnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
-        <Spin size="large" tip="Загрузка аналитики..." />
+      <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+        <Spin size="large" tip="Загрузка аналитики...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }
@@ -105,8 +107,8 @@ export default function CreditPortfolioAnalyticsPage() {
   const orgColumns = [
     {
       title: 'Организация',
-      dataIndex: 'organization',
-      key: 'organization',
+      dataIndex: 'name',
+      key: 'name',
       render: (text: string) => <strong>{text}</strong>,
     },
     {

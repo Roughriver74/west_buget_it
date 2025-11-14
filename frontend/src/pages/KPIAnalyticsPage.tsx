@@ -245,8 +245,10 @@ const KPIAnalyticsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" tip="Загрузка аналитики КПИ..." />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', padding: '100px 0' }}>
+        <Spin size="large" tip="Загрузка аналитики КПИ...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }

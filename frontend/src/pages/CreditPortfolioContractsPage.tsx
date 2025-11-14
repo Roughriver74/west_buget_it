@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Card, Table, Tag, Button, Space, Input, Select, Empty, Spin } from 'antd'
-import { SearchOutlined, FilterOutlined, FileTextOutlined } from '@ant-design/icons'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useMemo, useEffect } from 'react'
+import { Card, Table, Tag, Button, Space, Input, Select, Empty, Spin, Statistic, Pagination, Row, Col } from 'antd'
+import { SearchOutlined, FilterOutlined, FileTextOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import type { FinContract } from '@/api/creditPortfolio'
@@ -9,21 +9,54 @@ import dayjs from 'dayjs'
 
 const { Search } = Input
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
+const PAGE_SIZE = 20
+
 export default function CreditPortfolioContractsPage() {
   const { selectedDepartment } = useDepartment()
+  const queryClient = useQueryClient()
   const [searchText, setSearchText] = useState('')
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined)
   const [filterType, setFilterType] = useState<string | undefined>(undefined)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const { data: contracts, isLoading } = useQuery({
-    queryKey: ['credit-contracts', selectedDepartment?.id, filterActive],
+  // Debounce search and filters
+  const debouncedSearch = useDebounce(searchText, 300)
+  const debouncedFilterActive = useDebounce(filterActive, 300)
+  const debouncedFilterType = useDebounce(filterType, 300)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, debouncedFilterActive, debouncedFilterType])
+
+  const { data: contracts, isLoading, isError, refetch } = useQuery({
+    queryKey: ['credit-contracts', selectedDepartment?.id, debouncedFilterActive, debouncedFilterType],
     queryFn: () =>
       creditPortfolioApi.getContracts({
         department_id: selectedDepartment?.id,
-        is_active: filterActive,
-        contract_type: filterType,
+        is_active: debouncedFilterActive,
+        contract_type: debouncedFilterType,
       }),
     enabled: !!selectedDepartment,
+    placeholderData: keepPreviousData,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   })
 
   const { data: contractStats } = useQuery({
@@ -35,16 +68,39 @@ export default function CreditPortfolioContractsPage() {
     enabled: !!selectedDepartment,
   })
 
-  // Filter contracts by search text
-  const filteredContracts = contracts?.filter((contract: FinContract) => {
-    if (!searchText) return true
-    const searchLower = searchText.toLowerCase()
-    return (
-      contract.contract_number.toLowerCase().includes(searchLower) ||
-      contract.counterparty?.toLowerCase().includes(searchLower) ||
-      contract.contract_type?.toLowerCase().includes(searchLower)
-    )
-  })
+  // Filter contracts by search text and paginate
+  const filteredContracts = useMemo(() => {
+    if (!contracts) return []
+
+    let filtered = contracts
+
+    if (debouncedSearch) {
+      const searchLower = debouncedSearch.toLowerCase()
+      filtered = contracts.filter((contract: FinContract) =>
+        contract.contract_number.toLowerCase().includes(searchLower) ||
+        contract.counterparty?.toLowerCase().includes(searchLower) ||
+        contract.contract_type?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    return filtered
+  }, [contracts, debouncedSearch])
+
+  // Paginate data
+  const paginatedContracts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE
+    return filteredContracts.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [filteredContracts, currentPage])
+
+  // Calculate total sum for current page
+  const currentPageTotal = useMemo(() => {
+    return paginatedContracts.reduce((sum, contract) => {
+      // Sum total_paid if available, otherwise sum principal and interest
+      const total = contract.total_paid ||
+                   (contract.principal || 0) + (contract.interest || 0)
+      return sum + total
+    }, 0)
+  }, [paginatedContracts])
 
   const columns = [
     {
@@ -89,6 +145,16 @@ export default function CreditPortfolioContractsPage() {
       render: (text: string | null) => text || '—',
     },
     {
+      title: 'Всего выплачено',
+      dataIndex: 'total_paid',
+      key: 'total_paid',
+      align: 'right' as const,
+      render: (value: number | null) =>
+        value ? `${value.toLocaleString('ru-RU')} ₽` : '—',
+      sorter: (a: FinContract, b: FinContract) =>
+        (a.total_paid || 0) - (b.total_paid || 0),
+    },
+    {
       title: 'Статус',
       dataIndex: 'is_active',
       key: 'is_active',
@@ -97,63 +163,107 @@ export default function CreditPortfolioContractsPage() {
           {isActive ? 'Активен' : 'Закрыт'}
         </Tag>
       ),
-      filters: [
-        { text: 'Активные', value: true },
-        { text: 'Закрытые', value: false },
-      ],
-      onFilter: (value: any, record: FinContract) =>
-        record.is_active === value,
     },
   ]
 
-  if (isLoading) {
+  // Loading state
+  if (isLoading && !contracts) {
     return (
-      <div style={{ padding: 24, textAlign: 'center' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh',
+        padding: 24
+      }}>
         <Spin size="large" />
+        <p style={{ marginTop: 16, color: '#8c8c8c' }}>Загрузка договоров...</p>
+      </div>
+    )
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '60vh',
+        padding: 24,
+        gap: 16
+      }}>
+        <p style={{ color: '#8c8c8c', textAlign: 'center' }}>
+          Не удалось загрузить договоры. Попробуйте еще раз.
+        </p>
+        <Button
+          type="primary"
+          icon={<ReloadOutlined />}
+          onClick={() => refetch()}
+        >
+          Обновить
+        </Button>
       </div>
     )
   }
 
   return (
     <div style={{ padding: 24 }}>
-      <h1 style={{ marginBottom: 24 }}>Кредитный портфель - Договоры</h1>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Кредитный портфель - Договоры</h1>
+        <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
+          Детальная информация по кредитным договорам
+        </p>
+      </div>
 
       {/* Statistics Cards */}
-      {contractStats && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 16,
-            marginBottom: 24,
-            flexWrap: 'wrap',
-          }}
-        >
-          <Card style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 14, color: '#8c8c8c' }}>Всего договоров</div>
-              <div style={{ fontSize: 24, fontWeight: 'bold' }}>
-                {contractStats.total_count || 0}
-              </div>
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Всего договоров"
+              value={filteredContracts.length}
+              suffix={`/ ${contractStats?.total_count || 0}`}
+              prefix={<FileTextOutlined style={{ color: '#1890ff' }} />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Сумма на странице"
+              value={currentPageTotal}
+              precision={0}
+              suffix="₽"
+              prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+              {paginatedContracts.length} договоров из {filteredContracts.length}
             </div>
           </Card>
-          <Card style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 14, color: '#8c8c8c' }}>Активные</div>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>
-                {contractStats.active_count || 0}
-              </div>
-            </div>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Активные"
+              value={contractStats?.active_count || 0}
+              valueStyle={{ color: '#52c41a' }}
+            />
           </Card>
-          <Card style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 14, color: '#8c8c8c' }}>Закрытые</div>
-              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#8c8c8c' }}>
-                {contractStats.closed_count || 0}
-              </div>
-            </div>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card>
+            <Statistic
+              title="Закрытые"
+              value={contractStats?.closed_count || 0}
+              valueStyle={{ color: '#8c8c8c' }}
+            />
           </Card>
-        </div>
-      )}
+        </Col>
+      </Row>
 
       {/* Filters */}
       <Card style={{ marginBottom: 24 }}>
@@ -201,19 +311,46 @@ export default function CreditPortfolioContractsPage() {
 
       {/* Contracts Table */}
       <Card>
-        {!filteredContracts || filteredContracts.length === 0 ? (
-          <Empty description="Договоры не найдены" />
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredContracts}
-            rowKey="id"
-            pagination={{
-              pageSize: 20,
-              showSizeChanger: true,
-              showTotal: (total) => `Всего: ${total} договоров`,
-            }}
+        {filteredContracts.length === 0 ? (
+          <Empty
+            description={
+              debouncedSearch || debouncedFilterActive !== undefined || debouncedFilterType
+                ? 'Договоры не найдены по заданным фильтрам'
+                : 'Договоры не найдены'
+            }
           />
+        ) : (
+          <>
+            <Table
+              columns={columns}
+              dataSource={paginatedContracts}
+              rowKey="id"
+              pagination={false}
+              loading={isLoading}
+            />
+
+            {/* Pagination */}
+            {filteredContracts.length > PAGE_SIZE && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginTop: 24,
+                paddingTop: 16,
+                borderTop: '1px solid #f0f0f0'
+              }}>
+                <Pagination
+                  current={currentPage}
+                  pageSize={PAGE_SIZE}
+                  total={filteredContracts.length}
+                  onChange={setCurrentPage}
+                  showSizeChanger={false}
+                  showTotal={(total, range) =>
+                    `Страница ${currentPage} из ${Math.ceil(total / PAGE_SIZE)} (${range[0]}-${range[1]} из ${total} договоров)`
+                  }
+                />
+              </div>
+            )}
+          </>
         )}
       </Card>
     </div>

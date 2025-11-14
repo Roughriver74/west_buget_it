@@ -1,32 +1,37 @@
 import { useState } from 'react'
-import { Card, Row, Col, Statistic, Table, DatePicker, Button, Space, Spin } from 'antd'
+import { Card, Row, Col, Statistic, Table, Spin, Button, message, Space, Modal } from 'antd'
 import {
   DollarOutlined,
   RiseOutlined,
   FallOutlined,
   BankOutlined,
   FileTextOutlined,
+  DatabaseOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
-import dayjs, { Dayjs } from 'dayjs'
-
-const { RangePicker } = DatePicker
+import CreditPortfolioFilters, {
+  type CreditPortfolioFilterValues,
+} from '@/components/bank/CreditPortfolioFilters'
+import dayjs from 'dayjs'
 
 export default function CreditPortfolioPage() {
   const { selectedDepartment } = useDepartment()
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
   // Summary statistics
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['credit-portfolio-summary', selectedDepartment?.id, dateRange],
+    queryKey: ['credit-portfolio-summary', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getSummary({
         department_id: selectedDepartment?.id,
-        date_from: dateRange?.[0]?.format('YYYY-MM-DD'),
-        date_to: dateRange?.[1]?.format('YYYY-MM-DD'),
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
       }),
     enabled: !!selectedDepartment,
   })
@@ -43,12 +48,12 @@ export default function CreditPortfolioPage() {
 
   // Recent receipts
   const { data: receipts, isLoading: receiptsLoading } = useQuery({
-    queryKey: ['credit-receipts', selectedDepartment?.id, dateRange],
+    queryKey: ['credit-receipts', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getReceipts({
         department_id: selectedDepartment?.id,
-        date_from: dateRange?.[0]?.format('YYYY-MM-DD'),
-        date_to: dateRange?.[1]?.format('YYYY-MM-DD'),
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
         limit: 10,
       }),
     enabled: !!selectedDepartment,
@@ -56,12 +61,12 @@ export default function CreditPortfolioPage() {
 
   // Recent expenses
   const { data: expenses, isLoading: expensesLoading } = useQuery({
-    queryKey: ['credit-expenses', selectedDepartment?.id, dateRange],
+    queryKey: ['credit-expenses', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getExpenses({
         department_id: selectedDepartment?.id,
-        date_from: dateRange?.[0]?.format('YYYY-MM-DD'),
-        date_to: dateRange?.[1]?.format('YYYY-MM-DD'),
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
         limit: 10,
       }),
     enabled: !!selectedDepartment,
@@ -119,6 +124,59 @@ export default function CreditPortfolioPage() {
     },
   ]
 
+  // Load test data mutation
+  const loadTestDataMutation = useMutation({
+    mutationFn: (force: boolean) => creditPortfolioApi.loadTestData(force),
+    onSuccess: (data) => {
+      message.success(`Тестовые данные загружены успешно! ${data.data.organizations} организаций, ${data.data.contracts} договоров, ${data.data.receipts} поступлений, ${data.data.expenses} списаний`)
+      // Invalidate all credit portfolio queries
+      queryClient.invalidateQueries({ queryKey: ['credit-portfolio'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-contracts'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-expenses'] })
+    },
+    onError: (error: any) => {
+      if (error.response?.status === 400) {
+        // Test data already exists
+        Modal.confirm({
+          title: 'Тестовые данные уже существуют',
+          content: error.response?.data?.detail || 'Хотите перезагрузить тестовые данные? Это удалит существующие тестовые данные и создаст новые.',
+          okText: 'Да, перезагрузить',
+          cancelText: 'Отмена',
+          onOk: () => {
+            loadTestDataMutation.mutate(true) // Force reload
+          }
+        })
+      } else {
+        message.error(error.response?.data?.detail || 'Ошибка при загрузке тестовых данных')
+      }
+    }
+  })
+
+  const handleLoadTestData = () => {
+    Modal.confirm({
+      title: 'Загрузить тестовые данные?',
+      content: (
+        <div>
+          <p>Будут созданы тестовые данные:</p>
+          <ul>
+            <li>3 организации (Сбербанк, ВТБ, Альфа-Банк)</li>
+            <li>3 банковских счета</li>
+            <li>3 кредитных договора</li>
+            <li>Поступления за 2023-2025 годы</li>
+            <li>Списания (погашение кредитов) за 2023-2025</li>
+            <li>Детализацию платежей (тело/проценты)</li>
+          </ul>
+        </div>
+      ),
+      okText: 'Загрузить',
+      cancelText: 'Отмена',
+      onOk: () => {
+        loadTestDataMutation.mutate(false)
+      }
+    })
+  }
+
   const monthlyColumns = [
     {
       title: 'Месяц',
@@ -151,19 +209,33 @@ export default function CreditPortfolioPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ margin: 0 }}>Кредитный портфель - Аналитика</h1>
-        <Space>
-          <RangePicker
-            value={dateRange}
-            onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs])}
-            format="DD.MM.YYYY"
-            placeholder={['Дата от', 'Дата до']}
-          />
-          <Button icon={<ReloadOutlined />} onClick={() => setDateRange(null)}>
-            Сбросить
-          </Button>
-        </Space>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Кредитный портфель - Аналитика</h1>
+          <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
+            Обзор поступлений и списаний по кредитному портфелю
+          </p>
+        </div>
+        {user?.role === 'ADMIN' && (
+          <Space>
+            <Button
+              type="primary"
+              icon={<DatabaseOutlined />}
+              onClick={handleLoadTestData}
+              loading={loadTestDataMutation.isPending}
+            >
+              Загрузить тестовые данные
+            </Button>
+          </Space>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div style={{ marginBottom: 24 }}>
+        <CreditPortfolioFilters
+          onFilterChange={setFilters}
+          initialValues={filters}
+        />
       </div>
 
       {/* Summary Cards */}

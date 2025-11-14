@@ -384,8 +384,10 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: 48 }}>
-        <Spin size="large" tip="Загрузка данных планирования..." />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400, padding: 48 }}>
+        <Spin size="large" tip="Загрузка данных планирования...">
+          <div style={{ minHeight: 200 }} />
+        </Spin>
       </div>
     )
   }
