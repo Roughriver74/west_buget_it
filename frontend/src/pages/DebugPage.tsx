@@ -8,7 +8,7 @@ import {
   FileTextOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import { useDepartment } from '@/contexts/DepartmentContext'
 

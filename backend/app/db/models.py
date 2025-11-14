@@ -1772,6 +1772,7 @@ class FinOrganization(Base):
     department_rel = relationship("Department")
     receipts = relationship("FinReceipt", back_populates="org")
     expenses_fin = relationship("FinExpense", back_populates="org")
+    contracts = relationship("FinContract", back_populates="organization")
 
     # Unique constraint на name + department_id
     __table_args__ = (
@@ -1822,6 +1823,9 @@ class FinContract(Base):
     contract_type = Column(String(100))  # Кредит, Заем, и т.д.
     counterparty = Column(String(255))
 
+    # Foreign keys
+    organization_id = Column(Integer, ForeignKey("fin_organizations.id"), nullable=True, index=True)
+
     # Multi-tenancy
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
@@ -1832,6 +1836,7 @@ class FinContract(Base):
 
     # Relationships
     department_rel = relationship("Department")
+    organization = relationship("FinOrganization", back_populates="contracts")
     receipts = relationship("FinReceipt", back_populates="contract")
     expenses_fin = relationship("FinExpense", back_populates="contract")
 

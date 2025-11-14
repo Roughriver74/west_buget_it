@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Card, Table, Tag, Button, Space, Input, Select, Empty, Spin, Statistic, Pagination, Row, Col } from 'antd'
 import { SearchOutlined, FilterOutlined, FileTextOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons'
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import type { FinContract } from '@/api/creditPortfolio'
@@ -30,7 +30,6 @@ const PAGE_SIZE = 20
 
 export default function CreditPortfolioContractsPage() {
   const { selectedDepartment } = useDepartment()
-  const queryClient = useQueryClient()
   const [searchText, setSearchText] = useState('')
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined)
   const [filterType, setFilterType] = useState<string | undefined>(undefined)
@@ -94,10 +93,11 @@ export default function CreditPortfolioContractsPage() {
 
   // Calculate total sum for current page
   const currentPageTotal = useMemo(() => {
-    return paginatedContracts.reduce((sum, contract) => {
+    return paginatedContracts.reduce((sum: number, contract: FinContract) => {
       // Sum total_paid if available, otherwise sum principal and interest
-      const total = contract.total_paid ||
-                   (contract.principal || 0) + (contract.interest || 0)
+      const total =
+        contract.total_paid ||
+        (contract.principal || 0) + (contract.interest || 0)
       return sum + total
     }, 0)
   }, [paginatedContracts])

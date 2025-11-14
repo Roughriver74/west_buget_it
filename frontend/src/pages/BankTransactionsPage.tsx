@@ -11,7 +11,6 @@ import {
   Space,
   Modal,
   Upload,
-  message as messageStatic,
   Statistic,
   Row,
   Col,
@@ -25,7 +24,6 @@ import {
   ReloadOutlined,
   FilterOutlined,
   LinkOutlined,
-  TagsOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   DollarOutlined,
@@ -35,10 +33,8 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { bankTransactionsApi, categoriesApi } from '@/api'
-import type {
-  BankTransaction,
-  BankTransactionStatus,
-} from '@/types/bankTransaction'
+import type { BankTransaction, BankTransactionStatus } from '@/types/bankTransaction'
+import type { BudgetCategory } from '@/types'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
 import LoadingState from '@/components/common/LoadingState'
@@ -340,13 +336,13 @@ const BankTransactionsPage = () => {
                 placeholder="Выберите категорию"
                 allowClear
                 loading={!categories}
-                options={(categories?.items || []).map(cat => ({
+                options={(categories || []).map((cat: BudgetCategory) => ({
                   value: cat.id,
                   label: cat.name,
                 }))}
                 showSearch
                 filterOption={(input, option) =>
-                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
               />
             </Form.Item>
@@ -884,7 +880,7 @@ const BankTransactionsPage = () => {
                   filterOption={(input, option) =>
                     String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
-                  options={categories?.map((cat: { id: number; name: string }) => ({
+                  options={categories?.map((cat: BudgetCategory) => ({
                     value: cat.id,
                     label: cat.name,
                   }))}

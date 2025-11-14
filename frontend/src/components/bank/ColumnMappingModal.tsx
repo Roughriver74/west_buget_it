@@ -196,7 +196,7 @@ const ColumnMappingModal: React.FC<ColumnMappingModalProps> = ({
                 return <div style={{ fontSize: 12 }}>{String(value)}</div>
               },
             }))}
-            rowKey={(record, idx) => `preview-row-${idx}`}
+            rowKey={(_, idx) => `preview-row-${idx}`}
             pagination={false}
             size="small"
             scroll={{ x: columns.length * 150 }}

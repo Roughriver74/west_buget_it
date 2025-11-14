@@ -26,6 +26,9 @@ export interface FinContract {
   contract_number: string
   contract_date?: string
   contract_type?: string
+  principal?: number
+  interest?: number
+  total_paid?: number | null
   counterparty?: string
   is_active: boolean
   department_id: number

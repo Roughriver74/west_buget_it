@@ -96,14 +96,8 @@ class CreditPortfolioImporter:
         )
 
         if not bank:
-            # Try to get organization ID if org_name provided
-            org_id = None
-            if org_name:
-                org_id = self.get_or_create_organization(org_name)
-
             bank = FinBankAccount(
                 account_number=account_number,
-                organization_id=org_id,
                 department_id=self.department_id,
                 is_active=True
             )

@@ -932,7 +932,10 @@ async def get_monthly_stats(
     # Try to get from cache
     cached_result = cache_service.get(CACHE_NAMESPACE, cache_key)
     if cached_result is not None:
-        return [MonthlyStats(**item) for item in cached_result]
+        cleaned_result = [item for item in cached_result if item.get('month')]
+        if len(cleaned_result) != len(cached_result):
+            cache_service.set(CACHE_NAMESPACE, cache_key, cleaned_result)
+        return [MonthlyStats(**item) for item in cleaned_result]
 
     # Determine department_id based on role
     target_department_id = department_id
@@ -951,7 +954,10 @@ async def get_monthly_stats(
     receipts_query = db.query(
         receipts_month_col.label('month'),
         func.sum(FinReceipt.amount).label('receipts')
-    ).filter(FinReceipt.is_active == True)
+    ).filter(
+        FinReceipt.is_active == True,
+        FinReceipt.document_date.isnot(None)
+    )
 
     if target_department_id:
         receipts_query = receipts_query.filter(FinReceipt.department_id == target_department_id)
@@ -967,7 +973,10 @@ async def get_monthly_stats(
     expenses_query = db.query(
         expenses_month_col.label('month'),
         func.sum(FinExpense.amount).label('expenses')
-    ).filter(FinExpense.is_active == True)
+    ).filter(
+        FinExpense.is_active == True,
+        FinExpense.document_date.isnot(None)
+    )
 
     if target_department_id:
         expenses_query = expenses_query.filter(FinExpense.department_id == target_department_id)
@@ -994,7 +1003,9 @@ async def get_monthly_stats(
     # Format response
     data = []
     for row in results:
-        month_str = row.month.strftime('%Y-%m-%d') if row.month else None
+        if not row.month:
+            continue
+        month_str = row.month.strftime('%Y-%m-%d')
         receipts = float(row.receipts) if row.receipts else 0
         expenses = float(row.expenses) if row.expenses else 0
         net = receipts - expenses
