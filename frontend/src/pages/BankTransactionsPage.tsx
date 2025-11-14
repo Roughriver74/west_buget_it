@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Card,
@@ -18,12 +18,10 @@ import {
   Drawer,
   Form,
   Tooltip,
-  Popconfirm,
 } from 'antd'
 import {
   UploadOutlined,
   ReloadOutlined,
-  SearchOutlined,
   FilterOutlined,
   LinkOutlined,
   TagsOutlined,
@@ -34,12 +32,10 @@ import {
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { bankTransactionsApi, categoriesApi, expensesApi } from '@/api'
+import { bankTransactionsApi, categoriesApi } from '@/api'
 import type {
   BankTransaction,
   BankTransactionStatus,
-  BankTransactionType,
-  MatchingSuggestion,
 } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import LoadingState from '@/components/common/LoadingState'
