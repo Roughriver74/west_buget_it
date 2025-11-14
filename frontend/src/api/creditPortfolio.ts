@@ -90,6 +90,24 @@ export interface FinExpense {
   updated_at?: string
 }
 
+export interface FinExpenseDetail {
+  id: number
+  expense_operation_id: string
+  contract_number?: string
+  repayment_type?: string
+  settlement_account?: string
+  advance_account?: string
+  payment_type?: string
+  payment_amount?: number
+  settlement_rate?: number
+  settlement_amount?: number
+  vat_amount?: number
+  expense_amount?: number
+  vat_in_expense?: number
+  department_id: number
+  created_at: string
+}
+
 export interface CreditPortfolioSummary {
   total_receipts: number
   total_expenses: number
@@ -193,6 +211,18 @@ export const creditPortfolioApi = {
 
   getExpense: async (id: number): Promise<FinExpense> => {
     const { data } = await apiClient.get(`/credit-portfolio/expenses/${id}`)
+    return data
+  },
+
+  // ==================== Expense Details ====================
+  getExpenseDetails: async (params?: {
+    skip?: number
+    limit?: number
+    department_id?: number
+    date_from?: string
+    date_to?: string
+  }): Promise<FinExpenseDetail[]> => {
+    const { data } = await apiClient.get('/credit-portfolio/expense-details', { params })
     return data
   },
 

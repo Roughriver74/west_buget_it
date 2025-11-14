@@ -653,6 +653,43 @@ async def get_expense(
     return expense
 
 
+# ==================== Expense Details ====================
+
+@router.get("/expense-details", response_model=List[FinExpenseDetailInDB])
+async def list_expense_details(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1, le=20000),
+    department_id: Optional[int] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить детализированные записи списаний (тело/проценты)
+
+    Доступ: только MANAGER, ADMIN
+    """
+    if not check_finance_access(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    query = db.query(FinExpenseDetail).join(
+        FinExpense, FinExpense.operation_id == FinExpenseDetail.expense_operation_id
+    )
+
+    if department_id:
+        query = query.filter(FinExpenseDetail.department_id == department_id)
+
+    if date_from:
+        query = query.filter(FinExpense.document_date >= date_from)
+
+    if date_to:
+        query = query.filter(FinExpense.document_date <= date_to)
+
+    details = query.order_by(FinExpense.document_date.desc()).offset(skip).limit(limit).all()
+    return details
+
+
 @router.get("/expenses/stats/summary")
 async def get_expenses_summary(
     department_id: Optional[int] = None,
