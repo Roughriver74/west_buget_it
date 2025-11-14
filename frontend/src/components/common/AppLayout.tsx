@@ -192,11 +192,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 						{
 							key: '/credit-portfolio',
 							icon: <DashboardOutlined />,
-							label: <Link to='/credit-portfolio'>Аналитика</Link>,
+							label: <Link to='/credit-portfolio'>Обзор</Link>,
+						},
+						{
+							key: '/credit-portfolio/analytics',
+							icon: <FundViewOutlined />,
+							label: <Link to='/credit-portfolio/analytics'>Расширенная аналитика</Link>,
+						},
+						{
+							key: '/credit-portfolio/compare',
+							icon: <LineChartOutlined />,
+							label: <Link to='/credit-portfolio/compare'>Сравнение периодов</Link>,
 						},
 						{
 							key: '/credit-portfolio/kpi',
-							icon: <FundViewOutlined />,
+							icon: <TrophyOutlined />,
 							label: <Link to='/credit-portfolio/kpi'>KPI метрики</Link>,
 						},
 						{

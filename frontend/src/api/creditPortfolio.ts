@@ -229,6 +229,48 @@ export const creditPortfolioApi = {
     return data
   },
 
+  // ==================== Advanced Analytics ====================
+  getMonthlyEfficiency: async (params?: {
+    department_id?: number
+    date_from?: string
+    date_to?: string
+    organization_id?: number
+    bank_account_id?: number
+  }) => {
+    const { data } = await apiClient.get('/credit-portfolio/analytics/monthly-efficiency', { params })
+    return data
+  },
+
+  getOrgEfficiency: async (params?: {
+    department_id?: number
+    date_from?: string
+    date_to?: string
+    organization_id?: number
+  }) => {
+    const { data } = await apiClient.get('/credit-portfolio/analytics/org-efficiency', { params })
+    return data
+  },
+
+  getCashflowMonthly: async (params?: {
+    department_id?: number
+    date_from?: string
+    date_to?: string
+    organization_id?: number
+  }) => {
+    const { data } = await apiClient.get('/credit-portfolio/analytics/cashflow-monthly', { params })
+    return data
+  },
+
+  getYearlyComparison: async (params?: {
+    department_id?: number
+    date_from?: string
+    date_to?: string
+    exclude_contracts?: string
+  }) => {
+    const { data } = await apiClient.get('/credit-portfolio/analytics/yearly-comparison', { params })
+    return data
+  },
+
   // ==================== Import ====================
   triggerImport: async () => {
     const { data } = await apiClient.post('/credit-portfolio/import/trigger')

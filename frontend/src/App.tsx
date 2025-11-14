@@ -80,6 +80,8 @@ const CreditPortfolioPage = lazy(() => import('./pages/CreditPortfolioPage'))
 const CreditPortfolioKPIPage = lazy(() => import('./pages/CreditPortfolioKPIPage'))
 const CreditPortfolioCashFlowPage = lazy(() => import('./pages/CreditPortfolioCashFlowPage'))
 const CreditPortfolioContractsPage = lazy(() => import('./pages/CreditPortfolioContractsPage'))
+const CreditPortfolioComparePage = lazy(() => import('./pages/CreditPortfolioComparePage'))
+const CreditPortfolioAnalyticsPage = lazy(() => import('./pages/CreditPortfolioAnalyticsPage'))
 
 function App() {
   return (
@@ -158,6 +160,22 @@ function App() {
                             element={
                               <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
                                 <CreditPortfolioContractsPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/credit-portfolio/compare"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioComparePage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/credit-portfolio/analytics"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioAnalyticsPage />
                               </ProtectedRoute>
                             }
                           />
