@@ -34,6 +34,7 @@ export const analyticsApi = {
   getPaymentCalendar: async (params: {
     year?: number
     month?: number
+    department_id?: number
     category_id?: number
     organization_id?: number
   }): Promise<PaymentCalendar> => {
@@ -43,6 +44,7 @@ export const analyticsApi = {
 
   getPaymentsByDay: async (params: {
     date: string
+    department_id?: number
     category_id?: number
     organization_id?: number
   }): Promise<PaymentsByDay> => {

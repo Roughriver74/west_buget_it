@@ -3715,6 +3715,14 @@ export type components = {
       total_amount: number;
       /** Payment Count */
       payment_count: number;
+      /** Planned Amount */
+      planned_amount?: number;
+      /** Planned Count */
+      planned_count?: number;
+      /** Baseline Amount */
+      baseline_amount?: number;
+      /** Forecast Amount */
+      forecast_amount?: number;
     };
     /** PaymentDetail */
     PaymentDetail: {

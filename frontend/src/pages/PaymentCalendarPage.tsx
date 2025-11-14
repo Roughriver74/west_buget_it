@@ -18,7 +18,7 @@ import {
   Tooltip,
   Tag,
 } from 'antd'
-import { CalendarOutlined, DollarOutlined, FileTextOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { CalendarOutlined, DollarOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi, forecastApi } from '@/api'
 import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types'
@@ -159,7 +159,7 @@ const PaymentCalendarPage = () => {
         )}
 
         {/* Planned payments (PENDING expenses) */}
-        {payment.planned_amount && payment.planned_count ? (
+        {payment?.planned_amount && payment?.planned_count ? (
           <Tooltip title={`${payment.planned_count} запланированных платежей на сумму ${formatCurrency(payment.planned_amount)} (заявки к оплате)`}>
             <div style={{
               marginTop: payment.total_amount > 0 ? 4 : 0,
@@ -183,7 +183,7 @@ const PaymentCalendarPage = () => {
         {forecast && (
           <Tooltip title={`${forecast.count} прогнозных расходов на сумму ${formatCurrency(forecast.total)} (автоматический расчет)`}>
             <div style={{
-              marginTop: payment || payment.planned_amount ? 4 : 0,
+              marginTop: (payment && (payment.total_amount > 0 || (payment.planned_amount && payment.planned_amount > 0))) ? 4 : 0,
               padding: '2px 4px',
               backgroundColor: '#e6f7ff',
               borderRadius: '2px',
