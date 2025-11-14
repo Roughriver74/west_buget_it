@@ -75,6 +75,12 @@ const RevenueAnalyticsPage = lazy(() => import('./pages/RevenueAnalyticsPage'))
 // Bank Transactions module
 const BankTransactionsPage = lazy(() => import('./pages/BankTransactionsPage'))
 
+// Credit Portfolio module
+const CreditPortfolioPage = lazy(() => import('./pages/CreditPortfolioPage'))
+const CreditPortfolioKPIPage = lazy(() => import('./pages/CreditPortfolioKPIPage'))
+const CreditPortfolioCashFlowPage = lazy(() => import('./pages/CreditPortfolioCashFlowPage'))
+const CreditPortfolioContractsPage = lazy(() => import('./pages/CreditPortfolioContractsPage'))
+
 function App() {
   return (
     <ThemeProvider>
@@ -118,6 +124,40 @@ function App() {
                             element={
                               <ProtectedRoute requiredRoles={['ADMIN', 'FOUNDER', 'MANAGER', 'USER']}>
                                 <BankTransactionsPage />
+                              </ProtectedRoute>
+                            }
+                          />
+
+                          {/* Credit Portfolio - MANAGER, ADMIN, ACCOUNTANT only */}
+                          <Route
+                            path="/credit-portfolio"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/credit-portfolio/kpi"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioKPIPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/credit-portfolio/cash-flow"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioCashFlowPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/credit-portfolio/contracts"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+                                <CreditPortfolioContractsPage />
                               </ProtectedRoute>
                             }
                           />

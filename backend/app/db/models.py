@@ -1705,3 +1705,265 @@ class BankTransaction(Base):
 
     def __repr__(self):
         return f"<BankTransaction {self.transaction_date} {self.counterparty_name} {self.amount}>"
+
+
+# ==================== Credit Portfolio Models (from West Fin DWH) ====================
+
+class FinOrganization(Base):
+    """Model for credit portfolio organizations (Организации холдинга)"""
+    __tablename__ = "fin_organizations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, index=True)
+    inn = Column(String(20))
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    receipts = relationship("FinReceipt", back_populates="org")
+    expenses_fin = relationship("FinExpense", back_populates="org")
+
+    # Unique constraint на name + department_id
+    __table_args__ = (
+        Index('ix_fin_organizations_name_dept', 'name', 'department_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<FinOrganization(id={self.id}, name='{self.name}')>"
+
+
+class FinBankAccount(Base):
+    """Model for bank accounts for credit portfolio (Банковские счета)"""
+    __tablename__ = "fin_bank_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_number = Column(String(255), nullable=False, index=True)
+    bank_name = Column(String(255))
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    receipts = relationship("FinReceipt", back_populates="bank")
+    expenses_fin = relationship("FinExpense", back_populates="bank")
+
+    # Unique constraint на account_number + department_id
+    __table_args__ = (
+        Index('ix_fin_bank_accounts_number_dept', 'account_number', 'department_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<FinBankAccount(id={self.id}, account='{self.account_number}')>"
+
+
+class FinContract(Base):
+    """Model for credit contracts (Кредитные договоры)"""
+    __tablename__ = "fin_contracts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    contract_number = Column(String(255), nullable=False, index=True)
+    contract_date = Column(Date, index=True)
+    contract_type = Column(String(100))  # Кредит, Заем, и т.д.
+    counterparty = Column(String(255))
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    receipts = relationship("FinReceipt", back_populates="contract")
+    expenses_fin = relationship("FinExpense", back_populates="contract")
+
+    # Unique constraint на contract_number + department_id
+    __table_args__ = (
+        Index('ix_fin_contracts_number_dept', 'contract_number', 'department_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<FinContract(id={self.id}, number='{self.contract_number}')>"
+
+
+class FinReceipt(Base):
+    """Model for credit receipts / поступления кредитов"""
+    __tablename__ = "fin_receipts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operation_id = Column(String(255), nullable=False, index=True)
+
+    # Foreign keys
+    organization_id = Column(Integer, ForeignKey("fin_organizations.id"), index=True, nullable=False)
+    bank_account_id = Column(Integer, ForeignKey("fin_bank_accounts.id"), index=True)
+    contract_id = Column(Integer, ForeignKey("fin_contracts.id"), index=True)
+
+    # Transaction details
+    operation_type = Column(String(255))
+    accounting_account = Column(String(50))
+    document_number = Column(String(255))
+    document_date = Column(Date, index=True)
+    payer = Column(String(255), index=True)
+    payer_account = Column(String(255))
+    settlement_account = Column(String(100))
+    contract_date = Column(Date)
+    currency = Column(String(10), default="RUB")
+    amount = Column(Numeric(15, 2), nullable=False)
+    commission = Column(Numeric(15, 2))
+    payment_purpose = Column(Text)
+    responsible_person = Column(String(255))
+    comment = Column(Text)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    org = relationship("FinOrganization", back_populates="receipts")
+    bank = relationship("FinBankAccount", back_populates="receipts")
+    contract = relationship("FinContract", back_populates="receipts")
+
+    # Unique constraint на operation_id + department_id
+    __table_args__ = (
+        Index('ix_fin_receipts_operation_dept', 'operation_id', 'department_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<FinReceipt(id={self.id}, operation_id='{self.operation_id}', amount={self.amount})>"
+
+
+class FinExpense(Base):
+    """Model for credit expenses / списания по кредитам"""
+    __tablename__ = "fin_expenses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operation_id = Column(String(255), nullable=False, index=True)
+
+    # Foreign keys
+    organization_id = Column(Integer, ForeignKey("fin_organizations.id"), index=True, nullable=False)
+    bank_account_id = Column(Integer, ForeignKey("fin_bank_accounts.id"), index=True)
+    contract_id = Column(Integer, ForeignKey("fin_contracts.id"), index=True)
+
+    # Transaction details
+    operation_type = Column(String(255))
+    accounting_account = Column(String(50))
+    document_number = Column(String(255))
+    document_date = Column(Date, index=True)
+    recipient = Column(String(255), index=True)
+    recipient_account = Column(String(255))
+    debit_account = Column(String(100))
+    contract_date = Column(Date)
+    currency = Column(String(10), default="RUB")
+    amount = Column(Numeric(15, 2), nullable=False)
+    expense_article = Column(String(255), index=True)
+    payment_purpose = Column(Text)
+    responsible_person = Column(String(255))
+    comment = Column(Text)
+    tax_period = Column(String(10))
+    unconfirmed_by_bank = Column(Boolean, default=False)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    department_rel = relationship("Department")
+    org = relationship("FinOrganization", back_populates="expenses_fin")
+    bank = relationship("FinBankAccount", back_populates="expenses_fin")
+    contract = relationship("FinContract", back_populates="expenses_fin")
+    details = relationship("FinExpenseDetail", back_populates="expense", cascade="all, delete-orphan")
+
+    # Unique constraint на operation_id + department_id
+    __table_args__ = (
+        Index('ix_fin_expenses_operation_dept', 'operation_id', 'department_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<FinExpense(id={self.id}, operation_id='{self.operation_id}', amount={self.amount})>"
+
+
+class FinExpenseDetail(Base):
+    """Model for expense details / расшифровка платежей (тело/проценты)"""
+    __tablename__ = "fin_expense_details"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    expense_operation_id = Column(
+        String(255),
+        ForeignKey("fin_expenses.operation_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    contract_number = Column(String(255), index=True)
+    repayment_type = Column(String(100))
+    settlement_account = Column(String(100), index=True)
+    advance_account = Column(String(100))
+    payment_type = Column(String(255), index=True)  # Тело кредита / Проценты
+    payment_amount = Column(Numeric(15, 2))
+    settlement_rate = Column(Numeric(15, 6), default=1)
+    settlement_amount = Column(Numeric(15, 2))
+    vat_amount = Column(Numeric(15, 2))
+    expense_amount = Column(Numeric(15, 2))
+    vat_in_expense = Column(Numeric(15, 2))
+
+    # Multi-tenancy (наследуется от родительского expense)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+
+    # Relationships
+    department_rel = relationship("Department")
+    expense = relationship("FinExpense", back_populates="details")
+
+    def __repr__(self):
+        return f"<FinExpenseDetail(id={self.id}, expense_operation_id='{self.expense_operation_id}')>"
+
+
+class FinImportLog(Base):
+    """Model for import logs / журнал импорта из 1С"""
+    __tablename__ = "fin_import_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    import_date = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    source_file = Column(String(255), index=True)
+    table_name = Column(String(50), index=True)
+    rows_inserted = Column(Integer, default=0)
+    rows_updated = Column(Integer, default=0)
+    rows_failed = Column(Integer, default=0)
+    status = Column(String(50), index=True)  # SUCCESS, FAILED, PARTIAL
+    error_message = Column(Text)
+    processed_by = Column(String(100))
+    processing_time_seconds = Column(Numeric(10, 2))
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<FinImportLog(id={self.id}, source_file='{self.source_file}', status='{self.status}')>"

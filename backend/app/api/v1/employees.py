@@ -275,15 +275,11 @@ async def update_employee(
     db: Session = Depends(get_db)
 ):
     """
-    Update an employee (ADMIN/MANAGER only)
-    """
-    # Only ADMIN and MANAGER can update employees
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators and managers can update employees"
-        )
+    Update an employee
 
+    - **USER**: Can update employees only in their own department
+    - **MANAGER/ADMIN**: Can update employees in any department
+    """
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(
@@ -448,15 +444,11 @@ async def add_salary_history(
     db: Session = Depends(get_db)
 ):
     """
-    Add a salary history record (ADMIN/MANAGER only)
-    """
-    # Only ADMIN and MANAGER can add salary history
-    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators and managers can add salary history"
-        )
+    Add a salary history record
 
+    - **USER**: Can add salary history only for employees in their own department
+    - **MANAGER/ADMIN**: Can add salary history for any employee
+    """
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if not employee:
         raise HTTPException(

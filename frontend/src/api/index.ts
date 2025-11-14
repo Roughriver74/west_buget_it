@@ -21,3 +21,4 @@ export { revenueApi, revenueStreamsApi, revenueCategoriesApi, revenueActualsApi 
 export { invoiceProcessingApi } from './invoiceProcessing'
 export { founderDashboardApi } from './founderDashboard'
 export { bankTransactionsApi } from './bankTransactions'
+export { creditPortfolioApi } from './creditPortfolio'

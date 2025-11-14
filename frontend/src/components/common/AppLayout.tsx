@@ -24,6 +24,10 @@ import {
   BulbFilled,
   KeyOutlined,
   TrophyOutlined,
+  CreditCardOutlined,
+  FundViewOutlined,
+  AreaChartOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -153,11 +157,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					label: <Link to='/expenses'>Заявки</Link>,
 				},
 				{
-					key: '/bank-transactions',
-					icon: <BankOutlined />,
-					label: <Link to='/bank-transactions'>Банковские операции</Link>,
-				},
-				{
 					key: '/budget',
 					icon: <DollarOutlined />,
 					label: <Link to='/budget'>Бюджет</Link>,
@@ -171,6 +170,46 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/budget/plan',
 					icon: <DollarOutlined />,
 					label: <Link to='/budget/plan'>Год в целом</Link>,
+				},
+			],
+		},
+
+		{
+			key: 'finance-submenu',
+			icon: <DollarCircleOutlined />,
+			label: 'Финансы',
+			children: [
+				{
+					key: '/bank-transactions',
+					icon: <BankOutlined />,
+					label: <Link to='/bank-transactions'>Банковские операции</Link>,
+				},
+				{
+					key: 'credit-portfolio-submenu',
+					icon: <CreditCardOutlined />,
+					label: 'Кредитный портфель',
+					children: [
+						{
+							key: '/credit-portfolio',
+							icon: <DashboardOutlined />,
+							label: <Link to='/credit-portfolio'>Аналитика</Link>,
+						},
+						{
+							key: '/credit-portfolio/kpi',
+							icon: <FundViewOutlined />,
+							label: <Link to='/credit-portfolio/kpi'>KPI метрики</Link>,
+						},
+						{
+							key: '/credit-portfolio/cash-flow',
+							icon: <AreaChartOutlined />,
+							label: <Link to='/credit-portfolio/cash-flow'>Денежные потоки</Link>,
+						},
+						{
+							key: '/credit-portfolio/contracts',
+							icon: <FileSearchOutlined />,
+							label: <Link to='/credit-portfolio/contracts'>Договоры</Link>,
+						},
+					],
 				},
 			],
 		},

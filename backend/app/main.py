@@ -11,7 +11,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions, credit_portfolio
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -218,6 +218,9 @@ app.include_router(external_invoice_integration.router, prefix=f"{settings.API_P
 
 # Bank Transactions (Банковские операции)
 app.include_router(bank_transactions.router, prefix=f"{settings.API_PREFIX}/bank-transactions", tags=["Bank Transactions"])
+
+# Credit Portfolio (Кредитный портфель)
+app.include_router(credit_portfolio.router, prefix=f"{settings.API_PREFIX}/credit-portfolio", tags=["Credit Portfolio"])
 
 
 @app.on_event("startup")
