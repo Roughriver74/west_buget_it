@@ -131,6 +131,13 @@ class Settings(BaseSettings):
     C1_USERNAME: str = "api_user"
     C1_PASSWORD: str = "api_password"
 
+    # Credit Portfolio FTP (для автоматического импорта из 1С)
+    CREDIT_PORTFOLIO_FTP_HOST: str = "floppisw.beget.tech"
+    CREDIT_PORTFOLIO_FTP_USER: str = "floppisw_fin"
+    CREDIT_PORTFOLIO_FTP_PASSWORD: str = "G!5zb1FiL8!d"
+    CREDIT_PORTFOLIO_FTP_REMOTE_DIR: str = "/"
+    CREDIT_PORTFOLIO_FTP_LOCAL_DIR: str = "data/credit_portfolio"
+
     @field_validator('SECRET_KEY')
     @classmethod
     def validate_secret_key(cls, v: str) -> str:

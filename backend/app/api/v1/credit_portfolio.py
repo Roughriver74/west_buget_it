@@ -2,11 +2,14 @@
 Credit Portfolio API endpoints
 Управление кредитным портфелем
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import date, datetime
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.db.models import (
@@ -418,3 +421,70 @@ async def list_import_logs(
 
     logs = query.order_by(FinImportLog.import_date.desc()).offset(skip).limit(limit).all()
     return logs
+
+
+# ==================== Import from FTP ====================
+
+@router.post("/import/trigger", status_code=status.HTTP_200_OK)
+async def trigger_ftp_import(
+    department_id: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Запустить автоматический импорт данных из 1С через FTP
+
+    Процесс:
+    1. Подключение к FTP серверу
+    2. Загрузка XLSX файлов
+    3. Парсинг файлов (поступления, списания, расшифровка)
+    4. Импорт в БД с UPSERT логикой
+    5. Авто-создание организаций, счетов, договоров
+
+    Доступ: только MANAGER, ADMIN, ACCOUNTANT
+    """
+    if not check_finance_access(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    # Determine department_id (общий FTP для всех отделов по умолчанию)
+    target_department_id = department_id if department_id else current_user.department_id
+    if not target_department_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Department ID must be specified"
+        )
+
+    try:
+        from app.services.credit_portfolio_ftp import download_credit_portfolio_files
+        from app.services.credit_portfolio_importer import CreditPortfolioImporter
+
+        # Step 1: Download files from FTP
+        downloaded_files = download_credit_portfolio_files()
+
+        if not downloaded_files:
+            return {
+                "success": False,
+                "message": "No files downloaded from FTP server",
+                "files_processed": 0,
+                "files_failed": 0
+            }
+
+        # Step 2: Import files
+        importer = CreditPortfolioImporter(db, target_department_id)
+        summary = importer.import_files(downloaded_files)
+
+        return {
+            "success": summary["success"] > 0,
+            "message": f"Import completed: {summary['success']}/{summary['total']} files imported",
+            "files_processed": summary["success"],
+            "files_failed": summary["failed"],
+            "total_files": summary["total"],
+            "department_id": target_department_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error during FTP import: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Import failed: {str(e)}"
+        )

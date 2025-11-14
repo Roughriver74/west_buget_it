@@ -225,16 +225,32 @@ app.include_router(credit_portfolio.router, prefix=f"{settings.API_PREFIX}/credi
 
 @app.on_event("startup")
 async def startup_event():
-    """Log application startup"""
+    """Log application startup and start background scheduler"""
     log_info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}", "Startup")
     log_info(f"API Documentation: /docs", "Startup")
     log_info(f"API Prefix: {settings.API_PREFIX}", "Startup")
 
+    # Start background scheduler for automated tasks
+    try:
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+        log_info("Background scheduler started", "Startup")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Log application shutdown"""
+    """Log application shutdown and stop background scheduler"""
     log_info(f"Shutting down {settings.APP_NAME}", "Shutdown")
+
+    # Stop background scheduler
+    try:
+        from app.services.scheduler import stop_scheduler
+        stop_scheduler()
+        log_info("Background scheduler stopped", "Shutdown")
+    except Exception as e:
+        logger.error(f"Failed to stop scheduler: {e}")
 
 
 @app.get("/")

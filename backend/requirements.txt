@@ -36,3 +36,6 @@ openai==1.54.0
 
 # Логирование
 loguru==0.7.2
+
+# Background Scheduler для автоматических задач
+APScheduler==3.10.4
