@@ -40,7 +40,6 @@ import type {
   BankTransactionStatus,
   BankTransactionType,
   MatchingSuggestion,
-  CategorySuggestion,
 } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import LoadingState from '@/components/common/LoadingState'
@@ -108,7 +107,7 @@ const BankTransactionsPage = () => {
   // Fetch categories
   const { data: categories } = useQuery({
     queryKey: ['categories', selectedDepartment?.id],
-    queryFn: () => categoriesApi.getCategories({ department_id: selectedDepartment?.id }),
+    queryFn: () => categoriesApi.getAll({ department_id: selectedDepartment?.id, is_active: true }),
   })
 
   // Fetch matching expenses
@@ -618,9 +617,9 @@ const BankTransactionsPage = () => {
                   placeholder="Выберите категорию"
                   optionFilterProp="children"
                   filterOption={(input, option) =>
-                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
-                  options={categories?.map((cat) => ({
+                  options={categories?.map((cat: { id: number; name: string }) => ({
                     value: cat.id,
                     label: cat.name,
                   }))}
