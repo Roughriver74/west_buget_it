@@ -76,6 +76,7 @@ const PaymentCalendarPage = () => {
       analyticsApi.getPaymentCalendar({
         year: currentYear,
         month: currentMonth,
+        department_id: selectedDepartment?.id,
         category_id: categoryId,
       }),
   })
@@ -216,6 +217,7 @@ const PaymentCalendarPage = () => {
         if (payment) {
           const result = await analyticsApi.getPaymentsByDay({
             date: dateStr,
+            department_id: selectedDepartment?.id,
             category_id: categoryId,
           })
           dayData = result.payments
