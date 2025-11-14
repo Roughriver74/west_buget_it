@@ -211,6 +211,24 @@ from .invoice_processing import (
     ProcessedInvoiceUpdate,
     InvoiceProcessingStats,
 )
+from .bank_transaction import (
+    BankTransactionBase,
+    BankTransactionCreate,
+    BankTransactionUpdate,
+    BankTransactionCategorize,
+    BankTransactionLink,
+    BankTransactionInDB,
+    BankTransactionWithRelations,
+    BankTransactionList,
+    BankTransactionStats,
+    BankTransactionImportResult,
+    MatchingSuggestion,
+    CategorySuggestion,
+    RegularPaymentPattern,
+    BulkCategorizeRequest,
+    BulkLinkRequest,
+    BulkStatusUpdateRequest,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -428,4 +446,21 @@ __all__ = [
     "ProcessedInvoiceDetail",
     "ProcessedInvoiceUpdate",
     "InvoiceProcessingStats",
+    # Bank Transactions
+    "BankTransactionBase",
+    "BankTransactionCreate",
+    "BankTransactionUpdate",
+    "BankTransactionCategorize",
+    "BankTransactionLink",
+    "BankTransactionInDB",
+    "BankTransactionWithRelations",
+    "BankTransactionList",
+    "BankTransactionStats",
+    "BankTransactionImportResult",
+    "MatchingSuggestion",
+    "CategorySuggestion",
+    "RegularPaymentPattern",
+    "BulkCategorizeRequest",
+    "BulkLinkRequest",
+    "BulkStatusUpdateRequest",
 ]

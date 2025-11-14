@@ -148,7 +148,7 @@ def get_scenarios(
                 detail="User has no assigned department"
             )
         query = query.filter(BudgetScenario.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         if department_id is not None:
             query = query.filter(BudgetScenario.department_id == department_id)
 
@@ -308,7 +308,7 @@ def get_versions(
                 detail="User has no assigned department"
             )
         query = query.filter(BudgetVersion.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         if department_id is not None:
             query = query.filter(BudgetVersion.department_id == department_id)
 

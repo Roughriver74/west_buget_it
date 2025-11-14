@@ -1520,7 +1520,7 @@ async def get_payroll_budget_summary(
     # Apply department filter based on role
     if current_user.role == UserRoleEnum.USER:
         query = query.filter(PayrollPlan.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         if department_id:
             query = query.filter(PayrollPlan.department_id == department_id)
 
@@ -1635,7 +1635,7 @@ async def register_payroll_payment(
     # Apply department filter based on role
     if current_user.role == UserRoleEnum.USER:
         query = query.filter(PayrollPlan.department_id == current_user.department_id)
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         if department_id:
             query = query.filter(PayrollPlan.department_id == department_id)
 
@@ -1941,7 +1941,7 @@ async def get_salary_distribution(
     dept_filter = None
     if current_user.role == UserRoleEnum.USER:
         dept_filter = current_user.department_id
-    elif current_user.role in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+    elif current_user.role in [UserRoleEnum.FOUNDER, UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
         if department_id:
             dept_filter = department_id
 
