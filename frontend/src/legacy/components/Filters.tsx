@@ -39,7 +39,7 @@ export default function Filters() {
     queryFn: () =>
       creditPortfolioApi.getOrganizations({
         department_id: departmentId,
-        limit: 1000,
+        limit: 10000,
       }),
     enabled: true,
   })
@@ -52,7 +52,7 @@ export default function Filters() {
     queryFn: () =>
       creditPortfolioApi.getBankAccounts({
         department_id: departmentId,
-        limit: 1000,
+        limit: 10000,
       }),
     enabled: true,
   })
@@ -65,7 +65,7 @@ export default function Filters() {
     queryFn: () =>
       creditPortfolioApi.getContracts({
         department_id: departmentId,
-        limit: 2000,
+        limit: 20000,
       }),
     enabled: true,
   })

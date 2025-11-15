@@ -19,6 +19,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
+import ExportButton from '@/legacy/components/ExportButton'
 
 export default function CreditPortfolioAnalyticsPage() {
 	const { selectedDepartment } = useDepartment()
@@ -210,9 +211,24 @@ export default function CreditPortfolioAnalyticsPage() {
 
 	return (
 		<div style={{ padding: 24 }}>
-			<h1 style={{ marginBottom: 24 }}>
-				Кредитный портфель - Расширенная аналитика
-			</h1>
+			<div
+				style={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					marginBottom: 24,
+				}}
+			>
+				<h1 style={{ margin: 0 }}>
+					Кредитный портфель - Расширенная аналитика
+				</h1>
+				<ExportButton
+					targetId='analytics-content'
+					fileName='credit-analytics'
+					data={orgEfficiency || []}
+				/>
+			</div>
+			<div id='analytics-content'>
 
 			{/* KPI Metrics */}
 			<Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -382,6 +398,7 @@ export default function CreditPortfolioAnalyticsPage() {
 					</Col>
 				</Row>
 			</Card>
+			</div>
 		</div>
 	)
 }

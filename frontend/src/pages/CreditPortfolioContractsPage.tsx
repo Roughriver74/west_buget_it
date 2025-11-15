@@ -6,6 +6,7 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import type { FinContract } from '@/api/creditPortfolio'
 import dayjs from 'dayjs'
+import ExportButton from '@/legacy/components/ExportButton'
 
 const { Search } = Input
 
@@ -211,12 +212,16 @@ export default function CreditPortfolioContractsPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Кредитный портфель - Договоры</h1>
-        <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
-          Детальная информация по кредитным договорам
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Кредитный портфель - Договоры</h1>
+          <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
+            Детальная информация по кредитным договорам
+          </p>
+        </div>
+        <ExportButton targetId="contracts-content" fileName="credit-contracts" data={filteredContracts} />
       </div>
+      <div id="contracts-content">
 
       {/* Statistics Cards */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
@@ -353,6 +358,7 @@ export default function CreditPortfolioContractsPage() {
           </>
         )}
       </Card>
+      </div>
     </div>
   )
 }

@@ -26,6 +26,7 @@ import { creditPortfolioApi } from '@/api/creditPortfolio'
 import CreditPortfolioFilters, {
   type CreditPortfolioFilterValues,
 } from '@/components/bank/CreditPortfolioFilters'
+import ExportButton from '@/legacy/components/ExportButton'
 
 interface MonthlyCashFlow {
   month: string
@@ -191,11 +192,14 @@ export default function CreditPortfolioCashFlowPage() {
   return (
     <div style={{ padding: 24 }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0 }}>Анализ денежных потоков</h1>
-        <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
-          Cash Flow Analysis - движение средств
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Анализ денежных потоков</h1>
+          <p style={{ margin: '8px 0 0 0', color: '#8c8c8c' }}>
+            Cash Flow Analysis - движение средств
+          </p>
+        </div>
+        <ExportButton targetId="cashflow-content" fileName="cash-flow-analysis" data={monthlyData} />
       </div>
 
       {/* Filters */}
@@ -203,6 +207,8 @@ export default function CreditPortfolioCashFlowPage() {
         onFilterChange={setFilters}
         initialValues={filters}
       />
+
+      <div id="cashflow-content">
 
       {/* Metrics */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -396,6 +402,7 @@ export default function CreditPortfolioCashFlowPage() {
           </Card>
         </Col>
       </Row>
+      </div>
     </div>
   )
 }
