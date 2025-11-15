@@ -11,6 +11,7 @@ from datetime import datetime, date
 from decimal import Decimal
 import pandas as pd
 import io
+import logging
 
 from app.db import get_db
 from app.db.models import (
@@ -40,11 +41,18 @@ from app.schemas.bank_transaction import (
     BulkCategorizeRequest,
     BulkLinkRequest,
     BulkStatusUpdateRequest,
+    ODataSyncRequest,
+    ODataSyncResult,
+    ODataTestConnectionRequest,
+    ODataTestConnectionResult,
 )
 from app.utils.auth import get_current_active_user
 from app.utils.excel_export import encode_filename_header
 from app.services.bank_transaction_import import BankTransactionImporter
 from app.services.transaction_classifier import TransactionClassifier, RegularPaymentDetector
+from app.services.odata_sync import ODataBankTransactionSync, ODataSyncConfig
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -816,3 +824,138 @@ async def import_transactions(
         errors=result['errors'],
         warnings=[]
     )
+
+
+@router.post("/odata/test-connection", response_model=ODataTestConnectionResult)
+async def test_odata_connection(
+    request: ODataTestConnectionRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Test OData connection to 1C
+
+    Tests connection to 1C OData service before syncing.
+    Only ADMIN and MANAGER can test connections.
+    """
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER can test OData connections"
+        )
+
+    try:
+        # Create config
+        config = ODataSyncConfig(
+            base_url=request.odata_url,
+            username=request.username,
+            password=request.password,
+            timeout=request.timeout
+        )
+
+        # Create sync service
+        sync_service = ODataBankTransactionSync(db, config)
+
+        # Test connection
+        result = sync_service.test_connection()
+
+        return ODataTestConnectionResult(**result)
+
+    except Exception as e:
+        logger.error(f"Failed to test OData connection: {e}", exc_info=True)
+        return ODataTestConnectionResult(
+            success=False,
+            message=f"Connection test failed: {e}",
+            error=str(e)
+        )
+
+
+@router.post("/odata/sync", response_model=ODataSyncResult)
+async def sync_from_odata(
+    request: ODataSyncRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync bank transactions from 1C via OData
+
+    Syncs bank transactions (debits and credits) from 1C OData service.
+    Only ADMIN and MANAGER can perform sync.
+
+    Features:
+    - Fetches transactions from 1C OData endpoint
+    - Creates new transactions or updates existing (by external_id_1c)
+    - Supports date range filtering
+    - Handles both DEBIT (списания) and CREDIT (поступления) operations
+
+    Example request:
+    {
+        "odata_url": "http://server:port/base/odata/standard.odata",
+        "username": "admin",
+        "password": "password",
+        "entity_name": "Document_BankStatement",
+        "department_id": 1,
+        "date_from": "2025-01-01",
+        "date_to": "2025-01-31"
+    }
+    """
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER can sync from OData"
+        )
+
+    # Verify department exists
+    department = db.query(Department).filter(Department.id == request.department_id).first()
+    if not department:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Department with id {request.department_id} not found"
+        )
+
+    # For MANAGER role, verify they belong to the department
+    if current_user.role == UserRoleEnum.MANAGER:
+        if current_user.department_id != request.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="MANAGER can only sync to their own department"
+            )
+
+    try:
+        # Create config
+        config = ODataSyncConfig(
+            base_url=request.odata_url,
+            username=request.username,
+            password=request.password,
+            entity_name=request.entity_name,
+            timeout=request.timeout
+        )
+
+        # Create sync service
+        sync_service = ODataBankTransactionSync(db, config)
+
+        # Perform sync
+        result = sync_service.sync_transactions(
+            department_id=request.department_id,
+            date_from=request.date_from,
+            date_to=request.date_to,
+            organization_id=request.organization_id
+        )
+
+        # Log the operation
+        logger.info(
+            f"OData sync completed by user {current_user.id}: "
+            f"created={result.get('created', 0)}, "
+            f"updated={result.get('updated', 0)}, "
+            f"skipped={result.get('skipped', 0)}"
+        )
+
+        return ODataSyncResult(**result)
+
+    except Exception as e:
+        logger.error(f"OData sync failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Sync failed: {str(e)}"
+        )
