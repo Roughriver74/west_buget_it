@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card, Row, Col, Statistic, Table, Empty, Spin, Tag } from 'antd'
 import {
 	TrophyOutlined,
@@ -20,36 +21,49 @@ import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import ExportButton from '@/legacy/components/ExportButton'
+import CreditPortfolioFilters, {
+	type CreditPortfolioFilterValues,
+} from '@/components/bank/CreditPortfolioFilters'
 
 export default function CreditPortfolioAnalyticsPage() {
 	const { selectedDepartment } = useDepartment()
+	const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
 	// Fetch summary for KPI metrics
 	const { data: summary, isLoading: summaryLoading } = useQuery({
-		queryKey: ['credit-portfolio-summary', selectedDepartment?.id],
+		queryKey: ['credit-portfolio-summary', selectedDepartment?.id, filters],
 		queryFn: () =>
 			creditPortfolioApi.getSummary({
 				department_id: selectedDepartment?.id,
+				date_from: filters.dateFrom,
+				date_to: filters.dateTo,
 			}),
 		enabled: !!selectedDepartment,
 	})
 
 	// Fetch monthly efficiency
 	const { data: monthlyEfficiency, isLoading: monthlyLoading } = useQuery({
-		queryKey: ['credit-portfolio-monthly-efficiency', selectedDepartment?.id],
+		queryKey: ['credit-portfolio-monthly-efficiency', selectedDepartment?.id, filters],
 		queryFn: () =>
 			creditPortfolioApi.getMonthlyEfficiency({
 				department_id: selectedDepartment?.id,
+				date_from: filters.dateFrom,
+				date_to: filters.dateTo,
+				organization_id: filters.organizationIds?.[0],
+				bank_account_id: filters.bankAccountIds?.[0],
 			}),
 		enabled: !!selectedDepartment,
 	})
 
 	// Fetch organization efficiency
 	const { data: orgEfficiency, isLoading: orgLoading } = useQuery({
-		queryKey: ['credit-portfolio-org-efficiency', selectedDepartment?.id],
+		queryKey: ['credit-portfolio-org-efficiency', selectedDepartment?.id, filters],
 		queryFn: () =>
 			creditPortfolioApi.getOrgEfficiency({
 				department_id: selectedDepartment?.id,
+				date_from: filters.dateFrom,
+				date_to: filters.dateTo,
+				organization_id: filters.organizationIds?.[0],
 			}),
 		enabled: !!selectedDepartment,
 	})
@@ -228,6 +242,13 @@ export default function CreditPortfolioAnalyticsPage() {
 					data={orgEfficiency || []}
 				/>
 			</div>
+
+			{/* Filters */}
+			<CreditPortfolioFilters
+				onFilterChange={setFilters}
+				initialValues={filters}
+			/>
+
 			<div id='analytics-content'>
 
 			{/* KPI Metrics */}

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card, Row, Col, Statistic, Progress, Empty, Spin } from 'antd'
 import {
   RiseOutlined,
@@ -8,15 +9,21 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
+import CreditPortfolioFilters, {
+  type CreditPortfolioFilterValues,
+} from '@/components/bank/CreditPortfolioFilters'
 
 export default function CreditPortfolioKPIPage() {
   const { selectedDepartment } = useDepartment()
+  const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
   const { data: summary, isLoading } = useQuery({
-    queryKey: ['credit-portfolio-summary', selectedDepartment?.id],
+    queryKey: ['credit-portfolio-summary', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getSummary({
         department_id: selectedDepartment?.id,
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
       }),
     enabled: !!selectedDepartment,
   })
@@ -52,6 +59,12 @@ export default function CreditPortfolioKPIPage() {
   return (
     <div style={{ padding: 24 }}>
       <h1 style={{ marginBottom: 24 }}>Кредитный портфель - KPI метрики</h1>
+
+      {/* Filters */}
+      <CreditPortfolioFilters
+        onFilterChange={setFilters}
+        initialValues={filters}
+      />
 
       <Row gutter={[16, 16]}>
         {/* Debt Ratio */}

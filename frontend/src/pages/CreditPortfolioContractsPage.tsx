@@ -7,6 +7,9 @@ import { creditPortfolioApi } from '@/api/creditPortfolio'
 import type { FinContract } from '@/api/creditPortfolio'
 import dayjs from 'dayjs'
 import ExportButton from '@/legacy/components/ExportButton'
+import CreditPortfolioFilters, {
+  type CreditPortfolioFilterValues,
+} from '@/components/bank/CreditPortfolioFilters'
 
 const { Search } = Input
 
@@ -32,6 +35,7 @@ const PAGE_SIZE = 20
 export default function CreditPortfolioContractsPage() {
   const { selectedDepartment } = useDepartment()
   const [searchText, setSearchText] = useState('')
+  const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined)
   const [filterType, setFilterType] = useState<string | undefined>(undefined)
   const [currentPage, setCurrentPage] = useState(1)
@@ -44,10 +48,10 @@ export default function CreditPortfolioContractsPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearch, debouncedFilterActive, debouncedFilterType])
+  }, [debouncedSearch, debouncedFilterActive, debouncedFilterType, filters])
 
   const { data: contracts, isLoading, isError, refetch } = useQuery({
-    queryKey: ['credit-contracts', selectedDepartment?.id, debouncedFilterActive, debouncedFilterType],
+    queryKey: ['credit-contracts', selectedDepartment?.id, filters, debouncedFilterActive, debouncedFilterType],
     queryFn: () =>
       creditPortfolioApi.getContracts({
         department_id: selectedDepartment?.id,
@@ -270,7 +274,13 @@ export default function CreditPortfolioContractsPage() {
         </Col>
       </Row>
 
-      {/* Filters */}
+      {/* Advanced Filters */}
+      <CreditPortfolioFilters
+        onFilterChange={setFilters}
+        initialValues={filters}
+      />
+
+      {/* Quick Filters */}
       <Card style={{ marginBottom: 24 }}>
         <Space wrap style={{ width: '100%' }}>
           <Search
