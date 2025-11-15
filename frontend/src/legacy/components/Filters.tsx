@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { creditPortfolioApi } from '@/api/creditPortfolio'
+import { creditPortfolioApi, type FinOrganization, type FinBankAccount, type FinContract } from '@/api/creditPortfolio'
 import {
   useFilterStore,
   useFilterValues,
@@ -72,7 +72,7 @@ export default function Filters() {
 
   const organizationOptions = useMemo(
     () =>
-      (organizationsData || []).map(org => ({
+      (organizationsData || []).map((org: FinOrganization) => ({
         value: org.name,
         label: org.name,
       })),
@@ -81,7 +81,7 @@ export default function Filters() {
 
   const bankAccountOptions = useMemo(
     () =>
-      (bankAccountsData || []).map(bank => ({
+      (bankAccountsData || []).map((bank: FinBankAccount) => ({
         value: bank.account_number,
         label: bank.bank_name ? `${bank.account_number} • ${bank.bank_name}` : bank.account_number,
       })),
@@ -91,8 +91,8 @@ export default function Filters() {
   const contractOptions = useMemo(
     () =>
       (contractsData || [])
-        .filter(contract => Boolean(contract.contract_number))
-        .map(contract => ({
+        .filter((contract: FinContract) => Boolean(contract.contract_number))
+        .map((contract: FinContract) => ({
           value: contract.contract_number,
           label: contract.contract_number,
         })),

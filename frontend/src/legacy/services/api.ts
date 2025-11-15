@@ -34,9 +34,9 @@ async function getReferenceData(departmentId?: number): Promise<ReferenceCacheEn
   }
 
   const [organizations, bankAccounts, contracts] = await Promise.all([
-    creditPortfolioApi.getOrganizations({ department_id: departmentId, limit: 2000 }),
-    creditPortfolioApi.getBankAccounts({ department_id: departmentId, limit: 2000 }),
-    creditPortfolioApi.getContracts({ department_id: departmentId, limit: 5000 }),
+    creditPortfolioApi.getOrganizations({ department_id: departmentId, limit: 1000 }),
+    creditPortfolioApi.getBankAccounts({ department_id: departmentId, limit: 1000 }),
+    creditPortfolioApi.getContracts({ department_id: departmentId, limit: 1000 }),
   ])
 
   const entry: ReferenceCacheEntry = {
@@ -44,9 +44,9 @@ async function getReferenceData(departmentId?: number): Promise<ReferenceCacheEn
     organizations,
     bankAccounts,
     contracts,
-    orgMap: new Map(organizations.map(org => [org.id, org.name])),
-    bankMap: new Map(bankAccounts.map(bank => [bank.id, { account_number: bank.account_number, bank_name: bank.bank_name }])),
-    contractMap: new Map(contracts.map(contract => [contract.id, contract.contract_number])),
+    orgMap: new Map(organizations.map((org: FinOrganization) => [org.id, org.name])),
+    bankMap: new Map(bankAccounts.map((bank: FinBankAccount) => [bank.id, { account_number: bank.account_number, bank_name: bank.bank_name }])),
+    contractMap: new Map(contracts.map((contract: FinContract) => [contract.id, contract.contract_number])),
   }
 
   referenceCache.set(cacheKey, entry)
@@ -65,12 +65,9 @@ const mapReceipt = (receipt: FinReceipt, refs: ReferenceCacheEntry): Receipt => 
   payer: receipt.payer,
   payer_account: receipt.payer_account,
   settlement_account: receipt.settlement_account,
-  contract_number:
-    receipt.contract_id && refs.contractMap.get(receipt.contract_id)
-      ? refs.contractMap.get(receipt.contract_id)
-      : receipt.contract_id
-        ? refs.contractMap.get(receipt.contract_id) ?? undefined
-        : receipt.contract_id,
+  contract_number: receipt.contract_id
+    ? refs.contractMap.get(receipt.contract_id) ?? null
+    : null,
   contract_date: receipt.contract_date ?? null,
   currency: receipt.currency,
   amount: Number(receipt.amount || 0),
@@ -92,12 +89,9 @@ const mapExpense = (expense: FinExpense, refs: ReferenceCacheEntry): Expense => 
   recipient: expense.recipient,
   recipient_account: expense.recipient_account,
   debit_account: expense.debit_account,
-  contract_number:
-    expense.contract_id && refs.contractMap.get(expense.contract_id)
-      ? refs.contractMap.get(expense.contract_id)
-      : expense.contract_id
-        ? refs.contractMap.get(expense.contract_id) ?? undefined
-        : expense.contract_id,
+  contract_number: expense.contract_id
+    ? refs.contractMap.get(expense.contract_id) ?? null
+    : null,
   contract_date: expense.contract_date ?? null,
   currency: expense.currency,
   amount: Number(expense.amount || 0),
@@ -131,7 +125,7 @@ export const receiptsAPI = {
     const references = await getReferenceData(params?.department_id)
     const receipts = await creditPortfolioApi.getReceipts({
       skip: params?.skip ?? 0,
-      limit: params?.limit ?? 10000,
+      limit: Math.min(params?.limit ?? 1000, 1000),
       department_id: params?.department_id,
       date_from: params?.date_from,
       date_to: params?.date_to,
@@ -149,7 +143,7 @@ export const expensesAPI = {
     const references = await getReferenceData(params?.department_id)
     const expenses = await creditPortfolioApi.getExpenses({
       skip: params?.skip ?? 0,
-      limit: params?.limit ?? 10000,
+      limit: Math.min(params?.limit ?? 1000, 1000),
       department_id: params?.department_id,
       date_from: params?.date_from,
       date_to: params?.date_to,
