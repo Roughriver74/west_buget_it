@@ -1,4 +1,4 @@
-import { Modal, Table, Select, Alert } from 'antd'
+import { Modal, Table, Alert } from 'antd'
 import { useState, useEffect } from 'react'
 
 interface ColumnMappingModalProps {
