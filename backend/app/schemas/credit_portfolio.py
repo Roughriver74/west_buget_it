@@ -90,6 +90,10 @@ class FinContractInDB(FinContractBase):
     department_id: int
     created_at: datetime
     updated_at: Optional[datetime]
+    # Calculated fields (optional, not in database)
+    total_paid: Optional[Decimal] = None
+    principal: Optional[Decimal] = None
+    interest: Optional[Decimal] = None
 
     class Config:
         from_attributes = True
@@ -110,7 +114,7 @@ class FinReceiptBase(BaseModel):
     payer_account: Optional[str] = None
     settlement_account: Optional[str] = None
     contract_date: Optional[date] = None
-    currency: str = "RUB"
+    currency: Optional[str] = "RUB"
     amount: Decimal
     commission: Optional[Decimal] = None
     payment_purpose: Optional[str] = None
@@ -148,7 +152,7 @@ class FinExpenseBase(BaseModel):
     recipient_account: Optional[str] = None
     debit_account: Optional[str] = None
     contract_date: Optional[date] = None
-    currency: str = "RUB"
+    currency: Optional[str] = "RUB"
     amount: Decimal
     expense_article: Optional[str] = None
     payment_purpose: Optional[str] = None

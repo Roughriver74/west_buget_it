@@ -34,9 +34,9 @@ async function getReferenceData(departmentId?: number): Promise<ReferenceCacheEn
   }
 
   const [organizations, bankAccounts, contracts] = await Promise.all([
-    creditPortfolioApi.getOrganizations({ department_id: departmentId, limit: 10000 }),
-    creditPortfolioApi.getBankAccounts({ department_id: departmentId, limit: 10000 }),
-    creditPortfolioApi.getContracts({ department_id: departmentId, limit: 10000 }),
+    creditPortfolioApi.getOrganizations({ department_id: departmentId, limit: 50000 }),
+    creditPortfolioApi.getBankAccounts({ department_id: departmentId, limit: 50000 }),
+    creditPortfolioApi.getContracts({ department_id: departmentId, limit: 50000 }),
   ])
 
   const entry: ReferenceCacheEntry = {
@@ -125,7 +125,7 @@ export const receiptsAPI = {
     const references = await getReferenceData(params?.department_id)
     const receipts = await creditPortfolioApi.getReceipts({
       skip: params?.skip ?? 0,
-      limit: Math.min(params?.limit ?? 10000, 10000),
+      limit: params?.limit ?? 50000,
       department_id: params?.department_id,
       date_from: params?.date_from,
       date_to: params?.date_to,
@@ -143,7 +143,7 @@ export const expensesAPI = {
     const references = await getReferenceData(params?.department_id)
     const expenses = await creditPortfolioApi.getExpenses({
       skip: params?.skip ?? 0,
-      limit: Math.min(params?.limit ?? 10000, 10000),
+      limit: params?.limit ?? 50000,
       department_id: params?.department_id,
       date_from: params?.date_from,
       date_to: params?.date_to,
@@ -160,7 +160,7 @@ export const expenseDetailsAPI = {
   getAll: async (params?: ExpenseDetailQueryParams): Promise<ExpenseDetailList> => {
     const details = await creditPortfolioApi.getExpenseDetails({
       skip: params?.skip ?? 0,
-      limit: params?.limit ?? 150000,
+      limit: params?.limit ?? 50000,
       department_id: params?.department_id,
       date_from: params?.date_from,
       date_to: params?.date_to,

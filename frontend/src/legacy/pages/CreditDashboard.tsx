@@ -93,8 +93,8 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
     [debouncedFilters]
   )
 
-  // Backend API limits: receipts and expenses max 10000, expense-details max 150000
-  const limitBase = 10000
+  // Backend API limits increased to 50000 for all endpoints
+  const limitBase = 50000
 
   const receiptParams = useMemo<ReceiptQueryParams>(() => {
     const params: ReceiptQueryParams = { limit: limitBase, department_id: departmentId }
@@ -132,7 +132,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
   const expenseDetailsQuery = useQuery({
     queryKey: ['legacy-dashboard', 'expense-details', departmentId],
-    queryFn: () => expenseDetailsAPI.getAll({ limit: 150000, department_id: departmentId }),
+    queryFn: () => expenseDetailsAPI.getAll({ limit: 50000, department_id: departmentId }),
     placeholderData: keepPreviousData,
     staleTime: 10 * 60 * 1000,
     enabled: Boolean(departmentId),
@@ -248,10 +248,10 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
     const totalReceived = filteredReceipts.reduce((sum, r) => sum + Number(r.amount || 0), 0)
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
     const principalPaid = filteredDetails
-      .filter(d => (d.payment_type || '').toLowerCase().includes('тело'))
+      .filter(d => d.payment_type === 'Погашение долга')
       .reduce((sum, d) => sum + Number(d.payment_amount || 0), 0)
     const interestPaid = filteredDetails
-      .filter(d => (d.payment_type || '').toLowerCase().includes('процент'))
+      .filter(d => d.payment_type === 'Уплата процентов')
       .reduce((sum, d) => sum + Number(d.payment_amount || 0), 0)
     const debtBalance = totalReceived - principalPaid
 
@@ -289,9 +289,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       if (!expense) return
       const contract = expense.contract_number || 'Без договора'
       if (!contracts[contract]) return
-      if ((d.payment_type || '').toLowerCase().includes('тело')) {
+      if (d.payment_type === 'Погашение долга') {
         contracts[contract].principal += Number(d.payment_amount || 0)
-      } else if ((d.payment_type || '').toLowerCase().includes('процент')) {
+      } else if (d.payment_type === 'Уплата процентов') {
         contracts[contract].interest += Number(d.payment_amount || 0)
       }
     })
@@ -351,9 +351,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       if (!dateStr) return
       const monthKey = dateStr.slice(0, 7)
       const record = ensureMonth(monthKey)
-      if ((detail.payment_type || '').toLowerCase().includes('тело')) {
+      if (detail.payment_type === 'Погашение долга') {
         record.principal += Number(detail.payment_amount || 0)
-      } else if ((detail.payment_type || '').toLowerCase().includes('процент')) {
+      } else if (detail.payment_type === 'Уплата процентов') {
         record.interest += Number(detail.payment_amount || 0)
       }
     })
@@ -377,9 +377,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       if (!expense) return
       const org = expense.organization || 'Не указано'
       if (!orgs[org]) return
-      if ((d.payment_type || '').toLowerCase().includes('тело')) {
+      if (d.payment_type === 'Погашение долга') {
         orgs[org].principal += Number(d.payment_amount || 0)
-      } else if ((d.payment_type || '').toLowerCase().includes('процент')) {
+      } else if (d.payment_type === 'Уплата процентов') {
         orgs[org].interest += Number(d.payment_amount || 0)
       }
     })
@@ -420,9 +420,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       const contract = expense.contract_number || 'Без договора'
       if (!contracts[contract]) return
 
-      if ((d.payment_type || '').toLowerCase().includes('тело')) {
+      if (d.payment_type === 'Погашение долга') {
         contracts[contract].principalPaid += Number(d.payment_amount || 0)
-      } else if ((d.payment_type || '').toLowerCase().includes('процент')) {
+      } else if (d.payment_type === 'Уплата процентов') {
         contracts[contract].interestPaid += Number(d.payment_amount || 0)
       }
 
@@ -709,14 +709,14 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
           <div className="text-sm opacity-80">Погашено тела</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.principalPaid)}</div>
           <div className="text-xs opacity-80">
-            {filteredDetails.filter(d => (d.payment_type || '').toLowerCase().includes('тело')).length} платежей
+            {filteredDetails.filter(d => d.payment_type === 'Погашение долга').length} платежей
           </div>
         </div>
         <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-orange-500 to-orange-600">
           <div className="text-sm opacity-80">Уплачено процентов</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.interestPaid)}</div>
           <div className="text-xs opacity-80">
-            {filteredDetails.filter(d => (d.payment_type || '').toLowerCase().includes('процент')).length} платежей
+            {filteredDetails.filter(d => d.payment_type === 'Уплата процентов').length} платежей
           </div>
         </div>
         <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-red-500 to-red-600">

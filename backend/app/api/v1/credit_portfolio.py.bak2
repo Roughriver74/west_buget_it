@@ -238,7 +238,7 @@ async def list_contracts(
     interest_expr = func.coalesce(
         func.sum(
             case(
-                (FinExpenseDetail.payment_type == 'Уплата процентов', FinExpenseDetail.payment_amount),
+                (FinExpenseDetail.payment_type.ilike('%процент%'), FinExpenseDetail.payment_amount),
                 else_=0
             )
         ),
@@ -378,7 +378,7 @@ async def get_contracts_summary(
     interest_expr = func.coalesce(
         func.sum(
             case(
-                (FinExpenseDetail.payment_type == 'Уплата процентов', FinExpenseDetail.payment_amount),
+                (FinExpenseDetail.payment_type.ilike('%процент%'), FinExpenseDetail.payment_amount),
                 else_=0
             )
         ),
@@ -883,7 +883,7 @@ async def get_summary(
 
     # Interest (проценты)
     interest_query = details_query.filter(
-        FinExpenseDetail.payment_type == 'Уплата процентов'
+        FinExpenseDetail.payment_type.ilike('%процент%')
     )
     total_interest = interest_query.scalar() or 0
 
@@ -1183,7 +1183,7 @@ async def get_monthly_efficiency(
         ).label('principal'),
         func.sum(
             case(
-                (FinExpenseDetail.payment_type == 'Уплата процентов', FinExpenseDetail.payment_amount),
+                (FinExpenseDetail.payment_type.ilike('%процент%'), FinExpenseDetail.payment_amount),
                 else_=0
             )
         ).label('interest')
@@ -1301,7 +1301,7 @@ async def get_org_efficiency(
         ).label('principal'),
         func.sum(
             case(
-                (FinExpenseDetail.payment_type == 'Уплата процентов', FinExpenseDetail.payment_amount),
+                (FinExpenseDetail.payment_type.ilike('%процент%'), FinExpenseDetail.payment_amount),
                 else_=0
             )
         ).label('interest'),
@@ -1537,7 +1537,7 @@ async def get_yearly_comparison(
         ).label('principal'),
         func.sum(
             case(
-                (FinExpenseDetail.payment_type == 'Уплата процентов', FinExpenseDetail.payment_amount),
+                (FinExpenseDetail.payment_type.ilike('%процент%'), FinExpenseDetail.payment_amount),
                 else_=0
             )
         ).label('interest')

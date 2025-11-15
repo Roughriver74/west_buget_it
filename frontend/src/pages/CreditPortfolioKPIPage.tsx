@@ -45,15 +45,15 @@ export default function CreditPortfolioKPIPage() {
   }
 
   // Calculate KPIs
-  const totalDebt = summary.total_receipts - summary.total_expenses
+  const totalDebt = Number((summary.total_receipts - summary.total_expenses).toFixed(2))
   const debtRatio = summary.total_receipts > 0
-    ? ((summary.total_expenses / summary.total_receipts) * 100)
+    ? Number(((summary.total_expenses / summary.total_receipts) * 100).toFixed(2))
     : 0
   const interestRatio = summary.total_expenses > 0
-    ? ((summary.total_interest / summary.total_expenses) * 100)
+    ? Number(((summary.total_interest / summary.total_expenses) * 100).toFixed(2))
     : 0
   const principalRatio = summary.total_expenses > 0
-    ? ((summary.total_principal / summary.total_expenses) * 100)
+    ? Number(((summary.total_principal / summary.total_expenses) * 100).toFixed(2))
     : 0
 
   return (
