@@ -17,6 +17,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import CreditPortfolioFilters, {
+  type CreditPortfolioFilterValues,
+} from '@/components/bank/CreditPortfolioFilters'
 
 type PeriodType = 'yearly' | 'quarterly'
 
@@ -45,23 +48,30 @@ interface YoYGrowth {
 export default function CreditPortfolioComparePage() {
   const { selectedDepartment } = useDepartment()
   const [comparisonPeriod, setComparisonPeriod] = useState<PeriodType>('yearly')
+  const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
   // Fetch yearly comparison data
   const { data: yearlyData, isLoading: yearlyLoading } = useQuery({
-    queryKey: ['credit-portfolio-yearly-comparison', selectedDepartment?.id],
+    queryKey: ['credit-portfolio-yearly-comparison', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getYearlyComparison({
         department_id: selectedDepartment?.id,
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
       }),
     enabled: !!selectedDepartment,
   })
 
   // Fetch monthly efficiency for quarterly breakdown
   const { data: monthlyData, isLoading: monthlyLoading } = useQuery({
-    queryKey: ['credit-portfolio-monthly-efficiency', selectedDepartment?.id],
+    queryKey: ['credit-portfolio-monthly-efficiency', selectedDepartment?.id, filters],
     queryFn: () =>
       creditPortfolioApi.getMonthlyEfficiency({
         department_id: selectedDepartment?.id,
+        date_from: filters.dateFrom,
+        date_to: filters.dateTo,
+        organization_id: filters.organizationIds?.[0],
+        bank_account_id: filters.bankAccountIds?.[0],
       }),
     enabled: !!selectedDepartment,
   })
@@ -269,6 +279,12 @@ export default function CreditPortfolioComparePage() {
           <Radio.Button value="quarterly">По кварталам</Radio.Button>
         </Radio.Group>
       </div>
+
+      {/* Filters */}
+      <CreditPortfolioFilters
+        onFilterChange={setFilters}
+        initialValues={filters}
+      />
 
       {/* Comparison Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
