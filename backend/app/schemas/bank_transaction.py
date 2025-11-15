@@ -182,3 +182,45 @@ class BulkStatusUpdateRequest(BaseModel):
     """Request for bulk status update"""
     transaction_ids: List[int]
     status: str
+
+
+class ODataSyncRequest(BaseModel):
+    """Request for OData sync from 1C"""
+    odata_url: str = Field(..., description="1C OData base URL (e.g. http://server:port/base/odata/standard.odata)")
+    username: str = Field(..., description="1C username")
+    password: str = Field(..., description="1C password")
+    entity_name: str = Field(default="Document_BankStatement", description="OData entity name")
+    department_id: int = Field(..., description="Department ID for imported transactions")
+    organization_id: Optional[int] = Field(None, description="Organization ID filter")
+    date_from: Optional[date] = Field(None, description="Start date for sync")
+    date_to: Optional[date] = Field(None, description="End date for sync")
+    timeout: int = Field(default=30, description="Request timeout in seconds")
+
+
+class ODataSyncResult(BaseModel):
+    """Result of OData sync operation"""
+    success: bool
+    total_fetched: int
+    created: int
+    updated: int
+    skipped: int
+    errors: List[dict]
+    message: Optional[str] = None
+    error: Optional[str] = None
+
+
+class ODataTestConnectionRequest(BaseModel):
+    """Request for testing OData connection"""
+    odata_url: str
+    username: str
+    password: str
+    timeout: int = 30
+
+
+class ODataTestConnectionResult(BaseModel):
+    """Result of OData connection test"""
+    success: bool
+    message: str
+    status_code: Optional[int] = None
+    url: Optional[str] = None
+    error: Optional[str] = None

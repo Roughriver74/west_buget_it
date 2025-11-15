@@ -172,4 +172,46 @@ export const bankTransactionsApi = {
     })
     return data
   },
+
+  // Test OData connection
+  testODataConnection: async (params: {
+    odata_url: string
+    username: string
+    password: string
+    timeout?: number
+  }): Promise<{
+    success: boolean
+    message: string
+    status_code?: number
+    url?: string
+    error?: string
+  }> => {
+    const { data } = await apiClient.post('/bank-transactions/odata/test-connection', params)
+    return data
+  },
+
+  // Sync from 1C OData
+  syncFromOData: async (params: {
+    odata_url: string
+    username: string
+    password: string
+    entity_name?: string
+    department_id: number
+    organization_id?: number
+    date_from?: string
+    date_to?: string
+    timeout?: number
+  }): Promise<{
+    success: boolean
+    total_fetched: number
+    created: number
+    updated: number
+    skipped: number
+    errors: any[]
+    message?: string
+    error?: string
+  }> => {
+    const { data } = await apiClient.post('/bank-transactions/odata/sync', params)
+    return data
+  },
 }

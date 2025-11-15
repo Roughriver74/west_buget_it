@@ -62,6 +62,7 @@ const BankTransactionsPage = () => {
   // Modals
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [mappingModalOpen, setMappingModalOpen] = useState(false)
+  const [odataSyncModalOpen, setOdataSyncModalOpen] = useState(false)
   const [categorizeDrawerOpen, setCategorizeDrawerOpen] = useState(false)
   const [matchingDrawerOpen, setMatchingDrawerOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<BankTransaction | null>(null)
@@ -79,6 +80,7 @@ const BankTransactionsPage = () => {
 
   // Forms
   const [categorizeForm] = Form.useForm()
+  const [odataSyncForm] = Form.useForm()
 
   // Fetch transactions
   const { data, isLoading, error, refetch } = useQuery({
@@ -235,6 +237,52 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления: ${error.response?.data?.detail || error.message}`)
+    },
+  })
+
+  // OData test connection mutation
+  const odataTestMutation = useMutation({
+    mutationFn: (params: { odata_url: string; username: string; password: string }) =>
+      bankTransactionsApi.testODataConnection(params),
+    onSuccess: (result) => {
+      if (result.success) {
+        message.success('Соединение с 1С успешно установлено')
+      } else {
+        message.error(`Ошибка соединения: ${result.message}`)
+      }
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка тестирования: ${error.response?.data?.detail || error.message}`)
+    },
+  })
+
+  // OData sync mutation
+  const odataSyncMutation = useMutation({
+    mutationFn: (params: {
+      odata_url: string
+      username: string
+      password: string
+      entity_name?: string
+      department_id: number
+      organization_id?: number
+      date_from?: string
+      date_to?: string
+    }) => bankTransactionsApi.syncFromOData(params),
+    onSuccess: (result) => {
+      if (result.success) {
+        message.success(
+          `Синхронизация завершена: создано ${result.created}, обновлено ${result.updated}, пропущено ${result.skipped}`
+        )
+        setOdataSyncModalOpen(false)
+        odataSyncForm.resetFields()
+        queryClient.invalidateQueries({ queryKey: ['bankTransactions'] })
+        queryClient.invalidateQueries({ queryKey: ['bankTransactionsStats'] })
+      } else {
+        message.error(`Ошибка синхронизации: ${result.error || 'Неизвестная ошибка'}`)
+      }
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка синхронизации: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -589,6 +637,42 @@ const BankTransactionsPage = () => {
     }
   }
 
+  const handleTestODataConnection = async () => {
+    try {
+      const values = await odataSyncForm.validateFields(['odata_url', 'username', 'password'])
+      odataTestMutation.mutate({
+        odata_url: values.odata_url,
+        username: values.username,
+        password: values.password,
+      })
+    } catch (error) {
+      console.error('Validation failed:', error)
+    }
+  }
+
+  const handleODataSync = async () => {
+    if (!selectedDepartment) {
+      message.error('Выберите отдел для синхронизации')
+      return
+    }
+
+    try {
+      const values = await odataSyncForm.validateFields()
+      odataSyncMutation.mutate({
+        odata_url: values.odata_url,
+        username: values.username,
+        password: values.password,
+        entity_name: values.entity_name || 'Document_BankStatement',
+        department_id: selectedDepartment.id,
+        organization_id: values.organization_id,
+        date_from: values.date_range?.[0]?.format('YYYY-MM-DD'),
+        date_to: values.date_range?.[1]?.format('YYYY-MM-DD'),
+      })
+    } catch (error) {
+      console.error('Validation failed:', error)
+    }
+  }
+
   if (isLoading) {
     return <LoadingState />
   }
@@ -654,6 +738,15 @@ const BankTransactionsPage = () => {
           >
             Импорт из Excel
           </Button>
+          {user && ['MANAGER', 'ADMIN'].includes(user.role) && (
+            <Button
+              type="primary"
+              onClick={() => setOdataSyncModalOpen(true)}
+              style={{ background: '#52c41a', borderColor: '#52c41a' }}
+            >
+              Синхронизация с 1С
+            </Button>
+          )}
           <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
             Обновить
           </Button>
@@ -982,6 +1075,105 @@ const BankTransactionsPage = () => {
         previewData={previewData}
         loading={importMutation.isPending}
       />
+
+      {/* OData Sync Modal */}
+      <Modal
+        title="Синхронизация с 1С через OData"
+        open={odataSyncModalOpen}
+        onOk={handleODataSync}
+        onCancel={() => {
+          setOdataSyncModalOpen(false)
+          odataSyncForm.resetFields()
+        }}
+        width={700}
+        confirmLoading={odataSyncMutation.isPending}
+        okText="Синхронизировать"
+        cancelText="Отмена"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p>
+            Синхронизация банковских операций из 1С через протокол OData.
+            Система автоматически создаст новые транзакции и обновит существующие.
+          </p>
+          {selectedDepartment && (
+            <div style={{
+              padding: 12,
+              background: '#f6ffed',
+              border: '1px solid #b7eb8f',
+              borderRadius: 4,
+              marginBottom: 16,
+            }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+              <strong>Отдел:</strong> {selectedDepartment.name}
+            </div>
+          )}
+        </div>
+
+        <Form form={odataSyncForm} layout="vertical">
+          <Form.Item
+            name="odata_url"
+            label="OData URL 1С"
+            rules={[
+              { required: true, message: 'Введите URL OData' },
+              { type: 'url', message: 'Введите корректный URL' },
+            ]}
+            tooltip="Пример: http://server:port/base/odata/standard.odata"
+          >
+            <Input placeholder="http://server:port/base/odata/standard.odata" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="username"
+                label="Имя пользователя 1С"
+                rules={[{ required: true, message: 'Введите имя пользователя' }]}
+              >
+                <Input placeholder="admin" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="password"
+                label="Пароль"
+                rules={[{ required: true, message: 'Введите пароль' }]}
+              >
+                <Input.Password placeholder="password" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="entity_name"
+            label="Имя сущности OData"
+            tooltip="Имя документа в 1С (по умолчанию: Document_BankStatement)"
+          >
+            <Input placeholder="Document_BankStatement" />
+          </Form.Item>
+
+          <Form.Item
+            name="date_range"
+            label="Период синхронизации"
+            rules={[{ required: true, message: 'Выберите период' }]}
+          >
+            <RangePicker
+              style={{ width: '100%' }}
+              format="DD.MM.YYYY"
+              placeholder={['Дата начала', 'Дата окончания']}
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              onClick={handleTestODataConnection}
+              loading={odataTestMutation.isPending}
+              block
+            >
+              Проверить соединение
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
