@@ -1,8 +1,8 @@
+@import './legacy/styles/mobile.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './legacy/styles/mobile.css';
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
