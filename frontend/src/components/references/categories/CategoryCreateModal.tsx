@@ -1,23 +1,27 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Modal, message, Form } from 'antd'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { categoriesApi } from '@/api'
 import CategoryForm from './CategoryForm'
+import type { BudgetCategory } from '@/types'
 
 interface CategoryCreateModalProps {
   open: boolean
   onClose: () => void
+  initialName?: string
+  onCreated?: (category: BudgetCategory) => void
 }
 
-const CategoryCreateModal: React.FC<CategoryCreateModalProps> = ({ open, onClose }) => {
+const CategoryCreateModal: React.FC<CategoryCreateModalProps> = ({ open, onClose, initialName, onCreated }) => {
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
 
   const createMutation = useMutation({
     mutationFn: categoriesApi.create,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['categories'] })
       message.success('Статья расходов успешно создана!')
+      onCreated?.(data)
       onClose()
       form.resetFields()
     },
@@ -36,6 +40,12 @@ const CategoryCreateModal: React.FC<CategoryCreateModalProps> = ({ open, onClose
     onClose()
   }
 
+  useEffect(() => {
+    if (open && initialName) {
+      form.setFieldsValue({ name: initialName })
+    }
+  }, [open, initialName, form])
+
   return (
     <Modal
       title="Создать статью расходов"
@@ -47,7 +57,7 @@ const CategoryCreateModal: React.FC<CategoryCreateModalProps> = ({ open, onClose
       okText="Создать"
       cancelText="Отмена"
     >
-      <CategoryForm form={form} onFinish={handleFinish} />
+      <CategoryForm form={form} onFinish={handleFinish} initialValues={{ name: initialName }} />
     </Modal>
   )
 }

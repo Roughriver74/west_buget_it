@@ -890,3 +890,110 @@ def bulk_transfer_department(
             "name": target_department.name
         }
     }
+
+
+class Expense1CSyncRequest(BaseModel):
+    """Request model for 1C expense sync"""
+    date_from: datetime = Field(..., description="Start date for sync")
+    date_to: datetime = Field(..., description="End date for sync")
+    department_id: int = Field(..., description="Department ID for multi-tenancy")
+    only_posted: bool = Field(default=True, description="Only sync posted documents")
+
+
+@router.post("/sync/1c")
+def sync_expenses_from_1c(
+    request: Expense1CSyncRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync expense requests from 1C via OData (ADMIN/MANAGER only)
+
+    This endpoint will:
+    1. Connect to 1C OData API
+    2. Fetch expense documents for the specified period
+    3. Create/update expenses in the database
+    4. Auto-create organizations and contractors if needed
+
+    Features:
+    - Uses external_id_1c to prevent duplicates
+    - Updates existing expenses if data changes
+    - Creates new organizations/contractors from 1C
+    - Supports pagination for large datasets
+
+    Note: Only ADMIN and MANAGER can sync expenses from 1C
+    """
+    # Permission check
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators and managers can sync expenses from 1C"
+        )
+
+    # Validate department exists
+    from app.db.models import Department
+    department = db.query(Department).filter(
+        Department.id == request.department_id,
+        Department.is_active == True
+    ).first()
+
+    if not department:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Department {request.department_id} not found"
+        )
+
+    # Get 1C OData credentials from environment
+    odata_url = os.getenv('ODATA_1C_URL', 'http://10.10.100.77/trade/odata/standard.odata')
+    odata_username = os.getenv('ODATA_1C_USERNAME', 'odata.user')
+    odata_password = os.getenv('ODATA_1C_PASSWORD', 'ak228Hu2hbs28')
+
+    try:
+        # Create OData client
+        from app.services.odata_1c_client import OData1CClient
+        odata_client = OData1CClient(
+            base_url=odata_url,
+            username=odata_username,
+            password=odata_password
+        )
+
+        # Test connection
+        if not odata_client.test_connection():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to connect to 1C OData service"
+            )
+
+        # Create sync service
+        from app.services.expense_1c_sync import Expense1CSync
+        sync_service = Expense1CSync(
+            db=db,
+            odata_client=odata_client,
+            department_id=request.department_id
+        )
+
+        # Run sync
+        result = sync_service.sync_expenses(
+            date_from=request.date_from.date(),
+            date_to=request.date_to.date(),
+            batch_size=100,
+            only_posted=request.only_posted
+        )
+
+        return {
+            "success": result.to_dict()['success'],
+            "message": "Sync completed" if result.to_dict()['success'] else "Sync completed with errors",
+            "statistics": result.to_dict(),
+            "department": {
+                "id": department.id,
+                "name": department.name
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        error_detail = f"Sync failed: {str(e)}\n{traceback.format_exc()}"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_detail
+        )

@@ -151,7 +151,7 @@ export const useBudgetVersionWithDetails = (
   }
 ) => {
   const enabled = !!id && (options?.enabled ?? true)
-  const { enabled: _ignored, ...restOptions } = options ?? {}
+  const { enabled: _enabledOption, ...restOptions } = options ?? {}
 
   return useQuery({
     queryKey: budgetPlanningKeys.versionWithDetails(id ?? 0),

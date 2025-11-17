@@ -44,6 +44,7 @@ const ContractorsPage = lazy(() => import('./pages/ContractorsPage'))
 const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'))
 const ContractorDetailPage = lazy(() => import('./pages/ContractorDetailPage'))
 const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage'))
+const BusinessOperationMappingsPage = lazy(() => import('./pages/BusinessOperationMappingsPage'))
 
 // Admin module
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
@@ -74,6 +75,7 @@ const RevenueAnalyticsPage = lazy(() => import('./pages/RevenueAnalyticsPage'))
 
 // Bank Transactions module
 const BankTransactionsPage = lazy(() => import('./pages/BankTransactionsPage'))
+const BankTransactionsAnalyticsPage = lazy(() => import('./pages/BankTransactionsAnalyticsPage'))
 
 // Credit Portfolio module
 const CreditPortfolioPage = lazy(() => import('./pages/CreditPortfolioPage'))
@@ -126,6 +128,14 @@ function App() {
                             element={
                               <ProtectedRoute requiredRoles={['ADMIN', 'FOUNDER', 'MANAGER', 'USER']}>
                                 <BankTransactionsPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/bank-transactions/analytics"
+                            element={
+                              <ProtectedRoute requiredRoles={['ADMIN', 'FOUNDER', 'MANAGER', 'USER']}>
+                                <BankTransactionsAnalyticsPage />
                               </ProtectedRoute>
                             }
                           />
@@ -238,6 +248,16 @@ function App() {
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <OrganizationDetailPage />
+                            </ProtectedRoute>
+                          }
+                        />
+
+                        {/* Business Operation Mappings - ADMIN and MANAGER only */}
+                        <Route
+                          path="/business-operation-mappings"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                              <BusinessOperationMappingsPage />
                             </ProtectedRoute>
                           }
                         />

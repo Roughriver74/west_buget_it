@@ -21,6 +21,7 @@ export interface BankTransaction {
   transaction_date: string
   amount: number
   transaction_type: BankTransactionType
+  payment_source?: 'BANK' | 'CASH'
   counterparty_name?: string
   counterparty_inn?: string
   counterparty_kpp?: string
@@ -109,7 +110,9 @@ export interface BankTransactionList {
 
 export interface BankTransactionStats {
   total_transactions: number
-  total_amount: number
+  total_amount: number // Deprecated: use total_credit_amount and total_debit_amount
+  total_credit_amount: number // Sum of CREDIT (приход) transactions
+  total_debit_amount: number // Sum of DEBIT (расход) transactions
   new_count: number
   categorized_count: number
   matched_count: number
@@ -170,4 +173,229 @@ export interface BulkLinkRequest {
 export interface BulkStatusUpdateRequest {
   transaction_ids: number[]
   status: BankTransactionStatus
+}
+
+// ===================================================================
+// Analytics Types
+// ===================================================================
+
+export interface BankTransactionKPIs {
+  // Financial metrics
+  total_debit_amount: number
+  total_credit_amount: number
+  net_flow: number
+  total_transactions: number
+
+  // Comparison with previous period
+  debit_change_percent?: number
+  credit_change_percent?: number
+  net_flow_change_percent?: number
+  transactions_change?: number
+
+  // Status distribution
+  new_count: number
+  categorized_count: number
+  matched_count: number
+  approved_count: number
+  needs_review_count: number
+  ignored_count: number
+
+  // Status percentages
+  new_percent: number
+  categorized_percent: number
+  matched_percent: number
+  approved_percent: number
+  needs_review_percent: number
+  ignored_percent: number
+
+  // AI metrics
+  avg_category_confidence?: number
+  auto_categorized_count: number
+  auto_categorized_percent: number
+  regular_payments_count: number
+  regular_payments_percent: number
+}
+
+export interface MonthlyFlowData {
+  year: number
+  month: number
+  month_name: string
+  debit_amount: number
+  credit_amount: number
+  net_flow: number
+  transaction_count: number
+  avg_confidence?: number
+}
+
+export interface CategoryBreakdown {
+  category_id: number
+  category_name: string
+  category_type?: string
+  transaction_count: number
+  total_amount: number
+  avg_amount: number
+  avg_confidence?: number
+  percent_of_total: number
+}
+
+export interface CounterpartyBreakdown {
+  counterparty_inn?: string
+  counterparty_name: string
+  transaction_count: number
+  total_amount: number
+  avg_amount: number
+  first_transaction_date: string
+  last_transaction_date: string
+  is_regular: boolean
+}
+
+export interface RegionalData {
+  region: string
+  transaction_count: number
+  total_amount: number
+  percent_of_total: number
+}
+
+export interface SourceDistribution {
+  payment_source: string
+  year: number
+  month: number
+  month_name: string
+  transaction_count: number
+  total_amount: number
+}
+
+export interface ProcessingFunnelStage {
+  status: string
+  count: number
+  amount: number
+  percent_of_total: number
+  avg_processing_hours?: number
+}
+
+export interface ProcessingFunnelData {
+  stages: ProcessingFunnelStage[]
+  total_count: number
+  conversion_rate_to_approved: number
+}
+
+export interface ConfidenceBracket {
+  bracket: string
+  min_confidence: number
+  max_confidence: number
+  count: number
+  total_amount: number
+  percent_of_total: number
+}
+
+export interface AIPerformanceData {
+  confidence_distribution: ConfidenceBracket[]
+  avg_confidence: number
+  high_confidence_count: number
+  high_confidence_percent: number
+  low_confidence_count: number
+  low_confidence_percent: number
+}
+
+export interface ExhibitionData {
+  transaction_id: number
+  transaction_date: string
+  exhibition: string
+  counterparty_name: string
+  amount: number
+  category_name?: string
+}
+
+export interface LowConfidenceItem {
+  transaction_id: number
+  transaction_date: string
+  counterparty_name: string
+  amount: number
+  payment_purpose?: string
+  suggested_category_name?: string
+  category_confidence: number
+  status: string
+}
+
+export interface RegularPaymentSummary {
+  counterparty_inn?: string
+  counterparty_name: string
+  category_name: string
+  avg_amount: number
+  amount_variance: number
+  payment_count: number
+  avg_days_between?: number
+  last_payment_date: string
+  next_expected_date?: string
+}
+
+export interface DailyFlowData {
+  date: string
+  debit_amount: number
+  credit_amount: number
+  net_flow: number
+  transaction_count: number
+}
+
+export interface ActivityHeatmapPoint {
+  day_of_week: number
+  hour: number
+  transaction_count: number
+  total_amount: number
+  avg_amount: number
+}
+
+export interface StatusTimelinePoint {
+  date: string
+  new_count: number
+  categorized_count: number
+  matched_count: number
+  approved_count: number
+  needs_review_count: number
+  ignored_count: number
+}
+
+export interface ConfidenceScatterPoint {
+  transaction_id: number
+  transaction_date: string
+  counterparty_name?: string
+  amount: number
+  category_confidence?: number
+  status: string
+  transaction_type: BankTransactionType
+  is_regular_payment: boolean
+}
+
+export interface BankTransactionAnalytics {
+  kpis: BankTransactionKPIs
+  monthly_flow: MonthlyFlowData[]
+  daily_flow: DailyFlowData[]
+  top_categories: CategoryBreakdown[]
+  category_type_distribution: CategoryBreakdown[]
+  top_counterparties: CounterpartyBreakdown[]
+  regional_distribution: RegionalData[]
+  source_distribution: SourceDistribution[]
+  processing_funnel: ProcessingFunnelData
+  ai_performance: AIPerformanceData
+  low_confidence_items: LowConfidenceItem[]
+  activity_heatmap: ActivityHeatmapPoint[]
+  status_timeline: StatusTimelinePoint[]
+  confidence_scatter: ConfidenceScatterPoint[]
+  regular_payments: RegularPaymentSummary[]
+  exhibitions: ExhibitionData[]
+}
+
+export interface BankTransactionAnalyticsParams {
+  date_from?: string
+  date_to?: string
+  year?: number
+  month?: number
+  quarter?: number
+  transaction_type?: BankTransactionType
+  payment_source?: 'BANK' | 'CASH'
+  status?: BankTransactionStatus
+  region?: string
+  category_id?: number
+  department_id?: number
+  compare_previous_period?: boolean
 }

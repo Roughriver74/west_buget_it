@@ -98,7 +98,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         createMutation.mutate(values)
       } else if (mode === 'edit' && user) {
         // Don't send username and password on update
-        const { username, password, ...updateValues } = values
+        const { username: _username, password, ...updateValues } = values
 
         // First update user data
         await updateMutation.mutateAsync({ id: user.id, values: updateValues })

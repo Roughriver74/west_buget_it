@@ -93,7 +93,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
     const cleanTree = (nodes: any[]): any[] => {
       return nodes.map(node => {
         if (node.children.length === 0) {
-          const { children, ...rest } = node
+          const { children: _unusedChildren, ...rest } = node
           return rest
         }
         return {

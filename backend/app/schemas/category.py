@@ -25,6 +25,7 @@ class BudgetCategoryUpdate(BaseModel):
     description: Optional[str] = None
     is_active: Optional[bool] = None
     parent_id: Optional[int] = None
+    department_id: Optional[int] = None  # Only ADMIN/MANAGER can change this
 
 
 class BudgetCategoryInDB(BudgetCategoryBase):

@@ -84,7 +84,7 @@ const PaymentCalendarPage = () => {
   // Fetch forecast data
   const { data: forecastData, isLoading: forecastLoading } = useQuery({
     queryKey: ['forecast-calendar', currentYear, currentMonth, selectedDepartment?.id],
-    queryFn: () => forecastApi.getAll(currentYear, currentMonth, selectedDepartment?.id!),
+    queryFn: () => forecastApi.getAll(currentYear, currentMonth, selectedDepartment?.id ?? 0),
     enabled: !!selectedDepartment?.id,
   })
 

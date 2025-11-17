@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from app.db.session import SessionLocal
 from app.db.models import User
-from app.core.security import get_password_hash
+from app.utils.auth import get_password_hash
 
 
 def change_admin_password(new_password=None):

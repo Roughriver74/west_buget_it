@@ -12,6 +12,7 @@ interface CategoryFormModalProps {
   onCancel: () => void
   category?: BudgetCategory | null
   mode: 'create' | 'edit'
+  initialName?: string
 }
 
 const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
@@ -19,6 +20,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   onCancel,
   category,
   mode,
+  initialName,
 }) => {
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
@@ -35,8 +37,11 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       })
     } else if (visible && mode === 'create') {
       form.resetFields()
+      if (initialName) {
+        form.setFieldsValue({ name: initialName })
+      }
     }
-  }, [visible, category, mode, form])
+  }, [visible, category, mode, form, initialName])
 
   // Create mutation
   const createMutation = useMutation({

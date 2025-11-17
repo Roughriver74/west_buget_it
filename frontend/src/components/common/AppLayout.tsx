@@ -28,6 +28,7 @@ import {
   FundViewOutlined,
   AreaChartOutlined,
   FileSearchOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -102,6 +103,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 		key: '/founder/dashboard',
 		icon: <TrophyOutlined />,
 		label: <Link to='/founder/dashboard'>Дашборд учредителя</Link>,
+	}] : []
+
+  // Business Operation Mappings - ADMIN and MANAGER only
+  const businessOperationMappingsMenuItem = (user?.role === 'ADMIN' || user?.role === 'MANAGER') ? [{
+		key: '/business-operation-mappings',
+		icon: <SettingOutlined />,
+		label: <Link to='/business-operation-mappings'>Маппинг операций</Link>,
 	}] : []
 
   const baseMenuItems = [
@@ -180,9 +188,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 			label: 'Финансы',
 			children: [
 				{
-					key: '/bank-transactions',
+					key: 'bank-transactions-submenu',
 					icon: <BankOutlined />,
-					label: <Link to='/bank-transactions'>Банковские операции</Link>,
+					label: 'Банковские операции',
+					children: [
+						{
+							key: '/bank-transactions',
+							icon: <UnorderedListOutlined />,
+							label: <Link to='/bank-transactions'>Список транзакций</Link>,
+						},
+						{
+							key: '/bank-transactions/analytics',
+							icon: <FundViewOutlined />,
+							label: <Link to='/bank-transactions/analytics'>Аналитика</Link>,
+						},
+					],
 				},
 				{
 					key: 'credit-portfolio-submenu',
@@ -358,6 +378,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <BankOutlined />,
 					label: <Link to='/organizations'>Организации</Link>,
 				},
+				...businessOperationMappingsMenuItem,
 			],
 		},
 	]

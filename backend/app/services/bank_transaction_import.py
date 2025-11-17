@@ -288,31 +288,32 @@ class BankTransactionImporter:
                         imported_at=datetime.utcnow(),
                     )
 
-                    # AI Classification (only for DEBIT transactions - expenses)
-                    if transaction_type == BankTransactionTypeEnum.DEBIT:
-                        try:
-                            category_id, confidence, reasoning = self.classifier.classify(
-                                payment_purpose=payment_purpose,
-                                counterparty_name=counterparty_name,
-                                counterparty_inn=counterparty_inn,
-                                amount=amount,
-                                department_id=department_id
-                            )
+                    # AI Classification (for both DEBIT and CREDIT transactions)
+                    try:
+                        category_id, confidence, reasoning = self.classifier.classify(
+                            payment_purpose=payment_purpose,
+                            counterparty_name=counterparty_name,
+                            counterparty_inn=counterparty_inn,
+                            amount=amount,
+                            department_id=department_id,
+                            transaction_type=transaction_type.value  # Pass transaction type for better classification
+                        )
 
-                            if category_id:
-                                transaction.suggested_category_id = category_id
-                                transaction.category_confidence = float(confidence)
+                        if category_id:
+                            transaction.suggested_category_id = category_id
+                            transaction.category_confidence = float(confidence)
 
-                                # Auto-apply if high confidence (>90%)
-                                if confidence >= 0.9:
-                                    transaction.category_id = category_id
-                                    transaction.status = BankTransactionStatusEnum.CATEGORIZED
-                                # Mark for review if medium confidence (50-90%)
-                                elif confidence >= 0.5:
-                                    transaction.status = BankTransactionStatusEnum.NEW
-                        except Exception as e:
-                            # If classification fails, just continue without it
-                            pass
+                            # Auto-apply if high confidence (>90%)
+                            if confidence >= 0.9:
+                                transaction.category_id = category_id
+                                transaction.status = BankTransactionStatusEnum.CATEGORIZED
+                            # Mark for review if medium confidence (50-90%)
+                            elif confidence >= 0.5:
+                                transaction.status = BankTransactionStatusEnum.NEEDS_REVIEW
+
+                    except Exception as e:
+                        # If classification fails, just continue without it
+                        pass
 
                     self.db.add(transaction)
                     imported += 1

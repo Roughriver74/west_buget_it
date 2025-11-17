@@ -151,6 +151,12 @@ class BankTransactionStatusEnum(str, enum.Enum):
     IGNORED = "IGNORED"  # Проигнорирована (не относится к учету)
 
 
+class PaymentSourceEnum(str, enum.Enum):
+    """Enum for payment source (bank or cash)"""
+    BANK = "BANK"  # Банк
+    CASH = "CASH"  # Касса
+
+
 class RegionEnum(str, enum.Enum):
     """Enum for regions"""
     MOSCOW = "MOSCOW"  # Москва
@@ -213,6 +219,7 @@ class BudgetCategory(Base):
     __tablename__ = "budget_categories"
     __table_args__ = (
         Index('idx_budget_category_dept_active', 'department_id', 'is_active'),
+        Index('idx_budget_category_external_id_1c_dept', 'external_id_1c', 'department_id', unique=True),  # Composite unique for 1C sync
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -226,6 +233,12 @@ class BudgetCategory(Base):
 
     # Подкатегории (hierarchical structure)
     parent_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
+
+    # 1C Integration (Catalog_СтатьиДвиженияДенежныхСредств)
+    external_id_1c = Column(String(100), nullable=True, index=True)  # Ref_Key из 1С
+    code_1c = Column(String(50), nullable=True)  # Code из 1С (например: "01-000021")
+    is_folder = Column(Boolean, default=False, nullable=False)  # Папка (группа) или элемент
+    order_index = Column(Integer, nullable=True)  # РеквизитДопУпорядочивания из 1С
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -247,14 +260,19 @@ class Contractor(Base):
     __tablename__ = "contractors"
     __table_args__ = (
         Index('idx_contractor_dept_active', 'department_id', 'is_active'),
+        Index('idx_contractor_external_id_1c_dept', 'external_id_1c', 'department_id', unique=True),  # Composite unique for 1C sync
     )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(500), nullable=False, index=True)
     short_name = Column(String(255), nullable=True)
     inn = Column(String(20), nullable=True, index=True)  # Removed unique constraint for multi-tenancy
+    kpp = Column(String(20), nullable=True)  # КПП для 1С интеграции
     contact_info = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # 1C Integration
+    external_id_1c = Column(String(100), nullable=True, index=True)  # ID в 1С (unique per department)
 
     # Bitrix24 integration
     bitrix_company_id = Column(Integer, nullable=True, index=True)  # ID компании в Битрикс24
@@ -282,11 +300,26 @@ class Organization(Base):
     legal_name = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
 
+    # 1C Integration (Organizations are shared, so external_id_1c should be unique globally)
+    external_id_1c = Column(String(100), nullable=True, unique=True, index=True)  # ID в 1С (уникален глобально)
+    full_name = Column(String(500), nullable=True)  # Полное наименование из 1С (НаименованиеПолное)
+    short_name = Column(String(255), nullable=True)  # Краткое наименование из 1С (НаименованиеСокращенное)
+    inn = Column(String(20), nullable=True, index=True)  # ИНН
+    kpp = Column(String(20), nullable=True)  # КПП
+    ogrn = Column(String(20), nullable=True)  # ОГРН
+    prefix = Column(String(10), nullable=True)  # Префикс (например: "ВА", "Вест")
+    okpo = Column(String(20), nullable=True)  # Код по ОКПО
+    status_1c = Column(String(50), nullable=True)  # Статус из 1С ("Действует", "Ликвидирована")
+
+    # Department for tracking which department imported (optional for shared entities)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     expenses = relationship("Expense", back_populates="organization")
+    department_rel = relationship("Department", foreign_keys=[department_id])
 
     def __repr__(self):
         return f"<Organization {self.name}>"
@@ -298,6 +331,7 @@ class Expense(Base):
     __table_args__ = (
         Index('idx_expense_dept_status', 'department_id', 'status'),
         Index('idx_expense_dept_date', 'department_id', 'request_date'),
+        Index('idx_expense_external_id_1c_dept', 'external_id_1c', 'department_id', unique=True),  # Composite unique for 1C sync
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -328,6 +362,7 @@ class Expense(Base):
     # Import tracking
     imported_from_ftp = Column(Boolean, default=False, nullable=False)  # Загружена из FTP
     needs_review = Column(Boolean, default=False, nullable=False)  # Требует проверки категории
+    external_id_1c = Column(String(100), nullable=True, index=True)  # ID документа в 1С (для синхронизации)
 
     # Bitrix24 integration
     bitrix_task_id = Column(Integer, nullable=True, index=True)  # ID задачи в Битрикс24
@@ -1664,10 +1699,19 @@ class BankTransaction(Base):
     counterparty_kpp = Column(String(9), nullable=True)  # КПП контрагента
     counterparty_account = Column(String(20), nullable=True)  # Счет контрагента
     counterparty_bank = Column(String(500), nullable=True)  # Банк контрагента
-    counterparty_bik = Column(String(9), nullable=True)  # БИК банка контрагента
+    counterparty_bik = Column(String(20), nullable=True)  # БИК банка контрагента (SWIFT/BIC code)
 
     # Назначение платежа
     payment_purpose = Column(Text, nullable=True)  # Назначение платежа (основа для AI классификации)
+    business_operation = Column(String(100), nullable=True, index=True)  # ХозяйственнаяОперация из 1С (для авто-категоризации)
+
+    # Источник платежа
+    payment_source = Column(
+        Enum(PaymentSourceEnum),
+        nullable=True,
+        default=PaymentSourceEnum.BANK,
+        index=True
+    )  # Источник: банк или касса
 
     # Наша организация
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
@@ -2015,3 +2059,53 @@ class FinImportLog(Base):
 
     def __repr__(self):
         return f"<FinImportLog(id={self.id}, source_file='{self.source_file}', status='{self.status}')>"
+
+
+class BusinessOperationMapping(Base):
+    """
+    Model for mapping 1C Business Operations (ХозяйственнаяОперация) to Budget Categories
+
+    Гибкая таблица для настройки соответствия хозяйственных операций из 1С
+    и категорий бюджета. Позволяет настраивать маппинг для каждого отдела отдельно.
+    """
+    __tablename__ = "business_operation_mappings"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Хозяйственная операция из 1С
+    business_operation = Column(String(100), nullable=False, index=True)
+
+    # Связь с категорией бюджета
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+
+    # Приоритет (чем выше - тем важнее, для случаев когда одна операция может быть в нескольких категориях)
+    priority = Column(Integer, default=10, nullable=False)
+
+    # Уверенность маппинга (0.0-1.0)
+    confidence = Column(Numeric(5, 4), default=0.98, nullable=False)
+
+    # Комментарий (зачем этот маппинг)
+    notes = Column(Text, nullable=True)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    category_rel = relationship("BudgetCategory")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+
+    # Unique constraint: одна операция -> одна категория в рамках отдела
+    __table_args__ = (
+        Index('ix_business_operation_mapping_unique',
+              'business_operation', 'department_id', 'category_id', unique=True),
+    )
+
+    def __repr__(self):
+        return f"<BusinessOperationMapping(id={self.id}, operation='{self.business_operation}', category_id={self.category_id})>"

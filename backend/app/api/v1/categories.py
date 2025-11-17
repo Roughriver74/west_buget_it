@@ -200,8 +200,16 @@ def update_category(
     # Update fields
     update_data = category.model_dump(exclude_unset=True)
 
+    # Only ADMIN/MANAGER can change department_id
+    if 'department_id' in update_data and update_data['department_id'] is not None:
+        if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only ADMIN or MANAGER can change department"
+            )
+        log_info(f"Department change requested: {db_category.department_id} -> {update_data['department_id']}", "CategoryUpdate")
+
     # Log what we're updating
-    from app.utils.logger import log_info
     log_info(f"Updating category {category_id} with data: {update_data}", "CategoryUpdate")
 
     for field, value in update_data.items():

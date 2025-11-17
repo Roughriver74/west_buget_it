@@ -298,7 +298,14 @@ const ForecastPage = () => {
     if (!editingData) return
 
     // Удаляем поля, которые не нужны для обновления (read-only)
-    const { category, contractor, organization, created_at, updated_at, ...dataToSend } = editingData as any
+    const {
+      category: _category,
+      contractor: _contractor,
+      organization: _organization,
+      created_at: _createdAt,
+      updated_at: _updatedAt,
+      ...dataToSend
+    } = editingData as any
 
     updateMutation.mutate({
       id,

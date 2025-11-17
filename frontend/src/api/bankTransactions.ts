@@ -13,6 +13,8 @@ import type {
   BulkStatusUpdateRequest,
   BankTransactionStatus,
   BankTransactionType,
+  BankTransactionAnalytics,
+  BankTransactionAnalyticsParams,
 } from '@/types/bankTransaction'
 
 export const bankTransactionsApi = {
@@ -22,6 +24,7 @@ export const bankTransactionsApi = {
     limit?: number
     status?: BankTransactionStatus
     transaction_type?: BankTransactionType
+    payment_source?: 'BANK' | 'CASH'
     category_id?: number
     organization_id?: number
     department_id?: number
@@ -30,16 +33,24 @@ export const bankTransactionsApi = {
     search?: string
     only_unprocessed?: boolean
     has_expense?: boolean
+    account_number?: string
+    account_is_null?: boolean
   }): Promise<BankTransactionList> => {
     const { data } = await apiClient.get('/bank-transactions', { params })
     return data
   },
 
-  // Get statistics
+  // Get statistics (with all filters for accurate totals)
   getStats: async (params?: {
     department_id?: number
+    status?: BankTransactionStatus
+    transaction_type?: BankTransactionType
+    payment_source?: 'BANK' | 'CASH'
     date_from?: string
     date_to?: string
+    search?: string
+    account_number?: string
+    account_is_null?: boolean
   }): Promise<BankTransactionStats> => {
     const { data } = await apiClient.get('/bank-transactions/stats', { params })
     return data
@@ -190,7 +201,7 @@ export const bankTransactionsApi = {
     return data
   },
 
-  // Sync from 1C OData
+  // Sync from 1C OData (Background Task)
   syncFromOData: async (params: {
     odata_url: string
     username: string
@@ -202,16 +213,40 @@ export const bankTransactionsApi = {
     date_to?: string
     timeout?: number
   }): Promise<{
-    success: boolean
-    total_fetched: number
-    created: number
-    updated: number
-    skipped: number
-    errors: any[]
-    message?: string
-    error?: string
+    task_id: string
+    message: string
+    status: string
+    department: {
+      id: number
+      name: string
+    }
   }> => {
     const { data } = await apiClient.post('/bank-transactions/odata/sync', params)
+    return data
+  },
+
+  // Get OData sync task status
+  getSyncStatus: async (taskId: string): Promise<{
+    task_id: string
+    status: 'STARTED' | 'COMPLETED' | 'FAILED'
+    started_at: string
+    completed_at?: string
+    result?: {
+      total_fetched: number
+      created: number
+      updated: number
+      skipped: number
+      auto_categorized: number
+    }
+    error?: string
+  }> => {
+    const { data } = await apiClient.get(`/bank-transactions/odata/sync/status/${taskId}`)
+    return data
+  },
+
+  // Get comprehensive analytics
+  getAnalytics: async (params?: BankTransactionAnalyticsParams): Promise<BankTransactionAnalytics> => {
+    const { data } = await apiClient.get('/bank-transactions/analytics', { params })
     return data
   },
 }
