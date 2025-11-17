@@ -16,10 +16,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ssh root@31.129.107.178
 ```
 
-**Production deployment**: See [Coolify Setup Guide](docs/COOLIFY_SETUP.md)
 
 **Troubleshooting deployment issues**:
-- [Coolify Fix Guide](docs/COOLIFY_FIX.md) - решение проблем с API URL и CORS
+
 - [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
 - [Memory Optimization](docs/MEMORY_OPTIMIZATION.md) - решение проблемы потери доступа через 15-20 минут (OOM)
 - [Memory Fix Quick Reference](docs/MEMORY_FIX.md) - краткая памятка по проблеме с памятью
