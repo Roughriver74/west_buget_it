@@ -232,7 +232,7 @@ const OrganizationsPage = () => {
             }
           )
 
-          const { statistics, message: msg } = response.data
+          const { statistics } = response.data
 
           message.success(
             `Синхронизация завершена! Создано: ${statistics.total_created}, Обновлено: ${statistics.total_updated}, Пропущено: ${statistics.total_skipped}`
