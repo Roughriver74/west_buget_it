@@ -26,8 +26,20 @@ from app.db.models import (
     User,
     UserRoleEnum
 )
-from app.core.logging import log_info, log_error, log_warning
 import argparse
+
+
+# Simple logging functions
+def log_info(msg: str, prefix: str = "INFO"):
+    print(f"[{prefix}] {msg}")
+
+
+def log_error(msg: str):
+    print(f"[ERROR] {msg}")
+
+
+def log_warning(msg: str):
+    print(f"[WARNING] {msg}")
 
 
 # Default mappings for standard 1C business operations
