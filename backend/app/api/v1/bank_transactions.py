@@ -217,6 +217,9 @@ def get_bank_transactions_stats(
     payment_source: Optional[str] = Query(None, description="Filter by payment source (BANK/CASH)"),
     account_number: Optional[str] = Query(None, description="Filter by our account number"),
     account_is_null: bool = Query(False, description="Filter transactions without account number"),
+    organization_id: Optional[int] = Query(None, description="Filter by organization"),
+    has_expense: Optional[bool] = Query(None, description="Filter by presence of linked expense"),
+    only_unprocessed: bool = Query(False, description="Show NEW and NEEDS_REVIEW only"),
     date_from: Optional[date] = Query(None, description="Filter by date from"),
     date_to: Optional[date] = Query(None, description="Filter by date to"),
     search: Optional[str] = Query(None, description="Search in counterparty_name, counterparty_inn, payment_purpose"),
@@ -249,7 +252,12 @@ def get_bank_transactions_stats(
         query = query.filter(BankTransaction.transaction_date <= date_to)
 
     # Status filter
-    if status:
+    if only_unprocessed:
+        query = query.filter(BankTransaction.status.in_([
+            BankTransactionStatusEnum.NEW,
+            BankTransactionStatusEnum.NEEDS_REVIEW
+        ]))
+    elif status:
         query = query.filter(BankTransaction.status == status)
 
     # Transaction type filter (DEBIT/CREDIT)
@@ -270,6 +278,13 @@ def get_bank_transactions_stats(
         query = query.filter(BankTransaction.account_number == account_number)
     elif account_is_null:
         query = query.filter(BankTransaction.account_number.is_(None))
+    if organization_id:
+        query = query.filter(BankTransaction.organization_id == organization_id)
+    if has_expense is not None:
+        if has_expense:
+            query = query.filter(BankTransaction.expense_id.isnot(None))
+        else:
+            query = query.filter(BankTransaction.expense_id.is_(None))
 
     # Search filter
     if search:

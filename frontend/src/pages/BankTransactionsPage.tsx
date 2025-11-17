@@ -35,10 +35,12 @@ import {
   TagOutlined,
   UploadOutlined,
   WalletOutlined,
+  DownOutlined,
+  UpOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { bankTransactionsApi, categoriesApi } from '@/api'
+import { bankTransactionsApi, categoriesApi, organizationsApi } from '@/api'
 import CategoryCreateModal from '@/components/references/categories/CategoryCreateModal'
 import type { BudgetCategory } from '@/types'
 import { BankTransactionStatus, BankTransactionType } from '@/types/bankTransaction'
@@ -87,6 +89,9 @@ const BankTransactionsPage = () => {
   const [accountFilter, setAccountFilter] = useState<{ value: string | null; label: string } | null>(
     null
   )
+  const [organizationFilter, setOrganizationFilter] = useState<number | undefined>(undefined)
+  const [accountBreakdownCollapsed, setAccountBreakdownCollapsed] = useState(true)
+  const [collapsedAccounts, setCollapsedAccounts] = useState<Record<string, boolean>>({})
 
   // Modals
   const [importModalOpen, setImportModalOpen] = useState(false)
@@ -126,6 +131,7 @@ const BankTransactionsPage = () => {
       search: search || undefined,
       only_unprocessed: onlyUnprocessed,
       department_id: selectedDepartment?.id,
+      organization_id: organizationFilter,
     }),
     [
       transactionType,
@@ -134,6 +140,7 @@ const BankTransactionsPage = () => {
       search,
       onlyUnprocessed,
       selectedDepartment?.id,
+      organizationFilter,
     ]
   )
 
@@ -322,6 +329,12 @@ const BankTransactionsPage = () => {
   const { data: categories } = useQuery({
     queryKey: ['categories', selectedDepartment?.id],
     queryFn: () => categoriesApi.getAll({ department_id: selectedDepartment?.id, is_active: true }),
+  })
+
+  // Fetch organizations for filters
+  const { data: organizations, isLoading: organizationsLoading } = useQuery({
+    queryKey: ['organizations', selectedDepartment?.id],
+    queryFn: () => organizationsApi.getAll({ is_active: true }),
   })
 
   // Fetch matching expenses
@@ -550,6 +563,20 @@ const BankTransactionsPage = () => {
     },
     [formatAccountNumber]
   )
+
+  const toggleAccountBreakdownVisibility = useCallback(() => {
+    setAccountBreakdownCollapsed((prev) => !prev)
+  }, [])
+
+  const toggleAccountCardCollapse = useCallback((key: string) => {
+    setCollapsedAccounts((prev) => {
+      const current = prev[key] ?? true
+      return {
+        ...prev,
+        [key]: !current,
+      }
+    })
+  }, [])
 
   const paymentSourceMeta: Record<'BANK' | 'CASH', { label: string; color: string; icon: ReactNode }> = {
     BANK: {
@@ -1227,86 +1254,130 @@ const BankTransactionsPage = () => {
       )}
 
       {/* Account breakdown cards */}
-      {shouldShowAccountBreakdown && (
-        <Card
-          style={{ marginBottom: 16 }}
-          title={
-            <Space align="center">
-              <BankOutlined />
-              <span>Приход / расход по счетам</span>
-            </Space>
-          }
-        >
-          {bankBreakdownLoading ? (
-            <div className="account-breakdown-loading">Загрузка разбивки по счетам...</div>
-          ) : bankAccountBreakdown && bankAccountBreakdown.length > 0 ? (
-            <div className="account-breakdown-grid">
-              {bankAccountBreakdown.map((bank) => {
-                const accountValue = bank.account ?? null
-                const isActive = !!accountFilter && accountFilter.value === accountValue
-                return (
-                  <div
-                    key={`${bank.key}-${bank.organization || 'unknown'}`}
-                    className={`account-breakdown-card${isActive ? ' account-breakdown-card--active' : ''}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleAccountCardClick(bank)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        handleAccountCardClick(bank)
-                      }
-                    }}
-                  >
-                    <div className="account-breakdown-card__header">
-                      <span className="account-breakdown-card__account">
-                        {bank.account ? formatAccountNumber(bank.account) : 'Счёт не указан'}
-                      </span>
-                      <span className="account-breakdown-card__count">{bank.count} шт.</span>
-                    </div>
-                    <div className="account-breakdown-card__org">
-                      <Text strong>{bank.organization || 'Организация не указана'}</Text>
-                      {bank.department && (
-                        <Tag className="account-breakdown-card__dept" icon={<TagOutlined />}>
-                          {bank.department}
-                        </Tag>
+      {shouldShowAccountBreakdown &&
+        (accountBreakdownCollapsed ? (
+          <div
+            style={{
+              marginBottom: 8,
+              display: 'flex',
+              justifyContent: 'flex-start',
+            }}
+          >
+            <Button
+              type="dashed"
+              icon={<DownOutlined />}
+              onClick={toggleAccountBreakdownVisibility}
+            >
+              Показать блок счетов
+            </Button>
+          </div>
+        ) : (
+          <Card
+            style={{ marginBottom: 16 }}
+            title={
+              <Space align="center">
+                <BankOutlined />
+                <span>Приход / расход по счетам</span>
+              </Space>
+            }
+            extra={
+              <Button
+                type="link"
+                icon={<UpOutlined />}
+                onClick={toggleAccountBreakdownVisibility}
+              >
+                Свернуть блок
+              </Button>
+            }
+          >
+            {bankBreakdownLoading ? (
+              <div className="account-breakdown-loading">Загрузка разбивки по счетам...</div>
+            ) : bankAccountBreakdown && bankAccountBreakdown.length > 0 ? (
+              <div className="account-breakdown-grid">
+                {bankAccountBreakdown.map((bank) => {
+                  const accountValue = bank.account ?? null
+                  const isActive = !!accountFilter && accountFilter.value === accountValue
+                  const cardKey = String(bank.key)
+                  const isCollapsed = collapsedAccounts[cardKey] ?? true
+                  return (
+                    <div
+                      key={`${bank.key}-${bank.organization || 'unknown'}`}
+                      className={`account-breakdown-card${isActive ? ' account-breakdown-card--active' : ''}${isCollapsed ? ' account-breakdown-card--collapsed' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleAccountCardClick(bank)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleAccountCardClick(bank)
+                        }
+                      }}
+                    >
+                      <div className="account-breakdown-card__header">
+                        <span className="account-breakdown-card__account">
+                          {bank.account ? formatAccountNumber(bank.account) : 'Счёт не указан'}
+                        </span>
+                        <Space size={8} align="center">
+                          <span className="account-breakdown-card__count">{bank.count} шт.</span>
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={isCollapsed ? <DownOutlined /> : <UpOutlined />}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleAccountCardCollapse(cardKey)
+                            }}
+                            aria-label={isCollapsed ? 'Развернуть карточку счёта' : 'Свернуть карточку счёта'}
+                          />
+                        </Space>
+                      </div>
+                      {!isCollapsed && (
+                        <>
+                          <div className="account-breakdown-card__org">
+                            <Text strong>{bank.organization || 'Организация не указана'}</Text>
+                            {bank.department && (
+                              <Tag className="account-breakdown-card__dept" icon={<TagOutlined />}>
+                                {bank.department}
+                              </Tag>
+                            )}
+                          </div>
+                          <div className="account-breakdown-card__metrics">
+                            <div className="account-breakdown-card__metric">
+                              <span>Приход</span>
+                              <strong className="credit">+{formatCurrency(bank.credit)}</strong>
+                            </div>
+                            <div className="account-breakdown-card__metric">
+                              <span>Расход</span>
+                              <strong className="debit">-{formatCurrency(bank.debit)}</strong>
+                            </div>
+                            <div
+                              className={`account-breakdown-card__metric ${
+                                bank.net >= 0 ? 'net-positive' : 'net-negative'
+                              }`}
+                            >
+                              <span>Сальдо</span>
+                              <strong>
+                                {bank.net >= 0 ? '+' : '-'}
+                                {formatCurrency(Math.abs(bank.net))}
+                              </strong>
+                            </div>
+                          </div>
+                          {bank.pending > 0 && (
+                            <div className="account-breakdown-card__pending">
+                              Требует обработки: {bank.pending}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                    <div className="account-breakdown-card__metrics">
-                      <div className="account-breakdown-card__metric">
-                        <span>Приход</span>
-                        <strong className="credit">+{formatCurrency(bank.credit)}</strong>
-                      </div>
-                      <div className="account-breakdown-card__metric">
-                        <span>Расход</span>
-                        <strong className="debit">-{formatCurrency(bank.debit)}</strong>
-                      </div>
-                      <div
-                        className={`account-breakdown-card__metric ${
-                          bank.net >= 0 ? 'net-positive' : 'net-negative'
-                        }`}
-                      >
-                        <span>Сальдо</span>
-                        <strong>
-                          {bank.net >= 0 ? '+' : '-'}
-                          {formatCurrency(Math.abs(bank.net))}
-                        </strong>
-                      </div>
-                    </div>
-                    {bank.pending > 0 && (
-                      <div className="account-breakdown-card__pending">
-                        Требует обработки: {bank.pending}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <Empty description="Нет данных по счетам" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-          )}
-        </Card>
-      )}
+                  )
+                })}
+              </div>
+            ) : (
+              <Empty description="Нет данных по счетам" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
+          </Card>
+        ))}
 
       {/* Filters */}
       <Card style={{ marginBottom: 16 }}>
@@ -1459,6 +1530,20 @@ const BankTransactionsPage = () => {
           </div>
 
           <Space wrap>
+            <Select
+              placeholder="Организация"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ minWidth: 220 }}
+              loading={organizationsLoading}
+              value={organizationFilter}
+              onChange={(value) => setOrganizationFilter(value ?? undefined)}
+              options={(organizations || []).map((org) => ({
+                value: org.id,
+                label: org.name,
+              }))}
+            />
             <Search
               placeholder="Поиск по контрагенту, ИНН, назначению..."
               style={{ width: 350 }}

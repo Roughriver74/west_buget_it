@@ -73,6 +73,15 @@ const BankTransactionsAnalyticsPage: React.FC = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
+  // Handle date range change
+  const handleDateRangeChange = (dates: [Dayjs | null, Dayjs | null] | null) => {
+    if (dates && dates[0] && dates[1]) {
+      setDateRange([dates[0], dates[1]])
+    } else {
+      setDateRange(null)
+    }
+  }
+
   // Reset filters
   const handleResetFilters = () => {
     setYear(new Date().getFullYear())
@@ -185,7 +194,7 @@ const BankTransactionsAnalyticsPage: React.FC = () => {
             </label>
             <RangePicker
               value={dateRange}
-              onChange={setDateRange}
+              onChange={handleDateRangeChange}
               style={{ width: '100%' }}
               format="YYYY-MM-DD"
             />
