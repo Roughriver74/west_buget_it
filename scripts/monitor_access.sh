@@ -122,7 +122,7 @@ while true; do
         # Попытка автоматического рестарта proxy после 3 неудач
         if [ $CONSECUTIVE_FAILURES -eq 3 ]; then
             log "${YELLOW}⚠️  3 неудачные попытки подряд - рестарт proxy...${NC}"
-            ssh "$SERVER" "docker restart coolify-proxy" 2>&1 | tee -a "$LOG_FILE"
+            ssh "$SERVER" "docker restart traefik" 2>&1 | tee -a "$LOG_FILE"
             log "Ожидание 30 секунд после рестарта..."
             sleep 30
         fi

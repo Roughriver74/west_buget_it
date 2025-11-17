@@ -249,7 +249,7 @@ OCR_DPI=300
    - [ ] Обновить docker-compose.yml
    - [ ] Тестировать локально в Docker
 
-2. **Coolify**
+2. **Docker**
    - [ ] Обновить build configuration
    - [ ] Добавить env variables
    - [ ] Деплой на production

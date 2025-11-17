@@ -51,6 +51,7 @@ export const bankTransactionsApi = {
     search?: string
     account_number?: string
     account_is_null?: boolean
+    category_id?: number
     organization_id?: number
     has_expense?: boolean
     only_unprocessed?: boolean

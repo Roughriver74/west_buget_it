@@ -48,7 +48,7 @@ ssh root@93.189.228.52
 
 # Найти имя frontend контейнера
 docker ps | grep frontend
-# Пример: coolify-prod-frontend-abc123
+# Пример: docker-prod-frontend-abc123
 
 # Проверить может ли frontend достучаться до backend
 docker exec <frontend_container_name> ping -c 3 backend
@@ -63,7 +63,7 @@ docker exec <frontend_container_name> ping -c 3 backend
 ```bash
 # Найти реальное имя/IP backend контейнера
 docker ps | grep backend
-# Пример: coolify-prod-backend-xyz789
+# Пример: docker-prod-backend-xyz789
 
 # Проверить в какой сети находятся контейнеры
 docker network ls
@@ -78,12 +78,12 @@ docker network inspect <network_name>
 proxy_pass http://backend:8000;
 
 # Стало (используйте реальное имя):
-proxy_pass http://coolify-prod-backend-xyz789:8000;
+proxy_pass http://docker-prod-backend-xyz789:8000;
 ```
 
-**Вариант B: Использовать имя сервиса из Coolify**
+**Вариант B: Использовать имя сервиса из Docker**
 
-В Coolify обычно сервисы доступны по имени приложения. Проверьте имя backend приложения в Coolify.
+в Docker обычно сервисы доступны по имени приложения. Проверьте имя backend приложения в Docker.
 
 ```nginx
 proxy_pass http://<backend_service_name>:8000;
@@ -93,7 +93,7 @@ proxy_pass http://<backend_service_name>:8000;
 
 Если backend развернут на отдельном домене:
 
-### В Coolify Frontend настройках:
+### в Docker Frontend настройках:
 
 **Environment Variables:**
 ```bash
@@ -104,7 +104,7 @@ VITE_API_URL=https://budget-west.shknv.ru/api/v1
 
 **Rebuild frontend** после изменения переменных!
 
-### В Coolify Backend настройках:
+### в Docker Backend настройках:
 
 **Environment Variables:**
 ```bash
@@ -137,7 +137,7 @@ docker ps | grep backend
 docker exec <backend_container> env | grep CORS
 
 # Если CORS_ORIGINS не содержит ваш домен:
-# Обновите в Coolify Backend -> Environment Variables:
+# Обновите в Docker Backend -> Environment Variables:
 CORS_ORIGINS=["https://budget-west.shknv.ru","http://localhost:5173"]
 
 # Restart backend
@@ -197,14 +197,14 @@ echo -e "\n=== 5. Backend логи (последние 20 строк) ==="
 ssh root@93.189.228.52 "docker ps --format '{{.Names}}' | grep backend | head -1 | xargs docker logs --tail 20"
 ```
 
-## Рекомендованное решение для Coolify
+## Рекомендованное решение для Docker
 
-**Шаг 1**: В Coolify Frontend:
+**Шаг 1**: в Docker Frontend:
 ```bash
 VITE_API_URL=/api
 ```
 
-**Шаг 2**: В Coolify Backend:
+**Шаг 2**: в Docker Backend:
 ```bash
 CORS_ORIGINS=["https://budget-west.shknv.ru"]
 ```

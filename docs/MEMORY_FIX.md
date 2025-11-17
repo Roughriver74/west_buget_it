@@ -43,8 +43,8 @@ git add docker-compose.prod.yml backend/entrypoint.sh docs/
 git commit -m "fix: optimize memory usage to prevent OOM kills"
 git push origin main
 
-# 2. Деплой в Coolify (автоматически через webhook)
-# Или вручную: нажать "Redeploy" в Coolify UI
+# 2. Деплой в Docker (автоматически через webhook)
+# Или вручную: нажать "Redeploy" в Docker UI
 ```
 
 ## 📊 Ожидаемый результат

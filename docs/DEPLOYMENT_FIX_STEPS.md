@@ -16,9 +16,9 @@ git commit -m "fix: add health endpoint with API prefix for proper frontend conn
 git push origin main
 ```
 
-### Шаг 2: Настройка Frontend в Coolify
+### Шаг 2: Настройка Frontend в Docker
 
-1. Откройте **Frontend** приложение в Coolify (https://budget-west.shknv.ru:8000)
+1. Откройте **Frontend** приложение в Docker (https://budget-west.shknv.ru:8000)
 2. Перейдите в раздел **Environment Variables**
 3. Найдите переменную `VITE_API_URL`
 4. **Измените значение на**: `/api` (без кавычек)
@@ -26,14 +26,14 @@ git push origin main
 
 ### Шаг 3: Rebuild Backend
 
-1. Откройте **Backend** приложение в Coolify
+1. Откройте **Backend** приложение в Docker
 2. Нажмите **Rebuild** (не Restart!)
 3. Дождитесь завершения сборки (обычно 2-3 минуты)
 4. Проверьте логи на наличие ошибок
 
 ### Шаг 4: Rebuild Frontend
 
-1. Откройте **Frontend** приложение в Coolify
+1. Откройте **Frontend** приложение в Docker
 2. **ВАЖНО**: Нажмите **Rebuild** (не Restart!)
    - Rebuild пересоздаст контейнер с новыми переменными окружения
    - Restart просто перезапустит существующий контейнер
@@ -107,7 +107,7 @@ Browser
   ↓
 https://budget-west.shknv.ru
   ↓
-Coolify Proxy (Traefik)
+Docker Proxy (Traefik)
   ↓
 Frontend Container (nginx)
   ↓ /api/* → proxy_pass http://backend:8000
@@ -130,7 +130,7 @@ Backend Container (FastAPI)
 Если по какой-то причине нужен api.budget-west.shknv.ru:
 
 1. Создайте DNS запись: `api.budget-west.shknv.ru A 93.189.228.52`
-2. В Coolify Backend добавьте домен: `api.budget-west.shknv.ru`
+2. в Docker Backend добавьте домен: `api.budget-west.shknv.ru`
 3. В Frontend установите: `VITE_API_URL=https://api.budget-west.shknv.ru/api/v1`
 4. В Backend добавьте в CORS: `https://api.budget-west.shknv.ru`
 
@@ -138,6 +138,6 @@ Backend Container (FastAPI)
 
 ## Контакты для помощи
 
-- Документация Coolify: https://coolify.io/docs
-- GitHub Issues: https://github.com/coollabsio/coolify/issues
-- Документация проекта: `/docs/COOLIFY_FIX.md`
+- Документация Docker: https://docker.io/docs
+- GitHub Issues: https://github.com/coollabsio/docker/issues
+- Документация проекта: `/docs/docker_FIX.md`

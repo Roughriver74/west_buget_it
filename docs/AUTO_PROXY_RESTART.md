@@ -2,10 +2,10 @@
 
 ## Проблема
 
-После деплоя новой версии приложения через Coolify, Traefik proxy не всегда автоматически подхватывает новые Docker labels и маршруты контейнеров. Это приводит к:
+После деплоя новой версии приложения через Docker, Traefik proxy не всегда автоматически подхватывает новые Docker labels и маршруты контейнеров. Это приводит к:
 - Timeout при обращении к frontend/backend
 - 504 Gateway Timeout на API запросах
-- Необходимости ручного рестарта proxy: `docker restart coolify-proxy`
+- Необходимости ручного рестарта proxy: `docker restart traefik`
 
 ## Решение
 
@@ -127,7 +127,7 @@ journalctl -u docker-events-proxy-restart.service -n 10
 
 ### Проверка После Деплоя
 ```bash
-# Сразу после деплоя от Coolify проверить:
+# Сразу после деплоя от Docker проверить:
 journalctl -u docker-events-proxy-restart.service --since "2 minutes ago"
 
 # Должно быть сообщение о рестарте proxy
@@ -189,10 +189,10 @@ systemctl daemon-reload
 ## История Изменений
 
 - **2025-11-05**: Создан автоматический сервис для решения проблемы с Traefik после деплоя
-- **Причина**: После каждого деплоя через Coolify требовался ручной рестарт proxy
+- **Причина**: После каждого деплоя через Docker требовался ручной рестарт proxy
 - **Решение**: Docker events listener с автоматическим рестартом
 
 ## См. Также
 
-- [COOLIFY_SETUP.md](COOLIFY_SETUP.md) - Настройка деплоя через Coolify
-- [COOLIFY_FIX.md](COOLIFY_FIX.md) - Решение проблем с CORS и API URL
+- [docker_SETUP.md](docker_SETUP.md) - Настройка деплоя через Docker
+- [docker_FIX.md](docker_FIX.md) - Решение проблем с CORS и API URL

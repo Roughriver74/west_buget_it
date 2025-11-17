@@ -111,19 +111,19 @@ for container in $CONTAINERS; do
     log ""
 done
 
-# Проверка Coolify proxy
-log_section "7. Проверка Coolify Proxy"
-PROXY_STATUS=$(ssh "$SERVER" "docker ps --filter 'name=coolify-proxy' --format '{{.Status}}'")
+# Проверка Traefik proxy
+log_section "7. Проверка Traefik Proxy"
+PROXY_STATUS=$(ssh "$SERVER" "docker ps --filter 'name=traefik' --format '{{.Status}}'")
 if [ -n "$PROXY_STATUS" ]; then
     log "Статус прокси: $PROXY_STATUS"
 
     # Проверка последних рестартов прокси
-    PROXY_RESTARTS=$(ssh "$SERVER" "docker inspect --format='{{.RestartCount}}' coolify-proxy 2>/dev/null")
+    PROXY_RESTARTS=$(ssh "$SERVER" "docker inspect --format='{{.RestartCount}}' traefik 2>/dev/null")
     log "Количество рестартов: $PROXY_RESTARTS"
 
     # Проверка логов прокси на ошибки
     log "--- Последние ошибки прокси ---"
-    PROXY_ERRORS=$(ssh "$SERVER" "docker logs coolify-proxy --since 30m 2>&1 | grep -i -E '(error|fail|timeout)' | tail -n 10")
+    PROXY_ERRORS=$(ssh "$SERVER" "docker logs traefik --since 30m 2>&1 | grep -i -E '(error|fail|timeout)' | tail -n 10")
     if [ -n "$PROXY_ERRORS" ]; then
         log "${YELLOW}Найдены ошибки в прокси:${NC}"
         echo "$PROXY_ERRORS" | tee -a "$LOG_FILE"
@@ -131,7 +131,7 @@ if [ -n "$PROXY_STATUS" ]; then
         log "${GREEN}✅ Ошибок в прокси не найдено${NC}"
     fi
 else
-    log "${YELLOW}⚠️  Coolify proxy не найден${NC}"
+    log "${YELLOW}⚠️  Traefik proxy не найден${NC}"
 fi
 log ""
 

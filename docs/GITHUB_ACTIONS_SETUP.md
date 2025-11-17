@@ -239,12 +239,12 @@ jobs:
       - name: Deployment Ready
         run: |
           echo "✅ All checks passed!"
-          echo "🚀 Ready for deployment to Coolify"
+          echo "🚀 Ready for deployment to Docker"
           echo "Branch: ${{ github.ref_name }}"
           echo "Commit: ${{ github.sha }}"
           echo ""
-          echo "Coolify will automatically deploy this commit if auto-deploy is enabled."
-          echo "Otherwise, deploy manually from Coolify dashboard."
+          echo "Docker will automatically deploy this commit if auto-deploy is enabled."
+          echo "Otherwise, deploy manually from Docker dashboard."
 
   # ============================================
   # Summary
@@ -315,7 +315,7 @@ git push
 
 ### Deployment Ready
 - ✅ Уведомляет о готовности к деплою
-- ✅ Готовность к автодеплою на Coolify
+- ✅ Готовность к автодеплою через Docker
 
 ## Опциональные настройки
 
@@ -335,17 +335,17 @@ git push
 
 Это предотвратит мерж PR с неуспешными тестами!
 
-## Интеграция с Coolify
+## Интеграция с Docker
 
 После настройки GitHub Actions:
 
-1. В Coolify включите **Auto Deploy**
+1. в Docker включите **Auto Deploy**
 2. Укажите ветку для деплоя (например, `main`)
-3. Coolify будет автоматически деплоить после успешного прохождения CI
+3. Docker будет автоматически деплоить после успешного прохождения CI
 
 **Workflow:**
 ```
-Push to GitHub → GitHub Actions CI → ✅ Tests Pass → Coolify Auto-Deploy
+Push to GitHub → GitHub Actions CI → ✅ Tests Pass → Docker Auto-Deploy
 ```
 
 ## Troubleshooting
@@ -370,4 +370,4 @@ Push to GitHub → GitHub Actions CI → ✅ Tests Pass → Coolify Auto-Deploy
 
 ---
 
-**Готово!** Теперь у вас полноценный CI/CD pipeline с автоматическими тестами и деплоем на Coolify! 🚀
+**Готово!** Теперь у вас полноценный CI/CD pipeline с автоматическими тестами и деплоем через Docker! 🚀

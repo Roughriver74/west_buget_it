@@ -7,9 +7,9 @@
 - `tesseract-ocr` - для распознавания текста
 - Русский и английский языковые пакеты
 
-## Деплой на Coolify (3 шага)
+## Деплой через Docker (3 шага)
 
-### 1️⃣ Откройте Coolify
+### 1️⃣ Откройте Docker
 ```
 https://budget-west.shknv.ru
 ```
@@ -42,7 +42,7 @@ cd /root/west_buget_it  # или ваш путь к проекту
 
 ## Альтернатива: Ручной деплой через SSH
 
-Если не используете Coolify:
+Если не используете Docker:
 
 ```bash
 # Подключитесь к серверу
@@ -125,11 +125,11 @@ docker exec <backend_container_name> tesseract --list-langs
    docker-compose -f docker-compose.prod.yml build --no-cache backend
    ```
 
-### ❌ Проблема: "Coolify not using updated Dockerfile"
+### ❌ Проблема: "Docker not using updated Dockerfile"
 
 **Решение:**
-Coolify кэширует слои Docker. Принудительно пересоберите:
-1. В Coolify откройте Backend settings
+Docker кэширует слои Docker. Принудительно пересоберите:
+1. в Docker откройте Backend settings
 2. Найдите опцию **"Build Options"** или **"Advanced"**
 3. Включите **"No Cache"** или **"Force Rebuild"**
 4. Нажмите **"Rebuild"**
@@ -165,7 +165,7 @@ chmod +x check_ocr_deps.sh
    docker logs <backend_container> -f --tail 100
    ```
 
-2. **Проверьте логи Coolify:**
+2. **Проверьте логи Docker:**
    - В веб-интерфейсе: Logs → Backend
 
 3. **Создайте issue в GitHub:**

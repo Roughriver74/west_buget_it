@@ -71,6 +71,11 @@ type AccountBreakdownEntry = {
   pending: number
 }
 
+type AccountBreakdownResult = {
+  entries: AccountBreakdownEntry[]
+  usedCategoryIds: number[]
+}
+
 const BankTransactionsPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
@@ -89,6 +94,7 @@ const BankTransactionsPage = () => {
   const [accountFilter, setAccountFilter] = useState<{ value: string | null; label: string } | null>(
     null
   )
+  const [categoryFilter, setCategoryFilter] = useState<number | undefined>(undefined)
   const [organizationFilter, setOrganizationFilter] = useState<number | undefined>(undefined)
   const [accountBreakdownCollapsed, setAccountBreakdownCollapsed] = useState(true)
   const [collapsedAccounts, setCollapsedAccounts] = useState<Record<string, boolean>>({})
@@ -132,6 +138,7 @@ const BankTransactionsPage = () => {
       only_unprocessed: onlyUnprocessed,
       department_id: selectedDepartment?.id,
       organization_id: organizationFilter,
+      category_id: categoryFilter,
     }),
     [
       transactionType,
@@ -141,6 +148,7 @@ const BankTransactionsPage = () => {
       onlyUnprocessed,
       selectedDepartment?.id,
       organizationFilter,
+      categoryFilter,
     ]
   )
 
@@ -336,6 +344,7 @@ const BankTransactionsPage = () => {
     queryKey: ['organizations', selectedDepartment?.id],
     queryFn: () => organizationsApi.getAll({ is_active: true }),
   })
+
 
   // Fetch matching expenses
   const { data: matchingSuggestions, isLoading: matchingLoading } = useQuery({
@@ -545,6 +554,11 @@ const BankTransactionsPage = () => {
     setPage(1)
   }, [])
 
+  const clearCategoryFilter = useCallback(() => {
+    setCategoryFilter(undefined)
+    setPage(1)
+  }, [])
+
   const handleAccountCardClick = useCallback(
     (entry: AccountBreakdownEntry) => {
       setAccountFilter((current) => {
@@ -699,19 +713,17 @@ const BankTransactionsPage = () => {
   const bankBreakdownKey = useMemo(() => ['bankBreakdown', baseFilterParams], [baseFilterParams])
 
   const { data: bankAccountBreakdown, isLoading: bankBreakdownLoading } = useQuery<
-    AccountBreakdownEntry[]
+    AccountBreakdownResult
   >({
     queryKey: bankBreakdownKey,
-    queryFn: async (): Promise<AccountBreakdownEntry[]> => {
+    queryFn: async (): Promise<AccountBreakdownResult> => {
       const limit = 500
       let skip = 0
       let processed = 0
       let total = 0
       let hasMore = true
-      const summary: Record<
-        string,
-        AccountBreakdownEntry
-      > = {}
+      const summary: Record<string, AccountBreakdownEntry> = {}
+      const usedCategoryIds = new Set<number>()
 
       while (hasMore) {
         const response = await bankTransactionsApi.getTransactions({
@@ -722,6 +734,9 @@ const BankTransactionsPage = () => {
         total = response.total
         response.items.forEach((item) => {
           const accountKey = item.account_number || '—'
+          if (item.category_id) {
+            usedCategoryIds.add(item.category_id)
+          }
           if (!summary[accountKey]) {
             summary[accountKey] = {
               key: accountKey,
@@ -759,18 +774,44 @@ const BankTransactionsPage = () => {
         }
       }
 
-      return Object.values(summary)
+      const entries = Object.values(summary)
         .map((entry) => ({
           ...entry,
           net: entry.credit - entry.debit,
         }))
-        .sort((a, b) => (b.credit + b.debit) - (a.credit + a.debit))
+        .sort((a, b) => b.credit + b.debit - (a.credit + a.debit))
+
+      return {
+        entries,
+        usedCategoryIds: Array.from(usedCategoryIds),
+      }
     },
     enabled: !isNaN(data?.total ?? 0) && (data?.total ?? 0) > 0,
   })
 
   const shouldShowAccountBreakdown =
-    bankBreakdownLoading || (bankAccountBreakdown && bankAccountBreakdown.length > 0)
+    bankBreakdownLoading || (bankAccountBreakdown && bankAccountBreakdown.entries.length > 0)
+
+  const usedCategoryIds = bankAccountBreakdown?.usedCategoryIds || []
+
+  const categoryFilterOptions = useMemo(() => {
+    if (!categories || usedCategoryIds.length === 0) return []
+    const nameById = new Map<number, string>()
+    categories.forEach((category) => {
+      nameById.set(category.id, category.name)
+    })
+    return usedCategoryIds
+      .map((id) => ({
+        value: id,
+        label: nameById.get(id) || `Категория #${id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru'))
+  }, [categories, usedCategoryIds])
+
+  const selectedCategoryOption = useMemo(
+    () => categoryFilterOptions.find((option) => option.value === categoryFilter),
+    [categoryFilterOptions, categoryFilter]
+  )
 
   const columns: ColumnsType<BankTransaction> = [
     {
@@ -1292,9 +1333,9 @@ const BankTransactionsPage = () => {
           >
             {bankBreakdownLoading ? (
               <div className="account-breakdown-loading">Загрузка разбивки по счетам...</div>
-            ) : bankAccountBreakdown && bankAccountBreakdown.length > 0 ? (
+            ) : bankAccountBreakdown && bankAccountBreakdown.entries.length > 0 ? (
               <div className="account-breakdown-grid">
-                {bankAccountBreakdown.map((bank) => {
+                {bankAccountBreakdown.entries.map((bank) => {
                   const accountValue = bank.account ?? null
                   const isActive = !!accountFilter && accountFilter.value === accountValue
                   const cardKey = String(bank.key)
@@ -1530,6 +1571,21 @@ const BankTransactionsPage = () => {
           </div>
 
           <Space wrap>
+            {categoryFilterOptions.length > 0 && (
+              <Select
+                placeholder="Категория"
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                style={{ minWidth: 220 }}
+                value={categoryFilter}
+                onChange={(value) => {
+                  setCategoryFilter(value ?? undefined)
+                  setPage(1)
+                }}
+                options={categoryFilterOptions}
+              />
+            )}
             <Select
               placeholder="Организация"
               allowClear
@@ -1568,6 +1624,19 @@ const BankTransactionsPage = () => {
                 style={{ marginLeft: 4 }}
               >
                 Счёт: {accountFilter.label}
+              </Tag>
+            )}
+            {categoryFilter && (
+              <Tag
+                color="purple"
+                closable
+                onClose={(e) => {
+                  e.preventDefault()
+                  clearCategoryFilter()
+                }}
+                style={{ marginLeft: 4 }}
+              >
+                Категория: {selectedCategoryOption?.label || `#${categoryFilter}`}
               </Tag>
             )}
           </Space>

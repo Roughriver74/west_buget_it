@@ -95,13 +95,13 @@ git commit -m "fix: increase Traefik timeout to prevent 504 Gateway Timeout
 git push origin main
 ```
 
-### 2. Деплой через Coolify
+### 2. Деплой через Docker
 
 **Вариант A: Автоматический (если настроен webhook)**
-- Coolify автоматически обнаружит изменения и задеплоит
+- Docker автоматически обнаружит изменения и задеплоит
 
 **Вариант B: Ручной деплой**
-1. Зайти в Coolify UI (https://93.189.228.52:8000)
+1. Зайти в Docker UI (https://93.189.228.52:8000)
 2. Найти проект "west-buget-it"
 3. Нажать кнопку **"Redeploy"**
 4. Дождаться завершения деплоя (~2-3 минуты)
@@ -143,7 +143,7 @@ curl -I https://api.budget-west.shknv.ru/health
 # Ожидается: Запрос завершится успешно, даже если занимает >60 секунд
 
 # 3. Мониторинг логов Traefik
-ssh root@93.189.228.52 "docker logs -f coolify-proxy"
+ssh root@93.189.228.52 "docker logs -f traefik"
 
 # 4. Мониторинг логов Backend
 ssh root@93.189.228.52 "docker logs -f \$(docker ps --filter 'name=backend-io00swck8gss4kosckwwwo88' --format '{{.Names}}' | head -1)"
@@ -172,7 +172,7 @@ curl -X GET "https://api.budget-west.shknv.ru/api/v1/analytics/annual-report?yea
 1. **Проверить глобальные timeout'ы Traefik:**
 ```bash
 # Посмотреть конфигурацию Traefik
-ssh root@93.189.228.52 "docker exec coolify-proxy cat /etc/traefik/traefik.yaml"
+ssh root@93.189.228.52 "docker exec traefik cat /etc/traefik/traefik.yaml"
 ```
 
 2. **Увеличить Gunicorn timeout:**
@@ -206,7 +206,7 @@ async def check_import_status(task_id: str):
 
 - [MEMORY_OPTIMIZATION.md](MEMORY_OPTIMIZATION.md) - Оптимизация памяти
 - [MEMORY_FIX.md](MEMORY_FIX.md) - Быстрое решение проблем с памятью
-- [COOLIFY_SETUP.md](COOLIFY_SETUP.md) - Настройка Coolify
+- [docker_SETUP.md](docker_SETUP.md) - Настройка Docker
 - [AUTO_PROXY_RESTART.md](AUTO_PROXY_RESTART.md) - Автоматический рестарт proxy
 
 ## 🎯 Технические Детали
@@ -236,7 +236,7 @@ async def check_import_status(task_id: str):
 
 ```bash
 # 1. Нет ошибок 504 в логах Traefik
-ssh root@93.189.228.52 "docker logs coolify-proxy --since 30m 2>&1 | grep -c ' 504 '"
+ssh root@93.189.228.52 "docker logs traefik --since 30m 2>&1 | grep -c ' 504 '"
 # Ожидается: 0
 
 # 2. Backend обрабатывает запросы корректно

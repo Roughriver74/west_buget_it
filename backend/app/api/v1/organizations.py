@@ -8,11 +8,13 @@ import io
 
 from app.db import get_db
 from app.utils.excel_export import encode_filename_header
-from app.db.models import Organization, User
+from app.db.models import Organization, User, UserRoleEnum
 from app.schemas import OrganizationCreate, OrganizationUpdate, OrganizationInDB
 from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
+from app.services.odata_1c_client import create_1c_client_from_env
+from app.services.organization_1c_sync import Organization1CSync
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -338,4 +340,58 @@ async def import_organizations(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при импорте: {str(e)}"
+        )
+
+
+@router.post("/sync/1c", status_code=status.HTTP_200_OK)
+def sync_organizations_from_1c(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Синхронизировать организации из 1С через OData API (ADMIN/MANAGER only)
+
+    Organizations are SHARED across all departments.
+    Any authorized ADMIN or MANAGER can sync organizations from 1C.
+    """
+    # Only ADMIN and MANAGER can sync organizations
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER can sync organizations from 1C"
+        )
+
+    try:
+        # Create 1C OData client
+        odata_client = create_1c_client_from_env()
+
+        # Test connection
+        if not odata_client.test_connection():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to connect to 1C OData service. Please check connection settings."
+            )
+
+        # Create sync service
+        sync_service = Organization1CSync(
+            db=db,
+            odata_client=odata_client,
+        )
+
+        # Run sync
+        result = sync_service.sync_organizations(batch_size=100)
+
+        # Clear cache after sync
+        cache_service.invalidate_namespace(CACHE_NAMESPACE)
+
+        # Return result
+        return result.to_dict()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(e, "1C organization sync failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Sync failed: {str(e)}"
         )

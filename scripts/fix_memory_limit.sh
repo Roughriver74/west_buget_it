@@ -37,7 +37,7 @@ echo "   Нужно пересоздать контейнер с новыми л
 echo ""
 
 echo "Варианты:"
-echo "A. Пересоздать через Coolify (рекомендуется)"
+echo "A. Пересоздать через Docker (рекомендуется)"
 echo "B. Пересоздать вручную через docker-compose"
 echo "C. Временно увеличить SWAP (не решает проблему полностью)"
 echo ""
@@ -47,7 +47,7 @@ read -p "Выберите вариант (A/B/C): " choice
 case $choice in
     [Aa])
         echo ""
-        echo "✅ Вариант A: Через Coolify"
+        echo "✅ Вариант A: Через Docker"
         echo ""
         echo "Шаги:"
         echo "1. Закоммитить изменения:"
@@ -55,8 +55,8 @@ case $choice in
         echo "   git commit -m 'fix: increase memory limit to 768MB'"
         echo "   git push origin main"
         echo ""
-        echo "2. Coolify автоматически задеплоит через webhook"
-        echo "   ИЛИ вручную: зайти в Coolify UI и нажать 'Redeploy'"
+        echo "2. Docker автоматически задеплоит через webhook"
+        echo "   ИЛИ вручную: зайти в Docker UI и нажать 'Redeploy'"
         echo ""
         ;;
 

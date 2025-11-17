@@ -14,9 +14,9 @@ Backend не разрешает CORS запросы с домена `https://api
 
 ## Решение
 
-### 1. Обновить CORS_ORIGINS в Coolify
+### 1. Обновить CORS_ORIGINS в Docker
 
-Зайдите в Coolify и обновите переменную окружения `CORS_ORIGINS` для backend сервиса:
+Зайдите в Docker и обновите переменную окружения `CORS_ORIGINS` для backend сервиса:
 
 **Текущее значение:**
 ```json
@@ -30,7 +30,7 @@ Backend не разрешает CORS запросы с домена `https://api
 
 #### Инструкция:
 
-1. Откройте Coolify UI по адресу: http://93.189.228.52:8000
+1. Откройте deployment UI по адресу: http://93.189.228.52:8000
 2. Найдите проект "IT Budget Manager" (или соответствующее название)
 3. Перейдите в раздел "Environment Variables" для backend сервиса
 4. Найдите переменную `CORS_ORIGINS`
@@ -59,15 +59,15 @@ VITE_API_URL=https://api.budget-west.shknv.ru
 ### 3. Изменения в docker-compose.prod.yml
 
 Файл `docker-compose.prod.yml` был обновлен:
-- Удалены неработающие Traefik labels (Coolify использует Caddy)
+- Удалены неработающие Traefik labels (Docker использует Caddy)
 - CORS теперь настраивается только через переменную окружения
 
 ### 4. Перезапуск сервисов
 
-После обновления переменных окружения в Coolify:
+После обновления переменных окружения в Docker:
 
 ```bash
-# Coolify автоматически перезапустит контейнер
+# Docker автоматически перезапустит контейнер
 # Или вручную через UI: Deploy > Restart
 ```
 
@@ -110,7 +110,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Почему это произошло?
 
-Coolify использует Caddy для reverse proxy, а не Traefik. Traefik labels в docker-compose.prod.yml не работали и создавали ошибки в логах. CORS должен настраиваться на уровне FastAPI приложения через переменную окружения.
+Docker использует Caddy для reverse proxy, а не Traefik. Traefik labels в docker-compose.prod.yml не работали и создавали ошибки в логах. CORS должен настраиваться на уровне FastAPI приложения через переменную окружения.
 
 ### Архитектура CORS в проекте
 
@@ -118,7 +118,7 @@ Coolify использует Caddy для reverse proxy, а не Traefik. Traefi
 Frontend (budget-west.shknv.ru)
      ↓ fetch()
 API (api.budget-west.shknv.ru)
-     ↓ Caddy proxy (Coolify)
+     ↓ Caddy proxy (Docker)
      ↓
 Backend Container :8000
      ↓ FastAPI CORS Middleware

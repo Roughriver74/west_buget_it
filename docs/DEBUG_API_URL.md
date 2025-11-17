@@ -112,7 +112,7 @@ curl http://127.0.0.1:3001/config-check
 Самый надёжный способ - использовать относительный URL:
 
 ```bash
-# В Coolify или docker-compose.prod.yml:
+# в Docker или docker-compose.prod.yml:
 VITE_API_URL=/api
 
 # Это заставит frontend использовать:

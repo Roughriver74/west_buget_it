@@ -21,7 +21,7 @@ grep "Number(r.amount" CreditDashboard.tsx
 Если `Number()` отсутствует - нужен деплой новой версии.
 
 ### Исправление
-Выполните деплой через Coolify или вручную:
+Выполните деплой через Docker или вручную:
 ```bash
 git pull origin main
 cd frontend
@@ -200,7 +200,7 @@ npm run build
 ```bash
 cd ../backend
 docker-compose restart backend
-# или через Coolify
+# или через Docker
 ```
 
 ### Шаг 4: Очистить Redis кэш

@@ -60,7 +60,7 @@ Pillow==11.0.0         # Обработка изображений
 
 ## Инструкции по деплою
 
-### Вариант A: Coolify (Рекомендуется)
+### Вариант A: Docker (Рекомендуется)
 
 #### Шаг 1: Закоммитьте изменения
 
@@ -70,9 +70,9 @@ git commit -m "fix: add OCR dependencies (tesseract, poppler-utils) to productio
 git push origin main
 ```
 
-#### Шаг 2: Rebuild в Coolify
+#### Шаг 2: Rebuild в Docker
 
-1. Откройте Coolify веб-интерфейс: https://west-it.ru
+1. Откройте Docker веб-интерфейс: https://west-it.ru
 2. Перейдите в Backend приложение
 3. Нажмите **"Rebuild"** (важно: НЕ "Restart"!)
 4. Дождитесь завершения сборки (займет 3-5 минут)
@@ -111,7 +111,7 @@ curl -X POST "https://api.budget-west.shknv.ru/api/v1/invoice-processing/process
 
 ### Вариант B: Ручной деплой через Docker Compose
 
-Если не используете Coolify:
+Если не используете Docker:
 
 ```bash
 ssh root@93.189.228.52
@@ -242,7 +242,7 @@ class Settings(BaseSettings):
 **Изменение настроек через environment variables:**
 
 ```bash
-# В Coolify или docker-compose.prod.yml
+# в Docker или docker-compose.prod.yml
 OCR_LANGUAGE=rus+eng  # Русский и английский
 OCR_DPI=300          # Высокое качество (медленно но точно)
 # или

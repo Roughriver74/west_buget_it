@@ -13,6 +13,8 @@ from app.services.cache import cache_service
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 from app.utils.excel_export import encode_filename_header
+from app.services.odata_1c_client import create_1c_client_from_env
+from app.services.category_1c_sync import Category1CSync
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -521,4 +523,76 @@ async def import_categories(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error importing file: {str(e)}"
+        )
+
+
+@router.post("/sync/1c", status_code=status.HTTP_200_OK)
+def sync_categories_from_1c(
+    department_id: Optional[int] = Query(None, description="Department ID (required for sync)"),
+    include_folders: bool = Query(False, description="Include folders/groups from 1C"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Синхронизировать категории бюджета из 1С через OData API (ADMIN/MANAGER only)
+
+    Categories are department-specific - must specify department_id.
+    """
+    # Only ADMIN and MANAGER can sync categories
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN and MANAGER can sync categories from 1C"
+        )
+
+    # Department ID is required for category sync
+    if department_id is None:
+        # Use current user's department if not specified
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Department ID is required for category sync"
+            )
+        department_id = current_user.department_id
+
+    try:
+        # Create 1C OData client
+        odata_client = create_1c_client_from_env()
+
+        # Test connection
+        if not odata_client.test_connection():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to connect to 1C OData service. Please check connection settings."
+            )
+
+        # Create sync service
+        sync_service = Category1CSync(
+            db=db,
+            odata_client=odata_client,
+            department_id=department_id,
+        )
+
+        # Run sync
+        result = sync_service.sync_categories(
+            batch_size=100,
+            include_folders=include_folders
+        )
+
+        # Clear cache after sync
+        cache_service.invalidate_namespace(CACHE_NAMESPACE)
+
+        # Return result with department info
+        result_dict = result.to_dict()
+        result_dict["department_id"] = department_id
+
+        return result_dict
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_error(e, "1C category sync failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Sync failed: {str(e)}"
         )

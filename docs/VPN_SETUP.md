@@ -140,7 +140,7 @@ script-security 2
 
 Backend приложение должно использовать следующие параметры для доступа к 1С:
 
-**Environment variables** (в Coolify или .env):
+**Environment variables** (в Docker или .env):
 ```bash
 ODATA_1C_URL=http://10.10.100.77/trade/odata/standard.odata
 ODATA_1C_USERNAME=odata.user
@@ -218,7 +218,7 @@ ssh root@31.129.107.178 journalctl -u openvpn-client@1c-vpn | grep -i error
 
 ⚠️ **Важно**:
 - VPN credentials хранятся в `/etc/openvpn/client/1c-vpn.conf` (root:root 600)
-- OData credentials хранятся в environment variables (Coolify Secrets)
+- OData credentials хранятся в environment variables (Docker Secrets)
 - Файл `client08.ovpn` содержит приватные ключи - **НЕ КОММИТИТЬ В GIT**
 - Backup конфига: периодически делайте backup `/etc/openvpn/client/`
 
@@ -295,5 +295,5 @@ ssh root@31.129.107.178 'openvpn --config /etc/openvpn/client/1c-vpn.conf --verb
 ## Связь с другими документами
 
 - [1C Expense Requests Sync](1C_EXPENSE_REQUESTS_SYNC.md) - использует VPN для доступа к OData
-- [Coolify Setup](COOLIFY_SETUP.md) - конфигурация environment variables
+- [Docker Setup](docker_SETUP.md) - конфигурация environment variables
 - [OData 1C Client](../backend/app/services/odata_1c_client.py) - Python клиент для работы с 1С

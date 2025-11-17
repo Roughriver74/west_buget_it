@@ -47,7 +47,7 @@ if ssh "$SERVER" "docker exec '$BACKEND_CONTAINER' which pdfinfo" > /dev/null 2>
 else
     echo "❌ poppler-utils НЕ установлен - ТРЕБУЕТСЯ REBUILD!"
     echo ""
-    echo "Выполните rebuild в Coolify или запустите:"
+    echo "Выполните rebuild контейнера:"
     echo "  ssh $SERVER 'cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml build backend && docker-compose -f docker-compose.prod.yml up -d backend'"
 fi
 
@@ -77,7 +77,7 @@ if ssh "$SERVER" "docker exec '$BACKEND_CONTAINER' which tesseract" > /dev/null 
 else
     echo "❌ tesseract-ocr НЕ установлен - ТРЕБУЕТСЯ REBUILD!"
     echo ""
-    echo "Выполните rebuild в Coolify или запустите:"
+    echo "Выполните rebuild контейнера:"
     echo "  ssh $SERVER 'cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml build backend && docker-compose -f docker-compose.prod.yml up -d backend'"
 fi
 

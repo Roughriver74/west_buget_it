@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Typography, Card, Table, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckOutlined, CloudSyncOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { organizationsApi } from '@/api'
@@ -24,6 +24,7 @@ const OrganizationsPage = () => {
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [syncLoading, setSyncLoading] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -211,6 +212,59 @@ const OrganizationsPage = () => {
     })
   }
 
+  const handleSyncFrom1C = async () => {
+    Modal.confirm({
+      title: 'Загрузить организации из 1С?',
+      content: 'Будет выполнена синхронизация организаций из 1С. Новые организации будут созданы, существующие - обновлены.',
+      okText: 'Загрузить',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        setSyncLoading(true)
+        try {
+          const token = localStorage.getItem('token')
+          const response = await axios.post(
+            `${API_BASE}/organizations/sync/1c`,
+            {},
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          )
+
+          const { statistics, message: msg } = response.data
+
+          message.success(
+            `Синхронизация завершена! Создано: ${statistics.total_created}, Обновлено: ${statistics.total_updated}, Пропущено: ${statistics.total_skipped}`
+          )
+
+          if (statistics.errors && statistics.errors.length > 0) {
+            Modal.warning({
+              title: 'Предупреждения при синхронизации',
+              content: (
+                <div>
+                  {statistics.errors.map((error: string, index: number) => (
+                    <div key={index}>{error}</div>
+                  ))}
+                </div>
+              ),
+              width: 600,
+            })
+          }
+
+          queryClient.invalidateQueries({ queryKey: ['organizations'] })
+        } catch (error: any) {
+          console.error('1C sync error:', error)
+          message.error(
+            `Ошибка при синхронизации: ${error.response?.data?.detail || error.message}`
+          )
+        } finally {
+          setSyncLoading(false)
+        }
+      },
+    })
+  }
+
   const columns = [
     {
       title: 'Название',
@@ -340,6 +394,14 @@ const OrganizationsPage = () => {
 
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
+          <Button
+            icon={<CloudSyncOutlined />}
+            onClick={handleSyncFrom1C}
+            loading={syncLoading}
+            type="primary"
+          >
+            Загрузить из 1С
+          </Button>
           <Button icon={<DownloadOutlined />} onClick={handleExport}>
             Экспорт в Excel
           </Button>

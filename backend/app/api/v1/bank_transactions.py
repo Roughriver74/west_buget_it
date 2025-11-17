@@ -217,6 +217,7 @@ def get_bank_transactions_stats(
     payment_source: Optional[str] = Query(None, description="Filter by payment source (BANK/CASH)"),
     account_number: Optional[str] = Query(None, description="Filter by our account number"),
     account_is_null: bool = Query(False, description="Filter transactions without account number"),
+    category_id: Optional[int] = Query(None, description="Filter by category"),
     organization_id: Optional[int] = Query(None, description="Filter by organization"),
     has_expense: Optional[bool] = Query(None, description="Filter by presence of linked expense"),
     only_unprocessed: bool = Query(False, description="Show NEW and NEEDS_REVIEW only"),
@@ -278,6 +279,8 @@ def get_bank_transactions_stats(
         query = query.filter(BankTransaction.account_number == account_number)
     elif account_is_null:
         query = query.filter(BankTransaction.account_number.is_(None))
+    if category_id:
+        query = query.filter(BankTransaction.category_id == category_id)
     if organization_id:
         query = query.filter(BankTransaction.organization_id == organization_id)
     if has_expense is not None:

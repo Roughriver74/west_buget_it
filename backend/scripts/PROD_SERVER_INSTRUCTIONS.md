@@ -94,9 +94,9 @@ docker-compose restart backend
 docker-compose restart frontend
 ```
 
-### Через Coolify
+### Через Docker
 
-Зайдите в панель Coolify и сделайте **Restart** для:
+Зайдите в панель Docker и сделайте **Restart** для:
 - Backend service
 - Frontend service
 

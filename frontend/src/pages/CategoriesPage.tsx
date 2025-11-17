@@ -1,17 +1,20 @@
 import React, { useState } from 'react'
 import { Typography, Card, Space, Button, Upload, message, Modal } from 'antd'
-import { DownloadOutlined, UploadOutlined, DeleteOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
+import { DownloadOutlined, UploadOutlined, DeleteOutlined, CheckOutlined, CloseOutlined, CloudSyncOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import CategoryTable from '@/components/references/categories/CategoryTable'
+import { useDepartment } from '@/contexts/DepartmentContext'
 
 const { Title, Paragraph } = Typography
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 const CategoriesPage: React.FC = () => {
+  const { selectedDepartment } = useDepartment()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [syncLoading, setSyncLoading] = useState(false)
 
   const handleExport = () => {
     const url = `${API_BASE}/categories/export`
@@ -158,6 +161,64 @@ const CategoriesPage: React.FC = () => {
     })
   }
 
+  const handleSyncFrom1C = async () => {
+    if (!selectedDepartment) {
+      message.error('Выберите отдел для синхронизации категорий')
+      return
+    }
+
+    Modal.confirm({
+      title: 'Загрузить категории из 1С?',
+      content: `Будет выполнена синхронизация категорий бюджета из 1С для отдела "${selectedDepartment.name}". Новые категории будут созданы, существующие - обновлены.`,
+      okText: 'Загрузить',
+      cancelText: 'Отмена',
+      onOk: async () => {
+        setSyncLoading(true)
+        try {
+          const token = localStorage.getItem('token')
+          const response = await axios.post(
+            `${API_BASE}/categories/sync/1c?department_id=${selectedDepartment.id}`,
+            {},
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          )
+
+          const { statistics, message: msg } = response.data
+
+          message.success(
+            `Синхронизация завершена! Создано: ${statistics.total_created}, Обновлено: ${statistics.total_updated}, Пропущено: ${statistics.total_skipped}`
+          )
+
+          if (statistics.errors && statistics.errors.length > 0) {
+            Modal.warning({
+              title: 'Предупреждения при синхронизации',
+              content: (
+                <div>
+                  {statistics.errors.map((error: string, index: number) => (
+                    <div key={index}>{error}</div>
+                  ))}
+                </div>
+              ),
+              width: 600,
+            })
+          }
+
+          window.location.reload()
+        } catch (error: any) {
+          console.error('1C sync error:', error)
+          message.error(
+            `Ошибка при синхронизации: ${error.response?.data?.detail || error.message}`
+          )
+        } finally {
+          setSyncLoading(false)
+        }
+      },
+    })
+  }
+
   return (
     <div>
       <Title level={2}>Справочник статей расходов</Title>
@@ -167,6 +228,15 @@ const CategoriesPage: React.FC = () => {
       </Paragraph>
 
       <Space style={{ marginBottom: 16 }} wrap>
+        <Button
+          icon={<CloudSyncOutlined />}
+          onClick={handleSyncFrom1C}
+          loading={syncLoading}
+          type="primary"
+          disabled={!selectedDepartment}
+        >
+          Загрузить из 1С
+        </Button>
         <Button icon={<DownloadOutlined />} onClick={handleExport}>
           Экспорт в Excel
         </Button>

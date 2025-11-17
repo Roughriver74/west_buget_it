@@ -2,13 +2,13 @@
 set -e
 
 # Database Migration Script
-# Migrates database from old Coolify server to new production server
+# Migrates database from old Docker server to new production server
 
 echo "==========================================="
-echo "Database Migration: Coolify → Production"
+echo "Database Migration: Docker → Production"
 echo "==========================================="
 echo ""
-echo "From: 93.189.228.52 (Coolify)"
+echo "From: 93.189.228.52 (Docker)"
 echo "To: 31.129.107.178 (Production)"
 echo ""
 
@@ -16,7 +16,7 @@ echo ""
 OLD_SERVER="93.189.228.52"
 NEW_SERVER="31.129.107.178"
 
-# Old database (Coolify)
+# Old database (Docker)
 OLD_CONTAINER="postgres-sskow88ckgsk4ossc8s8440k-093812936523"
 OLD_DB_NAME="west_fin_dwh"
 OLD_DB_USER="west_user"

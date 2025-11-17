@@ -36,7 +36,7 @@ dmesg -T | grep -i "out of memory"
 - **Итого: 4 × 250MB = ~1GB памяти** только для backend!
 
 **На сервере также работают:**
-- Coolify (350MB)
+- Docker (350MB)
 - PostgreSQL (46MB + 46MB)
 - Redis (11MB + 6MB)
 - Frontend (5MB)
@@ -127,7 +127,7 @@ exec gunicorn app.main:app \
 
 ## 🚀 Деплой Исправления
 
-### Вариант 1: Через Coolify (Рекомендуется)
+### Вариант 1: Через Docker (Рекомендуется)
 
 1. **Commit изменения в Git:**
 ```bash
@@ -136,9 +136,9 @@ git commit -m "fix: optimize memory usage - reduce workers and add memory limits
 git push origin main
 ```
 
-2. **Деплой в Coolify:**
-   - Coolify автоматически обнаружит изменения (webhook)
-   - Или вручную: нажмите **"Redeploy"** в Coolify UI
+2. **Деплой в Docker:**
+   - Docker автоматически обнаружит изменения (webhook)
+   - Или вручную: нажмите **"Redeploy"** в Docker UI
 
 3. **Проверка:**
 ```bash
@@ -154,7 +154,7 @@ ssh root@93.189.228.52 'docker stats --no-stream'
 # SSH на сервер
 ssh root@93.189.228.52
 
-# Перейти в директорию проекта (найти через Coolify или docker ps)
+# Перейти в директорию проекта (найти через Docker или docker ps)
 cd /path/to/project
 
 # Pull изменения
@@ -286,7 +286,7 @@ workers = (2 × CPU_cores) + 1
 ## 📚 Связанные Документы
 
 - [MEMORY_FIX.md](MEMORY_FIX.md) - Краткая памятка по проблеме
-- [COOLIFY_SETUP.md](COOLIFY_SETUP.md) - Настройка Coolify
+- [docker_SETUP.md](docker_SETUP.md) - Настройка Docker
 - [AUTO_PROXY_RESTART.md](AUTO_PROXY_RESTART.md) - Автоматический рестарт proxy
 - [diagnose_access_loss.sh](../diagnose_access_loss.sh) - Диагностический скрипт
 - [monitor_access.sh](../monitor_access.sh) - Мониторинг в реальном времени
