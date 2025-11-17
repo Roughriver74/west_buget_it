@@ -16,6 +16,9 @@ COPY . .
 ARG VITE_API_URL=https://budget-west.shknv.ru
 ENV VITE_API_URL=$VITE_API_URL
 
+# Clean any cached build artifacts to ensure fresh build
+RUN rm -rf dist node_modules/.vite
+
 # Build application
 RUN npm run build
 
