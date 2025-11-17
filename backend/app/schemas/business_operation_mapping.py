@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 class BusinessOperationMappingBase(BaseModel):
     """Base schema for business operation mapping"""
     business_operation: str = Field(..., description="Business operation name from 1C", max_length=100)
-    category_id: int = Field(..., description="Budget category ID")
+    category_id: Optional[int] = Field(None, description="Budget category ID (nullable for auto-created stubs)")
     priority: int = Field(default=10, ge=1, le=100, description="Priority (higher = more important)")
     confidence: Decimal = Field(default=Decimal("0.98"), ge=0, le=1, description="Confidence level (0-1)")
     notes: Optional[str] = Field(None, description="Optional notes")
@@ -54,7 +54,7 @@ class BusinessOperationMappingInDB(BaseModel):
     """Schema for business operation mapping in database"""
     id: int
     business_operation: str
-    category_id: int
+    category_id: Optional[int] = None
     category_name: Optional[str] = None
     category_type: Optional[str] = None
     priority: int

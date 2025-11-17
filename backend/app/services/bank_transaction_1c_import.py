@@ -18,7 +18,8 @@ from app.db.models import (
     PaymentSourceEnum,
     DocumentTypeEnum,
     Organization,
-    Contractor
+    Contractor,
+    BusinessOperationMapping
 )
 from app.services.odata_1c_client import OData1CClient
 from app.services.transaction_classifier import TransactionClassifier
@@ -36,6 +37,7 @@ class BankTransaction1CImportResult:
         self.total_updated = 0  # Обновлено существующих
         self.total_skipped = 0  # Пропущено (дубликаты)
         self.auto_categorized = 0  # Автоматически категоризировано
+        self.auto_stubs_created = 0  # Автоматически создано stub-маппингов
         self.errors: List[str] = []
 
     def to_dict(self) -> Dict[str, Any]:
@@ -46,6 +48,7 @@ class BankTransaction1CImportResult:
             'total_updated': self.total_updated,
             'total_skipped': self.total_skipped,
             'auto_categorized': self.auto_categorized,
+            'auto_stubs_created': self.auto_stubs_created,
             'errors': self.errors
         }
 
@@ -371,6 +374,13 @@ class BankTransaction1CImporter:
         # Парсинг данных из выписки
         transaction_data = self._parse_receipt_data(receipt_data)
 
+        # Создать stub-маппинг для хозяйственной операции (если его ещё нет)
+        if transaction_data.get('business_operation'):
+            self._ensure_business_operation_mapping_exists(
+                transaction_data['business_operation'],
+                result
+            )
+
         if existing:
             # Обновить существующую запись
             for key, value in transaction_data.items():
@@ -419,6 +429,13 @@ class BankTransaction1CImporter:
 
         # Парсинг данных
         transaction_data = self._parse_payment_data(payment_data)
+
+        # Создать stub-маппинг для хозяйственной операции (если его ещё нет)
+        if transaction_data.get('business_operation'):
+            self._ensure_business_operation_mapping_exists(
+                transaction_data['business_operation'],
+                result
+            )
 
         if existing:
             # Обновить существующую запись
@@ -469,6 +486,13 @@ class BankTransaction1CImporter:
         # Парсинг данных из ПКО
         transaction_data = self._parse_cash_receipt_data(receipt_data)
 
+        # Создать stub-маппинг для хозяйственной операции (если его ещё нет)
+        if transaction_data.get('business_operation'):
+            self._ensure_business_operation_mapping_exists(
+                transaction_data['business_operation'],
+                result
+            )
+
         if existing:
             # Обновить существующую запись
             for key, value in transaction_data.items():
@@ -517,6 +541,13 @@ class BankTransaction1CImporter:
 
         # Парсинг данных из РКО
         transaction_data = self._parse_cash_payment_data(payment_data)
+
+        # Создать stub-маппинг для хозяйственной операции (если его ещё нет)
+        if transaction_data.get('business_operation'):
+            self._ensure_business_operation_mapping_exists(
+                transaction_data['business_operation'],
+                result
+            )
 
         if existing:
             # Обновить существующую запись
@@ -873,3 +904,45 @@ class BankTransaction1CImporter:
 
         except Exception as e:
             logger.warning(f"Classification failed for transaction: {e}")
+
+    def _ensure_business_operation_mapping_exists(
+        self,
+        business_operation: str,
+        result: BankTransaction1CImportResult
+    ) -> None:
+        """
+        Создать stub-маппинг для хозяйственной операции, если его ещё нет
+
+        Args:
+            business_operation: Название хозяйственной операции из 1С
+            result: Результат импорта (для подсчёта созданных стабов)
+        """
+        if not business_operation:
+            return
+
+        # Проверить, есть ли уже маппинг для этой операции в этом отделе
+        existing = self.db.query(BusinessOperationMapping).filter(
+            BusinessOperationMapping.business_operation == business_operation,
+            BusinessOperationMapping.department_id == self.department_id
+        ).first()
+
+        if existing:
+            # Маппинг уже существует
+            return
+
+        # Создать stub-маппинг без категории
+        stub_mapping = BusinessOperationMapping(
+            business_operation=business_operation,
+            category_id=None,  # Пользователь назначит вручную через UI
+            department_id=self.department_id,
+            priority=0,  # Низкий приоритет для uncategorized stubs
+            confidence=0.0,  # Нет уверенности пока не назначена категория
+            notes="Авто-создано при импорте из 1С - требуется назначить категорию вручную",
+            is_active=False  # Неактивен пока не назначена категория
+        )
+
+        self.db.add(stub_mapping)
+        self.db.flush()
+
+        result.auto_stubs_created += 1
+        logger.debug(f"Created stub mapping for business operation: {business_operation}")

@@ -28,6 +28,15 @@ from app.schemas.invoice_processing import (
     CreateExpenseFromInvoiceResponse,
     InvoiceProcessingStats,
     OCRResult,
+    Invoice1CValidationRequest,
+    Invoice1CValidationResponse,
+    Invoice1CFoundData,
+    Create1CExpenseRequestRequest,
+    Create1CExpenseRequestResponse,
+    SuggestCategoryRequest,
+    SuggestCategoryResponse,
+    CashFlowCategoryListItem,
+    InvoiceUpdateCategoryRequest,
 )
 from app.utils.auth import get_current_active_user
 from app.services.invoice_processor import InvoiceProcessorService
@@ -578,3 +587,306 @@ async def get_processing_stats(
         success_rate=round(success_rate, 2),
         error_rate=round(error_rate, 2)
     )
+
+
+# ==================== 1C Integration ====================
+
+@router.get("/cash-flow-categories", response_model=List[CashFlowCategoryListItem])
+async def get_cash_flow_categories_for_selection(
+    department_id: Optional[int] = Query(None, description="Фильтр по отделу"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить список статей ДДС (движения денежных средств) для выбора
+
+    Возвращает только синхронизированные категории из 1С (external_id_1c заполнен)
+    Только элементы (не папки)
+    """
+    from app.db.models import BudgetCategory
+
+    query = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True,
+        BudgetCategory.external_id_1c.isnot(None),  # Только синхронизированные
+        BudgetCategory.is_folder == False  # Только элементы (не папки)
+    )
+
+    # Role-based filtering
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(BudgetCategory.department_id == department_id)
+
+    categories = query.order_by(BudgetCategory.order_index, BudgetCategory.name).all()
+
+    return [
+        CashFlowCategoryListItem(
+            id=cat.id,
+            name=cat.name,
+            code=cat.code,
+            external_id_1c=cat.external_id_1c,
+            parent_id=cat.parent_id,
+            is_folder=cat.is_folder,
+            order_index=cat.order_index
+        )
+        for cat in categories
+    ]
+
+
+@router.post("/{invoice_id}/suggest-category", response_model=SuggestCategoryResponse)
+async def suggest_cash_flow_category_for_invoice(
+    invoice_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    AI-предложение статьи ДДС на основе назначения платежа
+
+    Анализирует payment_purpose и предлагает подходящую категорию
+    """
+    # Получить invoice
+    invoice = db.query(ProcessedInvoice).filter_by(id=invoice_id).first()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invoice с ID={invoice_id} не найден"
+        )
+
+    # Проверка прав доступа
+    if current_user.role == UserRoleEnum.USER and invoice.department_id != current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому invoice"
+        )
+
+    try:
+        from app.services.invoice_to_1c_converter import InvoiceTo1CConverter
+        from app.services.odata_1c_client import create_1c_client_from_env
+
+        odata_client = create_1c_client_from_env()
+        converter = InvoiceTo1CConverter(db, odata_client)
+
+        suggested_category_id = converter.suggest_cash_flow_category(
+            payment_purpose=invoice.payment_purpose,
+            supplier_name=invoice.supplier_name,
+            total_amount=invoice.total_amount,
+            department_id=invoice.department_id
+        )
+
+        if suggested_category_id:
+            from app.db.models import BudgetCategory
+            category = db.query(BudgetCategory).filter_by(id=suggested_category_id).first()
+
+            return SuggestCategoryResponse(
+                suggested_category_id=suggested_category_id,
+                category_name=category.name if category else None,
+                confidence=75.0,  # Placeholder (можно улучшить)
+                reasoning=f"На основе назначения платежа: '{invoice.payment_purpose[:50]}...'"
+            )
+        else:
+            return SuggestCategoryResponse(
+                suggested_category_id=None,
+                category_name=None,
+                confidence=None,
+                reasoning="Не удалось автоматически определить категорию"
+            )
+
+    except Exception as e:
+        logger.error(f"Ошибка при AI-предложении категории: {e}", exc_info=True)
+        return SuggestCategoryResponse(
+            suggested_category_id=None,
+            category_name=None,
+            confidence=None,
+            reasoning=f"Ошибка: {str(e)}"
+        )
+
+
+@router.put("/{invoice_id}/category")
+async def update_invoice_category(
+    invoice_id: int,
+    request: InvoiceUpdateCategoryRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Обновить категорию (статью ДДС) для invoice
+    """
+    invoice = db.query(ProcessedInvoice).filter_by(id=invoice_id).first()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invoice с ID={invoice_id} не найден"
+        )
+
+    # Проверка прав доступа
+    if current_user.role == UserRoleEnum.USER and invoice.department_id != current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому invoice"
+        )
+
+    # Проверка существования категории
+    from app.db.models import BudgetCategory
+    category = db.query(BudgetCategory).filter_by(id=request.category_id).first()
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Категория с ID={request.category_id} не найдена"
+        )
+
+    if not category.external_id_1c:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Категория '{category.name}' не синхронизирована с 1С. external_id_1c не заполнен."
+        )
+
+    # Обновить категорию
+    invoice.category_id = request.category_id
+    db.commit()
+
+    logger.info(f"Invoice {invoice_id} category updated to {request.category_id} ({category.name})")
+
+    return {"success": True, "message": f"Категория обновлена: {category.name}"}
+
+
+@router.post("/{invoice_id}/validate-for-1c", response_model=Invoice1CValidationResponse)
+async def validate_invoice_for_1c(
+    invoice_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Валидация invoice перед отправкой в 1С
+
+    Проверяет:
+    - Обязательные поля заполнены
+    - Контрагент найден в 1С по ИНН
+    - Организация найдена в 1С
+    - Статья ДДС выбрана и синхронизирована с 1С
+    """
+    invoice = db.query(ProcessedInvoice).filter_by(id=invoice_id).first()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invoice с ID={invoice_id} не найден"
+        )
+
+    # Проверка прав доступа
+    if current_user.role == UserRoleEnum.USER and invoice.department_id != current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому invoice"
+        )
+
+    try:
+        from app.services.invoice_to_1c_converter import InvoiceTo1CConverter
+        from app.services.odata_1c_client import create_1c_client_from_env
+
+        odata_client = create_1c_client_from_env()
+        converter = InvoiceTo1CConverter(db, odata_client)
+
+        validation_result = converter.validate_invoice_for_1c(invoice)
+
+        return Invoice1CValidationResponse(
+            is_valid=validation_result.is_valid,
+            errors=validation_result.errors,
+            warnings=validation_result.warnings,
+            found_data=Invoice1CFoundData(
+                counterparty={
+                    "guid": validation_result.counterparty_guid,
+                    "name": validation_result.counterparty_name
+                } if validation_result.counterparty_guid else None,
+                organization={
+                    "guid": validation_result.organization_guid,
+                    "name": validation_result.organization_name
+                } if validation_result.organization_guid else None,
+                cash_flow_category={
+                    "guid": validation_result.cash_flow_category_guid,
+                    "name": validation_result.cash_flow_category_name
+                } if validation_result.cash_flow_category_guid else None
+            )
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка при валидации invoice {invoice_id} для 1С: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка валидации: {str(e)}"
+        )
+
+
+@router.post("/{invoice_id}/create-1c-expense-request", response_model=Create1CExpenseRequestResponse)
+async def create_1c_expense_request_from_invoice(
+    invoice_id: int,
+    request: Create1CExpenseRequestRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Создать заявку на расходование денежных средств в 1С из invoice
+
+    Требования:
+    - Invoice обработан (status = PROCESSED)
+    - Категория (статья ДДС) выбрана
+    - Контрагент существует в 1С
+    - Организация существует в 1С
+
+    Process:
+    1. Валидация invoice
+    2. Поиск контрагента и организации в 1С
+    3. Создание документа в 1С через OData
+    4. (Опционально) Загрузка прикрепленного файла
+    5. Сохранение external_id_1c в invoice
+    """
+    invoice = db.query(ProcessedInvoice).filter_by(id=invoice_id).first()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invoice с ID={invoice_id} не найден"
+        )
+
+    # Проверка прав доступа
+    if current_user.role == UserRoleEnum.USER and invoice.department_id != current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому invoice"
+        )
+
+    # Проверка что invoice еще не отправлен в 1С
+    if invoice.external_id_1c:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invoice уже отправлен в 1С (external_id_1c={invoice.external_id_1c})"
+        )
+
+    try:
+        from app.services.invoice_to_1c_converter import InvoiceTo1CConverter, InvoiceValidationError
+        from app.services.odata_1c_client import create_1c_client_from_env
+
+        odata_client = create_1c_client_from_env()
+        converter = InvoiceTo1CConverter(db, odata_client)
+
+        # Создать заявку в 1С
+        external_id_1c = converter.create_expense_request_in_1c(
+            invoice=invoice,
+            upload_attachment=request.upload_attachment
+        )
+
+        return Create1CExpenseRequestResponse(
+            success=True,
+            external_id_1c=external_id_1c,
+            message=f"Заявка на расход успешно создана в 1С (GUID: {external_id_1c})",
+            created_at=invoice.created_in_1c_at
+        )
+
+    except InvoiceValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при создании заявки в 1С для invoice {invoice_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при создании заявки в 1С: {str(e)}"
+        )

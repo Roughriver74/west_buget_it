@@ -268,3 +268,71 @@ class InvoiceProcessingStats(BaseModel):
 
     success_rate: float = Field(description="Процент успешно обработанных")
     error_rate: float = Field(description="Процент с ошибками")
+
+
+# ==================== 1C Integration Schemas ====================
+
+class Invoice1CValidationRequest(BaseModel):
+    """Запрос на валидацию счета перед отправкой в 1С"""
+    invoice_id: int = Field(..., description="ID обработанного счета")
+
+
+class Invoice1CFoundData(BaseModel):
+    """Найденные данные из 1С при валидации"""
+    counterparty: Optional[dict] = Field(None, description="Контрагент {guid, name}")
+    organization: Optional[dict] = Field(None, description="Организация {guid, name}")
+    cash_flow_category: Optional[dict] = Field(None, description="Статья ДДС {guid, name}")
+
+
+class Invoice1CValidationResponse(BaseModel):
+    """Результат валидации счета перед отправкой в 1С"""
+    is_valid: bool = Field(..., description="Прошла ли валидация")
+    errors: List[str] = Field(default_factory=list, description="Список ошибок")
+    warnings: List[str] = Field(default_factory=list, description="Предупреждения")
+    found_data: Invoice1CFoundData = Field(..., description="Найденные данные в 1С")
+
+
+class Create1CExpenseRequestRequest(BaseModel):
+    """Запрос на создание заявки на расход в 1С"""
+    invoice_id: int = Field(..., description="ID обработанного счета")
+    upload_attachment: bool = Field(default=True, description="Загружать ли прикрепленный файл")
+
+
+class Create1CExpenseRequestResponse(BaseModel):
+    """Ответ после создания заявки в 1С"""
+    success: bool
+    external_id_1c: Optional[str] = Field(None, description="GUID созданной заявки в 1С")
+    message: str
+    created_at: Optional[datetime] = None
+
+
+class SuggestCategoryRequest(BaseModel):
+    """Запрос на AI-предложение категории"""
+    invoice_id: int = Field(..., description="ID обработанного счета")
+
+
+class SuggestCategoryResponse(BaseModel):
+    """Ответ с предложенной категорией"""
+    suggested_category_id: Optional[int] = Field(None, description="ID предложенной категории")
+    category_name: Optional[str] = None
+    confidence: Optional[float] = Field(None, description="Уверенность в предложении (0-100%)")
+    reasoning: Optional[str] = Field(None, description="Обоснование выбора")
+
+
+class CashFlowCategoryListItem(BaseModel):
+    """Элемент списка статей ДДС для выбора"""
+    id: int
+    name: str
+    code: Optional[str] = None
+    external_id_1c: str = Field(..., description="GUID в 1С")
+    parent_id: Optional[int] = None
+    is_folder: bool
+    order_index: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceUpdateCategoryRequest(BaseModel):
+    """Запрос на обновление категории счета"""
+    category_id: int = Field(..., description="ID категории бюджета (статьи ДДС)")

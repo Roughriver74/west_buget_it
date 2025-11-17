@@ -2075,8 +2075,8 @@ class BusinessOperationMapping(Base):
     # Хозяйственная операция из 1С
     business_operation = Column(String(100), nullable=False, index=True)
 
-    # Связь с категорией бюджета
-    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False, index=True)
+    # Связь с категорией бюджета (nullable для авто-созданных stub записей)
+    category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
 
     # Приоритет (чем выше - тем важнее, для случаев когда одна операция может быть в нескольких категориях)
     priority = Column(Integer, default=10, nullable=False)

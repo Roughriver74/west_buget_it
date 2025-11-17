@@ -17,24 +17,37 @@ logger = logging.getLogger(__name__)
 class OData1CClient:
     """Client for 1C OData API integration"""
 
-    def __init__(self, base_url: str, username: str, password: str):
+    def __init__(self, base_url: str, username: str = None, password: str = None,
+                 custom_auth_token: str = None):
         """
         Initialize 1C OData client
 
         Args:
             base_url: Base URL for OData endpoint (e.g., http://10.10.100.77/trade/odata/standard.odata)
-            username: Username for authentication
-            password: Password for authentication
+            username: Username for authentication (if not using custom_auth_token)
+            password: Password for authentication (if not using custom_auth_token)
+            custom_auth_token: Custom authorization token (e.g., "Basic base64string")
         """
         self.base_url = base_url.rstrip('/')
         self.username = username
         self.password = password
         self.session = requests.Session()
-        self.session.auth = HTTPBasicAuth(username, password)
-        self.session.headers.update({
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        })
+
+        # Use custom auth token if provided, otherwise use username/password
+        if custom_auth_token:
+            self.session.headers.update({
+                'Authorization': custom_auth_token,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            })
+            logger.info("Using custom authorization token")
+        else:
+            self.session.auth = HTTPBasicAuth(username, password)
+            self.session.headers.update({
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            })
+            logger.info(f"Using HTTPBasicAuth with username: {username}")
 
     def _make_request(
         self,

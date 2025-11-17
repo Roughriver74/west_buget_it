@@ -4,9 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**IT Budget Manager** - Full-stack web application for managing IT department budgets with expense tracking, forecasting, payroll management, KPI system, and analytics. Written in Russian for Russian-speaking organizations.
+**IT Budget Manager** - Enterprise-grade full-stack web application for comprehensive financial management with expense/revenue tracking, forecasting, payroll, KPI system, credit portfolio management, AI-powered automation, and 1C integration. Written in Russian for Russian-speaking organizations.
 
-**Stack**: FastAPI + React/TypeScript + PostgreSQL + Docker
+**Stack**: FastAPI + React/TypeScript + PostgreSQL + Docker + Redis + APScheduler
+
+**Key Features**:
+- 💰 Budget planning & expense management (OPEX/CAPEX)
+- 📈 Revenue budget with seasonality & customer LTV
+- 🏦 AI bank transaction classification & matching
+- 💼 Credit portfolio management with FTP auto-import
+- 🧾 AI invoice OCR processing (Tesseract + GPT-4o)
+- 👔 Founder dashboard with cross-department KPIs
+- 🔄 1C OData integration (expenses, catalogs, transactions)
+- ⏰ Background automation (APScheduler)
+- 👥 Payroll & KPI-based bonuses
+- 🔐 Multi-tenancy & role-based access (5 roles)
+- 📊 Advanced analytics & forecasting
 
 ## Development Commands
 
@@ -153,7 +166,7 @@ curl -X GET "http://localhost:8000/api/v1/external/export/expenses?year=2025&for
 ```bash
 cd backend
 python scripts/import_excel.py --file ../IT_Budget_Analysis_Full.xlsx
-python scripts/import_planfact_2025.py  # Import plan/fact data for 2025
+python scripts/import_plan_fact_2025.py  # Import plan/fact data for 2025
 ```
 
 ## Critical Architecture Principles
@@ -235,18 +248,19 @@ const MyPage = () => {
 
 ### 🎭 3. Role-Based Access Control
 
-Four roles with different access levels:
+Five roles with different access levels:
 
 - **USER**: Full access to all features, but **only sees their own department data** (auto-filtered by backend)
 - **MANAGER**: Full access to all features, **can view and filter all departments**
 - **ACCOUNTANT**: Access to reference data (categories, contractors, organizations), NDFL calculator
+- **FOUNDER**: Executive dashboard with cross-department KPIs and high-level financial metrics (read-only access to all departments)
 - **ADMIN**: Full system access + user management + department management
 
 **Access Control Flow:**
 1. Frontend routes check if user has required role (via `requiredRoles` in `ProtectedRoute`)
 2. Backend API filters data by `department_id` based on user role:
    - **USER**: queries automatically filtered to `user.department_id`
-   - **MANAGER/ADMIN**: can specify `department_id` parameter to filter or see all departments
+   - **MANAGER/ADMIN/FOUNDER**: can specify `department_id` parameter to filter or see all departments
 3. All data entities have `department_id` for multi-tenancy isolation
 
 Check roles on both backend (API endpoints) and frontend (UI components).
@@ -255,7 +269,7 @@ Check roles on both backend (API endpoints) and frontend (UI components).
 
 ### Backend Structure (`backend/app/`)
 ```
-api/v1/              # API endpoints (20+ modules)
+api/v1/              # API endpoints (40 modules)
 ├── auth.py          # Authentication & JWT
 ├── expenses.py      # Expense management
 ├── budget.py        # Budget planning & tracking
@@ -265,6 +279,9 @@ api/v1/              # API endpoints (20+ modules)
 ├── kpi.py           # KPI system for performance bonuses
 ├── analytics.py     # Analytics & reporting
 ├── bank_transactions.py  # Bank transactions (NEW v0.6.0) 🏦
+├── credit_portfolio.py  # Credit portfolio management (NEW v0.8.0) 💰
+├── revenue_*.py     # Revenue budget modules (8 files, NEW v0.8.0) 📈
+├── invoice_processing.py  # AI invoice OCR & processing (NEW) 🧾
 ├── departments.py   # Department management
 ├── audit.py         # Audit logging
 └── ...              # Other endpoints
@@ -285,12 +302,15 @@ utils/               # Utilities & logging
 
 ### Frontend Structure (`frontend/src/`)
 ```
-pages/               # 30+ page components
+pages/               # 56 page components
 ├── DashboardPage.tsx
 ├── ExpensesPage.tsx
 ├── BudgetPlanPage.tsx
 ├── PayrollPlanPage.tsx
 ├── KpiManagementPage.tsx
+├── CreditPortfolioPage.tsx  # Credit portfolio (NEW v0.8.0) 💰
+├── RevenueStreamsPage.tsx   # Revenue budget (NEW v0.8.0) 📈
+├── FounderDashboardPage.tsx # Founder dashboard (NEW) 👔
 └── ...
 
 components/          # Reusable components
@@ -332,9 +352,32 @@ hooks/               # Custom React hooks
 - `employee_kpis` - KPI tracking per employee
 - `kpi_goals` - KPI goals and targets
 - `goal_achievements` - KPI achievement tracking
-- `bank_transactions` - Bank statement operations (NEW v0.6.0) 🏦
+- `bank_transactions` - Bank statement operations (v0.6.0) 🏦
+- `business_operation_mappings` - AI classification rules (v0.7.0) ⚙️
 - `audit_logs` - Audit trail (department_id nullable)
 - `attachments` - File attachments (linked via expense_id)
+
+**Credit Portfolio entities** (NEW v0.8.0) 💰:
+- `fin_organizations` - Financial organizations
+- `fin_bank_accounts` - Bank accounts
+- `fin_contracts` - Credit contracts
+- `fin_receipts` - Receipts
+- `fin_expenses` - Financial expenses
+- `fin_expense_details` - Expense line items
+- `fin_import_logs` - FTP import logs
+
+**Revenue Budget entities** (NEW v0.8.0) 📈:
+- `revenue_streams` - Revenue sources (products/services)
+- `revenue_categories` - Revenue categories
+- `revenue_plans` - Revenue planning (main table)
+- `revenue_plan_versions` - Version control with approval
+- `revenue_plan_details` - Monthly revenue details
+- `revenue_actuals` - Actual revenue records
+- `customer_metrics` - Customer LTV and churn risk
+- `seasonality_coefficients` - Seasonal adjustments
+
+**Invoice Processing entities** (NEW) 🧾:
+- `processed_invoices` - OCR + AI parsed invoices
 
 **Key indexes**: All tables have indexes on `department_id` and `is_active` for performance.
 
@@ -1310,6 +1353,1333 @@ Organization {guid} not found in 1C
 
 **Полная документация**: [1C Expense Requests Sync Guide](docs/1C_EXPENSE_REQUESTS_SYNC.md)
 
+### 🔄 1C Catalog Synchronization - Синхронизация справочников
+
+Помимо синхронизации заявок, система также поддерживает **автоматическую синхронизацию справочников** из 1С.
+
+**Синхронизируемые сущности:**
+
+#### 1. Organizations (Справочник_Организации)
+```bash
+POST /api/v1/sync-1c/organizations/sync
+```
+- Автоматическое создание/обновление организаций
+- Поля: наименование, ИНН, КПП, юридический адрес
+- external_id_1c для предотвращения дубликатов
+
+#### 2. Budget Categories (Справочник_СтатьиРасходов)
+```bash
+POST /api/v1/sync-1c/categories/sync
+```
+- Синхронизация категорий бюджета
+- Иерархическая структура (родитель-потомок)
+- Типы: OPEX, CAPEX, Tax
+
+#### 3. Contractors (Справочник_Контрагенты)
+```bash
+POST /api/v1/sync-1c/contractors/sync
+```
+- Контрагенты (поставщики, подрядчики)
+- ИНН, КПП, банковские реквизиты
+
+#### 4. Bank Transactions (Документ_ОперацииПоСчету)
+```bash
+POST /api/v1/sync-1c/bank-transactions/sync
+```
+- Банковские операции из 1С
+- Автоматическая категоризация
+- Связывание с expense requests
+
+**Сервисы:**
+- `Catalog1CSync` (`backend/app/services/catalog_1c_sync.py`)
+- `Category1CSync` (`backend/app/services/category_1c_sync.py`)
+- `Organization1CSync` (`backend/app/services/organization_1c_sync.py`)
+
+**Автоматизация через APScheduler:**
+```python
+# Daily sync (midnight)
+@scheduler.scheduled_job(CronTrigger(hour=0, minute=0))
+async def sync_1c_catalogs_daily():
+    await catalog_sync.sync_organizations()
+    await catalog_sync.sync_categories()
+    await catalog_sync.sync_contractors()
+```
+
+**Документация:**
+- 📖 [1C Catalog Sync Guide](docs/1C_CATALOG_SYNC.md)
+- 📖 [1C Catalog Sync Cron](docs/1C_CATALOG_SYNC_CRON.md)
+- 📖 [1C OData Integration](docs/1C_ODATA_INTEGRATION.md)
+
+---
+
+## 💰 Credit Portfolio Management - Финансовый портфель для ФИН отдела
+
+### Обзор функционала
+
+**Credit Portfolio** - модуль для управления финансовым портфелем компании: организации, банковские счета, кредитные договоры, поступления и расходы.
+
+**Ключевые возможности:**
+- ✅ Управление организациями и банковскими счетами
+- ✅ Кредитные договоры с параметрами (сумма, ставка, срок)
+- ✅ Учет поступлений и расходов по договорам
+- ✅ Автоматический импорт данных из Excel через FTP
+- ✅ Ежемесячная аналитика и KPI
+- ✅ Сравнение договоров и cash flow анализ
+- ✅ Интеграция с основными бюджетами
+
+### Модели данных (7 моделей)
+
+```python
+# 1. FinOrganization - Финансовые организации
+class FinOrganization(Base):
+    __tablename__ = "fin_organizations"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)  # Наименование
+    inn = Column(String(12))                     # ИНН
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 2. FinBankAccount - Банковские счета
+class FinBankAccount(Base):
+    __tablename__ = "fin_bank_accounts"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("fin_organizations.id"))
+    account_number = Column(String(20), nullable=False)
+    bank_name = Column(String(255))
+    currency = Column(String(3), default="RUB")  # RUB, USD, EUR
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 3. FinContract - Кредитные договоры
+class FinContract(Base):
+    __tablename__ = "fin_contracts"
+
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("fin_organizations.id"))
+    contract_number = Column(String(50))
+    contract_date = Column(Date)
+    contract_amount = Column(Numeric(15, 2))     # Сумма договора
+    interest_rate = Column(Numeric(5, 2))        # Процентная ставка
+    start_date = Column(Date)                    # Дата начала
+    end_date = Column(Date)                      # Дата окончания
+    status = Column(String(50))                  # ACTIVE/CLOSED
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 4. FinReceipt - Поступления
+class FinReceipt(Base):
+    __tablename__ = "fin_receipts"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("fin_contracts.id"))
+    receipt_date = Column(Date)
+    amount = Column(Numeric(15, 2))
+    description = Column(Text)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 5. FinExpense - Расходы по договорам
+class FinExpense(Base):
+    __tablename__ = "fin_expenses"
+
+    id = Column(Integer, primary_key=True)
+    contract_id = Column(Integer, ForeignKey("fin_contracts.id"))
+    expense_date = Column(Date)
+    amount = Column(Numeric(15, 2))
+    category = Column(String(100))               # INTEREST/PRINCIPAL/FEE
+    description = Column(Text)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 6. FinExpenseDetail - Детализация расходов
+class FinExpenseDetail(Base):
+    __tablename__ = "fin_expense_details"
+
+    id = Column(Integer, primary_key=True)
+    expense_id = Column(Integer, ForeignKey("fin_expenses.id"))
+    item_name = Column(String(255))
+    amount = Column(Numeric(15, 2))
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 7. FinImportLog - Логи импорта из FTP
+class FinImportLog(Base):
+    __tablename__ = "fin_import_logs"
+
+    id = Column(Integer, primary_key=True)
+    import_date = Column(DateTime, default=func.now())
+    file_name = Column(String(255))
+    status = Column(String(50))                  # SUCCESS/ERROR
+    records_imported = Column(Integer, default=0)
+    error_message = Column(Text)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+```
+
+### API Endpoints
+
+**Base path**: `/api/v1/credit-portfolio`
+
+```bash
+# Organizations
+GET    /api/v1/credit-portfolio/organizations
+POST   /api/v1/credit-portfolio/organizations
+PUT    /api/v1/credit-portfolio/organizations/{id}
+DELETE /api/v1/credit-portfolio/organizations/{id}
+
+# Bank Accounts
+GET    /api/v1/credit-portfolio/bank-accounts
+POST   /api/v1/credit-portfolio/bank-accounts
+PUT    /api/v1/credit-portfolio/bank-accounts/{id}
+DELETE /api/v1/credit-portfolio/bank-accounts/{id}
+
+# Contracts
+GET    /api/v1/credit-portfolio/contracts
+POST   /api/v1/credit-portfolio/contracts
+PUT    /api/v1/credit-portfolio/contracts/{id}
+DELETE /api/v1/credit-portfolio/contracts/{id}
+GET    /api/v1/credit-portfolio/contracts/{id}/details  # Детали договора
+
+# Receipts & Expenses
+GET    /api/v1/credit-portfolio/receipts
+POST   /api/v1/credit-portfolio/receipts
+GET    /api/v1/credit-portfolio/expenses
+POST   /api/v1/credit-portfolio/expenses
+
+# Analytics & KPI
+GET    /api/v1/credit-portfolio/analytics/monthly
+GET    /api/v1/credit-portfolio/analytics/kpi
+GET    /api/v1/credit-portfolio/analytics/cash-flow
+GET    /api/v1/credit-portfolio/analytics/contract-comparison
+
+# FTP Import
+POST   /api/v1/credit-portfolio/import/ftp  # Trigger FTP import
+GET    /api/v1/credit-portfolio/import/logs  # Import history
+```
+
+### FTP Автоматический импорт
+
+**Сервисы:**
+- `FTPImportService` (`backend/app/services/ftp_import_service.py`)
+- `CreditPortfolioParser` (`backend/app/services/credit_portfolio_parser.py`)
+- `ImportConfigManager` (`backend/app/services/import_config_manager.py`)
+
+**Workflow:**
+```
+1. ПОДКЛЮЧЕНИЕ К FTP
+   ↓
+   FTP сервер → проверка новых файлов Excel
+
+2. ЗАГРУЗКА ФАЙЛА
+   ↓
+   Download → /tmp/credit_portfolio_import_{date}.xlsx
+
+3. ПАРСИНГ
+   ↓
+   CreditPortfolioParser.parse_excel(file_path)
+   ↓
+   Определение структуры:
+   - Organizations sheet
+   - BankAccounts sheet
+   - Contracts sheet
+   - Receipts sheet
+   - Expenses sheet
+
+4. ВАЛИДАЦИЯ
+   ↓
+   Проверка обязательных полей
+   Проверка корректности данных
+
+5. ИМПОРТ
+   ↓
+   Batch insert/update (по 100 записей)
+   Create FinImportLog
+
+6. УВЕДОМЛЕНИЕ
+   ↓
+   Email notification (success/error)
+   Update dashboard statistics
+```
+
+**Конфигурация FTP** (`.env`):
+```bash
+# FTP Settings
+FTP_HOST=ftp.example.com
+FTP_PORT=21
+FTP_USERNAME=import_user
+FTP_PASSWORD=secure_password
+FTP_DIRECTORY=/credit_portfolio/import
+FTP_IMPORT_SCHEDULE=0 2 * * *  # Daily at 2 AM
+
+# Import Settings
+CREDIT_PORTFOLIO_AUTO_IMPORT=true
+CREDIT_PORTFOLIO_NOTIFY_EMAIL=finance@company.com
+```
+
+**Запуск импорта вручную:**
+```bash
+cd backend
+python scripts/run_credit_portfolio_import.py
+
+# Или через API
+curl -X POST "http://localhost:8000/api/v1/credit-portfolio/import/ftp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"department_id": 1}'
+```
+
+### Frontend страницы
+
+**5 основных страниц:**
+
+1. **CreditPortfolioPage.tsx** - Главная страница
+   - Список организаций, счетов, договоров
+   - Фильтры и поиск
+   - CRUD операции
+
+2. **CreditPortfolioContractsPage.tsx** - Управление договорами
+   - Таблица договоров с детализацией
+   - Статусы (ACTIVE/CLOSED)
+   - Сроки и суммы
+
+3. **CreditPortfolioComparePage.tsx** - Сравнение договоров
+   - Side-by-side сравнение
+   - Процентные ставки
+   - Сроки и условия
+
+4. **CreditPortfolioCashFlowPage.tsx** - Cash Flow анализ
+   - График поступлений/расходов
+   - Прогноз платежей
+   - Остатки по счетам
+
+5. **CreditPortfolioKPIPage.tsx** - KPI и аналитика
+   - Ежемесячная статистика
+   - Ключевые показатели
+   - Тренды
+
+### Интеграция с основным бюджетом
+
+```python
+# Связь с Expenses через category
+expense = Expense(
+    category_id=credit_portfolio_category_id,  # "Кредитные платежи"
+    amount=fin_expense.amount,
+    contractor_id=fin_contract.organization_id,
+    comment=f"Платеж по договору {fin_contract.contract_number}",
+    department_id=fin_expense.department_id
+)
+
+# Автоматическое создание expense при импорте
+if auto_create_expenses:
+    create_expense_from_fin_expense(fin_expense)
+```
+
+### Документация
+
+- 📖 [Credit Portfolio Overview](docs/CREDIT_PORTFOLIO_OVERVIEW.md)
+- 📖 [FTP Auto Import Guide](docs/CREDIT_PORTFOLIO_AUTO_IMPORT.md)
+- 📖 [Debug Guide](docs/CREDIT_PORTFOLIO_DEBUG.md)
+- 📖 [Final Status](docs/CREDIT_PORTFOLIO_FINAL_STATUS.md)
+- 📖 [Migration Notes](docs/CREDIT_PORTFOLIO_MIGRATION.md)
+
+### Типичные сценарии
+
+#### 1. Создание нового договора
+```bash
+curl -X POST "http://localhost:8000/api/v1/credit-portfolio/contracts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "organization_id": 1,
+    "contract_number": "КД-2025-001",
+    "contract_date": "2025-01-15",
+    "contract_amount": 5000000.00,
+    "interest_rate": 12.5,
+    "start_date": "2025-02-01",
+    "end_date": "2026-02-01",
+    "status": "ACTIVE",
+    "department_id": 1
+  }'
+```
+
+#### 2. Просмотр аналитики за месяц
+```bash
+curl "http://localhost:8000/api/v1/credit-portfolio/analytics/monthly?year=2025&month=11&department_id=1" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+#### 3. Импорт из FTP
+```bash
+# Автоматический (через cron)
+0 2 * * * cd /app/backend && python scripts/run_credit_portfolio_import.py
+
+# Ручной
+curl -X POST "http://localhost:8000/api/v1/credit-portfolio/import/ftp" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## 📈 Revenue Budget Management - Управление бюджетом доходов
+
+### Обзор функционала
+
+**Revenue Budget** - полноценный модуль для планирования и учета доходов с версионированием, customer metrics, и сезонностью.
+
+**Ключевые возможности:**
+- ✅ Источники доходов (Revenue Streams) и категории
+- ✅ Планирование доходов с версионированием (как в expenses budget)
+- ✅ Учет фактических доходов (Revenue Actuals)
+- ✅ Customer Lifetime Value (LTV) и метрики клиентов
+- ✅ Коэффициенты сезонности для прогнозирования
+- ✅ Аналитика и сравнение plan vs actual
+- ✅ Интеграция с expense budget для P&L
+
+### Модели данных (8 основных)
+
+```python
+# 1. RevenueStream - Источники дохода
+class RevenueStream(Base):
+    __tablename__ = "revenue_streams"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)   # Продукт/Услуга
+    code = Column(String(50), unique=True)
+    is_active = Column(Boolean, default=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 2. RevenueCategory - Категории доходов
+class RevenueCategory(Base):
+    __tablename__ = "revenue_categories"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)   # Прямые продажи, Подписки, Лицензии
+    code = Column(String(50), unique=True)
+    is_active = Column(Boolean, default=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 3. RevenuePlan - План доходов (главная таблица)
+class RevenuePlan(Base):
+    __tablename__ = "revenue_plans"
+
+    id = Column(Integer, primary_key=True)
+    year = Column(Integer, nullable=False)
+    name = Column(String(255))
+    version = Column(Integer, default=1)
+    is_active = Column(Boolean, default=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 4. RevenuePlanVersion - Версии плана (для approval workflow)
+class RevenuePlanVersion(Base):
+    __tablename__ = "revenue_plan_versions"
+
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(Integer, ForeignKey("revenue_plans.id"))
+    version_number = Column(Integer, nullable=False)
+    status = Column(String(50))  # DRAFT/PENDING/APPROVED/REJECTED
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 5. RevenuePlanDetail - Детали плана (по месяцам и источникам)
+class RevenuePlanDetail(Base):
+    __tablename__ = "revenue_plan_details"
+
+    id = Column(Integer, primary_key=True)
+    plan_version_id = Column(Integer, ForeignKey("revenue_plan_versions.id"))
+    stream_id = Column(Integer, ForeignKey("revenue_streams.id"))
+    category_id = Column(Integer, ForeignKey("revenue_categories.id"))
+    month = Column(Integer)  # 1-12
+    planned_amount = Column(Numeric(15, 2))
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 6. RevenueActual - Фактические доходы
+class RevenueActual(Base):
+    __tablename__ = "revenue_actuals"
+
+    id = Column(Integer, primary_key=True)
+    stream_id = Column(Integer, ForeignKey("revenue_streams.id"))
+    category_id = Column(Integer, ForeignKey("revenue_categories.id"))
+    actual_date = Column(Date, nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"))  # Опционально
+    invoice_number = Column(String(50))
+    description = Column(Text)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 7. CustomerMetrics - Метрики клиентов
+class CustomerMetrics(Base):
+    __tablename__ = "customer_metrics"
+
+    id = Column(Integer, primary_key=True)
+    customer_id = Column(Integer, nullable=False)
+    month = Column(Date)
+    revenue = Column(Numeric(15, 2))
+    ltv = Column(Numeric(15, 2))          # Customer Lifetime Value
+    churn_risk = Column(Numeric(5, 2))    # Риск оттока (0-100%)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+# 8. SeasonalityCoefficient - Коэффициенты сезонности
+class SeasonalityCoefficient(Base):
+    __tablename__ = "seasonality_coefficients"
+
+    id = Column(Integer, primary_key=True)
+    stream_id = Column(Integer, ForeignKey("revenue_streams.id"))
+    month = Column(Integer)  # 1-12
+    coefficient = Column(Numeric(5, 4))  # 0.5 = -50%, 1.5 = +50%
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+```
+
+### API Endpoints (8 модулей)
+
+**Base path**: `/api/v1/revenue`
+
+```bash
+# Revenue Streams
+GET    /api/v1/revenue/streams
+POST   /api/v1/revenue/streams
+PUT    /api/v1/revenue/streams/{id}
+DELETE /api/v1/revenue/streams/{id}
+
+# Revenue Categories
+GET    /api/v1/revenue/categories
+POST   /api/v1/revenue/categories
+PUT    /api/v1/revenue/categories/{id}
+DELETE /api/v1/revenue/categories/{id}
+
+# Revenue Plans (главный план)
+GET    /api/v1/revenue/plans
+POST   /api/v1/revenue/plans
+PUT    /api/v1/revenue/plans/{id}
+DELETE /api/v1/revenue/plans/{id}
+
+# Revenue Plan Versions (версионирование)
+GET    /api/v1/revenue/plan-versions
+POST   /api/v1/revenue/plan-versions/{id}/approve
+POST   /api/v1/revenue/plan-versions/{id}/reject
+
+# Revenue Plan Details (детали по месяцам)
+GET    /api/v1/revenue/plan-details?plan_version_id=1
+POST   /api/v1/revenue/plan-details
+PUT    /api/v1/revenue/plan-details/{id}
+POST   /api/v1/revenue/plan-details/bulk-update  # Массовое обновление
+
+# Revenue Actuals (фактические доходы)
+GET    /api/v1/revenue/actuals
+POST   /api/v1/revenue/actuals
+PUT    /api/v1/revenue/actuals/{id}
+DELETE /api/v1/revenue/actuals/{id}
+
+# Customer Metrics (метрики клиентов)
+GET    /api/v1/revenue/customer-metrics
+POST   /api/v1/revenue/customer-metrics
+GET    /api/v1/revenue/customer-metrics/ltv  # LTV аналитика
+
+# Seasonality (сезонность)
+GET    /api/v1/revenue/seasonality
+POST   /api/v1/revenue/seasonality
+PUT    /api/v1/revenue/seasonality/{id}
+GET    /api/v1/revenue/seasonality/forecast  # Прогноз с учетом сезонности
+
+# Analytics (аналитика)
+GET    /api/v1/revenue/analytics/plan-vs-actual
+GET    /api/v1/revenue/analytics/by-stream
+GET    /api/v1/revenue/analytics/by-category
+GET    /api/v1/revenue/analytics/trends
+GET    /api/v1/revenue/analytics/forecast  # Прогноз доходов
+```
+
+### Frontend страницы (8 страниц)
+
+1. **RevenueStreamsPage.tsx** - Управление источниками доходов
+2. **RevenueCategoriesPage.tsx** - Управление категориями
+3. **RevenuePlanPage.tsx** - Планирование доходов (главная)
+4. **RevenuePlanDetailsPage.tsx** - Детали плана по месяцам (как BudgetPlanDetailsTable)
+5. **RevenueActualsPage.tsx** - Учет фактических доходов
+6. **RevenueAnalyticsPage.tsx** - Аналитика plan vs actual
+7. **CustomerMetricsPage.tsx** - Метрики клиентов и LTV
+8. **SeasonalityPage.tsx** - Настройка коэффициентов сезонности
+
+### Workflow планирования
+
+```
+1. СОЗДАНИЕ ПЛАНА
+   ↓
+   Create RevenuePlan for year 2025
+   Create RevenuePlanVersion (v1, status=DRAFT)
+
+2. ЗАПОЛНЕНИЕ ДЕТАЛЕЙ
+   ↓
+   Add RevenuePlanDetail records:
+   - Stream: "Продукт А", Month: 1, Amount: 500000
+   - Stream: "Продукт Б", Month: 1, Amount: 300000
+   - ...для всех 12 месяцев
+
+3. APPROVAL WORKFLOW
+   ↓
+   Submit for approval → status=PENDING
+   Manager reviews
+   Approve → status=APPROVED
+
+4. ВЕРСИИ
+   ↓
+   При изменениях создается новая версия
+   Старые версии сохраняются для истории
+   Можно сравнивать версии side-by-side
+
+5. СРАВНЕНИЕ ПЛАН vs ФАКТ
+   ↓
+   RevenueActual records сравниваются с планом
+   Отклонения по месяцам, источникам, категориям
+   Тренды и forecast
+```
+
+### Интеграция с Expense Budget
+
+```python
+# Сводный P&L (Profit & Loss)
+def get_profit_loss_report(year: int, month: int, department_id: int):
+    # Доходы
+    revenue = db.query(func.sum(RevenueActual.amount)).filter(
+        extract('year', RevenueActual.actual_date) == year,
+        extract('month', RevenueActual.actual_date) == month,
+        RevenueActual.department_id == department_id
+    ).scalar() or 0
+
+    # Расходы
+    expenses = db.query(func.sum(Expense.amount)).filter(
+        extract('year', Expense.request_date) == year,
+        extract('month', Expense.request_date) == month,
+        Expense.department_id == department_id,
+        Expense.status == 'PAID'
+    ).scalar() or 0
+
+    # Прибыль
+    profit = revenue - expenses
+    margin = (profit / revenue * 100) if revenue > 0 else 0
+
+    return {
+        "revenue": float(revenue),
+        "expenses": float(expenses),
+        "profit": float(profit),
+        "margin_percent": float(margin)
+    }
+```
+
+### Сезонность и прогнозирование
+
+```python
+# Применение сезонных коэффициентов
+def forecast_with_seasonality(stream_id: int, base_amount: float, month: int):
+    coeff = db.query(SeasonalityCoefficient).filter_by(
+        stream_id=stream_id,
+        month=month
+    ).first()
+
+    if coeff:
+        return base_amount * float(coeff.coefficient)
+    else:
+        return base_amount  # Default: без изменений
+
+# Пример: зимний месяц (коэфф 1.3) → +30% к доходам
+# Летний месяц (коэфф 0.7) → -30% к доходам
+```
+
+### Документация
+
+- 📖 [Revenue Budget Guide](docs/REVENUE_BUDGET_GUIDE.md)
+- 📖 [Revenue Planning Workflow](docs/REVENUE_PLANNING_WORKFLOW.md)
+- 📖 [Customer LTV Calculations](docs/CUSTOMER_LTV.md)
+- 📖 [Seasonality Setup](docs/REVENUE_SEASONALITY.md)
+
+---
+
+## 🧾 AI Invoice Processing - Автоматическое распознавание счетов
+
+### Обзор функционала
+
+**Invoice Processing** - AI-powered модуль для автоматического распознавания и обработки счетов (invoices) с использованием OCR и GPT-4o.
+
+**Ключевые возможности:**
+- ✅ OCR распознавание PDF и изображений счетов (Tesseract)
+- ✅ AI парсинг через VseGPT API (GPT-4o-mini)
+- ✅ Автоматическое извлечение: сумма, дата, контрагент, позиции
+- ✅ **Интеграция с 1С: создание заявок на расход** (NEW v0.9.0) 🏢
+- ✅ Workflow: Upload → OCR → AI Parse → Review → **Create 1C Expense Request**
+- ✅ Ручная коррекция распознанных данных
+
+### Зависимости
+
+```bash
+# OCR
+pip install pytesseract pdf2image Pillow
+
+# System dependencies (macOS)
+brew install tesseract
+brew install poppler  # For PDF support
+
+# System dependencies (Ubuntu/Debian)
+apt-get install tesseract-ocr tesseract-ocr-rus poppler-utils
+
+# AI API
+# VseGPT API (GPT-4o-mini) через credentials
+```
+
+### Модель данных
+
+```python
+class ProcessedInvoice(Base):
+    __tablename__ = "processed_invoices"
+
+    id = Column(Integer, primary_key=True)
+
+    # Файл
+    file_name = Column(String(255))
+    file_path = Column(String(500))
+    file_type = Column(String(50))  # PDF/PNG/JPG
+
+    # OCR результаты
+    ocr_text = Column(Text)                  # Полный текст из OCR
+    ocr_confidence = Column(Numeric(5, 2))   # Уверенность OCR (0-100%)
+    ocr_status = Column(String(50))          # SUCCESS/ERROR
+
+    # AI парсинг
+    ai_parsed_data = Column(JSON)            # Структурированные данные
+    ai_confidence = Column(Numeric(5, 2))    # Уверенность AI (0-100%)
+
+    # Извлеченные поля
+    invoice_number = Column(String(100))
+    invoice_date = Column(Date)
+    total_amount = Column(Numeric(15, 2))
+    vat_amount = Column(Numeric(15, 2))
+    contractor_name = Column(String(255))
+    contractor_inn = Column(String(12))
+
+    # Позиции счета (JSON array)
+    line_items = Column(JSON)  # [{"name": "...", "qty": 1, "price": 1000, "total": 1000}]
+
+    # Статус обработки
+    status = Column(String(50))  # NEW/OCR_COMPLETED/AI_PARSED/REVIEWED/APPROVED/ERROR
+
+    # Связь с 1С
+    external_id_1c = Column(String(100))
+    synced_to_1c = Column(Boolean, default=False)
+    synced_at = Column(DateTime)
+
+    # Ручная коррекция
+    manually_corrected = Column(Boolean, default=False)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id"))
+    reviewed_at = Column(DateTime)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+
+    created_at = Column(DateTime, default=func.now())
+```
+
+### Сервисы
+
+#### 1. InvoiceOCRService (OCR распознавание)
+**Файл**: `backend/app/services/invoice_ocr_service.py`
+
+```python
+from app.services.invoice_ocr_service import InvoiceOCRService
+
+# Create service
+ocr_service = InvoiceOCRService()
+
+# Process PDF or image
+result = ocr_service.process_file(
+    file_path="/tmp/invoice.pdf",
+    language="rus+eng"  # Tesseract languages
+)
+
+# Result:
+# {
+#     "text": "...полный распознанный текст...",
+#     "confidence": 85.5,
+#     "status": "SUCCESS",
+#     "page_count": 2
+# }
+```
+
+#### 2. InvoiceAIParser (AI парсинг)
+**Файл**: `backend/app/services/invoice_ai_parser.py`
+
+```python
+from app.services.invoice_ai_parser import InvoiceAIParser
+
+# Create parser
+parser = InvoiceAIParser(vsegpt_api_key=settings.VSEGPT_API_KEY)
+
+# Parse OCR text
+parsed_data = parser.parse_invoice_text(ocr_text)
+
+# Result:
+# {
+#     "invoice_number": "СФ-2025-001",
+#     "invoice_date": "2025-11-17",
+#     "total_amount": 120000.00,
+#     "vat_amount": 20000.00,
+#     "contractor": {
+#         "name": "ООО Поставщик",
+#         "inn": "7701234567"
+#     },
+#     "line_items": [
+#         {"name": "Товар 1", "qty": 10, "price": 1000, "total": 10000},
+#         {"name": "Товар 2", "qty": 5, "price": 2000, "total": 10000}
+#     ],
+#     "confidence": 92.5
+# }
+```
+
+#### 3. InvoiceProcessorService (Главный сервис)
+**Файл**: `backend/app/services/invoice_processor_service.py`
+
+```python
+from app.services.invoice_processor_service import InvoiceProcessorService
+
+# Create processor
+processor = InvoiceProcessorService(db=db, department_id=1)
+
+# Full pipeline: Upload → OCR → AI Parse
+result = await processor.process_invoice_file(
+    file=uploaded_file,
+    auto_sync_to_1c=True
+)
+
+# Result:
+# ProcessedInvoice object with all fields populated
+```
+
+### API Endpoints
+
+**Base path**: `/api/v1/invoices`
+
+```bash
+# Upload and process invoice
+POST   /api/v1/invoices/upload
+  -F "file=@invoice.pdf"
+  -F "department_id=1"
+  -F "auto_parse=true"
+
+# Get processed invoices
+GET    /api/v1/invoices
+  ?status=AI_PARSED
+  &department_id=1
+
+# Get single invoice
+GET    /api/v1/invoices/{id}
+
+# Manual correction
+PUT    /api/v1/invoices/{id}/correct
+{
+  "invoice_number": "СФ-2025-001",
+  "total_amount": 120000.00,
+  "contractor_name": "ООО Поставщик"
+}
+
+# Approve invoice
+POST   /api/v1/invoices/{id}/approve
+
+# Sync to 1C
+POST   /api/v1/invoices/{id}/sync-to-1c
+
+# Re-process with AI
+POST   /api/v1/invoices/{id}/reprocess
+
+# ==================== 1C Integration (NEW v0.9.0) ====================
+
+# Get cash flow categories (статьи ДДС)
+GET    /api/v1/invoice-processing/cash-flow-categories
+  ?department_id=1
+
+# AI-suggest category
+POST   /api/v1/invoice-processing/{id}/suggest-category
+
+# Set category
+PUT    /api/v1/invoice-processing/{id}/category
+{
+  "category_id": 15
+}
+
+# Validate before sending to 1C
+POST   /api/v1/invoice-processing/{id}/validate-for-1c
+
+# Create expense request in 1C
+POST   /api/v1/invoice-processing/{id}/create-1c-expense-request
+{
+  "upload_attachment": true
+}
+```
+
+### Workflow обработки
+
+```
+1. UPLOAD
+   ↓
+   User uploads PDF/Image → /tmp/invoices/{uuid}.pdf
+
+2. OCR RECOGNITION
+   ↓
+   InvoiceOCRService.process_file()
+   ↓
+   Tesseract OCR → extracted text
+   ↓
+   Save to ProcessedInvoice.ocr_text
+   Status → OCR_COMPLETED
+
+3. AI PARSING
+   ↓
+   InvoiceAIParser.parse_invoice_text()
+   ↓
+   VseGPT API (GPT-4o-mini)
+   Prompt: "Extract structured data from this invoice: {ocr_text}"
+   ↓
+   Parse JSON response
+   ↓
+   Save to ProcessedInvoice.ai_parsed_data
+   Status → AI_PARSED
+
+4. REVIEW (Optional)
+   ↓
+   User reviews extracted data
+   ↓
+   Manual corrections if needed
+   ↓
+   Status → REVIEWED
+
+5. APPROVAL
+   ↓
+   User approves
+   ↓
+   Status → APPROVED
+
+6. SYNC TO 1C (Optional)
+   ↓
+   Create Document_СчетНаОплату in 1C via OData
+   ↓
+   synced_to_1c = true
+   external_id_1c = Ref_Key from 1C
+```
+
+### Environment Variables
+
+```bash
+# .env
+VSEGPT_API_KEY=your_vsegpt_api_key
+VSEGPT_API_URL=https://api.vsegpt.ru/v1/chat/completions
+VSEGPT_MODEL=openai/gpt-4o-mini
+
+# OCR Settings
+TESSERACT_CMD=/usr/bin/tesseract
+TESSERACT_LANGUAGES=rus+eng
+OCR_DPI=300  # Higher DPI = better quality, slower
+
+# File Storage
+INVOICE_STORAGE_PATH=/app/storage/invoices
+INVOICE_MAX_FILE_SIZE=10485760  # 10MB
+```
+
+### Frontend интеграция
+
+**Страница**: `frontend/src/pages/InvoiceProcessingPage.tsx`
+
+```typescript
+const InvoiceProcessingPage = () => {
+  const { selectedDepartment } = useDepartment()
+
+  // Upload invoice
+  const handleUpload = async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('department_id', selectedDepartment.id)
+    formData.append('auto_parse', 'true')
+
+    await api.uploadInvoice(formData)
+  }
+
+  // Review and correct
+  const handleCorrect = async (invoiceId: number, data: any) => {
+    await api.correctInvoice(invoiceId, data)
+  }
+
+  // Approve
+  const handleApprove = async (invoiceId: number) => {
+    await api.approveInvoice(invoiceId)
+  }
+}
+```
+
+### Интеграция с 1С
+
+```python
+# Sync invoice to 1C
+def sync_invoice_to_1c(invoice: ProcessedInvoice):
+    odata_client = OData1CClient()
+
+    # Create Document_СчетНаОплату
+    invoice_data = {
+        "Номер": invoice.invoice_number,
+        "Дата": invoice.invoice_date.isoformat(),
+        "Сумма": float(invoice.total_amount),
+        "Контрагент_Key": get_contractor_guid_by_inn(invoice.contractor_inn),
+        "ТабличнаяЧасть": [
+            {
+                "Номенклатура": item["name"],
+                "Количество": item["qty"],
+                "Цена": item["price"],
+                "Сумма": item["total"]
+            }
+            for item in invoice.line_items
+        ]
+    }
+
+    response = odata_client.create_document("Document_СчетНаОплату", invoice_data)
+
+    # Update invoice
+    invoice.external_id_1c = response["Ref_Key"]
+    invoice.synced_to_1c = True
+    invoice.synced_at = datetime.utcnow()
+```
+
+### Типичные сценарии
+
+#### 1. Загрузка и автоматическая обработка
+```bash
+curl -X POST "http://localhost:8000/api/v1/invoices/upload" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@invoice_001.pdf" \
+  -F "department_id=1" \
+  -F "auto_parse=true"
+```
+
+#### 2. Ручная коррекция
+```bash
+curl -X PUT "http://localhost:8000/api/v1/invoices/123/correct" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invoice_number": "СФ-2025-001",
+    "total_amount": 125000.00,
+    "contractor_inn": "7701234567"
+  }'
+```
+
+#### 3. Синхронизация с 1С
+```bash
+curl -X POST "http://localhost:8000/api/v1/invoices/123/sync-to-1c" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Troubleshooting
+
+**OCR Quality Issues:**
+```python
+# Increase DPI for better quality
+OCR_DPI=600  # Default: 300
+
+# Add preprocessing
+from PIL import Image, ImageEnhance
+
+def preprocess_image(image_path):
+    img = Image.open(image_path)
+
+    # Increase contrast
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(2.0)
+
+    # Convert to grayscale
+    img = img.convert('L')
+
+    return img
+```
+
+**AI Parsing Errors:**
+```python
+# Check API response
+logging.getLogger("app.services.invoice_ai_parser").setLevel(logging.DEBUG)
+
+# Fallback to manual parsing
+if ai_confidence < 80:
+    # Flag for manual review
+    invoice.status = "NEEDS_REVIEW"
+```
+
+### Документация 1С интеграции
+
+- 📖 **[Invoice to 1C Integration Guide](docs/INVOICE_TO_1C_INTEGRATION.md)** - Полная документация по созданию заявок на расход в 1С
+- 📖 **[Implementation Summary](docs/INVOICE_TO_1C_IMPLEMENTATION_SUMMARY.md)** - Техническая документация реализации
+
+**Workflow создания заявки в 1С:**
+1. Upload invoice → OCR → AI Parse
+2. **Выбор статьи ДДС** (cash flow category)
+3. **Валидация** (контрагент/организация найдены в 1С)
+4. **Создание заявки** через OData API
+5. Автоматическая синхронизация обратно как Expense
+
+**Требования:**
+- Контрагент должен существовать в 1С (по ИНН)
+- Организация должна существовать в 1С (buyer INN)
+- Статья ДДС должна быть синхронизирована (`external_id_1c` заполнен)
+
+**Пример:**
+```bash
+# 1. Suggest category
+POST /api/v1/invoice-processing/123/suggest-category
+
+# 2. Set category
+PUT /api/v1/invoice-processing/123/category {"category_id": 15}
+
+# 3. Validate
+POST /api/v1/invoice-processing/123/validate-for-1c
+
+# 4. Create in 1C
+POST /api/v1/invoice-processing/123/create-1c-expense-request
+```
+
+---
+
+## ⏰ Background Automation - Планировщик задач
+
+### Обзор функционала
+
+**Background Jobs** - автоматизация фоновых задач через APScheduler для регулярных операций.
+
+**Ключевые возможности:**
+- ✅ Автоматическая синхронизация с 1С (hourly/daily)
+- ✅ FTP мониторинг и импорт (credit portfolio)
+- ✅ Scheduled reports (email отчеты)
+- ✅ Bank transaction processing
+- ✅ Data cleanup tasks
+
+### Зависимости
+
+```python
+# requirements.txt
+APScheduler==3.10.4
+```
+
+### Scheduler Service
+
+**Файл**: `backend/app/services/scheduler.py`
+
+```python
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+# Create scheduler
+scheduler = AsyncIOScheduler()
+
+# Job: Sync 1C expense requests (hourly)
+@scheduler.scheduled_job(CronTrigger(hour='*', minute=0))
+async def sync_1c_expenses():
+    logger.info("Starting 1C expense sync job")
+    # Run sync for all departments
+    for dept in departments:
+        await expense_1c_sync.sync_expenses(
+            department_id=dept.id,
+            date_from=date.today() - timedelta(days=7),
+            date_to=date.today()
+        )
+
+# Job: FTP import (daily at 2 AM)
+@scheduler.scheduled_job(CronTrigger(hour=2, minute=0))
+async def ftp_import_credit_portfolio():
+    logger.info("Starting FTP import job")
+    await ftp_service.import_from_ftp()
+
+# Job: Send daily reports (daily at 8 AM)
+@scheduler.scheduled_job(CronTrigger(hour=8, minute=0))
+async def send_daily_reports():
+    logger.info("Sending daily reports")
+    await report_service.send_daily_summary()
+
+# Start scheduler
+scheduler.start()
+```
+
+### Интеграция с FastAPI
+
+**Файл**: `backend/app/main.py`
+
+```python
+from app.services.scheduler import scheduler
+
+@app.on_event("startup")
+async def startup_event():
+    # Start background scheduler
+    scheduler.start()
+    logger.info("Background scheduler started")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Stop scheduler gracefully
+    scheduler.shutdown()
+    logger.info("Background scheduler stopped")
+```
+
+### Конфигурация задач
+
+**Environment Variables**:
+```bash
+# .env
+SCHEDULER_ENABLED=true
+
+# 1C Sync
+SYNC_1C_EXPENSES_ENABLED=true
+SYNC_1C_EXPENSES_SCHEDULE=0 * * * *  # Hourly
+
+SYNC_1C_CATALOGS_ENABLED=true
+SYNC_1C_CATALOGS_SCHEDULE=0 0 * * *  # Daily at midnight
+
+# FTP Import
+FTP_IMPORT_ENABLED=true
+FTP_IMPORT_SCHEDULE=0 2 * * *  # Daily at 2 AM
+
+# Reports
+DAILY_REPORT_ENABLED=true
+DAILY_REPORT_SCHEDULE=0 8 * * *  # Daily at 8 AM
+DAILY_REPORT_RECIPIENTS=finance@company.com,cfo@company.com
+```
+
+### Доступные задачи
+
+```python
+# 1C Synchronization Jobs
+sync_1c_expenses()           # Hourly - заявки на расход
+sync_1c_catalogs()           # Daily - справочники
+sync_1c_organizations()      # Daily - организации
+sync_1c_categories()         # Daily - категории
+
+# FTP Import Jobs
+ftp_import_credit_portfolio() # Daily - кредитный портфель
+ftp_import_bank_statements()  # Daily - банковские выписки
+
+# Processing Jobs
+process_bank_transactions()   # Hourly - классификация транзакций
+detect_regular_patterns()     # Weekly - определение регулярных платежей
+
+# Reporting Jobs
+send_daily_reports()          # Daily - ежедневные отчеты
+send_weekly_summary()         # Weekly - еженедельная сводка
+send_monthly_closing()        # Monthly - закрытие месяца
+
+# Maintenance Jobs
+cleanup_old_logs()            # Daily - очистка старых логов
+cleanup_temp_files()          # Daily - очистка временных файлов
+vacuum_database()             # Weekly - оптимизация БД
+```
+
+### Мониторинг задач
+
+**API для управления задачами**:
+```bash
+# Get all scheduled jobs
+GET /api/v1/scheduler/jobs
+
+# Get job details
+GET /api/v1/scheduler/jobs/{job_id}
+
+# Trigger job manually
+POST /api/v1/scheduler/jobs/{job_id}/trigger
+
+# Pause job
+POST /api/v1/scheduler/jobs/{job_id}/pause
+
+# Resume job
+POST /api/v1/scheduler/jobs/{job_id}/resume
+```
+
+### Логирование
+
+```python
+import logging
+
+# Configure scheduler logging
+logging.getLogger('apscheduler').setLevel(logging.INFO)
+
+# Job execution logs
+@scheduler.scheduled_job(...)
+async def my_job():
+    logger.info(f"Job {my_job.__name__} started")
+    try:
+        # Job logic
+        logger.info(f"Job {my_job.__name__} completed successfully")
+    except Exception as e:
+        logger.error(f"Job {my_job.__name__} failed: {e}", exc_info=True)
+```
+
+### Документация
+
+- 📖 [APScheduler Auto Import](docs/APSCHEDULER_AUTO_IMPORT.md)
+- 📖 [1C Catalog Sync Cron](docs/1C_CATALOG_SYNC_CRON.md)
+
+---
+
+## 👔 Founder Dashboard - Панель руководителя
+
+### Обзор функционала
+
+**Founder Dashboard** - специальная панель для руководителя (FOUNDER role) с высокоуровневыми KPI и кросс-департментской аналитикой.
+
+**Ключевые возможности:**
+- ✅ Сводная финансовая информация по всем отделам
+- ✅ Ключевые KPI компании
+- ✅ Revenue vs Expenses (P&L)
+- ✅ Cash Flow прогноз
+- ✅ Top contractors и expenses
+- ✅ Тренды и отклонения от плана
+
+### FOUNDER Role
+
+```python
+class UserRoleEnum(str, enum.Enum):
+    USER = "USER"
+    MANAGER = "MANAGER"
+    ACCOUNTANT = "ACCOUNTANT"
+    FOUNDER = "FOUNDER"  # Executive read-only access
+    ADMIN = "ADMIN"
+```
+
+**Права доступа:**
+- Просмотр всех департаментов (read-only)
+- Доступ ко всем отчетам и аналитике
+- НЕ может редактировать данные (только просмотр)
+- Специальная dashboard страница
+
+### API Endpoints
+
+**Base path**: `/api/v1/founder`
+
+```bash
+# Executive summary
+GET /api/v1/founder/dashboard/summary
+
+# Cross-department KPIs
+GET /api/v1/founder/dashboard/kpis
+
+# P&L report (all departments)
+GET /api/v1/founder/dashboard/profit-loss?year=2025&month=11
+
+# Cash flow forecast
+GET /api/v1/founder/dashboard/cash-flow-forecast
+
+# Top metrics
+GET /api/v1/founder/dashboard/top-contractors
+GET /api/v1/founder/dashboard/top-expenses
+GET /api/v1/founder/dashboard/budget-execution
+```
+
+### Frontend
+
+**Страница**: `frontend/src/pages/FounderDashboardPage.tsx`
+
+**Компоненты:**
+- Executive summary cards (revenue, expenses, profit, margin)
+- Multi-department comparison charts
+- Budget execution gauge (plan vs actual)
+- Cash flow timeline
+- Top contractors table
+- Alerts and notifications
+
+**Доступ**: Только для пользователей с ролью FOUNDER
+
 ---
 
 ## Important Development Patterns
@@ -1496,7 +2866,7 @@ const scrollToColumn = useCallback((columnIndex: number) => {
 - **KPI Integration**: Link bonuses to KPI achievements
 - **Analytics**: Breakdown of salary components (base, bonuses, etc.)
 
-### Bank Transactions (NEW v0.6.0)
+### Bank Transactions (v0.6.0) 🏦
 - **Import from Excel**: Upload bank statements with auto-column detection
 - **AI Classification**: Automatic categorization using keyword matching and historical data
 - **Smart Matching**: Find matching expenses with scoring algorithm
@@ -1504,6 +2874,54 @@ const scrollToColumn = useCallback((columnIndex: number) => {
 - **Regular Patterns**: Detect recurring payments (subscriptions, rent)
 - **Multi-status workflow**: NEW → CATEGORIZED → MATCHED → APPROVED
 - **Reduces manual work by 80-90%** for recurring transactions
+
+### Business Operation Mappings (v0.7.0) ⚙️
+- **Visual UI**: Create/edit/delete mappings through web interface
+- **AI Integration**: Direct integration with bank transaction classifier
+- **Priority & Confidence**: Configurable parameters per mapping
+- **Mass Operations**: Bulk activate/deactivate/delete mappings
+
+### Credit Portfolio Management (v0.8.0) 💰
+- **Financial Organizations**: Manage organizations and bank accounts
+- **Credit Contracts**: Track credit agreements with terms and rates
+- **Receipts & Expenses**: Monitor financial flows
+- **FTP Auto-Import**: Automated data import from Excel via FTP
+- **Analytics & KPI**: Monthly analytics and contract comparison
+- **Cash Flow Analysis**: Forecast and track cash flow
+
+### Revenue Budget (v0.8.0) 📈
+- **Revenue Streams & Categories**: Manage revenue sources
+- **Planning with Versioning**: Full approval workflow like expense budget
+- **Revenue Actuals**: Track actual revenue vs plan
+- **Customer Metrics**: LTV calculations and churn risk analysis
+- **Seasonality**: Seasonal coefficients for forecasting
+- **P&L Integration**: Combined revenue-expense profit & loss reports
+
+### AI Invoice Processing (NEW) 🧾
+- **OCR Recognition**: Tesseract-based PDF/image text extraction
+- **AI Parsing**: VseGPT (GPT-4o-mini) for structured data extraction
+- **Auto-extraction**: Invoice number, date, amount, contractor, line items
+- **1C Integration**: Sync invoices to 1C Document_СчетНаОплату
+- **Manual Review**: Correction workflow for AI results
+
+### Background Automation (NEW) ⏰
+- **APScheduler**: Automated task scheduling
+- **1C Sync Jobs**: Hourly expense sync, daily catalog sync
+- **FTP Monitoring**: Automated file import from FTP
+- **Reports**: Scheduled daily/weekly/monthly reports
+- **Maintenance**: Auto-cleanup and database optimization
+
+### Founder Dashboard (NEW) 👔
+- **Executive KPIs**: Cross-department high-level metrics
+- **P&L Reports**: Consolidated profit & loss
+- **Cash Flow Forecast**: Company-wide cash flow projections
+- **Read-only Access**: FOUNDER role with view-only permissions
+
+### 1C OData Integration (Expanded)
+- **Expense Requests**: Automatic sync of spending requests
+- **Catalog Sync**: Organizations, categories, contractors
+- **Bank Transactions**: Import bank operations from 1C
+- **Scheduled Jobs**: Automated hourly/daily sync via APScheduler
 
 ### Monitoring & Security
 - **Sentry Integration**: Error tracking and monitoring
@@ -1532,11 +2950,49 @@ DEBUG=True
 APP_NAME="IT Budget Manager"
 API_PREFIX=/api/v1
 
-# Monitoring (Optional)
+# 1C OData Integration
+ODATA_1C_URL=http://10.10.100.77/trade/odata/standard.odata
+ODATA_1C_USERNAME=odata.user
+ODATA_1C_PASSWORD=ak228Hu2hbs28
+
+# FTP Settings (Credit Portfolio Import)
+FTP_HOST=ftp.example.com
+FTP_PORT=21
+FTP_USERNAME=import_user
+FTP_PASSWORD=secure_password
+FTP_DIRECTORY=/credit_portfolio/import
+FTP_IMPORT_SCHEDULE=0 2 * * *  # Daily at 2 AM
+
+# Credit Portfolio
+CREDIT_PORTFOLIO_AUTO_IMPORT=true
+CREDIT_PORTFOLIO_NOTIFY_EMAIL=finance@company.com
+
+# Invoice Processing (AI & OCR)
+VSEGPT_API_KEY=your_vsegpt_api_key
+VSEGPT_API_URL=https://api.vsegpt.ru/v1/chat/completions
+VSEGPT_MODEL=openai/gpt-4o-mini
+TESSERACT_CMD=/usr/bin/tesseract
+TESSERACT_LANGUAGES=rus+eng
+OCR_DPI=300
+INVOICE_STORAGE_PATH=/app/storage/invoices
+INVOICE_MAX_FILE_SIZE=10485760  # 10MB
+
+# Background Scheduler (APScheduler)
+SCHEDULER_ENABLED=true
+SYNC_1C_EXPENSES_ENABLED=true
+SYNC_1C_EXPENSES_SCHEDULE=0 * * * *  # Hourly
+SYNC_1C_CATALOGS_ENABLED=true
+SYNC_1C_CATALOGS_SCHEDULE=0 0 * * *  # Daily at midnight
+FTP_IMPORT_ENABLED=true
+DAILY_REPORT_ENABLED=true
+DAILY_REPORT_SCHEDULE=0 8 * * *  # Daily at 8 AM
+DAILY_REPORT_RECIPIENTS=finance@company.com,cfo@company.com
+
+# Monitoring
 SENTRY_DSN=your-sentry-dsn
 PROMETHEUS_ENABLED=true
 
-# Redis (Optional - for rate limiting)
+# Redis (for rate limiting)
 REDIS_URL=redis://localhost:6379
 ```
 
@@ -1586,11 +3042,13 @@ VITE_SENTRY_DSN=your-sentry-dsn
 
 ## Common Scripts
 
-Located in `backend/scripts/`:
+Located in `backend/scripts/` (68+ scripts):
 - `import_excel.py` - Import budget data from Excel
-- `import_planfact_2025.py` - Import plan/fact data for specific year
+- `import_plan_fact_2025.py` - Import plan/fact data for specific year
 - `import_ai_categories.py` - Import AI classifier categories into budget_categories table
 - `create_admin.py` - Create admin user
+- `test_1c_expense_sync.py` - Test 1C expense sync integration
+- `run_credit_portfolio_import.py` - Manual FTP import trigger
 - Various utility scripts for data management
 
 ### Import AI Categories
