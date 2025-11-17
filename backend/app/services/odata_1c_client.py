@@ -94,24 +94,25 @@ class OData1CClient:
         date_to: Optional[date] = None,
         top: int = 100,
         skip: int = 0,
-        only_posted: bool = False
+        only_posted: bool = True  # Deprecated, always filters for posted documents
     ) -> List[Dict[str, Any]]:
         """
         Получить поступления денежных средств из 1С
 
         Args:
-            date_from: Начальная дата периода (используется $filter если задан только год)
-            date_to: Конечная дата периода (фильтруется на клиенте)
+            date_from: Начальная дата периода
+            date_to: Конечная дата периода
             top: Количество записей (max 1000)
             skip: Пропустить N записей (для пагинации)
-            only_posted: Только проведенные документы (фильтруется на клиенте)
+            only_posted: Deprecated (always True) - теперь всегда фильтрует проведенные документы через OData
 
         Returns:
-            Список документов поступлений
+            Список документов поступлений (только проведенные и не помеченные на удаление)
 
         Note:
-            Если указан только date_from с началом года, использует OData $filter: year(Date) gt YYYY.
-            Важно: фильтр должен быть встроен в URL, а не передан через params словарь!
+            ОБЯЗАТЕЛЬНЫЕ фильтры применяются на уровне OData API:
+            - Posted eq true (только проведённые документы)
+            - DeletionMark eq false (не помеченные на удаление)
         """
         # Базовые параметры
         top_value = min(top, 1000)  # Ограничение 1С
@@ -121,22 +122,29 @@ class OData1CClient:
         # 1С не принимает фильтр через params, только встроенный в URL
         endpoint_with_params = f'Document_ПоступлениеБезналичныхДенежныхСредств?$top={top_value}&$format=json&$skip={skip}'
 
+        # ОБЯЗАТЕЛЬНЫЕ фильтры для всех документов из 1С
+        mandatory_filters = "Posted eq true and DeletionMark eq false"
+
         # Добавить OData $filter
         if date_from and date_to:
             # Используем точный фильтр по диапазону дат (Date >= start AND Date <= end)
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем начиная с даты
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_to:
             # Только конечная дата - фильтруем до даты
-            filter_str = f"Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
+        else:
+            # Без дат - только обязательные фильтры
+            endpoint_with_params += f'&$filter={mandatory_filters}'
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
         logger.info(f"Fetching bank receipts: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
@@ -148,16 +156,12 @@ class OData1CClient:
 
         results = response.get('value', [])
 
-        # Фильтрация только невалидных дат (OData фильтр уже применён на сервере)
+        # Фильтрация только невалидных дат (Posted и DeletionMark уже отфильтрованы на сервере)
         if results:
             results = [
                 r for r in results
                 if r.get('Date') and r.get('Date') != '0001-01-01T00:00:00'
             ]
-
-        # Фильтр по проведенным документам
-        if only_posted and results and 'Posted' in results[0]:
-            results = [r for r in results if r.get('Posted') == True]
 
         return results
 
@@ -167,24 +171,25 @@ class OData1CClient:
         date_to: Optional[date] = None,
         top: int = 100,
         skip: int = 0,
-        only_posted: bool = False
+        only_posted: bool = True  # Deprecated, always filters for posted documents
     ) -> List[Dict[str, Any]]:
         """
         Получить списания денежных средств из 1С
 
         Args:
-            date_from: Начальная дата периода (используется $filter если задан только год)
-            date_to: Конечная дата периода (фильтруется на клиенте)
+            date_from: Начальная дата периода
+            date_to: Конечная дата периода
             top: Количество записей (max 1000)
             skip: Пропустить N записей (для пагинации)
-            only_posted: Только проведенные документы (фильтруется на клиенте)
+            only_posted: Deprecated (always True) - теперь всегда фильтрует проведенные документы через OData
 
         Returns:
-            Список документов списаний
+            Список документов списаний (только проведенные и не помеченные на удаление)
 
         Note:
-            Если указан только date_from с началом года, использует OData $filter: year(Date) gt YYYY.
-            Важно: фильтр должен быть встроен в URL, а не передан через params словарь!
+            ОБЯЗАТЕЛЬНЫЕ фильтры применяются на уровне OData API:
+            - Posted eq true (только проведённые документы)
+            - DeletionMark eq false (не помеченные на удаление)
         """
         # Базовые параметры
         top_value = min(top, 1000)
@@ -194,22 +199,29 @@ class OData1CClient:
         # 1С не принимает фильтр через params, только встроенный в URL
         endpoint_with_params = f'Document_СписаниеБезналичныхДенежныхСредств?$top={top_value}&$format=json&$skip={skip}'
 
+        # ОБЯЗАТЕЛЬНЫЕ фильтры для всех документов из 1С
+        mandatory_filters = "Posted eq true and DeletionMark eq false"
+
         # Добавить OData $filter
         if date_from and date_to:
             # Используем точный фильтр по диапазону дат (Date >= start AND Date <= end)
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем начиная с даты
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_to:
             # Только конечная дата - фильтруем до даты
-            filter_str = f"Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
+        else:
+            # Без дат - только обязательные фильтры
+            endpoint_with_params += f'&$filter={mandatory_filters}'
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
         logger.info(f"Fetching bank payments: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
@@ -221,16 +233,12 @@ class OData1CClient:
 
         results = response.get('value', [])
 
-        # Фильтрация только невалидных дат (OData фильтр уже применён на сервере)
+        # Фильтрация только невалидных дат (Posted и DeletionMark уже отфильтрованы на сервере)
         if results:
             results = [
                 r for r in results
                 if r.get('Date') and r.get('Date') != '0001-01-01T00:00:00'
             ]
-
-        # Фильтр по проведенным документам
-        if only_posted and results and 'Posted' in results[0]:
-            results = [r for r in results if r.get('Posted') == True]
 
         return results
 
@@ -240,24 +248,25 @@ class OData1CClient:
         date_to: Optional[date] = None,
         top: int = 100,
         skip: int = 0,
-        only_posted: bool = False
+        only_posted: bool = True  # Deprecated, always filters for posted documents
     ) -> List[Dict[str, Any]]:
         """
         Получить приходные кассовые ордера (ПКО) из 1С
 
         Args:
-            date_from: Начальная дата периода (используется $filter если задан только год)
-            date_to: Конечная дата периода (фильтруется на клиенте)
+            date_from: Начальная дата периода
+            date_to: Конечная дата периода
             top: Количество записей (max 1000)
             skip: Пропустить N записей (для пагинации)
-            only_posted: Только проведенные документы (фильтруется на клиенте)
+            only_posted: Deprecated (always True) - теперь всегда фильтрует проведенные документы через OData
 
         Returns:
-            Список приходных кассовых ордеров
+            Список приходных кассовых ордеров (только проведенные и не помеченные на удаление)
 
         Note:
-            Если указан только date_from с началом года, использует OData $filter: year(Date) gt YYYY.
-            Важно: фильтр должен быть встроен в URL, а не передан через params словарь!
+            ОБЯЗАТЕЛЬНЫЕ фильтры применяются на уровне OData API:
+            - Posted eq true (только проведённые документы)
+            - DeletionMark eq false (не помеченные на удаление)
         """
         # Базовые параметры
         top_value = min(top, 1000)  # Ограничение 1С
@@ -267,23 +276,32 @@ class OData1CClient:
         # 1С не принимает фильтр через params, только встроенный в URL
         endpoint_with_params = f'Document_ПриходныйКассовыйОрдер?$top={top_value}&$format=json&$skip={skip}'
 
+        # ОБЯЗАТЕЛЬНЫЕ фильтры для всех документов из 1С
+        mandatory_filters = "Posted eq true and DeletionMark eq false"
+
         # Добавить OData $filter
         if date_from and date_to:
             # Если указаны обе даты и они в одном месяце - фильтруем точно по месяцу
             if date_from.year == date_to.year and date_from.month == date_to.month:
-                filter_str = f'year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
+                filter_str = f'{mandatory_filters} and year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
                 endpoint_with_params += f'&$filter={filter_str}'
                 logger.info(f"Using OData filter for cash receipts: {filter_str}")
             else:
                 # Для диапазона используем фильтр по году
                 year_filter = date_from.year - 1
-                endpoint_with_params += f'&$filter=year(Date) gt {year_filter}'
-                logger.info(f"Using OData filter for cash receipts: year(Date) gt {year_filter}")
+                filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
+                endpoint_with_params += f'&$filter={filter_str}'
+                logger.info(f"Using OData filter for cash receipts: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем по году
             year_filter = date_from.year - 1
-            endpoint_with_params += f'&$filter=year(Date) gt {year_filter}'
-            logger.info(f"Using OData filter for cash receipts: year(Date) gt {year_filter}")
+            filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
+            endpoint_with_params += f'&$filter={filter_str}'
+            logger.info(f"Using OData filter for cash receipts: {filter_str}")
+        else:
+            # Без дат - только обязательные фильтры
+            endpoint_with_params += f'&$filter={mandatory_filters}'
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
         logger.info(f"Fetching cash receipts (PKO): date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
@@ -295,16 +313,12 @@ class OData1CClient:
 
         results = response.get('value', [])
 
-        # Фильтрация только невалидных дат (OData фильтр уже применён на сервере)
+        # Фильтрация только невалидных дат (Posted и DeletionMark уже отфильтрованы на сервере)
         if results:
             results = [
                 r for r in results
                 if r.get('Date') and r.get('Date') != '0001-01-01T00:00:00'
             ]
-
-        # Фильтр по проведенным документам
-        if only_posted and results and 'Posted' in results[0]:
-            results = [r for r in results if r.get('Posted') == True]
 
         return results
 
@@ -314,24 +328,25 @@ class OData1CClient:
         date_to: Optional[date] = None,
         top: int = 100,
         skip: int = 0,
-        only_posted: bool = False
+        only_posted: bool = True  # Deprecated, always filters for posted documents
     ) -> List[Dict[str, Any]]:
         """
         Получить расходные кассовые ордера (РКО) из 1С
 
         Args:
-            date_from: Начальная дата периода (используется $filter если задан только год)
-            date_to: Конечная дата периода (фильтруется на клиенте)
+            date_from: Начальная дата периода
+            date_to: Конечная дата периода
             top: Количество записей (max 1000)
             skip: Пропустить N записей (для пагинации)
-            only_posted: Только проведенные документы (фильтруется на клиенте)
+            only_posted: Deprecated (always True) - теперь всегда фильтрует проведенные документы через OData
 
         Returns:
-            Список расходных кассовых ордеров
+            Список расходных кассовых ордеров (только проведенные и не помеченные на удаление)
 
         Note:
-            Если указан только date_from с началом года, использует OData $filter: year(Date) gt YYYY.
-            Важно: фильтр должен быть встроен в URL, а не передан через params словарь!
+            ОБЯЗАТЕЛЬНЫЕ фильтры применяются на уровне OData API:
+            - Posted eq true (только проведённые документы)
+            - DeletionMark eq false (не помеченные на удаление)
         """
         # Базовые параметры
         top_value = min(top, 1000)
@@ -341,23 +356,32 @@ class OData1CClient:
         # 1С не принимает фильтр через params, только встроенный в URL
         endpoint_with_params = f'Document_РасходныйКассовыйОрдер?$top={top_value}&$format=json&$skip={skip}'
 
+        # ОБЯЗАТЕЛЬНЫЕ фильтры для всех документов из 1С
+        mandatory_filters = "Posted eq true and DeletionMark eq false"
+
         # Добавить OData $filter
         if date_from and date_to:
             # Если указаны обе даты и они в одном месяце - фильтруем точно по месяцу
             if date_from.year == date_to.year and date_from.month == date_to.month:
-                filter_str = f'year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
+                filter_str = f'{mandatory_filters} and year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
                 endpoint_with_params += f'&$filter={filter_str}'
                 logger.info(f"Using OData filter for cash payments: {filter_str}")
             else:
                 # Для диапазона используем фильтр по году
                 year_filter = date_from.year - 1
-                endpoint_with_params += f'&$filter=year(Date) gt {year_filter}'
-                logger.info(f"Using OData filter for cash payments: year(Date) gt {year_filter}")
+                filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
+                endpoint_with_params += f'&$filter={filter_str}'
+                logger.info(f"Using OData filter for cash payments: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем по году
             year_filter = date_from.year - 1
-            endpoint_with_params += f'&$filter=year(Date) gt {year_filter}'
-            logger.info(f"Using OData filter for cash payments: year(Date) gt {year_filter}")
+            filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
+            endpoint_with_params += f'&$filter={filter_str}'
+            logger.info(f"Using OData filter for cash payments: {filter_str}")
+        else:
+            # Без дат - только обязательные фильтры
+            endpoint_with_params += f'&$filter={mandatory_filters}'
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
         logger.info(f"Fetching cash payments (RKO): date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
@@ -369,16 +393,12 @@ class OData1CClient:
 
         results = response.get('value', [])
 
-        # Фильтрация только невалидных дат (OData фильтр уже применён на сервере)
+        # Фильтрация только невалидных дат (Posted и DeletionMark уже отфильтрованы на сервере)
         if results:
             results = [
                 r for r in results
                 if r.get('Date') and r.get('Date') != '0001-01-01T00:00:00'
             ]
-
-        # Фильтр по проведенным документам
-        if only_posted and results and 'Posted' in results[0]:
-            results = [r for r in results if r.get('Posted') == True]
 
         return results
 
@@ -436,24 +456,25 @@ class OData1CClient:
         date_to: Optional[date] = None,
         top: int = 100,
         skip: int = 0,
-        only_posted: bool = False
+        only_posted: bool = True  # Deprecated, always filters for posted documents
     ) -> List[Dict[str, Any]]:
         """
         Получить заявки на расходование денежных средств из 1С
 
         Args:
-            date_from: Начальная дата периода (используется $filter если задан только год)
-            date_to: Конечная дата периода (фильтруется на клиенте)
+            date_from: Начальная дата периода
+            date_to: Конечная дата периода
             top: Количество записей (max 1000)
             skip: Пропустить N записей (для пагинации)
-            only_posted: Только проведенные документы (фильтруется на клиенте)
+            only_posted: Deprecated (always True) - теперь всегда фильтрует проведенные документы через OData
 
         Returns:
-            Список документов заявок на расход
+            Список документов заявок на расход (только проведенные и не помеченные на удаление)
 
         Note:
-            Если указан только date_from с началом года, использует OData $filter: year(Date) gt YYYY.
-            Важно: фильтр должен быть встроен в URL, а не передан через params словарь!
+            ОБЯЗАТЕЛЬНЫЕ фильтры применяются на уровне OData API:
+            - Posted eq true (только проведённые документы)
+            - DeletionMark eq false (не помеченные на удаление)
         """
         # Базовые параметры
         top_value = min(top, 1000)  # Ограничение 1С
@@ -463,22 +484,29 @@ class OData1CClient:
         # 1С не принимает фильтр через params, только встроенный в URL
         endpoint_with_params = f'Document_ЗаявкаНаРасходованиеДенежныхСредств?$top={top_value}&$format=json&$skip={skip}'
 
+        # ОБЯЗАТЕЛЬНЫЕ фильтры для всех документов из 1С
+        mandatory_filters = "Posted eq true and DeletionMark eq false"
+
         # Добавить OData $filter
         if date_from and date_to:
             # Используем точный фильтр по диапазону дат (Date >= start AND Date <= end)
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем начиная с даты
-            filter_str = f"Date ge datetime'{date_from.isoformat()}T00:00:00'"
+            filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
         elif date_to:
             # Только конечная дата - фильтруем до даты
-            filter_str = f"Date le datetime'{date_to.isoformat()}T23:59:59'"
+            filter_str = f"{mandatory_filters} and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
             logger.info(f"Using OData filter: {filter_str}")
+        else:
+            # Без дат - только обязательные фильтры
+            endpoint_with_params += f'&$filter={mandatory_filters}'
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
         logger.info(f"Fetching expense requests: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
@@ -490,16 +518,12 @@ class OData1CClient:
 
         results = response.get('value', [])
 
-        # Фильтрация только невалидных дат (OData фильтр уже применён на сервере)
+        # Фильтрация только невалидных дат (Posted и DeletionMark уже отфильтрованы на сервере)
         if results:
             results = [
                 r for r in results
                 if r.get('Date') and r.get('Date') != '0001-01-01T00:00:00'
             ]
-
-        # Фильтр по проведенным документам
-        if only_posted and results and 'Posted' in results[0]:
-            results = [r for r in results if r.get('Posted') == True]
 
         return results
 
@@ -573,6 +597,195 @@ class OData1CClient:
         logger.info(f"Fetched {len(results)} cash flow categories")
 
         return results
+
+    def get_counterparty_by_inn(self, inn: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить контрагента по ИНН
+
+        Args:
+            inn: ИНН контрагента
+
+        Returns:
+            Данные контрагента или None если не найден
+        """
+        if not inn:
+            return None
+
+        try:
+            # OData $filter по полю ИНН
+            filter_str = f"ИНН eq '{inn}'"
+            endpoint_with_params = f"Catalog_Контрагенты?$format=json&$filter={filter_str}"
+
+            logger.info(f"Searching counterparty by INN: {inn}")
+
+            response = self._make_request(
+                method='GET',
+                endpoint=endpoint_with_params,
+                params=None
+            )
+
+            results = response.get('value', [])
+            if results:
+                logger.info(f"Found counterparty with INN {inn}: {results[0].get('Description')}")
+                return results[0]  # Возвращаем первого найденного
+            else:
+                logger.warning(f"Counterparty with INN {inn} not found in 1C")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to search counterparty by INN {inn}: {e}")
+            return None
+
+    def get_organization_by_inn(self, inn: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить организацию по ИНН
+
+        Args:
+            inn: ИНН организации
+
+        Returns:
+            Данные организации или None если не найдена
+        """
+        if not inn:
+            return None
+
+        try:
+            # OData $filter по полю ИНН
+            filter_str = f"ИНН eq '{inn}'"
+            endpoint_with_params = f"Catalog_Организации?$format=json&$filter={filter_str}"
+
+            logger.info(f"Searching organization by INN: {inn}")
+
+            response = self._make_request(
+                method='GET',
+                endpoint=endpoint_with_params,
+                params=None
+            )
+
+            results = response.get('value', [])
+            if results:
+                logger.info(f"Found organization with INN {inn}: {results[0].get('Description')}")
+                return results[0]  # Возвращаем первую найденную
+            else:
+                logger.warning(f"Organization with INN {inn} not found in 1C")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to search organization by INN {inn}: {e}")
+            return None
+
+    def create_expense_request(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Создать заявку на расходование денежных средств в 1С
+
+        Args:
+            data: Данные заявки в формате OData:
+                {
+                    "Дата": "2025-10-31T00:00:00",
+                    "Организация_Key": "guid",
+                    "Получатель_Key": "guid",
+                    "СуммаДокумента": 2000.00,
+                    "Валюта_Key": "guid",
+                    "СтатьяДДС_Key": "guid",
+                    "НазначениеПлатежа": "текст",
+                    "ДатаПлатежа": "2025-11-03T00:00:00",
+                    "ХозяйственнаяОперация": "ОплатаПоставщику"
+                }
+
+        Returns:
+            Созданный документ с Ref_Key (GUID)
+
+        Raises:
+            requests.exceptions.RequestException: При ошибке создания
+        """
+        logger.info(f"Creating expense request in 1C: {data.get('НазначениеПлатежа', 'N/A')[:50]}...")
+
+        try:
+            response = self._make_request(
+                method='POST',
+                endpoint='Document_ЗаявкаНаРасходованиеДенежныхСредств',
+                data=data
+            )
+
+            ref_key = response.get('Ref_Key')
+            logger.info(f"Expense request created successfully with Ref_Key: {ref_key}")
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to create expense request in 1C: {e}")
+            raise
+
+    def upload_attachment_base64(
+        self,
+        file_content: bytes,
+        filename: str,
+        owner_guid: str,
+        file_extension: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Загрузить файл в 1С через Base64 encoding
+
+        Args:
+            file_content: Содержимое файла (bytes)
+            filename: Имя файла
+            owner_guid: GUID владельца (документа)
+            file_extension: Расширение файла (без точки), например "pdf"
+
+        Returns:
+            Созданное вложение или None при ошибке
+
+        Note:
+            Ограничение размера файла ~4-6MB из-за Base64 overhead
+        """
+        if not file_content:
+            logger.warning("File content is empty, skipping upload")
+            return None
+
+        # Проверка размера (макс 6MB в байтах)
+        max_size = 6 * 1024 * 1024
+        if len(file_content) > max_size:
+            logger.warning(f"File too large ({len(file_content)} bytes), max {max_size} bytes. Skipping upload.")
+            return None
+
+        try:
+            # Кодирование в Base64
+            base64_content = base64.b64encode(file_content).decode('utf-8')
+
+            # Определить расширение если не указано
+            if not file_extension and '.' in filename:
+                file_extension = filename.split('.')[-1].lower()
+
+            # Данные для создания вложения
+            # ВАЖНО: Структура может отличаться в зависимости от конфигурации 1С
+            # Обычно используется InformationRegister_ПрисоединенныеФайлы
+            attachment_data = {
+                "Наименование": filename,
+                "ДвоичныеДанные": base64_content,
+                "Владелец_Key": owner_guid,
+                "Расширение": file_extension or "pdf"
+            }
+
+            logger.info(f"Uploading attachment: {filename} ({len(file_content)} bytes) to owner {owner_guid}")
+
+            # ПРИМЕЧАНИЕ: Endpoint может отличаться в зависимости от конфигурации 1С
+            # Возможные варианты:
+            # - InformationRegister_ПрисоединенныеФайлы
+            # - Catalog_ПрисоединенныеФайлы
+            # - Catalog_ХранилищеФайлов
+            response = self._make_request(
+                method='POST',
+                endpoint='InformationRegister_ПрисоединенныеФайлы',
+                data=attachment_data
+            )
+
+            logger.info(f"Attachment uploaded successfully")
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to upload attachment: {e}")
+            # Не прерываем процесс если не удалось загрузить файл
+            return None
 
     def test_connection(self) -> bool:
         """
