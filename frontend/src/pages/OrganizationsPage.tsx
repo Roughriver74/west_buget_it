@@ -8,11 +8,12 @@ import type { Organization } from '@/types'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import OrganizationFormModal from '@/components/organizations/OrganizationFormModal'
+import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 const OrganizationsPage = () => {
   const [page, setPage] = useState(1)
@@ -75,8 +76,7 @@ const OrganizationsPage = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      const url = `${API_URL}/api/v1/templates/download/organizations`
+      const url = `${API_BASE}/templates/download/organizations`
 
       // Get token from localStorage
       const token = localStorage.getItem('token')

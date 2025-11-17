@@ -5,10 +5,11 @@ import type { UploadProps } from 'antd'
 import axios from 'axios'
 import CategoryTable from '@/components/references/categories/CategoryTable'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 const CategoriesPage: React.FC = () => {
   const { selectedDepartment } = useDepartment()
@@ -24,8 +25,7 @@ const CategoriesPage: React.FC = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      const url = `${API_URL}/api/v1/templates/download/categories`
+      const url = `${API_BASE}/templates/download/categories`
 
       // Get token from localStorage
       const token = localStorage.getItem('token')
