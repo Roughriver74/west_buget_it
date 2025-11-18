@@ -365,7 +365,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 				},
 				...(user?.role === 'ADMIN' || user?.role === 'MANAGER' ? [{
 					key: '/payroll/scenarios',
-					label: <Link to='/payroll/scenarios'>Сценарии 2025 vs 2026</Link>,
+					label: <Link to='/payroll/scenarios'>Сценарии ФОТ</Link>,
 				}] : []),
 			],
 		},

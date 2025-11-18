@@ -56,16 +56,21 @@ export default function PayrollScenariosPage() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  // Fetch impact analysis (2025 vs 2026)
+  // Year selection state (default to current year vs next year)
+  const currentYear = new Date().getFullYear();
+  const [baseYear, setBaseYear] = useState(currentYear);
+  const [targetYear, setTargetYear] = useState(currentYear + 1);
+
+  // Fetch impact analysis (flexible years)
   const { data: impactAnalysis, isLoading: analysisLoading } = useQuery({
-    queryKey: ['payroll-impact-analysis', selectedDepartment?.id],
+    queryKey: ['payroll-impact-analysis', selectedDepartment?.id, baseYear, targetYear],
     queryFn: () =>
       payrollAnalysisAPI.getImpactAnalysis({
-        base_year: 2025,
-        target_year: 2026,
+        base_year: baseYear,
+        target_year: targetYear,
         department_id: selectedDepartment?.id,
       }),
-    enabled: !!selectedDepartment,
+    enabled: !!selectedDepartment && baseYear && targetYear,
   });
 
   // Fetch scenarios
@@ -106,8 +111,8 @@ export default function PayrollScenariosPage() {
     form.resetFields();
     form.setFieldsValue({
       scenario_type: 'BASE',
-      base_year: 2025,
-      target_year: 2026,
+      base_year: baseYear,
+      target_year: targetYear,
       headcount_change_percent: 0,
       salary_change_percent: 0,
     });
@@ -201,11 +206,60 @@ export default function PayrollScenariosPage() {
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h1>Сценарии планирования ФОТ (2025 vs 2026)</h1>
+        <h1>Сценарии планирования ФОТ</h1>
         <p style={{ color: '#666' }}>
           Анализ влияния изменений в страховых взносах на фонд оплаты труда
         </p>
       </div>
+
+      {/* Year Selection */}
+      <Card style={{ marginBottom: '24px' }}>
+        <Row gutter={16} align="middle">
+          <Col>
+            <span style={{ fontWeight: 500 }}>Сравнить годы:</span>
+          </Col>
+          <Col>
+            <Space>
+              <span>Базовый год:</span>
+              <Select
+                value={baseYear}
+                onChange={setBaseYear}
+                style={{ width: 100 }}
+              >
+                {Array.from({ length: 11 }, (_, i) => currentYear - 5 + i).map(year => (
+                  <Select.Option key={year} value={year}>{year}</Select.Option>
+                ))}
+              </Select>
+            </Space>
+          </Col>
+          <Col>
+            <span style={{ fontSize: '20px' }}>→</span>
+          </Col>
+          <Col>
+            <Space>
+              <span>Целевой год:</span>
+              <Select
+                value={targetYear}
+                onChange={setTargetYear}
+                style={{ width: 100 }}
+              >
+                {Array.from({ length: 11 }, (_, i) => currentYear - 5 + i).map(year => (
+                  <Select.Option key={year} value={year}>{year}</Select.Option>
+                ))}
+              </Select>
+            </Space>
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['payroll-impact-analysis'] })}
+            >
+              Пересчитать
+            </Button>
+          </Col>
+        </Row>
+      </Card>
 
       {/* Impact Analysis Card */}
       {impactAnalysis && (
@@ -213,23 +267,36 @@ export default function PayrollScenariosPage() {
           title={
             <Space>
               <BarChartOutlined />
-              Влияние изменений 2025 → 2026
+              Влияние изменений {baseYear} → {targetYear}
             </Space>
           }
           style={{ marginBottom: '24px' }}
           loading={analysisLoading}
         >
           <Alert
-            message="Планируемые изменения в страховых взносах"
+            message={`Изменения в страховых взносах (${baseYear} → ${targetYear})`}
             description={
               <div>
                 <p>
-                  В 2026 году ожидается значительное повышение ставок страховых взносов, что приведет к
-                  росту нагрузки на работодателя с <strong>30.2%</strong> до <strong>39.7%</strong> (+9.5 п.п.).
+                  {impactAnalysis.total_impact > 0 ? (
+                    <>
+                      Ожидается <strong>рост</strong> затрат на ФОТ на{' '}
+                      <strong>{formatCurrency(impactAnalysis.total_impact)}</strong>{' '}
+                      ({formatPercent(impactAnalysis.impact_percent)}) из-за изменений ставок страховых взносов.
+                    </>
+                  ) : impactAnalysis.total_impact < 0 ? (
+                    <>
+                      Ожидается <strong>снижение</strong> затрат на ФОТ на{' '}
+                      <strong>{formatCurrency(Math.abs(impactAnalysis.total_impact))}</strong>{' '}
+                      ({formatPercent(Math.abs(impactAnalysis.impact_percent))}) из-за изменений ставок страховых взносов.
+                    </>
+                  ) : (
+                    'Изменения в ставках страховых взносов не ожидаются.'
+                  )}
                 </p>
               </div>
             }
-            type="warning"
+            type={impactAnalysis.total_impact > 0 ? 'warning' : impactAnalysis.total_impact < 0 ? 'success' : 'info'}
             showIcon
             style={{ marginBottom: '24px' }}
           />
