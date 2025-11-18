@@ -65,6 +65,7 @@ jobs:
           push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
+          no-cache: true
           build-args: |
             VITE_API_URL=https://budget-west.shknv.ru
 
