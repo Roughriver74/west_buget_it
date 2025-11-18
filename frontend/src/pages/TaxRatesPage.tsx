@@ -276,7 +276,7 @@ export default function TaxRatesPage() {
               <Button
                 icon={<ReloadOutlined />}
                 onClick={() => initMutation.mutate()}
-                loading={initMutation.isLoading}
+                loading={initMutation.isPending}
               >
                 Заполнить по умолчанию
               </Button>
@@ -372,7 +372,7 @@ export default function TaxRatesPage() {
         open={isModalOpen}
         onCancel={handleModalClose}
         onOk={handleSubmit}
-        confirmLoading={createMutation.isLoading || updateMutation.isLoading}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
         destroyOnClose
       >
         <Form layout="vertical" form={form}>
