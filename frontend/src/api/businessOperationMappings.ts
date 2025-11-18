@@ -17,7 +17,7 @@ import type {
 export const getMappings = async (
   filters?: BusinessOperationMappingFilters
 ): Promise<BusinessOperationMappingList> => {
-  const response = await apiClient.get('/business-operation-mappings', {
+  const response = await apiClient.get('/business-operation-mappings/', {
     params: filters,
   })
   return response.data
@@ -37,7 +37,7 @@ export const getMapping = async (id: number): Promise<BusinessOperationMapping> 
 export const createMapping = async (
   data: BusinessOperationMappingCreate
 ): Promise<BusinessOperationMapping> => {
-  const response = await apiClient.post('/business-operation-mappings', data)
+  const response = await apiClient.post('/business-operation-mappings/', data)
   return response.data
 }
 
