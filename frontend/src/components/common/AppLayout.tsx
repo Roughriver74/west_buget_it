@@ -363,6 +363,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/payroll/ndfl',
 					label: <Link to='/payroll/ndfl'>Калькулятор НДФЛ</Link>,
 				},
+				...(user?.role === 'ADMIN' || user?.role === 'MANAGER' ? [{
+					key: '/payroll/scenarios',
+					label: <Link to='/payroll/scenarios'>Сценарии 2025 vs 2026</Link>,
+				}] : []),
 			],
 		},
 		{
