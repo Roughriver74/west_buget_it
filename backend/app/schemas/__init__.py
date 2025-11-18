@@ -237,6 +237,27 @@ from .tax_rate import (
     TaxCalculationRequest,
     TaxCalculationResult,
 )
+from .payroll_scenario import (
+    # Insurance Rates
+    InsuranceRateCreate,
+    InsuranceRateUpdate,
+    InsuranceRateInDB,
+    # Payroll Scenarios
+    PayrollScenarioCreate,
+    PayrollScenarioUpdate,
+    PayrollScenarioInDB,
+    PayrollScenarioWithDetails,
+    # Payroll Scenario Details
+    PayrollScenarioDetailCreate,
+    PayrollScenarioDetailUpdate,
+    PayrollScenarioDetailInDB,
+    # Payroll Yearly Comparisons
+    PayrollYearlyComparisonInDB,
+    YearComparisonRequest,
+    ScenarioCalculationRequest,
+    ScenarioCalculationResponse,
+    InsuranceImpactAnalysis,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -478,4 +499,23 @@ __all__ = [
     "TaxRateListItem",
     "TaxCalculationRequest",
     "TaxCalculationResult",
+    # Insurance Rates
+    "InsuranceRateCreate",
+    "InsuranceRateUpdate",
+    "InsuranceRateInDB",
+    # Payroll Scenarios
+    "PayrollScenarioCreate",
+    "PayrollScenarioUpdate",
+    "PayrollScenarioInDB",
+    "PayrollScenarioWithDetails",
+    # Payroll Scenario Details
+    "PayrollScenarioDetailCreate",
+    "PayrollScenarioDetailUpdate",
+    "PayrollScenarioDetailInDB",
+    # Payroll Yearly Comparisons
+    "PayrollYearlyComparisonInDB",
+    "YearComparisonRequest",
+    "ScenarioCalculationRequest",
+    "ScenarioCalculationResponse",
+    "InsuranceImpactAnalysis",
 ]

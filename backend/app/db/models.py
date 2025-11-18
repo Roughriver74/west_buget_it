@@ -2166,3 +2166,262 @@ class BusinessOperationMapping(Base):
 
     def __repr__(self):
         return f"<BusinessOperationMapping(id={self.id}, operation='{self.business_operation}', category_id={self.category_id})>"
+
+
+# ==================== Insurance & Payroll Scenario Models ====================
+
+
+class InsuranceRate(Base):
+    """
+    Справочник ставок страховых взносов по годам
+
+    Хранит исторические и планируемые ставки для:
+    - Пенсионного фонда (ПФР)
+    - Медицинского страхования (ФОМС)
+    - Социального страхования (ФСС)
+    - Страхования от несчастных случаев
+
+    Позволяет отслеживать изменения законодательства и их влияние на ФОТ
+    """
+    __tablename__ = "insurance_rates"
+    __table_args__ = (
+        Index('ix_insurance_rate_year_type', 'year', 'rate_type'),
+        Index('ix_insurance_rate_dept_year', 'department_id', 'year'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Период действия
+    year = Column(Integer, nullable=False, index=True)
+
+    # Тип страхового взноса
+    rate_type = Column(Enum(TaxTypeEnum), nullable=False, index=True)
+
+    # Ставка в процентах (например, 22.0 для 22%)
+    rate_percentage = Column(Numeric(5, 2), nullable=False)
+
+    # Пороговые значения для прогрессивной шкалы (опционально)
+    threshold_amount = Column(Numeric(15, 2), nullable=True)  # Порог для повышенной ставки
+    rate_above_threshold = Column(Numeric(5, 2), nullable=True)  # Ставка выше порога
+
+    # Описание изменений
+    description = Column(Text, nullable=True)  # Например: "Повышение с 22% до 30%"
+    legal_basis = Column(String(255), nullable=True)  # Ссылка на ФЗ/приказ
+
+    # Расчетные поля (для быстрого доступа)
+    total_employer_burden = Column(Numeric(5, 2), nullable=True)  # Общая нагрузка работодателя (сумма всех взносов)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+
+    def __repr__(self):
+        return f"<InsuranceRate {self.year} {self.rate_type.value}: {self.rate_percentage}%>"
+
+
+class PayrollScenarioTypeEnum(str, enum.Enum):
+    """Enum for payroll scenario types"""
+    BASE = "BASE"  # Базовый сценарий (текущее состояние)
+    OPTIMISTIC = "OPTIMISTIC"  # Оптимистичный (рост, расширение штата)
+    PESSIMISTIC = "PESSIMISTIC"  # Пессимистичный (сокращение, оптимизация)
+    CUSTOM = "CUSTOM"  # Кастомный сценарий
+
+
+class PayrollScenario(Base):
+    """
+    Сценарии планирования ФОТ с учетом изменений в законодательстве
+
+    Позволяет моделировать различные варианты:
+    - Базовый: текущий штат + новые ставки
+    - Оптимистичный: расширение штата
+    - Пессимистичный: сокращение штата/зарплат для компенсации роста взносов
+    """
+    __tablename__ = "payroll_scenarios"
+    __table_args__ = (
+        Index('ix_payroll_scenario_dept_year', 'department_id', 'target_year'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Основная информация
+    name = Column(String(255), nullable=False)  # Название сценария
+    description = Column(Text, nullable=True)  # Описание
+    scenario_type = Column(Enum(PayrollScenarioTypeEnum), nullable=False, default=PayrollScenarioTypeEnum.BASE)
+
+    # Год планирования
+    target_year = Column(Integer, nullable=False, index=True)  # Год, на который строится сценарий
+    base_year = Column(Integer, nullable=False)  # Базовый год для сравнения
+
+    # Параметры сценария
+    headcount_change_percent = Column(Numeric(5, 2), default=0, nullable=False)  # Изменение штата в %
+    salary_change_percent = Column(Numeric(5, 2), default=0, nullable=False)  # Изменение з/п в %
+
+    # Расчетные итоги (вычисляются автоматически)
+    total_headcount = Column(Integer, nullable=True)  # Итоговая численность
+    total_base_salary = Column(Numeric(15, 2), nullable=True)  # Итого оклады
+    total_insurance_cost = Column(Numeric(15, 2), nullable=True)  # Итого страховые взносы
+    total_payroll_cost = Column(Numeric(15, 2), nullable=True)  # Итого ФОТ (оклады + взносы + НДФЛ)
+
+    # Сравнение с базовым годом
+    base_year_total_cost = Column(Numeric(15, 2), nullable=True)  # ФОТ базового года
+    cost_difference = Column(Numeric(15, 2), nullable=True)  # Разница в рублях
+    cost_difference_percent = Column(Numeric(5, 2), nullable=True)  # Разница в %
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    scenario_details = relationship("PayrollScenarioDetail", back_populates="scenario", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<PayrollScenario {self.name} ({self.target_year})>"
+
+
+class PayrollScenarioDetail(Base):
+    """
+    Детали сценария ФОТ по сотрудникам
+
+    Хранит планируемые изменения для каждого сотрудника в рамках сценария:
+    - Изменение оклада
+    - Статус (работает/уволен/новый)
+    - Расчет страховых взносов
+    """
+    __tablename__ = "payroll_scenario_details"
+    __table_args__ = (
+        Index('ix_payroll_scenario_detail_scenario', 'scenario_id'),
+        Index('ix_payroll_scenario_detail_employee', 'employee_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Связи
+    scenario_id = Column(Integer, ForeignKey("payroll_scenarios.id"), nullable=False, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True, index=True)  # NULL для новых позиций
+
+    # Данные сотрудника
+    employee_name = Column(String(255), nullable=False)  # ФИО (для новых или архивных)
+    position = Column(String(255), nullable=True)  # Должность
+
+    # Статус в сценарии
+    is_new_hire = Column(Boolean, default=False, nullable=False)  # Новый сотрудник
+    is_terminated = Column(Boolean, default=False, nullable=False)  # Увольнение
+    termination_month = Column(Integer, nullable=True)  # Месяц увольнения (1-12)
+
+    # Плановый оклад
+    base_salary = Column(Numeric(15, 2), nullable=False)
+    monthly_bonus = Column(Numeric(15, 2), default=0, nullable=False)
+
+    # Расчет страховых взносов (по новым ставкам)
+    pension_contribution = Column(Numeric(15, 2), nullable=True)  # ПФР
+    medical_contribution = Column(Numeric(15, 2), nullable=True)  # ФОМС
+    social_contribution = Column(Numeric(15, 2), nullable=True)  # ФСС
+    injury_contribution = Column(Numeric(15, 2), nullable=True)  # НС
+    total_insurance = Column(Numeric(15, 2), nullable=True)  # Итого взносы
+
+    # НДФЛ
+    income_tax = Column(Numeric(15, 2), nullable=True)
+
+    # Итоговая стоимость сотрудника (оклад + взносы)
+    total_employee_cost = Column(Numeric(15, 2), nullable=True)
+
+    # Сравнение с базовым годом
+    base_year_salary = Column(Numeric(15, 2), nullable=True)  # Оклад в базовом году
+    base_year_insurance = Column(Numeric(15, 2), nullable=True)  # Взносы в базовом году
+    cost_increase = Column(Numeric(15, 2), nullable=True)  # Рост стоимости
+
+    # Примечания
+    notes = Column(Text, nullable=True)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    scenario = relationship("PayrollScenario", back_populates="scenario_details")
+    employee = relationship("Employee")
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<PayrollScenarioDetail {self.employee_name}: {self.base_salary}>"
+
+
+class PayrollYearlyComparison(Base):
+    """
+    Сравнительный анализ ФОТ между годами с учетом изменений в законодательстве
+
+    Автоматически рассчитываемая таблица для быстрого доступа к аналитике:
+    - Изменение ставок страховых взносов
+    - Влияние на общий ФОТ
+    - Рекомендации по оптимизации
+    """
+    __tablename__ = "payroll_yearly_comparisons"
+    __table_args__ = (
+        Index('ix_payroll_comparison_dept_years', 'department_id', 'base_year', 'target_year'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Сравниваемые годы
+    base_year = Column(Integer, nullable=False, index=True)  # Базовый год (например, 2025)
+    target_year = Column(Integer, nullable=False, index=True)  # Целевой год (например, 2026)
+
+    # Данные базового года
+    base_year_headcount = Column(Integer, nullable=True)
+    base_year_total_salary = Column(Numeric(15, 2), nullable=True)
+    base_year_total_insurance = Column(Numeric(15, 2), nullable=True)
+    base_year_total_cost = Column(Numeric(15, 2), nullable=True)
+
+    # Данные целевого года (при текущем штате)
+    target_year_headcount = Column(Integer, nullable=True)
+    target_year_total_salary = Column(Numeric(15, 2), nullable=True)  # Без изменений
+    target_year_total_insurance = Column(Numeric(15, 2), nullable=True)  # С новыми ставками
+    target_year_total_cost = Column(Numeric(15, 2), nullable=True)
+
+    # Анализ изменений
+    insurance_rate_change = Column(JSON, nullable=True)  # {"PENSION_FUND": {"from": 22, "to": 30}, ...}
+    total_cost_increase = Column(Numeric(15, 2), nullable=True)  # Рост в рублях
+    total_cost_increase_percent = Column(Numeric(5, 2), nullable=True)  # Рост в %
+
+    # Разбивка по типам взносов
+    pension_increase = Column(Numeric(15, 2), nullable=True)
+    medical_increase = Column(Numeric(15, 2), nullable=True)
+    social_increase = Column(Numeric(15, 2), nullable=True)
+
+    # Рекомендации (автоматически генерируемые)
+    recommendations = Column(JSON, nullable=True)  # [{"type": "headcount_reduction", "value": 5, "impact": -500000}]
+
+    # Расчетная дата
+    calculated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # System fields
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<PayrollYearlyComparison {self.base_year} vs {self.target_year}>"
