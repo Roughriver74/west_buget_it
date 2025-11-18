@@ -60,7 +60,7 @@ def get_mappings(
 
     query = (
         db.query(BusinessOperationMapping)
-        .join(BudgetCategory, BusinessOperationMapping.category_id == BudgetCategory.id)
+        .outerjoin(BudgetCategory, BusinessOperationMapping.category_id == BudgetCategory.id)
     )
 
     # Apply filters
