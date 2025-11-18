@@ -9,15 +9,15 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source code
-COPY . .
-
 # Build argument for API URL
 ARG VITE_API_URL=https://budget-west.shknv.ru
 ENV VITE_API_URL=$VITE_API_URL
 
-# Clean any cached build artifacts to ensure fresh build
-RUN rm -rf dist node_modules/.vite
+# Copy source code (AFTER setting build args to prevent cache invalidation)
+COPY . .
+
+# Clean any existing dist/ and cache AFTER copying to ensure truly fresh build
+RUN rm -rf dist node_modules/.vite .cache
 
 # Build application
 RUN npm run build
