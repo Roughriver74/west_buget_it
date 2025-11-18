@@ -44,6 +44,61 @@
       "aliases": ["оклад", "зарплата", "salary", "базовая_зарплата"]
     },
     {
+      "name": "employee_number",
+      "display_name": {
+        "ru": "Табельный номер",
+        "en": "Employee Number"
+      },
+      "type": "string",
+      "required": false,
+      "max_length": 50,
+      "aliases": ["табельный_номер", "номер", "employee_id", "номер_сотрудника"]
+    },
+    {
+      "name": "monthly_bonus_base",
+      "display_name": {
+        "ru": "Месячная премия",
+        "en": "Monthly Bonus"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "default": 0,
+      "aliases": ["месячная_премия", "ежемесячная_премия", "monthly_bonus", "базовая_месячная_премия"]
+    },
+    {
+      "name": "quarterly_bonus_base",
+      "display_name": {
+        "ru": "Квартальная премия",
+        "en": "Quarterly Bonus"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "aliases": ["квартальная_премия", "quarterly_bonus", "базовая_квартальная_премия"]
+    },
+    {
+      "name": "annual_bonus_base",
+      "display_name": {
+        "ru": "Годовая премия",
+        "en": "Annual Bonus"
+      },
+      "type": "decimal",
+      "required": false,
+      "min": 0,
+      "aliases": ["годовая_премия", "annual_bonus", "базовая_годовая_премия"]
+    },
+    {
+      "name": "birth_date",
+      "display_name": {
+        "ru": "Дата рождения",
+        "en": "Birth Date"
+      },
+      "type": "date",
+      "required": false,
+      "aliases": ["дата_рождения", "день_рождения", "birth_date", "date_of_birth", "дата_рожд"]
+    },
+    {
       "name": "hire_date",
       "display_name": {
         "ru": "Дата приема",
@@ -75,19 +130,21 @@
       "aliases": ["телефон", "тел", "phone_number"]
     },
     {
-      "name": "is_active",
+      "name": "status",
       "display_name": {
-        "ru": "Активен",
-        "en": "Is Active"
+        "ru": "Статус",
+        "en": "Status"
       },
-      "type": "boolean",
+      "type": "enum",
       "required": false,
-      "default": true,
-      "aliases": ["активен", "active", "работает"]
+      "default": "ACTIVE",
+      "enum": ["ACTIVE", "ON_VACATION", "ON_LEAVE", "FIRED"],
+      "aliases": ["статус", "status"]
     }
   ],
   "validation_rules": {
-    "unique_fields": ["full_name"]
+    "unique_fields": ["full_name", "birth_date"],
+    "unique_fields_comment": "Комбинация ФИО + дата рождения (для различения полных тёзок)"
   },
   "import_options": {
     "allow_update": true,

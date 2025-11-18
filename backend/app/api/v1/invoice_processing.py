@@ -212,6 +212,51 @@ async def process_invoice(
 
 # ==================== List & Get ====================
 
+# IMPORTANT: Specific routes must come BEFORE parameterized routes
+# Move /cash-flow-categories here to avoid conflict with /{invoice_id}
+
+@router.get("/cash-flow-categories", response_model=List[CashFlowCategoryListItem])
+async def get_cash_flow_categories_for_selection(
+    department_id: Optional[int] = Query(None, description="Фильтр по отделу"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Получить список статей ДДС (движения денежных средств) для выбора
+
+    Возвращает только синхронизированные категории из 1С (external_id_1c заполнен)
+    Только элементы (не папки)
+    """
+    from app.db.models import BudgetCategory
+
+    query = db.query(BudgetCategory).filter(
+        BudgetCategory.is_active == True,
+        BudgetCategory.external_id_1c.isnot(None),  # Только синхронизированные
+        BudgetCategory.is_folder == False  # Только элементы (не папки)
+    )
+
+    # Role-based filtering
+    if current_user.role == UserRoleEnum.USER:
+        query = query.filter(BudgetCategory.department_id == current_user.department_id)
+    elif department_id:
+        query = query.filter(BudgetCategory.department_id == department_id)
+
+    categories = query.order_by(BudgetCategory.order_index, BudgetCategory.name).all()
+
+    return [
+        CashFlowCategoryListItem(
+            id=cat.id,
+            name=cat.name,
+            code=cat.code_1c,
+            external_id_1c=cat.external_id_1c,
+            parent_id=cat.parent_id,
+            is_folder=cat.is_folder,
+            order_index=cat.order_index
+        )
+        for cat in categories
+    ]
+
+
 @router.get("/", response_model=List[ProcessedInvoiceListItem])
 async def get_invoices(
     department_id: Optional[int] = Query(None, description="Фильтр по отделу"),
@@ -591,48 +636,6 @@ async def get_processing_stats(
 
 # ==================== 1C Integration ====================
 
-@router.get("/cash-flow-categories", response_model=List[CashFlowCategoryListItem])
-async def get_cash_flow_categories_for_selection(
-    department_id: Optional[int] = Query(None, description="Фильтр по отделу"),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить список статей ДДС (движения денежных средств) для выбора
-
-    Возвращает только синхронизированные категории из 1С (external_id_1c заполнен)
-    Только элементы (не папки)
-    """
-    from app.db.models import BudgetCategory
-
-    query = db.query(BudgetCategory).filter(
-        BudgetCategory.is_active == True,
-        BudgetCategory.external_id_1c.isnot(None),  # Только синхронизированные
-        BudgetCategory.is_folder == False  # Только элементы (не папки)
-    )
-
-    # Role-based filtering
-    if current_user.role == UserRoleEnum.USER:
-        query = query.filter(BudgetCategory.department_id == current_user.department_id)
-    elif department_id:
-        query = query.filter(BudgetCategory.department_id == department_id)
-
-    categories = query.order_by(BudgetCategory.order_index, BudgetCategory.name).all()
-
-    return [
-        CashFlowCategoryListItem(
-            id=cat.id,
-            name=cat.name,
-            code=cat.code,
-            external_id_1c=cat.external_id_1c,
-            parent_id=cat.parent_id,
-            is_folder=cat.is_folder,
-            order_index=cat.order_index
-        )
-        for cat in categories
-    ]
-
-
 @router.post("/{invoice_id}/suggest-category", response_model=SuggestCategoryResponse)
 async def suggest_cash_flow_category_for_invoice(
     invoice_id: int,
@@ -709,7 +712,7 @@ async def update_invoice_category(
     db: Session = Depends(get_db)
 ):
     """
-    Обновить категорию (статью ДДС) для invoice
+    Обновить категорию (статью ДДС) и желаемую дату оплаты для invoice
     """
     invoice = db.query(ProcessedInvoice).filter_by(id=invoice_id).first()
     if not invoice:
@@ -740,13 +743,14 @@ async def update_invoice_category(
             detail=f"Категория '{category.name}' не синхронизирована с 1С. external_id_1c не заполнен."
         )
 
-    # Обновить категорию
+    # Обновить категорию и желаемую дату оплаты
     invoice.category_id = request.category_id
+    invoice.desired_payment_date = request.desired_payment_date
     db.commit()
 
-    logger.info(f"Invoice {invoice_id} category updated to {request.category_id} ({category.name})")
+    logger.info(f"Invoice {invoice_id} category updated to {request.category_id} ({category.name}), desired_payment_date set to {request.desired_payment_date}")
 
-    return {"success": True, "message": f"Категория обновлена: {category.name}"}
+    return {"success": True, "message": f"Категория обновлена: {category.name}. Желаемая дата оплаты: {request.desired_payment_date.strftime('%d.%m.%Y')}"}
 
 
 @router.post("/{invoice_id}/validate-for-1c", response_model=Invoice1CValidationResponse)

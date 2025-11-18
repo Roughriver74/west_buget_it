@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.utils.excel_export import encode_filename_header
 from app.db.models import (
     Employee, User, UserRoleEnum, Department, SalaryHistory, EmployeeStatusEnum,
-    PayrollPlan, PayrollActual, EmployeeKPI
+    PayrollPlan, PayrollActual, EmployeeKPI, TaxTypeEnum, TaxRate
 )
 from app.schemas.payroll import (
     EmployeeCreate,
@@ -26,17 +26,23 @@ from app.schemas.payroll import (
     SalaryHistoryInDB,
 )
 from app.utils.auth import get_current_active_user
+from app.services.tax_rate_utils import merge_tax_rates_with_defaults
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 
 def check_department_access(user: User, department_id: int) -> bool:
     """Check if user has access to the department"""
-    if user.role == UserRoleEnum.ADMIN:
-        return True
-    if user.role == UserRoleEnum.MANAGER:
+    if user.role in (
+        UserRoleEnum.ADMIN,
+        UserRoleEnum.MANAGER,
+        UserRoleEnum.ACCOUNTANT,
+        UserRoleEnum.FOUNDER,
+    ):
         return True
     if user.role == UserRoleEnum.USER:
+        return user.department_id == department_id
+    if user.role == UserRoleEnum.REQUESTER:
         return user.department_id == department_id
     return False
 
@@ -431,7 +437,7 @@ async def get_salary_history(
 
     salary_history = db.query(SalaryHistory).filter(
         SalaryHistory.employee_id == employee_id
-    ).order_by(SalaryHistory.effective_date.desc()).all()
+    ).order_by(SalaryHistory.effective_date.asc()).all()
 
     return salary_history
 
@@ -476,3 +482,152 @@ async def add_salary_history(
     db.refresh(new_history)
 
     return new_history
+
+
+@router.get("/{employee_id}/tax-calculation")
+async def get_employee_tax_calculation(
+    employee_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get tax calculation for employee's current salary
+
+    Returns НДФЛ, ПФР, ФОМС, ФСС breakdown based on current tax rates
+    """
+    from sqlalchemy import and_, or_
+    from datetime import date
+    from decimal import Decimal
+
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    if not employee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
+        )
+
+    # Check department access
+    if not check_department_access(current_user, employee.department_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found"
+        )
+
+    gross_amount = Decimal(str(employee.base_salary))
+    today = date.today()
+
+    # Get active tax rates for current date (department-specific + global)
+    tax_rates = db.query(TaxRate).filter(
+        TaxRate.is_active == True,
+        TaxRate.effective_from <= today,
+        or_(
+            TaxRate.effective_to.is_(None),
+            TaxRate.effective_to >= today
+        )
+    ).filter(
+        or_(
+            TaxRate.department_id == employee.department_id,
+            TaxRate.department_id.is_(None)
+        )
+    ).all()
+
+    selected_rates = merge_tax_rates_with_defaults(tax_rates)
+
+    # Initialize result
+    income_tax = Decimal(0)
+    income_tax_rate = Decimal(0)
+    pension_fund = Decimal(0)
+    pension_fund_rate = Decimal(0)
+    medical_insurance = Decimal(0)
+    medical_insurance_rate = Decimal(0)
+    social_insurance = Decimal(0)
+    social_insurance_rate = Decimal(0)
+
+    breakdown = {}
+
+    # Calculate taxes
+    for tax_rate in selected_rates.values():
+        if tax_rate.tax_type == TaxTypeEnum.INCOME_TAX:
+            # НДФЛ
+            if tax_rate.threshold_amount and gross_amount > tax_rate.threshold_amount:
+                amount_below = tax_rate.threshold_amount
+                amount_above = gross_amount - tax_rate.threshold_amount
+                income_tax = (amount_below * tax_rate.rate) + (amount_above * (tax_rate.rate_above_threshold or tax_rate.rate))
+                income_tax_rate = tax_rate.rate_above_threshold or tax_rate.rate
+            else:
+                income_tax = gross_amount * tax_rate.rate
+                income_tax_rate = tax_rate.rate
+
+            breakdown["income_tax"] = {
+                "rate": float(income_tax_rate),
+                "rate_percent": float(income_tax_rate * 100),
+                "amount": float(income_tax),
+                "description": tax_rate.name
+            }
+
+        elif tax_rate.tax_type == TaxTypeEnum.PENSION_FUND:
+            # ПФР
+            if tax_rate.threshold_amount and gross_amount > tax_rate.threshold_amount:
+                amount_below = tax_rate.threshold_amount
+                amount_above = gross_amount - tax_rate.threshold_amount
+                pension_fund = (amount_below * tax_rate.rate) + (amount_above * (tax_rate.rate_above_threshold or Decimal(0)))
+                pension_fund_rate = tax_rate.rate
+            else:
+                pension_fund = gross_amount * tax_rate.rate
+                pension_fund_rate = tax_rate.rate
+
+            breakdown["pension_fund"] = {
+                "rate": float(pension_fund_rate),
+                "rate_percent": float(pension_fund_rate * 100),
+                "amount": float(pension_fund),
+                "description": tax_rate.name
+            }
+
+        elif tax_rate.tax_type == TaxTypeEnum.MEDICAL_INSURANCE:
+            # ФОМС
+            medical_insurance = gross_amount * tax_rate.rate
+            medical_insurance_rate = tax_rate.rate
+
+            breakdown["medical_insurance"] = {
+                "rate": float(medical_insurance_rate),
+                "rate_percent": float(medical_insurance_rate * 100),
+                "amount": float(medical_insurance),
+                "description": tax_rate.name
+            }
+
+        elif tax_rate.tax_type == TaxTypeEnum.SOCIAL_INSURANCE:
+            # ФСС
+            social_insurance = gross_amount * tax_rate.rate
+            social_insurance_rate = tax_rate.rate
+
+            breakdown["social_insurance"] = {
+                "rate": float(social_insurance_rate),
+                "rate_percent": float(social_insurance_rate * 100),
+                "amount": float(social_insurance),
+                "description": tax_rate.name
+            }
+
+    # Calculate totals
+    total_social_contributions = pension_fund + medical_insurance + social_insurance
+    net_amount = gross_amount - income_tax
+    employer_cost = gross_amount + total_social_contributions
+
+    return {
+        "employee_id": employee_id,
+        "employee_name": employee.full_name,
+        "gross_salary": float(gross_amount),
+        "income_tax": float(income_tax),
+        "income_tax_rate_percent": float(income_tax_rate * 100),
+        "social_contributions": {
+            "pension_fund": float(pension_fund),
+            "pension_fund_rate_percent": float(pension_fund_rate * 100),
+            "medical_insurance": float(medical_insurance),
+            "medical_insurance_rate_percent": float(medical_insurance_rate * 100),
+            "social_insurance": float(social_insurance),
+            "social_insurance_rate_percent": float(social_insurance_rate * 100),
+            "total": float(total_social_contributions)
+        },
+        "net_salary": float(net_amount),
+        "employer_total_cost": float(employer_cost),
+        "breakdown": breakdown
+    }

@@ -247,6 +247,7 @@ class ProcessedInvoiceUpdate(BaseModel):
     supplier_kpp: Optional[str] = None
     total_amount: Optional[Decimal] = None
     payment_purpose: Optional[str] = None
+    desired_payment_date: Optional[DateType] = Field(None, description="Желаемая дата оплаты для отправки в 1С")
 
     # Можно обновить связь с contractor
     contractor_id: Optional[int] = None
@@ -294,7 +295,6 @@ class Invoice1CValidationResponse(BaseModel):
 
 class Create1CExpenseRequestRequest(BaseModel):
     """Запрос на создание заявки на расход в 1С"""
-    invoice_id: int = Field(..., description="ID обработанного счета")
     upload_attachment: bool = Field(default=True, description="Загружать ли прикрепленный файл")
 
 
@@ -334,5 +334,6 @@ class CashFlowCategoryListItem(BaseModel):
 
 
 class InvoiceUpdateCategoryRequest(BaseModel):
-    """Запрос на обновление категории счета"""
+    """Запрос на обновление категории счета и желаемой даты оплаты"""
     category_id: int = Field(..., description="ID категории бюджета (статьи ДДС)")
+    desired_payment_date: DateType = Field(..., description="Желаемая дата оплаты для отправки в 1С")

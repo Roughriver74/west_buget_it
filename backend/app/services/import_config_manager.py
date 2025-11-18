@@ -83,6 +83,10 @@ class ImportConfig:
         """Get calculated fields and their expressions"""
         return self.import_options.get("calculated_fields", {})
 
+    def get_alias_map(self) -> Dict[str, str]:
+        """Get alias map (alias_lowercase -> field_name)"""
+        return self._alias_map
+
 
 class ImportConfigManager:
     """Manager for import configurations"""

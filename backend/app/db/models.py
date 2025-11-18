@@ -82,7 +82,9 @@ class UserRoleEnum(str, enum.Enum):
     ADMIN = "ADMIN"  # Администратор - управление системой и пользователями
     FOUNDER = "FOUNDER"  # Учредитель - дашборд с ключевыми показателями по всем отделам
     MANAGER = "MANAGER"  # Руководитель - доступ ко всем отделам, сводная аналитика
+    ACCOUNTANT = "ACCOUNTANT"  # Финансист - справочники и НДФЛ, доступ ко всем отделам
     USER = "USER"  # Пользователь отдела - доступ только к своему отделу
+    REQUESTER = "REQUESTER"  # Запросчик заявок/расходов (ограниченные права)
 
 
 class BonusTypeEnum(str, enum.Enum):
@@ -90,6 +92,15 @@ class BonusTypeEnum(str, enum.Enum):
     PERFORMANCE_BASED = "PERFORMANCE_BASED"  # Результативный - зависит от КПИ%
     FIXED = "FIXED"  # Фиксированный - не зависит от КПИ
     MIXED = "MIXED"  # Смешанный - часть фиксированная, часть от КПИ
+
+
+class TaxTypeEnum(str, enum.Enum):
+    """Enum for tax and social contribution types"""
+    INCOME_TAX = "INCOME_TAX"  # НДФЛ
+    PENSION_FUND = "PENSION_FUND"  # ПФР (пенсионный фонд)
+    MEDICAL_INSURANCE = "MEDICAL_INSURANCE"  # ФОМС (медицинское страхование)
+    SOCIAL_INSURANCE = "SOCIAL_INSURANCE"  # ФСС (социальное страхование)
+    INJURY_INSURANCE = "INJURY_INSURANCE"  # Страхование от несчастных случаев
 
 
 class KPIGoalStatusEnum(str, enum.Enum):
@@ -229,7 +240,7 @@ class BudgetCategory(Base):
     is_active = Column(Boolean, default=True, nullable=False, index=True)
 
     # Department association (multi-tenancy)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
 
     # Подкатегории (hierarchical structure)
     parent_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True, index=True)
@@ -640,6 +651,7 @@ class Employee(Base):
     full_name = Column(String(255), nullable=False, index=True)  # ФИО
     position = Column(String(255), nullable=False)  # Должность
     employee_number = Column(String(50), nullable=True, index=True)  # Табельный номер
+    birth_date = Column(Date, nullable=True)  # Дата рождения (для различения полных тёзок)
 
     # Employment details
     hire_date = Column(Date, nullable=True)  # Дата приема на работу
@@ -808,6 +820,50 @@ class PayrollActual(Base):
 
     def __repr__(self):
         return f"<PayrollActual {self.year}-{self.month:02d} Employee#{self.employee_id}: {self.total_paid}>"
+
+
+class TaxRate(Base):
+    """Tax rates and social contributions (налоговые ставки и страховые взносы)"""
+    __tablename__ = "tax_rates"
+    __table_args__ = (
+        Index('idx_tax_rate_type_active', 'tax_type', 'is_active'),
+        Index('idx_tax_rate_effective_date', 'effective_from', 'effective_to'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Tax type
+    tax_type = Column(Enum(TaxTypeEnum), nullable=False, index=True)
+    name = Column(String(200), nullable=False)  # Название налога/взноса
+    description = Column(Text, nullable=True)  # Описание
+
+    # Rate details
+    rate = Column(Numeric(5, 4), nullable=False)  # Ставка (например, 0.13 для 13%)
+    threshold_amount = Column(Numeric(15, 2), nullable=True)  # Порог дохода (если применимо)
+    rate_above_threshold = Column(Numeric(5, 4), nullable=True)  # Ставка выше порога (например, 0.15 для НДФЛ > 5 млн)
+
+    # Effective period
+    effective_from = Column(Date, nullable=False, index=True)  # Дата начала действия
+    effective_to = Column(Date, nullable=True, index=True)  # Дата окончания действия (null = бессрочно)
+
+    # Multi-tenancy
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    notes = Column(Text, nullable=True)  # Примечания, основание (например, "Закон 123-ФЗ")
+
+    # Relationships
+    department_rel = relationship("Department")
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+    def __repr__(self):
+        return f"<TaxRate {self.tax_type.value}: {self.rate*100}%>"
 
 
 # ============================================================================
@@ -1628,6 +1684,7 @@ class ProcessedInvoice(Base):
     payment_purpose = Column(Text, nullable=True)
     contract_number = Column(String(100), nullable=True)
     contract_date = Column(Date, nullable=True)
+    desired_payment_date = Column(Date, nullable=True)  # Желаемая дата оплаты (ЖелательнаяДатаПлатежа) - устанавливается пользователем для отправки в 1С
 
     # Статус обработки
     status = Column(

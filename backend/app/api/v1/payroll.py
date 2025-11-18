@@ -46,11 +46,16 @@ router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
 def check_department_access(user: User, department_id: int) -> bool:
     """Check if user has access to the department"""
-    if user.role == UserRoleEnum.ADMIN:
-        return True
-    if user.role == UserRoleEnum.MANAGER:
+    if user.role in (
+        UserRoleEnum.ADMIN,
+        UserRoleEnum.MANAGER,
+        UserRoleEnum.ACCOUNTANT,
+        UserRoleEnum.FOUNDER,
+    ):
         return True
     if user.role == UserRoleEnum.USER:
+        return user.department_id == department_id
+    if user.role == UserRoleEnum.REQUESTER:
         return user.department_id == department_id
     return False
 
@@ -91,6 +96,9 @@ async def list_payroll_plans(
         query = query.filter(PayrollPlan.year == year)
     if month:
         query = query.filter(PayrollPlan.month == month)
+
+    # Sort by year and month (earliest to latest)
+    query = query.order_by(PayrollPlan.year.asc(), PayrollPlan.month.asc())
 
     plans = query.offset(skip).limit(limit).all()
     return plans
@@ -383,6 +391,9 @@ async def list_payroll_actuals(
         query = query.filter(PayrollActual.year == year)
     if month:
         query = query.filter(PayrollActual.month == month)
+
+    # Sort by year and month (earliest to latest)
+    query = query.order_by(PayrollActual.year.asc(), PayrollActual.month.asc())
 
     actuals = query.offset(skip).limit(limit).all()
     return actuals

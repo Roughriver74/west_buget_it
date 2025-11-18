@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Modal, Upload, message, Alert, Statistic, Row, Col, Typography, Button } from 'antd';
+import { Modal, Upload, App, Alert, Statistic, Row, Col, Typography, Button, Spin } from 'antd';
 import { InboxOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../../api/client';
+import apiClient from '@/api/client';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 const { Dragger } = Upload;
 const { Title } = Typography;
@@ -14,16 +15,20 @@ interface PayrollImportModalProps {
 
 interface ImportResult {
   success: boolean;
-  message: string;
-  total_rows: number;
-  created: number;
-  updated: number;
-  skipped: number;
-  errors: string[];
+  message?: string;
+  stats?: {
+    total_rows: number;
+    created: number;
+    updated: number;
+    skipped: number;
+  };
+  errors?: string[];
 }
 
 export default function PayrollImportModal({ visible, onCancel }: PayrollImportModalProps) {
   const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const { selectedDepartment } = useDepartment();
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
 
@@ -31,8 +36,17 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('entity_type', 'payroll_plans');
 
-      const response = await apiClient.post('/payroll/plans/import', formData, {
+      // Pass department_id so payroll plans are imported to the selected department
+      if (selectedDepartment?.id) {
+        formData.append('department_id', selectedDepartment.id.toString());
+      }
+
+      // Note: column_mapping is optional - the unified service will auto-detect columns
+      // based on aliases defined in backend/app/import_configs/payroll_plans.json
+
+      const response = await apiClient.post('/import/execute', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -77,25 +91,17 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${API_URL}/api/v1/templates/download/payroll_plans`;
-
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-
-      // Fetch with authentication
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // Use apiClient to avoid double /api/v1 prefix
+      const response = await apiClient.get('/import/template/payroll_plans', {
+        params: {
+          language: 'ru',
+          include_examples: true
+        },
+        responseType: 'blob'
       });
 
-      if (!response.ok) {
-        throw new Error('Не удалось скачать шаблон');
-      }
-
       // Create blob and download
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -107,7 +113,6 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
 
       message.success('Шаблон успешно скачан');
     } catch (error) {
-      console.error('Template download error:', error);
       message.error('Ошибка при скачивании шаблона');
     }
   };
@@ -188,6 +193,15 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
               Поддерживаются файлы .xlsx и .xls (макс. 10MB)
             </p>
           </Dragger>
+
+          {importMutation.isPending && (
+            <div style={{ textAlign: 'center', marginTop: 24 }}>
+              <Spin size="large" />
+              <div style={{ marginTop: 16 }}>
+                Импорт данных... Пожалуйста, подождите.
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -199,35 +213,37 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
             style={{ marginBottom: 20 }}
           />
 
-          <Row gutter={16} style={{ marginBottom: 20 }}>
-            <Col span={6}>
-              <Statistic
-                title="Всего строк"
-                value={importResult.total_rows}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Создано"
-                value={importResult.created}
-                valueStyle={{ color: '#3f8600' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Обновлено"
-                value={importResult.updated}
-                valueStyle={{ color: '#1890ff' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="Пропущено"
-                value={importResult.skipped}
-                valueStyle={{ color: '#cf1322' }}
-              />
-            </Col>
-          </Row>
+          {importResult.stats && (
+            <Row gutter={16} style={{ marginBottom: 20 }}>
+              <Col span={6}>
+                <Statistic
+                  title="Всего строк"
+                  value={importResult.stats.total_rows}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Создано"
+                  value={importResult.stats.created}
+                  valueStyle={{ color: '#3f8600' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Обновлено"
+                  value={importResult.stats.updated}
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic
+                  title="Пропущено"
+                  value={importResult.stats.skipped}
+                  valueStyle={{ color: '#cf1322' }}
+                />
+              </Col>
+            </Row>
+          )}
 
           {importResult.errors && importResult.errors.length > 0 && (
             <>
@@ -235,14 +251,19 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
               <Alert
                 message={
                   <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                    {importResult.errors.map((error, index) => (
-                      <div key={index}>• {error}</div>
-                    ))}
-                    {importResult.skipped > importResult.errors.length && (
-                      <div style={{ marginTop: 10, fontStyle: 'italic' }}>
-                        И еще {importResult.skipped - importResult.errors.length} ошибок...
-                      </div>
-                    )}
+                    {importResult.errors.map((error: any, index: number) => {
+                      // Handle both string errors and object errors {row, error}
+                      const errorText = typeof error === 'string'
+                        ? error
+                        : error.error || error.message || JSON.stringify(error);
+                      const rowPrefix = typeof error === 'object' && error.row
+                        ? `Строка ${error.row}: `
+                        : '';
+
+                      return (
+                        <div key={index}>• {rowPrefix}{errorText}</div>
+                      );
+                    })}
                   </div>
                 }
                 type="error"
@@ -250,6 +271,14 @@ export default function PayrollImportModal({ visible, onCancel }: PayrollImportM
               />
             </>
           )}
+
+          <Alert
+            message="Что дальше?"
+            description="Данные импортированы. Вы можете перейти к просмотру планов ФОТ или закрыть это окно."
+            type="info"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
         </>
       )}
     </Modal>

@@ -463,6 +463,40 @@ class OData1CClient:
             logger.warning(f"Failed to fetch organization {key}: {e}")
             return None
 
+    def get_subdivision_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить подразделение по наименованию
+
+        Args:
+            name: Наименование подразделения (например: "Москва", "СПБ")
+
+        Returns:
+            Данные подразделения (включая Ref_Key) или None
+        """
+        if not name or not name.strip():
+            return None
+
+        try:
+            # Фильтр по наименованию (Description или другое поле в 1С)
+            filter_str = f"Description eq '{name}'"
+            response = self._make_request(
+                method='GET',
+                endpoint=f"Catalog_Подразделения?$filter={filter_str}&$format=json&$top=1"
+            )
+
+            # Проверить результат
+            if response and 'value' in response and len(response['value']) > 0:
+                subdivision = response['value'][0]
+                logger.info(f"Found subdivision '{name}' with GUID: {subdivision.get('Ref_Key')}")
+                return subdivision
+            else:
+                logger.warning(f"Subdivision '{name}' not found in 1C")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch subdivision '{name}': {e}")
+            return None
+
     def get_expense_requests(
         self,
         date_from: Optional[date] = None,
@@ -625,17 +659,20 @@ class OData1CClient:
             return None
 
         try:
-            # OData $filter по полю ИНН
+            # OData $filter по полю ИНН (формат как в рабочем примере)
             filter_str = f"ИНН eq '{inn}'"
-            endpoint_with_params = f"Catalog_Контрагенты?$format=json&$filter={filter_str}"
+            endpoint_with_params = f"Catalog_Контрагенты?$top=1&$format=json&$filter={filter_str}"
 
             logger.info(f"Searching counterparty by INN: {inn}")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
 
             response = self._make_request(
                 method='GET',
                 endpoint=endpoint_with_params,
                 params=None
             )
+
+            logger.debug(f"Counterparty search response: {response}")
 
             results = response.get('value', [])
             if results:
@@ -663,17 +700,20 @@ class OData1CClient:
             return None
 
         try:
-            # OData $filter по полю ИНН
+            # OData $filter по полю ИНН (формат как в рабочем примере)
             filter_str = f"ИНН eq '{inn}'"
-            endpoint_with_params = f"Catalog_Организации?$format=json&$filter={filter_str}"
+            endpoint_with_params = f"Catalog_Организации?$top=1&$format=json&$filter={filter_str}"
 
             logger.info(f"Searching organization by INN: {inn}")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
 
             response = self._make_request(
                 method='GET',
                 endpoint=endpoint_with_params,
                 params=None
             )
+
+            logger.debug(f"Organization search response: {response}")
 
             results = response.get('value', [])
             if results:

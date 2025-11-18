@@ -29,6 +29,7 @@ import {
   AreaChartOutlined,
   FileSearchOutlined,
   UnorderedListOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -110,6 +111,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 		key: '/business-operation-mappings',
 		icon: <SettingOutlined />,
 		label: <Link to='/business-operation-mappings'>Маппинг операций</Link>,
+	}] : []
+
+  const taxRatesMenuItem = (user?.role === 'ADMIN' || user?.role === 'ACCOUNTANT') ? [{
+		key: '/references/tax-rates',
+		icon: <SafetyOutlined />,
+		label: <Link to='/references/tax-rates'>Налоговые ставки</Link>,
 	}] : []
 
   const baseMenuItems = [
@@ -378,6 +385,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					icon: <BankOutlined />,
 					label: <Link to='/organizations'>Организации</Link>,
 				},
+				...taxRatesMenuItem,
 				...businessOperationMappingsMenuItem,
 			],
 		},
@@ -480,7 +488,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               />
             )}
             <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 500 }}>
-              {isMobile ? 'BDR' : 'IT Budget Manager'}
+              {isMobile ? 'BDR' : 'Budget Manager'}
             </div>
           </Space>
 

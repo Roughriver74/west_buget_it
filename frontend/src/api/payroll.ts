@@ -7,6 +7,7 @@ export interface Employee {
   full_name: string;
   position: string;
   employee_number?: string;
+  birth_date?: string;  // Дата рождения (для различения полных тёзок)
   hire_date?: string;
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
@@ -35,6 +36,33 @@ export interface SalaryHistory {
   reason?: string;
   notes?: string;
   created_at: string;
+}
+
+export interface TaxCalculation {
+  employee_id: number;
+  employee_name: string;
+  gross_salary: number;
+  income_tax: number;
+  income_tax_rate_percent: number;
+  social_contributions: {
+    pension_fund: number;
+    pension_fund_rate_percent: number;
+    medical_insurance: number;
+    medical_insurance_rate_percent: number;
+    social_insurance: number;
+    social_insurance_rate_percent: number;
+    total: number;
+  };
+  net_salary: number;
+  employer_total_cost: number;
+  breakdown: {
+    [key: string]: {
+      rate: number;
+      rate_percent: number;
+      amount: number;
+      description: string;
+    };
+  };
 }
 
 export interface PayrollPlan {
@@ -195,6 +223,7 @@ export interface EmployeeCreate {
   full_name: string;
   position: string;
   employee_number?: string;
+  birth_date?: string;  // Дата рождения (для различения полных тёзок)
   hire_date?: string;
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
@@ -212,6 +241,7 @@ export interface EmployeeUpdate {
   full_name?: string;
   position?: string;
   employee_number?: string;
+  birth_date?: string;  // Дата рождения (для различения полных тёзок)
   hire_date?: string;
   fire_date?: string;
   status?: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
@@ -824,6 +854,16 @@ export const payrollTaxAnalyticsAPI = {
     const response = await apiClient.get<CostWaterfall>('payroll/analytics/cost-waterfall', {
       params,
     });
+    return response.data;
+  },
+};
+
+// ==================== Employee Tax Calculation API ====================
+
+export const employeeTaxAPI = {
+  // Получить расчет налогов для сотрудника
+  getTaxCalculation: async (employeeId: number) => {
+    const response = await apiClient.get<TaxCalculation>(`employees/${employeeId}/tax-calculation`);
     return response.data;
   },
 };

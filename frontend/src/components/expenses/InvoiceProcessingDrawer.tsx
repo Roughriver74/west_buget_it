@@ -8,7 +8,6 @@ import {
   Tag,
   Modal,
   message,
-  Upload,
   Descriptions,
   Tabs,
   Alert,
@@ -16,9 +15,10 @@ import {
   Input,
   Form,
   Typography,
+  DatePicker,
+  Spin,
 } from 'antd'
 import {
-  UploadOutlined,
   SyncOutlined,
   EyeOutlined,
   DeleteOutlined,
@@ -27,14 +27,16 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
+  CloudUploadOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
 
 import { invoiceProcessingApi } from '@/api/invoiceProcessing'
 import { categoriesApi } from '@/api/categories'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import QuickInvoiceUpload from './QuickInvoiceUpload'
 import type {
   ProcessedInvoiceListItem,
   InvoiceProcessingStatus,
@@ -57,14 +59,15 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
   const [form] = Form.useForm()
+  const [categoryForm] = Form.useForm()
 
-  const [fileList, setFileList] = useState<UploadFile[]>([])
-  const [uploading, setUploading] = useState(false)
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<ProcessedInvoiceDetail | null>(null)
   const [createExpenseModalVisible, setCreateExpenseModalVisible] = useState(false)
+  const [setCategoryModalVisible, setSetCategoryModalVisible] = useState(false)
   const [searchText, setSearchText] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<InvoiceProcessingStatus | undefined>()
+  const [validationResult, setValidationResult] = useState<any>(null)
 
   const filters: InvoiceListFilters = {
     department_id: selectedDepartment?.id,
@@ -86,36 +89,34 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
     enabled: !!selectedDepartment && visible,
   })
 
-  // Upload mutation
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) =>
-      invoiceProcessingApi.upload(file, selectedDepartment?.id),
-    onSuccess: (data) => {
-      message.success(`Файл загружен успешно! Запуск обработки...`)
-      setFileList([])
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-
-      // Автоматически запускаем обработку загруженного файла
-      if (data.invoice_id) {
-        processMutation.mutate(data.invoice_id)
-      }
-    },
-    onError: (error: any) => {
-      message.error(
-        `Ошибка загрузки: ${error.response?.data?.detail || error.message}`
-      )
-      setUploading(false)
-    },
+  // Fetch cash flow categories from 1C
+  const { data: cashFlowCategories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ['cashFlowCategories', selectedDepartment?.id],
+    queryFn: () => invoiceProcessingApi.getCashFlowCategories(selectedDepartment?.id),
+    enabled: !!selectedDepartment && visible,
   })
 
-  // Process mutation
+  // Process mutation (for re-processing existing invoices from table)
   const processMutation = useMutation({
     mutationFn: (invoiceId: number) =>
       invoiceProcessingApi.process({ invoice_id: invoiceId }),
-    onSuccess: (data) => {
-      setUploading(false)
+    onSuccess: async (data, invoiceId) => {
       if (data.success) {
         message.success('Счет успешно обработан!')
+
+        // Автоматически открыть модальное окно для выбора категории
+        const details = await invoiceProcessingApi.getById(invoiceId)
+        setSelectedInvoice(details)
+
+        // Установить дату оплаты по умолчанию (дата счета + 3 дня)
+        const invoiceDate = details.invoice_date ? dayjs(details.invoice_date) : dayjs()
+        const defaultPaymentDate = invoiceDate.add(3, 'day')
+
+        categoryForm.setFieldsValue({
+          desired_payment_date: defaultPaymentDate,
+        })
+
+        setSetCategoryModalVisible(true)
       } else {
         message.warning('Обработка завершена с ошибками. Требуется ручная проверка.')
       }
@@ -125,9 +126,69 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
       }
     },
     onError: (error: any) => {
-      setUploading(false)
       message.error(
         `Ошибка обработки: ${error.response?.data?.detail || error.message}`
+      )
+    },
+  })
+
+  // Update category mutation
+  const updateCategoryMutation = useMutation({
+    mutationFn: (values: { category_id: number; desired_payment_date: string }) =>
+      invoiceProcessingApi.updateCategory(selectedInvoice!.id, values),
+    onSuccess: () => {
+      message.success('Категория и дата оплаты установлены!')
+      setSetCategoryModalVisible(false)
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      if (selectedInvoice) {
+        loadInvoiceDetails(selectedInvoice.id)
+      }
+    },
+    onError: (error: any) => {
+      message.error(
+        `Ошибка обновления: ${error.response?.data?.detail || error.message}`
+      )
+    },
+  })
+
+  // Validate for 1C mutation
+  const validateFor1CMutation = useMutation({
+    mutationFn: (invoiceId: number) =>
+      invoiceProcessingApi.validateFor1C(invoiceId),
+    onSuccess: (data) => {
+      setValidationResult(data)
+      if (data.is_valid) {
+        message.success('Валидация успешна! Можно отправлять в 1С.')
+      } else {
+        message.error('Валидация не пройдена. Проверьте ошибки.')
+      }
+    },
+    onError: (error: any) => {
+      message.error(
+        `Ошибка валидации: ${error.response?.data?.detail || error.message}`
+      )
+    },
+  })
+
+  // Create in 1C mutation
+  const createIn1CMutation = useMutation({
+    mutationFn: (invoiceId: number) =>
+      invoiceProcessingApi.createIn1C(invoiceId, true),
+    onSuccess: (data) => {
+      if (data.success) {
+        message.success('Заявка на расход успешно создана в 1С!')
+        setValidationResult(null)
+        queryClient.invalidateQueries({ queryKey: ['invoices'] })
+        if (selectedInvoice) {
+          loadInvoiceDetails(selectedInvoice.id)
+        }
+      } else {
+        message.error(data.message)
+      }
+    },
+    onError: (error: any) => {
+      message.error(
+        `Ошибка создания в 1С: ${error.response?.data?.detail || error.message}`
       )
     },
   })
@@ -179,22 +240,6 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
       )
     },
   })
-
-  const handleUpload = async () => {
-    if (fileList.length === 0) {
-      message.warning('Выберите файл для загрузки')
-      return
-    }
-
-    setUploading(true)
-    try {
-      const file = fileList[0].originFileObj as File
-      await uploadMutation.mutateAsync(file)
-      setUploading(false)
-    } catch (error) {
-      setUploading(false)
-    }
-  }
 
   const handleProcess = (invoiceId: number) => {
     processMutation.mutate(invoiceId)
@@ -351,110 +396,99 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
   return (
     <>
       <Drawer
-        title="Обработка счетов AI"
+        title="🤖 AI Обработка счетов и отправка в 1С"
         width={1200}
         open={visible}
         onClose={onClose}
         destroyOnClose
       >
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
-          <Alert
-            message="AI обработка счетов"
-            description="Загружайте счета в формате PDF или изображения, и система автоматически распознает и извлечет данные с помощью OCR и AI."
-            type="info"
-            showIcon
-          />
+        <Tabs
+          defaultActiveKey="quick"
+          size="large"
+          style={{ marginTop: -16 }}
+          items={[
+            {
+              key: 'quick',
+              label: (
+                <span style={{ fontSize: 16, fontWeight: 500 }}>
+                  🚀 Быстрая отправка в 1С
+                </span>
+              ),
+              children: (
+                <QuickInvoiceUpload
+                  onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['invoices'] })
+                    message.success('Счет успешно отправлен в 1С!')
+                  }}
+                />
+              ),
+            },
+            {
+              key: 'list',
+              label: (
+                <span style={{ fontSize: 16, fontWeight: 500 }}>
+                  📋 Все счета
+                </span>
+              ),
+              children: (
+                <Space direction="vertical" style={{ width: '100%' }} size="large">
+                  {/* Filters */}
+                  <Card size="small">
+                    <Space>
+                      <Input.Search
+                        placeholder="Поиск по номеру или поставщику"
+                        style={{ width: 250 }}
+                        onSearch={setSearchText}
+                        allowClear
+                        size="small"
+                      />
+                      <Select
+                        placeholder="Фильтр по статусу"
+                        style={{ width: 180 }}
+                        onChange={setStatusFilter}
+                        allowClear
+                        size="small"
+                      >
+                        <Select.Option value="PENDING">Ожидает</Select.Option>
+                        <Select.Option value="PROCESSING">Обработка</Select.Option>
+                        <Select.Option value="PROCESSED">Обработан</Select.Option>
+                        <Select.Option value="ERROR">Ошибка</Select.Option>
+                        <Select.Option value="MANUAL_REVIEW">
+                          Требуется проверка
+                        </Select.Option>
+                        <Select.Option value="EXPENSE_CREATED">
+                          Расход создан
+                        </Select.Option>
+                      </Select>
+                    </Space>
+                  </Card>
 
-          {/* Upload Card */}
-          <Card title="Загрузка счета" size="small">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Upload
-                fileList={fileList}
-                onChange={({ fileList }) => setFileList(fileList)}
-                beforeUpload={(file) => {
-                  const isValidType =
-                    file.type === 'application/pdf' ||
-                    file.type.startsWith('image/')
-                  if (!isValidType) {
-                    message.error('Поддерживаются только PDF и изображения!')
-                    return false
-                  }
-                  const isLt10M = file.size / 1024 / 1024 < 10
-                  if (!isLt10M) {
-                    message.error('Файл должен быть меньше 10MB!')
-                    return false
-                  }
-                  return false // Prevent auto upload
-                }}
-                maxCount={1}
-                accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp"
-              >
-                <Button icon={<UploadOutlined />}>Выбрать файл</Button>
-              </Upload>
-              <Button
-                type="primary"
-                onClick={handleUpload}
-                loading={uploading}
-                disabled={fileList.length === 0}
-              >
-                Загрузить и начать обработку
-              </Button>
-            </Space>
-          </Card>
-
-          {/* Filters */}
-          <Card size="small">
-            <Space>
-              <Input.Search
-                placeholder="Поиск по номеру или поставщику"
-                style={{ width: 250 }}
-                onSearch={setSearchText}
-                allowClear
-                size="small"
-              />
-              <Select
-                placeholder="Фильтр по статусу"
-                style={{ width: 180 }}
-                onChange={setStatusFilter}
-                allowClear
-                size="small"
-              >
-                <Select.Option value="PENDING">Ожидает</Select.Option>
-                <Select.Option value="PROCESSING">Обработка</Select.Option>
-                <Select.Option value="PROCESSED">Обработан</Select.Option>
-                <Select.Option value="ERROR">Ошибка</Select.Option>
-                <Select.Option value="MANUAL_REVIEW">
-                  Требуется проверка
-                </Select.Option>
-                <Select.Option value="EXPENSE_CREATED">
-                  Расход создан
-                </Select.Option>
-              </Select>
-            </Space>
-          </Card>
-
-          {/* Invoices Table */}
-          <Card
-            title={`Загруженные счета (${invoicesData?.total || 0})`}
-            size="small"
-          >
-            <Table
-              columns={columns}
-              dataSource={invoicesData?.items || []}
-              loading={isLoading}
-              rowKey="id"
-              scroll={{ x: 1000 }}
-              pagination={{
-                total: invoicesData?.total || 0,
-                pageSize: invoicesData?.page_size || 20,
-                showSizeChanger: true,
-                showTotal: (total) => `Всего: ${total}`,
-                size: 'small',
-              }}
-              size="small"
-            />
-          </Card>
-        </Space>
+                  {/* Invoices Table */}
+                  <Card
+                    title={`Загруженные счета (${invoicesData?.total || 0})`}
+                    size="small"
+                  >
+                    <Table
+                      columns={columns}
+                      dataSource={invoicesData?.items || []}
+                      loading={isLoading}
+                      rowKey="id"
+                      scroll={{ x: 1000 }}
+                      pagination={{
+                        total: invoicesData?.total || 0,
+                        pageSize: invoicesData?.page_size || 20,
+                        showSizeChanger: true,
+                        showTotal: (total) => `Всего: ${total}`,
+                        size: 'small',
+                      }}
+                      size="small"
+                    />
+                  </Card>
+                </Space>
+              ),
+            },
+          ]}
+        />
       </Drawer>
 
       {/* Invoice Detail Modal */}
@@ -468,11 +502,57 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
             <Button key="close" onClick={() => setDetailModalVisible(false)}>
               Закрыть
             </Button>,
+            // Кнопка для установки категории (если ещё не установлена)
+            selectedInvoice.status === 'PROCESSED' &&
+              !selectedInvoice.category_id && (
+                <Button
+                  key="set-category"
+                  type="default"
+                  onClick={() => {
+                    const invoiceDate = selectedInvoice.invoice_date ? dayjs(selectedInvoice.invoice_date) : dayjs()
+                    const defaultPaymentDate = invoiceDate.add(3, 'day')
+                    categoryForm.setFieldsValue({
+                      desired_payment_date: defaultPaymentDate,
+                    })
+                    setSetCategoryModalVisible(true)
+                  }}
+                >
+                  Установить категорию
+                </Button>
+              ),
+            // Кнопка валидации для 1С
+            selectedInvoice.status === 'PROCESSED' &&
+              selectedInvoice.category_id &&
+              !selectedInvoice.external_id_1c && (
+                <Button
+                  key="validate-1c"
+                  icon={<SafetyCertificateOutlined />}
+                  onClick={() => validateFor1CMutation.mutate(selectedInvoice.id)}
+                  loading={validateFor1CMutation.isPending}
+                >
+                  Проверить для 1С
+                </Button>
+              ),
+            // Кнопка отправки в 1С
+            selectedInvoice.status === 'PROCESSED' &&
+              selectedInvoice.category_id &&
+              !selectedInvoice.external_id_1c && (
+                <Button
+                  key="create-1c"
+                  type="primary"
+                  icon={<CloudUploadOutlined />}
+                  onClick={() => createIn1CMutation.mutate(selectedInvoice.id)}
+                  loading={createIn1CMutation.isPending}
+                  disabled={validationResult && !validationResult.is_valid}
+                >
+                  Отправить в 1С
+                </Button>
+              ),
+            // Кнопка создания расхода (старый функционал)
             selectedInvoice.status === 'PROCESSED' &&
               !selectedInvoice.expense_id && (
                 <Button
                   key="create-expense"
-                  type="primary"
                   icon={<DollarOutlined />}
                   onClick={() => {
                     setCreateExpenseModalVisible(true)
@@ -600,6 +680,76 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
                       />
                     )}
 
+                    {selectedInvoice.category_id && selectedInvoice.desired_payment_date && (
+                      <Alert
+                        type="info"
+                        message="Категория установлена"
+                        description={
+                          <>
+                            <Text strong>Желаемая дата оплаты: </Text>
+                            <Text>
+                              {dayjs(selectedInvoice.desired_payment_date).format('DD.MM.YYYY')}
+                            </Text>
+                          </>
+                        }
+                        style={{ marginTop: 16 }}
+                      />
+                    )}
+
+                    {validationResult && (
+                      <Alert
+                        type={validationResult.is_valid ? 'success' : 'error'}
+                        message={validationResult.is_valid ? 'Валидация пройдена' : 'Ошибки валидации'}
+                        description={
+                          <>
+                            {validationResult.errors?.length > 0 && (
+                              <>
+                                <Text strong>Ошибки:</Text>
+                                <ul>
+                                  {validationResult.errors.map((err: string, idx: number) => (
+                                    <li key={idx}>{err}</li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                            {validationResult.warnings?.length > 0 && (
+                              <>
+                                <Text strong>Предупреждения:</Text>
+                                <ul>
+                                  {validationResult.warnings.map((warn: string, idx: number) => (
+                                    <li key={idx}>{warn}</li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                            {validationResult.is_valid && validationResult.found_data && (
+                              <>
+                                {validationResult.found_data.counterparty && (
+                                  <div>
+                                    <Text strong>Контрагент: </Text>
+                                    <Text>{validationResult.found_data.counterparty.name}</Text>
+                                  </div>
+                                )}
+                                {validationResult.found_data.organization && (
+                                  <div>
+                                    <Text strong>Организация: </Text>
+                                    <Text>{validationResult.found_data.organization.name}</Text>
+                                  </div>
+                                )}
+                                {validationResult.found_data.cash_flow_category && (
+                                  <div>
+                                    <Text strong>Статья ДДС: </Text>
+                                    <Text>{validationResult.found_data.cash_flow_category.name}</Text>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </>
+                        }
+                        style={{ marginTop: 16 }}
+                      />
+                    )}
+
                     {selectedInvoice.external_id_1c && (
                       <Alert
                         type="success"
@@ -673,6 +823,92 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
               },
             ]}
           />
+        </Modal>
+      )}
+
+      {/* Set Category Modal */}
+      {selectedInvoice && (
+        <Modal
+          title="Выбор категории и даты оплаты для отправки в 1С"
+          open={setCategoryModalVisible}
+          onCancel={() => setSetCategoryModalVisible(false)}
+          onOk={() => categoryForm.submit()}
+          confirmLoading={updateCategoryMutation.isPending}
+          okText="Сохранить"
+          cancelText="Отмена"
+          width={600}
+        >
+          <Alert
+            message="Важно!"
+            description="Выберите статью движения денежных средств (ДДС) и укажите желаемую дату оплаты для создания заявки на расход в 1С."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form
+            form={categoryForm}
+            layout="vertical"
+            onFinish={(values) => {
+              const formattedValues = {
+                category_id: values.category_id,
+                desired_payment_date: values.desired_payment_date.format('YYYY-MM-DD'),
+              }
+              updateCategoryMutation.mutate(formattedValues)
+            }}
+          >
+            <Form.Item
+              name="category_id"
+              label="Статья движения денежных средств (ДДС)"
+              rules={[{ required: true, message: 'Выберите статью ДДС' }]}
+            >
+              <Select
+                placeholder="Выберите категорию из 1С"
+                showSearch
+                optionFilterProp="children"
+                loading={categoriesLoading}
+                notFoundContent={categoriesLoading ? <Spin size="small" /> : 'Нет данных'}
+              >
+                {cashFlowCategories
+                  ?.filter((cat) => !cat.is_folder)
+                  .map((cat) => (
+                    <Select.Option key={cat.id} value={cat.id}>
+                      {cat.code ? `[${cat.code}] ${cat.name}` : cat.name}
+                    </Select.Option>
+                  ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="desired_payment_date"
+              label="Желаемая дата оплаты"
+              rules={[{ required: true, message: 'Выберите дату' }]}
+            >
+              <DatePicker
+                format="DD.MM.YYYY"
+                style={{ width: '100%' }}
+                placeholder="Выберите дату"
+              />
+            </Form.Item>
+
+            {selectedInvoice.invoice_number && (
+              <Alert
+                message={
+                  <>
+                    <Text strong>Счет: </Text>
+                    <Text>{selectedInvoice.invoice_number}</Text>
+                    <br />
+                    <Text strong>Поставщик: </Text>
+                    <Text>{selectedInvoice.supplier_name || 'Не указан'}</Text>
+                    <br />
+                    <Text strong>Сумма: </Text>
+                    <Text>{selectedInvoice.total_amount?.toLocaleString('ru-RU')} ₽</Text>
+                  </>
+                }
+                style={{ marginTop: 8 }}
+              />
+            )}
+          </Form>
         </Modal>
       )}
 

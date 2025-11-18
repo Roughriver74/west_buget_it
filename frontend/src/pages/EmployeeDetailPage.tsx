@@ -25,8 +25,8 @@ import {
   DeleteOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
-import { useState } from 'react';
-import { employeeAPI, payrollPlanAPI, payrollActualAPI } from '../api/payroll';
+import { useMemo, useState } from 'react';
+import { employeeAPI, payrollPlanAPI, payrollActualAPI, employeeTaxAPI } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
 import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
@@ -76,6 +76,13 @@ export default function EmployeeDetailPage() {
     queryFn: () => payrollActualAPI.list({ employee_id: Number(id) }),
   });
 
+  // Fetch tax calculation
+  const { data: taxCalculation } = useQuery({
+    queryKey: ['employee-tax-calculation', id],
+    queryFn: () => employeeTaxAPI.getTaxCalculation(Number(id)),
+    enabled: !!id && !!employee,
+  });
+
   // Delete plan mutation
   const deletePlanMutation = useMutation({
     mutationFn: (planId: number) => payrollPlanAPI.delete(planId),
@@ -102,6 +109,33 @@ export default function EmployeeDetailPage() {
     deletePlanMutation.mutate(planId);
   };
 
+  // Calculate statistics (hooks must run every render)
+  const sortedPlans = useMemo(() => {
+    return [...plans].sort((a, b) => {
+      if (a.year === b.year) {
+        return a.month - b.month;
+      }
+      return a.year - b.year;
+    });
+  }, [plans]);
+
+  const sortedActuals = useMemo(() => {
+    return [...actuals].sort((a, b) => {
+      if (a.year === b.year) {
+        return a.month - b.month;
+      }
+      return a.year - b.year;
+    });
+  }, [actuals]);
+
+  const sortedSalaryHistory = useMemo(() => {
+    const history = employee?.salary_history ?? [];
+    return [...history].sort(
+      (a, b) =>
+        new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+    );
+  }, [employee?.salary_history]);
+
   if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: '100px' }}>
@@ -119,9 +153,8 @@ export default function EmployeeDetailPage() {
     );
   }
 
-  // Calculate statistics
-  const totalPlanned = plans.reduce((sum, p) => sum + Number(p.total_planned), 0);
-  const totalPaid = actuals.reduce((sum, a) => sum + Number(a.total_paid), 0);
+  const totalPlanned = sortedPlans.reduce((sum, p) => sum + Number(p.total_planned), 0);
+  const totalPaid = sortedActuals.reduce((sum, a) => sum + Number(a.total_paid), 0);
   // Salary history columns
   const salaryHistoryColumns = [
     {
@@ -397,6 +430,82 @@ export default function EmployeeDetailPage() {
         </Descriptions>
       </Card>
 
+      {/* Tax Information */}
+      {taxCalculation && (
+        <Card title="Налоги и страховые взносы" style={{ marginBottom: '16px' }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Card type="inner" title="НДФЛ" style={{ marginBottom: '16px' }}>
+                <Statistic
+                  title="Ставка"
+                  value={taxCalculation.income_tax_rate_percent}
+                  precision={1}
+                  suffix="%"
+                />
+                <Statistic
+                  title="Сумма"
+                  value={taxCalculation.income_tax}
+                  precision={2}
+                  suffix="₽"
+                  style={{ marginTop: '16px' }}
+                />
+              </Card>
+
+              <Card type="inner" title="Зарплата">
+                <Descriptions column={1}>
+                  <Descriptions.Item label="Gross (начислено)">
+                    <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Net (на руки)">
+                    <strong style={{ color: '#52c41a' }}>
+                      {formatCurrency(taxCalculation.net_salary)}
+                    </strong>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Стоимость для компании">
+                    <strong style={{ color: '#fa8c16' }}>
+                      {formatCurrency(taxCalculation.employer_total_cost)}
+                    </strong>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            </Col>
+
+            <Col span={12}>
+              <Card type="inner" title="Страховые взносы" style={{ marginBottom: '16px' }}>
+                <Descriptions column={1} size="small">
+                  <Descriptions.Item label="ПФР (пенсионный фонд)">
+                    {formatCurrency(taxCalculation.social_contributions.pension_fund)}
+                    {' '}
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      ({taxCalculation.social_contributions.pension_fund_rate_percent.toFixed(1)}%)
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="ФОМС (медицинское страхование)">
+                    {formatCurrency(taxCalculation.social_contributions.medical_insurance)}
+                    {' '}
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      ({taxCalculation.social_contributions.medical_insurance_rate_percent.toFixed(1)}%)
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="ФСС (социальное страхование)">
+                    {formatCurrency(taxCalculation.social_contributions.social_insurance)}
+                    {' '}
+                    <span style={{ fontSize: '12px', color: '#666' }}>
+                      ({taxCalculation.social_contributions.social_insurance_rate_percent.toFixed(1)}%)
+                    </span>
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<strong>Итого взносов</strong>}>
+                    <strong style={{ color: '#fa8c16' }}>
+                      {formatCurrency(taxCalculation.social_contributions.total)}
+                    </strong>
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       {/* Tabs with different data */}
       <Card>
         <Tabs
@@ -422,7 +531,7 @@ export default function EmployeeDetailPage() {
                   </div>
                   <Table
                     columns={plansColumns}
-                    dataSource={plans}
+                    dataSource={sortedPlans}
                     rowKey="id"
                     pagination={{ pageSize: 12 }}
                   />
@@ -439,7 +548,7 @@ export default function EmployeeDetailPage() {
               children: (
                 <Table
                   columns={actualsColumns}
-                  dataSource={actuals}
+                  dataSource={sortedActuals}
                   rowKey="id"
                   pagination={{ pageSize: 12 }}
                 />
@@ -452,10 +561,10 @@ export default function EmployeeDetailPage() {
                   <HistoryOutlined /> История окладов ({employee.salary_history?.length || 0})
                 </span>
               ),
-              children: employee.salary_history && employee.salary_history.length > 0 ? (
+              children: sortedSalaryHistory.length > 0 ? (
                 <Table
                   columns={salaryHistoryColumns}
-                  dataSource={employee.salary_history}
+                  dataSource={sortedSalaryHistory}
                   rowKey="id"
                   pagination={false}
                 />

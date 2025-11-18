@@ -229,6 +229,14 @@ from .bank_transaction import (
     BulkLinkRequest,
     BulkStatusUpdateRequest,
 )
+from .tax_rate import (
+    TaxRateCreate,
+    TaxRateUpdate,
+    TaxRateInDB,
+    TaxRateListItem,
+    TaxCalculationRequest,
+    TaxCalculationResult,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -463,4 +471,11 @@ __all__ = [
     "BulkCategorizeRequest",
     "BulkLinkRequest",
     "BulkStatusUpdateRequest",
+    # Tax Rates
+    "TaxRateCreate",
+    "TaxRateUpdate",
+    "TaxRateInDB",
+    "TaxRateListItem",
+    "TaxCalculationRequest",
+    "TaxCalculationResult",
 ]

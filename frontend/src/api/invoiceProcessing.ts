@@ -10,6 +10,10 @@ import type {
   CreateExpenseFromInvoiceResponse,
   InvoiceProcessingStats,
   InvoiceListFilters,
+  InvoiceUpdateCategoryRequest,
+  Invoice1CValidationResponse,
+  Create1CExpenseRequestResponse,
+  CashFlowCategoryListItem,
 } from '@/types/invoiceProcessing'
 
 export const invoiceProcessingApi = {
@@ -122,6 +126,59 @@ export const invoiceProcessingApi = {
   getStats: async (departmentId?: number): Promise<InvoiceProcessingStats> => {
     const { data } = await apiClient.get(
       'invoices/invoice-processing/stats/summary',
+      {
+        params: departmentId ? { department_id: departmentId } : undefined,
+      }
+    )
+    return data
+  },
+
+  /**
+   * Update invoice category and desired payment date
+   */
+  updateCategory: async (
+    invoiceId: number,
+    request: InvoiceUpdateCategoryRequest
+  ): Promise<{ success: boolean; message: string }> => {
+    const { data } = await apiClient.put(
+      `invoices/invoice-processing/${invoiceId}/category`,
+      request
+    )
+    return data
+  },
+
+  /**
+   * Validate invoice for 1C integration
+   */
+  validateFor1C: async (invoiceId: number): Promise<Invoice1CValidationResponse> => {
+    const { data } = await apiClient.post(
+      `invoices/invoice-processing/${invoiceId}/validate-for-1c`
+    )
+    return data
+  },
+
+  /**
+   * Create expense request in 1C
+   */
+  createIn1C: async (
+    invoiceId: number,
+    uploadAttachment: boolean = true
+  ): Promise<Create1CExpenseRequestResponse> => {
+    const { data } = await apiClient.post(
+      `invoices/invoice-processing/${invoiceId}/create-1c-expense-request`,
+      { upload_attachment: uploadAttachment }
+    )
+    return data
+  },
+
+  /**
+   * Get cash flow categories (for category selection)
+   */
+  getCashFlowCategories: async (
+    departmentId?: number
+  ): Promise<CashFlowCategoryListItem[]> => {
+    const { data } = await apiClient.get(
+      'invoices/invoice-processing/cash-flow-categories',
       {
         params: departmentId ? { department_id: departmentId } : undefined,
       }

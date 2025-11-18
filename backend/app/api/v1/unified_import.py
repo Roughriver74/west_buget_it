@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 import json
+import logging
 
 from app.db.session import get_db
 from app.api.v1.auth import get_current_active_user
@@ -16,6 +17,7 @@ from app.db.models import User
 from app.services.unified_import_service import UnifiedImportService
 from app.services.template_generator import get_template_generator
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -95,9 +97,10 @@ async def preview_import(
 async def validate_import(
     entity_type: str = Form(...),
     file: UploadFile = File(...),
-    column_mapping: str = Form(...),
+    column_mapping: Optional[str] = Form(None),
     sheet_name: Optional[str] = Form(None),
     header_row: int = Form(0),
+    department_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -120,13 +123,7 @@ async def validate_import(
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Only Excel files are supported")
 
-    # Parse column mapping
-    try:
-        mapping_dict = json.loads(column_mapping)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid column_mapping JSON")
-
-    # Read file
+    # Read file first
     content = await file.read()
 
     # Parse sheet_name
@@ -134,14 +131,49 @@ async def validate_import(
     if sheet_name and sheet_name.isdigit():
         sheet = int(sheet_name)
 
-    # Validate
     service = UnifiedImportService(db, current_user)
+
+    # Parse column mapping - if not provided, auto-detect from file
+    mapping_dict = {}
+    if column_mapping:
+        try:
+            mapping_dict = json.loads(column_mapping)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid column_mapping JSON")
+    else:
+        # AUTO-DETECT: Read file to suggest mapping
+        logger.info("No column_mapping provided, performing auto-detection...")
+        preview_result = service.preview_import(
+            entity_type=entity_type,
+            file_content=content,
+            sheet_name=sheet if sheet is not None else 0,
+            header_row=header_row
+        )
+        if not preview_result["success"]:
+            raise HTTPException(status_code=400, detail=preview_result.get("error", "Failed to read file"))
+
+        mapping_dict = preview_result.get("suggested_mapping", {})
+        logger.info(f"Auto-detected mapping (entity->excel): {mapping_dict}")
+
+        if not mapping_dict:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not auto-detect column mapping. Please provide column_mapping manually."
+            )
+
+        # INVERT the mapping: {entity_field: excel_column} -> {excel_column: entity_field}
+        # because map_columns() expects {excel_column: entity_field}
+        mapping_dict = {v: k for k, v in mapping_dict.items() if v is not None}
+        logger.info(f"Inverted mapping (excel->entity) for validation: {mapping_dict}")
+
+    # Validate
     result = service.validate_import(
         entity_type=entity_type,
         file_content=content,
         column_mapping=mapping_dict,
         sheet_name=sheet if sheet is not None else 0,
-        header_row=header_row
+        header_row=header_row,
+        department_id=department_id
     )
 
     if not result["success"]:
@@ -154,11 +186,12 @@ async def validate_import(
 async def execute_import(
     entity_type: str = Form(...),
     file: UploadFile = File(...),
-    column_mapping: str = Form(...),
+    column_mapping: Optional[str] = Form(None),
     sheet_name: Optional[str] = Form(None),
     header_row: int = Form(0),
     skip_errors: bool = Form(False),
     dry_run: bool = Form(False),
+    department_id: Optional[int] = Form(None),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -182,13 +215,7 @@ async def execute_import(
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Only Excel files are supported")
 
-    # Parse column mapping
-    try:
-        mapping_dict = json.loads(column_mapping)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid column_mapping JSON")
-
-    # Read file
+    # Read file first
     content = await file.read()
 
     # Parse sheet_name
@@ -196,8 +223,50 @@ async def execute_import(
     if sheet_name and sheet_name.isdigit():
         sheet = int(sheet_name)
 
-    # Execute import
     service = UnifiedImportService(db, current_user)
+
+    # Parse column mapping - if not provided, auto-detect from file
+    mapping_dict = {}
+    if column_mapping:
+        try:
+            mapping_dict = json.loads(column_mapping)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid column_mapping JSON")
+    else:
+        # AUTO-DETECT: Read file to suggest mapping
+        logger.info("No column_mapping provided, performing auto-detection...")
+        preview_result = service.preview_import(
+            entity_type=entity_type,
+            file_content=content,
+            sheet_name=sheet if sheet is not None else 0,
+            header_row=header_row
+        )
+        if not preview_result["success"]:
+            raise HTTPException(status_code=400, detail=preview_result.get("error", "Failed to read file"))
+
+        mapping_dict = preview_result.get("suggested_mapping", {})
+        logger.info(f"Auto-detected mapping (entity->excel): {mapping_dict}")
+
+        if not mapping_dict:
+            raise HTTPException(
+                status_code=400,
+                detail="Could not auto-detect column mapping. Please provide column_mapping manually."
+            )
+
+        # INVERT the mapping: {entity_field: excel_column} -> {excel_column: entity_field}
+        # because map_columns() expects {excel_column: entity_field}
+        mapping_dict = {v: k for k, v in mapping_dict.items() if v is not None}
+        logger.info(f"Inverted mapping (excel->entity) for execution: {mapping_dict}")
+
+    target_department_id = department_id or current_user.department_id
+    logger.info(
+        "Executing import entity=%s department_id=%s user=%s",
+        entity_type,
+        target_department_id,
+        getattr(current_user, "username", "unknown")
+    )
+
+    # Execute import
     result = service.execute_import(
         entity_type=entity_type,
         file_content=content,
@@ -205,7 +274,8 @@ async def execute_import(
         sheet_name=sheet if sheet is not None else 0,
         header_row=header_row,
         skip_errors=skip_errors,
-        dry_run=dry_run
+        dry_run=dry_run,
+        department_id=department_id  # Pass department_id for import
     )
 
     if not result["success"]:

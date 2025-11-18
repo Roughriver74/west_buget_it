@@ -17,6 +17,9 @@ from decimal import Decimal
 import re
 from enum import Enum
 from io import BytesIO
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DataType(str, Enum):
@@ -198,8 +201,18 @@ class DynamicImportService:
                 BytesIO(file_content),
                 sheet_name=sheet_name,
                 header=header_row,
+                skiprows=[1] if header_row == 0 else None,  # Skip type hints row (row 2 in Excel)
                 nrows=max_rows
             )
+
+            # DEBUG: Log what was read
+            logger.info(f"=== EXCEL READ DEBUG ===")
+            logger.info(f"header_row: {header_row}")
+            logger.info(f"skiprows: {[1] if header_row == 0 else None}")
+            logger.info(f"DataFrame shape: {self.df.shape}")
+            logger.info(f"Columns: {list(self.df.columns)}")
+            logger.info(f"First row data:\n{self.df.head(1).to_dict('records')}")
+            logger.info(f"======================")
 
             # Analyze columns
             self.columns_info = self._analyze_columns()
@@ -350,6 +363,13 @@ class DynamicImportService:
         if self.df is None:
             return {"success": False, "error": "No data loaded. Call read_excel first."}
 
+        # DEBUG: Log mapping
+        logger.info(f"=== MAP COLUMNS DEBUG ===")
+        logger.info(f"Column mapping received: {column_mapping}")
+        logger.info(f"DataFrame columns: {list(self.df.columns)}")
+        logger.info(f"DataFrame has {len(self.df)} rows")
+        logger.info(f"========================")
+
         self.validation_messages = []
         mapped_data = []
 
@@ -457,13 +477,15 @@ class DynamicImportService:
 
     def suggest_mapping(
         self,
-        target_fields: List[str]
+        target_fields: List[str],
+        alias_map: Optional[Dict[str, str]] = None
     ) -> Dict[str, Optional[str]]:
         """
         Suggest column mapping based on field names and aliases
 
         Args:
             target_fields: List of entity field names to map to
+            alias_map: Dictionary of {alias_lowercase: field_name} from config
 
         Returns:
             Dictionary of {entity_field: suggested_excel_column}
@@ -472,33 +494,56 @@ class DynamicImportService:
             return {}
 
         suggestions = {}
-        excel_columns = [str(col).lower().strip() for col in self.df.columns]
+        # Remove asterisks and normalize column names
+        excel_columns_lower = [str(col).lower().strip().replace('*', '').strip() for col in self.df.columns]
 
         for target_field in target_fields:
-            target_lower = target_field.lower().strip()
-
-            # Check aliases
-            if target_lower in self.COLUMN_ALIASES:
-                aliases = self.COLUMN_ALIASES[target_lower]
-
-                for alias in aliases:
-                    if alias in excel_columns:
-                        # Get original column name
-                        original_col = self.df.columns[excel_columns.index(alias)]
+            # Try matching using alias_map if provided (from config)
+            if alias_map:
+                for excel_col_idx, excel_col_lower in enumerate(excel_columns_lower):
+                    # Check exact match first
+                    if alias_map.get(excel_col_lower) == target_field:
+                        original_col = self.df.columns[excel_col_idx]
                         suggestions[target_field] = str(original_col)
                         break
 
-            # Direct match
-            if target_field not in suggestions and target_lower in excel_columns:
-                original_col = self.df.columns[excel_columns.index(target_lower)]
-                suggestions[target_field] = str(original_col)
+                    # Check if any alias is contained in Excel column name
+                    # e.g., "оклад" in "базовый оклад"
+                    for alias_lower, field_name in alias_map.items():
+                        if field_name == target_field and alias_lower in excel_col_lower:
+                            original_col = self.df.columns[excel_col_idx]
+                            suggestions[target_field] = str(original_col)
+                            break
 
-            # Fuzzy match (contains)
-            if target_field not in suggestions:
-                for idx, excel_col in enumerate(excel_columns):
-                    if target_lower in excel_col or excel_col in target_lower:
-                        suggestions[target_field] = str(self.df.columns[idx])
+                    if target_field in suggestions:
                         break
+
+            # Fallback to old behavior for backwards compatibility
+            if target_field not in suggestions:
+                target_lower = target_field.lower().strip()
+
+                # Check static aliases (backwards compatibility)
+                if target_lower in self.COLUMN_ALIASES:
+                    aliases = self.COLUMN_ALIASES[target_lower]
+
+                    for alias in aliases:
+                        if alias in excel_columns_lower:
+                            # Get original column name
+                            original_col = self.df.columns[excel_columns_lower.index(alias)]
+                            suggestions[target_field] = str(original_col)
+                            break
+
+                # Direct match
+                if target_field not in suggestions and target_lower in excel_columns_lower:
+                    original_col = self.df.columns[excel_columns_lower.index(target_lower)]
+                    suggestions[target_field] = str(original_col)
+
+                # Fuzzy match (contains)
+                if target_field not in suggestions:
+                    for idx, excel_col in enumerate(excel_columns_lower):
+                        if target_lower in excel_col or excel_col in target_lower:
+                            suggestions[target_field] = str(self.df.columns[idx])
+                            break
 
         # Fill unmapped fields with None
         for field in target_fields:

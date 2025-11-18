@@ -82,6 +82,8 @@ export interface ProcessedInvoice {
   status: InvoiceProcessingStatus
   expense_id?: number | null
   contractor_id?: number | null
+  category_id?: number | null
+  desired_payment_date?: string | null
 
   // 1C Integration
   external_id_1c?: string | null
@@ -196,4 +198,49 @@ export interface InvoiceListFilters {
   date_from?: string
   date_to?: string
   search?: string
+}
+
+// 1C Integration types
+export interface InvoiceUpdateCategoryRequest {
+  category_id: number
+  desired_payment_date: string
+}
+
+export interface Invoice1CFoundData {
+  counterparty?: {
+    guid: string
+    name: string
+  } | null
+  organization?: {
+    guid: string
+    name: string
+  } | null
+  cash_flow_category?: {
+    guid: string
+    name: string
+  } | null
+}
+
+export interface Invoice1CValidationResponse {
+  is_valid: boolean
+  errors: string[]
+  warnings: string[]
+  found_data: Invoice1CFoundData
+}
+
+export interface Create1CExpenseRequestResponse {
+  success: boolean
+  external_id_1c?: string | null
+  message: string
+  created_at?: string | null
+}
+
+export interface CashFlowCategoryListItem {
+  id: number
+  name: string
+  code?: string | null
+  external_id_1c: string
+  parent_id?: number | null
+  is_folder: boolean
+  order_index?: number | null
 }

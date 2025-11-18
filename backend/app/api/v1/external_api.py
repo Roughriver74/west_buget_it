@@ -22,6 +22,7 @@ from app.db.models import (
     Contractor,
     Organization,
     Employee,
+    EmployeeStatusEnum,
     PayrollPlan,
     PayrollActual,
     BudgetPlan,
@@ -512,7 +513,7 @@ async def export_employees(
     """
     check_read_access(token)
 
-    query = db.query(Employee).filter(Employee.is_active == True)
+    query = db.query(Employee).filter(Employee.status == EmployeeStatusEnum.ACTIVE)
 
     # Department isolation
     if token.department_id:
@@ -534,7 +535,7 @@ async def export_employees(
             "base_salary": float(emp.base_salary),
             "hire_date": emp.hire_date.isoformat() if emp.hire_date else None,
             "department_id": emp.department_id,
-            "is_active": emp.is_active,
+            "is_active": emp.status == EmployeeStatusEnum.ACTIVE,
         })
 
     return {"data": data, "count": len(data)}

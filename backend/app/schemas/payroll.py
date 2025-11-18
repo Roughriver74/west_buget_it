@@ -13,6 +13,7 @@ class EmployeeBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     position: str = Field(..., min_length=1, max_length=255)
     employee_number: Optional[str] = Field(None, max_length=50)
+    birth_date: Optional[date] = Field(None, description="Дата рождения (для различения полных тёзок)")
     hire_date: Optional[date] = None
     fire_date: Optional[date] = None
     status: EmployeeStatusEnum = EmployeeStatusEnum.ACTIVE
@@ -40,6 +41,7 @@ class EmployeeUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     position: Optional[str] = Field(None, min_length=1, max_length=255)
     employee_number: Optional[str] = Field(None, max_length=50)
+    birth_date: Optional[date] = None
     hire_date: Optional[date] = None
     fire_date: Optional[date] = None
     status: Optional[EmployeeStatusEnum] = None

@@ -85,24 +85,9 @@ class TemplateGenerator:
         include_examples: bool
     ):
         """Generate main data sheet with headers and examples"""
-        # Title row
-        ws.merge_cells('A1:F1')
-        title_cell = ws['A1']
-        title_cell.value = config.display_name.get(language, config.entity)
-        title_cell.font = Font(size=14, bold=True, color="4472C4")
-        title_cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[1].height = 25
-
-        # Description row
-        ws.merge_cells('A2:F2')
-        desc_cell = ws['A2']
-        desc_cell.value = config.description.get(language, "")
-        desc_cell.font = Font(size=10, italic=True)
-        desc_cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[2].height = 20
-
-        # Header row
-        header_row = 4
+        # Start with header row immediately (no empty rows before)
+        # This is required for auto-detection of columns during import
+        header_row = 1
         for col_idx, field in enumerate(config.fields, start=1):
             col_letter = get_column_letter(col_idx)
             cell = ws[f"{col_letter}{header_row}"]
@@ -352,8 +337,8 @@ class TemplateGenerator:
                 {"name": "ИП Иванов И.И.", "short_name": "Иванов", "inn": "123456789012", "contact_info": "ivanov@mail.ru", "is_active": "Да"},
             ],
             "employees": [
-                {"full_name": "Иванов Иван Иванович", "position": "Системный администратор", "base_salary": 80000, "hire_date": "01.01.2023", "employee_number": "E001"},
-                {"full_name": "Петрова Мария Сергеевна", "position": "Разработчик", "base_salary": 120000, "hire_date": "15.03.2023", "employee_number": "E002"},
+                {"full_name": "Иванов Иван Иванович", "position": "Системный администратор", "base_salary": 80000, "employee_number": "E001", "birth_date": "15.06.1985", "monthly_bonus_base": 8000, "quarterly_bonus_base": 24000, "annual_bonus_base": 0, "hire_date": "01.01.2023"},
+                {"full_name": "Петрова Мария Сергеевна", "position": "Разработчик", "base_salary": 120000, "employee_number": "E002", "birth_date": "22.09.1990", "monthly_bonus_base": 12000, "quarterly_bonus_base": 0, "annual_bonus_base": 50000, "hire_date": "15.03.2023"},
             ],
             "payroll_plans": [
                 {"year": 2025, "month": 1, "employee_name": "Иванов Иван Иванович", "base_salary": 80000, "bonus": 8000, "other_payments": 0, "notes": ""},
@@ -388,8 +373,8 @@ class TemplateGenerator:
                 {"name": "IP Ivanov I.I.", "short_name": "Ivanov", "inn": "123456789012", "contact_info": "ivanov@mail.ru", "is_active": "Yes"},
             ],
             "employees": [
-                {"full_name": "John Smith", "position": "System Administrator", "base_salary": 80000, "hire_date": "01.01.2023", "employee_number": "E001"},
-                {"full_name": "Mary Johnson", "position": "Developer", "base_salary": 120000, "hire_date": "15.03.2023", "employee_number": "E002"},
+                {"full_name": "John Smith", "position": "System Administrator", "base_salary": 80000, "employee_number": "E001", "birth_date": "15.06.1985", "monthly_bonus_base": 8000, "quarterly_bonus_base": 24000, "annual_bonus_base": 0, "hire_date": "01.01.2023"},
+                {"full_name": "Mary Johnson", "position": "Developer", "base_salary": 120000, "employee_number": "E002", "birth_date": "22.09.1990", "monthly_bonus_base": 12000, "quarterly_bonus_base": 0, "annual_bonus_base": 50000, "hire_date": "15.03.2023"},
             ],
             "payroll_plans": [
                 {"year": 2025, "month": 1, "employee_name": "John Smith", "base_salary": 80000, "bonus": 8000, "other_payments": 0, "notes": ""},

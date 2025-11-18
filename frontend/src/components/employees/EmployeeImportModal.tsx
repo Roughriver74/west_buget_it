@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Modal, Upload, message, Alert, Statistic, Row, Col, Typography, Button, Spin } from 'antd';
+import { Modal, Upload, App, Alert, Statistic, Row, Col, Typography, Button, Spin } from 'antd';
 import { InboxOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
@@ -26,6 +27,8 @@ interface ImportResult {
 
 export default function EmployeeImportModal({ visible, onCancel }: EmployeeImportModalProps) {
   const queryClient = useQueryClient();
+  const { message, modal } = App.useApp();
+  const { selectedDepartment } = useDepartment();
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [fileList, setFileList] = useState<any[]>([]);
 
@@ -35,20 +38,13 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
       formData.append('file', file);
       formData.append('entity_type', 'employees');
 
-      // Basic column mapping for employees - the unified service will auto-detect columns
-      const columnMapping = {
-        'ФИО': 'full_name',
-        'Должность': 'position',
-        'Базовый оклад': 'base_salary',
-        'Оклад': 'base_salary',
-        'Месячная премия': 'monthly_bonus_base',
-        'Квартальная премия': 'quarterly_bonus_base',
-        'Годовая премия': 'annual_bonus_base',
-        'Дата приема': 'hire_date',
-        'Табельный номер': 'employee_number'
-      };
+      // IMPORTANT: Pass department_id so employees are imported to the selected department
+      if (selectedDepartment?.id) {
+        formData.append('department_id', selectedDepartment.id.toString());
+      }
 
-      formData.append('column_mapping', JSON.stringify(columnMapping));
+      // Note: column_mapping is optional - the unified service will auto-detect columns
+      // based on aliases defined in backend/app/import_configs/employees.json
 
       const response = await apiClient.post('/import/execute', formData, {
         headers: {
@@ -67,16 +63,22 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
       }
     },
     onError: (error: any) => {
-      console.log('Import error details:', error.response?.data);
+      console.error('Import error details:', error.response?.data);
+      console.error('Full error object:', error);
       const errorDetail = error.response?.data?.detail;
       const validationResult = error.response?.data?.validation_result;
+
+      // Log more details for debugging
+      if (typeof errorDetail === 'object') {
+        console.error('Error detail object:', JSON.stringify(errorDetail, null, 2));
+      }
 
       // Show detailed validation errors if available
       if (validationResult) {
         console.log('Validation result:', validationResult);
         const errorMessages = validationResult.messages?.filter((m: any) => m.severity === 'error') || [];
         if (errorMessages.length > 0) {
-          Modal.error({
+          modal.error({
             title: 'Ошибки валидации',
             content: (
               <div style={{ maxHeight: 400, overflow: 'auto' }}>
@@ -126,25 +128,17 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const url = `${API_URL}/api/v1/import/template/employees?language=ru&include_examples=true`;
-
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-
-      // Fetch with authentication
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      // Use apiClient to avoid double /api/v1 prefix
+      const response = await apiClient.get('/import/template/employees', {
+        params: {
+          language: 'ru',
+          include_examples: true
+        },
+        responseType: 'blob'
       });
 
-      if (!response.ok) {
-        throw new Error('Не удалось скачать шаблон');
-      }
-
       // Create blob and download
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -200,11 +194,12 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
                   <li><Text strong>ФИО</Text> - полное имя сотрудника (обязательно)</li>
                   <li><Text strong>Должность</Text> - должность сотрудника (обязательно)</li>
                   <li><Text strong>Базовый оклад</Text> или <Text strong>Оклад</Text> - размер оклада (обязательно)</li>
+                  <li><Text strong>Табельный номер</Text> - табельный номер (опционально)</li>
+                  <li><Text strong>Дата рождения</Text> - дата рождения для различения полных тёзок (опционально)</li>
                   <li><Text strong>Месячная премия</Text> - ежемесячная премия (опционально)</li>
                   <li><Text strong>Квартальная премия</Text> - премия раз в квартал (опционально)</li>
                   <li><Text strong>Годовая премия</Text> - премия раз в год (опционально)</li>
                   <li><Text strong>Дата приема</Text> - дата приема на работу (опционально)</li>
-                  <li><Text strong>Табельный номер</Text> - табельный номер (опционально)</li>
                 </ul>
                 <p style={{ marginTop: 10 }}>
                   <Text type="warning" strong>Важно:</Text> Система автоматически определит колонки по названиям.
@@ -213,6 +208,7 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
                 <p style={{ marginTop: 10 }}>
                   <Text type="secondary">
                     Если сотрудник с таким ФИО уже существует, его данные будут обновлены.
+                    Все сотрудники импортируются со статусом "Активен" по умолчанию.
                   </Text>
                 </p>
               </div>
@@ -300,9 +296,19 @@ export default function EmployeeImportModal({ visible, onCancel }: EmployeeImpor
               <Alert
                 message={
                   <div style={{ maxHeight: 200, overflow: 'auto' }}>
-                    {importResult.errors.map((error, index) => (
-                      <div key={index}>• {error}</div>
-                    ))}
+                    {importResult.errors.map((error: any, index: number) => {
+                      // Handle both string errors and object errors {row, error}
+                      const errorText = typeof error === 'string'
+                        ? error
+                        : error.error || error.message || JSON.stringify(error);
+                      const rowPrefix = typeof error === 'object' && error.row
+                        ? `Строка ${error.row}: `
+                        : '';
+
+                      return (
+                        <div key={index}>• {rowPrefix}{errorText}</div>
+                      );
+                    })}
                   </div>
                 }
                 type="error"

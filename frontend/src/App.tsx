@@ -45,6 +45,7 @@ const OrganizationsPage = lazy(() => import('./pages/OrganizationsPage'))
 const ContractorDetailPage = lazy(() => import('./pages/ContractorDetailPage'))
 const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage'))
 const BusinessOperationMappingsPage = lazy(() => import('./pages/BusinessOperationMappingsPage'))
+const TaxRatesPage = lazy(() => import('./pages/TaxRatesPage'))
 
 // Admin module
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
@@ -248,6 +249,14 @@ function App() {
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT', 'MANAGER', 'USER']}>
                               <OrganizationDetailPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/references/tax-rates"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN', 'ACCOUNTANT']}>
+                              <TaxRatesPage />
                             </ProtectedRoute>
                           }
                         />

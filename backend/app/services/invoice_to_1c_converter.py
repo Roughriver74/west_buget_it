@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from app.db.models import ProcessedInvoice, BudgetCategory
+from app.db.models import ProcessedInvoice, BudgetCategory, Organization, Department
 from app.services.odata_1c_client import OData1CClient
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ class Invoice1CValidationResult:
         self.organization_name: Optional[str] = None
         self.cash_flow_category_guid: Optional[str] = None
         self.cash_flow_category_name: Optional[str] = None
+        self.subdivision_guid: Optional[str] = None
+        self.subdivision_name: Optional[str] = None
 
     def add_error(self, message: str):
         """Добавить ошибку"""
@@ -65,7 +67,11 @@ class Invoice1CValidationResult:
                 "cash_flow_category": {
                     "guid": self.cash_flow_category_guid,
                     "name": self.cash_flow_category_name
-                } if self.cash_flow_category_guid else None
+                } if self.cash_flow_category_guid else None,
+                "subdivision": {
+                    "guid": self.subdivision_guid,
+                    "name": self.subdivision_name
+                } if self.subdivision_guid else None
             }
         }
 
@@ -170,33 +176,59 @@ class InvoiceTo1CConverter:
                 result.add_error(f"Ошибка при поиске контрагента в 1С: {str(e)}")
                 logger.error(f"Failed to search counterparty: {e}", exc_info=True)
 
-        # 4. Проверка наличия организации в 1С (по buyer INN из parsed_data)
-        buyer_inn = None
-        if invoice.parsed_data and isinstance(invoice.parsed_data, dict):
-            buyer = invoice.parsed_data.get('buyer', {})
-            if isinstance(buyer, dict):
-                buyer_inn = buyer.get('inn')
+        # 4. Получение организации из базы данных (через department)
+        try:
+            # Найти организацию, связанную с department invoice
+            organization = self.db.query(Organization).filter(
+                Organization.department_id == invoice.department_id,
+                Organization.is_active == True,
+                Organization.external_id_1c.isnot(None)
+            ).first()
 
-        if buyer_inn:
-            try:
-                organization = self.odata_client.get_organization_by_inn(buyer_inn)
-                if organization:
-                    result.organization_guid = organization.get('Ref_Key')
-                    result.organization_name = organization.get('Description')
-                    logger.info(f"Found organization in 1C: {result.organization_name}")
+            if not organization:
+                result.add_error(
+                    f"Организация для отдела (department_id={invoice.department_id}) не найдена или не синхронизирована с 1С. "
+                    f"Убедитесь, что организация создана в базе данных и синхронизирована с 1С (external_id_1c заполнен)."
+                )
+            else:
+                result.organization_guid = organization.external_id_1c
+                result.organization_name = organization.short_name or organization.name
+                logger.info(f"Found organization from DB: {result.organization_name} (GUID: {result.organization_guid})")
+
+        except Exception as e:
+            result.add_error(f"Ошибка при получении организации из базы данных: {str(e)}")
+            logger.error(f"Failed to fetch organization from DB: {e}", exc_info=True)
+
+        # 5. Получение подразделения (subdivision) из department и поиск GUID в 1С
+        try:
+            # Получить department
+            department = self.db.query(Department).filter_by(id=invoice.department_id).first()
+
+            if department and department.ftp_subdivision_name:
+                subdivision_name = department.ftp_subdivision_name.strip()
+                logger.info(f"Found subdivision name from department: '{subdivision_name}'")
+
+                # Попытаться найти подразделение в 1С по имени
+                subdivision_data = self.odata_client.get_subdivision_by_name(subdivision_name)
+
+                if subdivision_data:
+                    result.subdivision_guid = subdivision_data.get('Ref_Key')
+                    result.subdivision_name = subdivision_name
+                    logger.info(f"Found subdivision in 1C: {subdivision_name} (GUID: {result.subdivision_guid})")
                 else:
-                    result.add_error(
-                        f"Организация с ИНН {buyer_inn} не найдена в 1С. "
-                        f"Создайте организацию в 1С перед отправкой."
+                    result.add_warning(
+                        f"Подразделение '{subdivision_name}' не найдено в 1С. "
+                        f"Создайте подразделение в 1С или проверьте название в настройках отдела."
                     )
-            except Exception as e:
-                result.add_error(f"Ошибка при поиске организации в 1С: {str(e)}")
-                logger.error(f"Failed to search organization: {e}", exc_info=True)
-        else:
-            result.add_error(
-                "ИНН покупателя (buyer.inn) не найден в parsed_data. "
-                "Возможно, AI не распознал данные покупателя. Проверьте invoice."
-            )
+            else:
+                result.add_warning(
+                    f"Название подразделения (ftp_subdivision_name) не указано в настройках отдела (department_id={invoice.department_id}). "
+                    f"Заявка будет создана без указания подразделения."
+                )
+
+        except Exception as e:
+            result.add_warning(f"Ошибка при получении подразделения: {str(e)}")
+            logger.error(f"Failed to fetch subdivision: {e}", exc_info=True)
 
         # Итоговый результат
         if result.is_valid:
@@ -235,39 +267,87 @@ class InvoiceTo1CConverter:
             raise InvoiceValidationError(error_msg)
 
         # 2. Подготовка данных для 1С
-        # Дата платежа: +3 дня от даты счета
-        payment_date = invoice.invoice_date + timedelta(days=3)
+        # Желаемая дата платежа из invoice или +3 дня от даты счета
+        desired_payment_date = getattr(invoice, 'desired_payment_date', None) or (invoice.invoice_date + timedelta(days=3))
 
         # Формирование JSON для POST запроса (по формату из рабочего примера curl)
         # ВАЖНО: Суммы должны быть целыми числами (int), как в рабочем примере
         amount_int = int(invoice.total_amount)
 
+        # НДС из invoice или расчет 20% от суммы без НДС
+        vat_amount = int(invoice.vat_amount) if invoice.vat_amount else int(amount_int * 0.2 / 1.2)
+        amount_without_vat = amount_int - vat_amount
+
+        # Формирование назначения платежа с НДС
+        payment_purpose = invoice.payment_purpose or f"Оплата по счету №{invoice.invoice_number} от {invoice.invoice_date.strftime('%d.%m.%Y')}"
+        if vat_amount > 0:
+            payment_purpose += f"\nВ т.ч. НДС (20%) {vat_amount} руб."
+
         expense_request_data = {
-            "Date": invoice.invoice_date.isoformat() + "T00:00:00",  # ИЗМЕНЕНО: "Date" вместо "Дата"
-            "Posted": False,  # ДОБАВЛЕНО: документ не проведен
-            "Статус": "НеСогласована",  # ДОБАВЛЕНО: статус заявки
+            # Основные поля
+            "Date": invoice.invoice_date.isoformat() + "T00:00:00",
+            "Posted": False,
             "Организация_Key": validation_result.organization_guid,
-            "КтоЗаявил_Key": self.DEFAULT_REQUESTER_GUID,  # ДОБАВЛЕНО: кто заявил
-            "Контрагент_Key": validation_result.counterparty_guid,  # ИЗМЕНЕНО: "Контрагент_Key" вместо "Получатель_Key"
-            "Партнер_Key": validation_result.counterparty_guid,  # ДОБАВЛЕНО: партнер (тот же что и контрагент)
-            "СуммаДокумента": amount_int,  # ИЗМЕНЕНО: int вместо float
-            "Валюта_Key": self.RUB_CURRENCY_GUID,  # RUB (правильный GUID)
-            "СтатьяДДС_Key": validation_result.cash_flow_category_guid,
-            "НазначениеПлатежа": invoice.payment_purpose or f"Оплата по счету №{invoice.invoice_number}",
-            "ДатаПлатежа": payment_date.isoformat() + "T00:00:00",
-            "ХозяйственнаяОперация": "ОплатаПоставщику",  # Фиксированная операция
-            "Автор_Key": self.AUTHOR_GUID,  # ДОБАВЛЕНО: автор документа
-            "РасшифровкаПлатежа": [  # ДОБАВЛЕНО: табличная часть с расшифровкой
+            "Статус": "НеСогласована",
+            "ХозяйственнаяОперация": "ОплатаПоставщику",
+
+            # Сумма и валюта
+            "СуммаДокумента": amount_int,
+            "Валюта_Key": self.RUB_CURRENCY_GUID,
+
+            # Формы оплаты (все доступные)
+            "ФормаОплатыНаличная": True,
+            "ФормаОплатыБезналичная": True,
+            "ФормаОплатыПлатежнаяКарта": False,
+
+            # Назначение и дата платежа
+            "НазначениеПлатежа": payment_purpose,
+            "ЖелательнаяДатаПлатежа": desired_payment_date.isoformat() + "T00:00:00",
+
+            # Контрагент
+            "Контрагент_Key": validation_result.counterparty_guid,
+            "Партнер_Key": validation_result.counterparty_guid,
+            "БанковскийСчетКонтрагента_Key": self.EMPTY_GUID,  # Пустой - не знаем конкретный счет
+
+            # Ответственные
+            "КтоЗаявил_Key": self.DEFAULT_REQUESTER_GUID,
+            "КтоРешил_Key": self.DEFAULT_RESOLVER_GUID,
+            "Автор_Key": self.AUTHOR_GUID,
+
+            # Статьи и планирование
+            "СтатьяДвиженияДенежныхСредств_Key": validation_result.cash_flow_category_guid,
+            "ПланированиеСуммы": "ВВалютеПлатежа",
+            "СтатьяАктивовПассивов_Key": self.EMPTY_GUID,
+            "ВариантОплаты": "ПредоплатаДоПоступления",
+
+            # Комментарий
+            "Комментарий": f"Создано автоматически из счета №{invoice.invoice_number}",
+            "ФормаОплатыЗаявки": "",
+
+            # Табличная часть РасшифровкаПлатежа
+            "РасшифровкаПлатежа": [
                 {
                     "НомерСтроки": 1,
-                    "Номенклатура_Key": self.EMPTY_NOMENCLATURE_GUID,
+                    "Номенклатура_Key": self.EMPTY_GUID,
                     "СтатьяРасходов_Key": validation_result.cash_flow_category_guid,
-                    "Сумма": amount_int  # ИЗМЕНЕНО: int вместо float
+                    "Сумма": amount_int,
+                    "СуммаБезНДС": amount_without_vat,
+                    "СуммаНДС": vat_amount,
+                    "СтавкаНДС_Key": self.VAT_20_PERCENT_GUID if vat_amount > 0 else self.EMPTY_GUID,
+                    "Количество": 1,
+                    "Цена": amount_int
                 }
             ]
         }
 
-        logger.info(f"1C expense request data prepared (new format): {expense_request_data}")
+        # Добавить подразделение только если оно найдено (1С не принимает пустой GUID)
+        if validation_result.subdivision_guid:
+            expense_request_data["Подразделение_Key"] = validation_result.subdivision_guid
+            logger.info(f"Adding subdivision to request: {validation_result.subdivision_name} (GUID: {validation_result.subdivision_guid})")
+        else:
+            logger.info("No subdivision found, omitting Подразделение_Key field from request")
+
+        logger.info(f"1C expense request data prepared (complete format): {expense_request_data}")
 
         # 3. Создание документа в 1С
         try:
