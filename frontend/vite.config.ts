@@ -10,6 +10,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // CRITICAL: Always empty outDir before build to prevent old files from persisting
+    emptyOutDir: true,
+  },
   server: {
     host: true,
     port: 5173,
