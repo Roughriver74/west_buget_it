@@ -10,22 +10,24 @@ from decimal import Decimal
 from typing import Dict
 from datetime import datetime
 
-# Social contribution limits for 2024-2025
-PENSION_LIMIT_2024 = Decimal('1917000')  # ПФР
-PENSION_LIMIT_2025 = Decimal('1917000')  # ПФР
+from app.core import constants
 
-MEDICAL_LIMIT_2024 = Decimal('1917000')  # ФОМС
-MEDICAL_LIMIT_2025 = Decimal('1917000')  # ФОМС
+# Social contribution limits for 2024-2025 (from constants)
+PENSION_LIMIT_2024 = Decimal(str(constants.PENSION_FUND_LIMIT))
+PENSION_LIMIT_2025 = Decimal(str(constants.PENSION_FUND_LIMIT))
 
-SOCIAL_LIMIT_2024 = Decimal('1032000')   # ФСС
-SOCIAL_LIMIT_2025 = Decimal('1032000')   # ФСС
+MEDICAL_LIMIT_2024 = Decimal(str(constants.MEDICAL_INSURANCE_LIMIT))
+MEDICAL_LIMIT_2025 = Decimal(str(constants.MEDICAL_INSURANCE_LIMIT))
 
-# Rates
-PENSION_BASE_RATE = Decimal('0.22')      # 22%
-PENSION_OVER_RATE = Decimal('0.10')      # 10% свыше лимита
+SOCIAL_LIMIT_2024 = Decimal(str(constants.SOCIAL_INSURANCE_LIMIT))
+SOCIAL_LIMIT_2025 = Decimal(str(constants.SOCIAL_INSURANCE_LIMIT))
 
-MEDICAL_RATE = Decimal('0.051')          # 5.1%
-SOCIAL_RATE = Decimal('0.029')           # 2.9%
+# Rates (from constants)
+PENSION_BASE_RATE = Decimal(str(constants.PENSION_FUND_BASE_RATE))
+PENSION_OVER_RATE = Decimal(str(constants.PENSION_FUND_OVER_LIMIT_RATE))
+
+MEDICAL_RATE = Decimal(str(constants.MEDICAL_INSURANCE_RATE))
+SOCIAL_RATE = Decimal(str(constants.SOCIAL_INSURANCE_RATE))
 
 
 def calculate_social_contributions(

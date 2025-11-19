@@ -72,7 +72,7 @@ def invalidate_analytics_cache():
 @router.get("/organizations", response_model=List[FinOrganizationInDB])
 async def list_organizations(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     current_user: User = Depends(get_current_active_user),
@@ -159,7 +159,7 @@ async def update_organization(
 @router.get("/bank-accounts", response_model=List[FinBankAccountInDB])
 async def list_bank_accounts(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     current_user: User = Depends(get_current_active_user),
@@ -211,7 +211,7 @@ async def create_bank_account(
 @router.get("/contracts", response_model=List[FinContractInDB])
 async def list_contracts(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     is_active: Optional[bool] = None,
     contract_type: Optional[str] = None,
@@ -519,7 +519,7 @@ async def get_contract_stats(
 @router.get("/receipts", response_model=List[FinReceiptInDB])
 async def list_receipts(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
@@ -651,7 +651,7 @@ async def get_receipts_summary(
 @router.get("/expenses", response_model=List[FinExpenseInDB])
 async def list_expenses(
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
@@ -716,7 +716,7 @@ async def get_expense(
 @router.get("/expense-details", response_model=List[FinExpenseDetailInDB])
 async def list_expense_details(
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=50000),
+    limit: int = Query(settings.CREDIT_PORTFOLIO_PAGE_SIZE, ge=1, le=settings.MAX_CREDIT_PORTFOLIO_PAGE_SIZE),
     department_id: Optional[int] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,

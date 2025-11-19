@@ -20,6 +20,8 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+from app.core.config import settings
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
@@ -75,8 +77,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # HSTS (HTTP Strict Transport Security)
         # Only enable in production with HTTPS
         if self.enable_hsts and self.is_production:
-            # max-age=31536000 (1 year), includeSubDomains, preload
-            headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+            # max-age from settings (default: 1 year), includeSubDomains, preload
+            headers["Strict-Transport-Security"] = f"max-age={settings.HSTS_MAX_AGE}; includeSubDomains; preload"
 
         # CSP (Content Security Policy)
         # Restrictive policy for API - adjust for frontend if needed

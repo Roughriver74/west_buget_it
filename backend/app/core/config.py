@@ -5,6 +5,9 @@ import secrets
 import json
 import os
 
+# Import constants for defaults
+from app.core import constants
+
 
 def parse_cors_origins(v: Any) -> List[str]:
     """
@@ -143,6 +146,66 @@ class Settings(BaseSettings):
     CREDIT_PORTFOLIO_IMPORT_ENABLED: bool = True
     CREDIT_PORTFOLIO_IMPORT_HOUR: int = 6  # 0-23
     CREDIT_PORTFOLIO_IMPORT_MINUTE: int = 0  # 0-59
+
+    # ============================================================================
+    # RATE LIMITING
+    # ============================================================================
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = constants.RATE_LIMIT_REQUESTS_PER_MINUTE
+    RATE_LIMIT_REQUESTS_PER_HOUR: int = constants.RATE_LIMIT_REQUESTS_PER_HOUR
+    RATE_LIMIT_DEFAULT_REQUESTS_PER_MINUTE: int = constants.RATE_LIMIT_DEFAULT_REQUESTS_PER_MINUTE
+    RATE_LIMIT_DEFAULT_REQUESTS_PER_HOUR: int = constants.RATE_LIMIT_DEFAULT_REQUESTS_PER_HOUR
+    RATE_LIMIT_CLEANUP_INTERVAL: int = constants.RATE_LIMIT_CLEANUP_INTERVAL
+
+    # Redis Rate Limiting
+    REDIS_SOCKET_TIMEOUT: int = constants.REDIS_SOCKET_TIMEOUT
+    REDIS_MINUTE_WINDOW_TTL: int = constants.REDIS_MINUTE_WINDOW_TTL
+    REDIS_HOUR_WINDOW_TTL: int = constants.REDIS_HOUR_WINDOW_TTL
+
+    # ============================================================================
+    # PAGINATION & LIMITS
+    # ============================================================================
+    DEFAULT_PAGE_SIZE: int = constants.DEFAULT_PAGE_SIZE
+    MAX_PAGE_SIZE: int = constants.MAX_PAGE_SIZE
+    DEFAULT_EXPENSES_PAGE_SIZE: int = constants.DEFAULT_EXPENSES_PAGE_SIZE
+    MAX_EXPENSES_PAGE_SIZE: int = constants.MAX_EXPENSES_PAGE_SIZE
+    DEFAULT_BANK_TX_PAGE_SIZE: int = constants.DEFAULT_BANK_TX_PAGE_SIZE
+    MAX_BANK_TX_PAGE_SIZE: int = constants.MAX_BANK_TX_PAGE_SIZE
+    CREDIT_PORTFOLIO_PAGE_SIZE: int = constants.CREDIT_PORTFOLIO_PAGE_SIZE
+    MAX_CREDIT_PORTFOLIO_PAGE_SIZE: int = constants.MAX_CREDIT_PORTFOLIO_PAGE_SIZE
+    REVENUE_PLAN_DETAILS_PAGE_SIZE: int = constants.REVENUE_PLAN_DETAILS_PAGE_SIZE
+    MAX_REVENUE_PLAN_DETAILS_PAGE_SIZE: int = constants.MAX_REVENUE_PLAN_DETAILS_PAGE_SIZE
+    TOP_ITEMS_DEFAULT_LIMIT: int = constants.TOP_ITEMS_DEFAULT_LIMIT
+    TOP_ITEMS_MAX_LIMIT: int = constants.TOP_ITEMS_MAX_LIMIT
+
+    # ============================================================================
+    # AI & MACHINE LEARNING
+    # ============================================================================
+    AI_MIN_SCORE_THRESHOLD: int = constants.AI_MIN_SCORE_THRESHOLD
+    AI_CONFIDENCE_MIN_BASE: float = constants.AI_CONFIDENCE_MIN_BASE
+    AI_CONFIDENCE_MAX_CAP: float = constants.AI_CONFIDENCE_MAX_CAP
+    AI_HISTORICAL_CONFIDENCE: float = constants.AI_HISTORICAL_CONFIDENCE
+    AI_HIGH_CONFIDENCE_THRESHOLD: float = constants.AI_HIGH_CONFIDENCE_THRESHOLD
+    AI_MEDIUM_CONFIDENCE_THRESHOLD: float = constants.AI_MEDIUM_CONFIDENCE_THRESHOLD
+    AI_PARSER_TEMPERATURE: float = constants.AI_PARSER_TEMPERATURE
+    AI_PARSER_MAX_TOKENS: int = constants.AI_PARSER_MAX_TOKENS
+
+    # ============================================================================
+    # API TIMEOUTS
+    # ============================================================================
+    ODATA_REQUEST_TIMEOUT: int = constants.ODATA_REQUEST_TIMEOUT
+    ODATA_CONNECTION_TIMEOUT: int = constants.ODATA_CONNECTION_TIMEOUT
+    ODATA_GET_REQUEST_TIMEOUT: int = constants.ODATA_GET_REQUEST_TIMEOUT
+
+    # ============================================================================
+    # SECURITY HEADERS
+    # ============================================================================
+    HSTS_MAX_AGE: int = constants.HSTS_MAX_AGE
+
+    # ============================================================================
+    # BATCH PROCESSING
+    # ============================================================================
+    SYNC_BATCH_SIZE: int = constants.SYNC_BATCH_SIZE
+    IMPORT_PREVIEW_ROWS: int = constants.IMPORT_PREVIEW_ROWS
 
     @field_validator('SECRET_KEY')
     @classmethod

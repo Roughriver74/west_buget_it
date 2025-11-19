@@ -9,6 +9,7 @@ import pandas as pd
 import io
 from sqlalchemy.orm import Session
 
+from app.core import constants
 from app.db.models import (
     BankTransaction,
     BankTransactionTypeEnum,
@@ -303,12 +304,12 @@ class BankTransactionImporter:
                             transaction.suggested_category_id = category_id
                             transaction.category_confidence = float(confidence)
 
-                            # Auto-apply if high confidence (>90%)
-                            if confidence >= 0.9:
+                            # Auto-apply if high confidence
+                            if confidence >= constants.AI_HIGH_CONFIDENCE_THRESHOLD:
                                 transaction.category_id = category_id
                                 transaction.status = BankTransactionStatusEnum.CATEGORIZED
-                            # Mark for review if medium confidence (50-90%)
-                            elif confidence >= 0.5:
+                            # Mark for review if medium confidence
+                            elif confidence >= constants.AI_MEDIUM_CONFIDENCE_THRESHOLD:
                                 transaction.status = BankTransactionStatusEnum.NEEDS_REVIEW
 
                     except Exception as e:
