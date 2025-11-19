@@ -38,7 +38,7 @@ from app.schemas.payroll_scenario import (
     ScenarioCalculationResponse,
     InsuranceImpactAnalysis,
 )
-from app.core.security import get_current_active_user
+from app.utils.auth import get_current_active_user
 from app.services.payroll_scenario_calculator import (
     PayrollScenarioCalculator,
     InsuranceImpactAnalyzer,
