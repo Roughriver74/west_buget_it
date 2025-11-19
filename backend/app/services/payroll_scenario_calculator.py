@@ -20,7 +20,9 @@ from app.db.models import (
     PayrollActual,
     TaxTypeEnum,
     PayrollScenarioTypeEnum,
+    TaxRate,
 )
+from app.services.tax_rate_utils import merge_tax_rates_with_defaults
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +62,19 @@ class PayrollScenarioCalculator:
             PayrollScenarioDetail.scenario_id == scenario_id
         ).all()
 
-        if not scenario_details:
-            # Если детали не созданы, создать их из текущих сотрудников
-            scenario_details = self._create_scenario_details_from_employees(
-                scenario, insurance_rates
-            )
+        # ВСЕГДА пересоздаем детали при расчете от БАЗОВОГО ГОДА,
+        # чтобы правильно применить новые проценты изменения
+        # Удаляем старые детали
+        logger.info(f"Recreating scenario details from BASE YEAR for scenario {scenario_id}")
+        self.db.query(PayrollScenarioDetail).filter(
+            PayrollScenarioDetail.scenario_id == scenario_id
+        ).delete()
+        self.db.commit()
+
+        # Создаем новые детали от базового года с учетом параметров сценария
+        scenario_details = self._create_scenario_details_from_base_year(
+            scenario, insurance_rates
+        )
 
         # Рассчитать каждого сотрудника
         total_headcount = 0
@@ -74,19 +84,33 @@ class PayrollScenarioCalculator:
         total_payroll_cost = Decimal('0.00')
 
         for detail in scenario_details:
-            if not detail.is_terminated:
+            # Учитываем уволенных сотрудников - они не считаются в численности
+            # но их зарплата может считаться частично (если указан termination_month)
+            if detail.is_terminated:
+                # Если указан месяц увольнения, считаем зарплату только до этого месяца
+                if detail.termination_month:
+                    months_worked = detail.termination_month
+                else:
+                    months_worked = 0  # Уволен сразу, не считаем
+            else:
                 total_headcount += 1
+                months_worked = 12
 
-            # Рассчитать страховые взносы
+            # ВАЖНО: detail.base_salary хранит МЕСЯЧНЫЙ оклад
+            # Для годового расчета умножаем на количество отработанных месяцев
+            annual_salary = (detail.base_salary + detail.monthly_bonus) * months_worked
+
+            # Рассчитать страховые взносы на ГОДОВУЮ зарплату (пропорционально месяцам)
             insurance_calc = self._calculate_insurance_for_employee(
-                detail.base_salary + detail.monthly_bonus,
+                annual_salary,
                 insurance_rates
             )
 
-            # Рассчитать НДФЛ (13%)
-            income_tax = (detail.base_salary + detail.monthly_bonus) * Decimal('0.13')
+            # Рассчитать НДФЛ на ГОДОВУЮ зарплату (13% дефолт или ставка из справочника)
+            income_tax_rate = insurance_rates.get('INCOME_TAX', Decimal('0.13'))
+            income_tax = annual_salary * income_tax_rate
 
-            # Обновить детали
+            # Обновить детали (сохраняем годовые значения)
             detail.pension_contribution = insurance_calc['pension']
             detail.medical_contribution = insurance_calc['medical']
             detail.social_contribution = insurance_calc['social']
@@ -94,13 +118,12 @@ class PayrollScenarioCalculator:
             detail.total_insurance = insurance_calc['total']
             detail.income_tax = income_tax
             detail.total_employee_cost = (
-                detail.base_salary +
-                detail.monthly_bonus +
+                annual_salary +
                 insurance_calc['total']
             )
 
-            # Аккумулировать итоги
-            total_base_salary += detail.base_salary + detail.monthly_bonus
+            # Аккумулировать итоги (годовые суммы)
+            total_base_salary += annual_salary
             total_insurance += insurance_calc['total']
             total_income_tax += income_tax
             total_payroll_cost += detail.total_employee_cost
@@ -111,8 +134,8 @@ class PayrollScenarioCalculator:
         scenario.total_insurance_cost = total_insurance
         scenario.total_payroll_cost = total_payroll_cost
 
-        # Рассчитать сравнение с базовым годом
-        base_year_cost = self._get_base_year_cost(scenario.base_year)
+        # Рассчитать сравнение с базовым годом (используем тех же сотрудников)
+        base_year_cost = self._get_base_year_cost_for_employees(scenario.base_year, scenario_details)
         scenario.base_year_total_cost = base_year_cost
         scenario.cost_difference = total_payroll_cost - base_year_cost
         scenario.cost_difference_percent = (
@@ -134,20 +157,116 @@ class PayrollScenarioCalculator:
         }
 
     def _get_insurance_rates(self, year: int) -> Dict[str, Decimal]:
-        """Получить ставки страховых взносов для года"""
+        """Получить ставки страховых взносов/НДФЛ для года из справочника TaxRate
+
+        Использует TaxRate (справочник налоговых ставок) вместо InsuranceRate.
+        Логика поиска:
+        1. Конвертируем год в дату (1 января указанного года)
+        2. Ищем активные ставки для этой даты (effective_from <= calc_date и effective_to >= calc_date или NULL)
+        3. Если есть ставки с effective_from в будущем (но <= конца года), учитываем их как будущие изменения
+        4. Сначала ищем ставки для конкретного отдела, затем глобальные
+        5. Если не найдены, используем дефолтные значения
+        """
+        from datetime import date
+        from sqlalchemy import or_, and_
+        
+        # Конвертируем год в дату (1 января указанного года и 31 декабря для поиска будущих ставок)
+        calc_date = date(year, 1, 1)
+        year_end_date = date(year, 12, 31)
+        
         rates = {}
-
-        for rate_type in [TaxTypeEnum.PENSION_FUND, TaxTypeEnum.MEDICAL_INSURANCE,
-                          TaxTypeEnum.SOCIAL_INSURANCE, TaxTypeEnum.INJURY_INSURANCE]:
-            rate_record = self.db.query(InsuranceRate).filter(
-                InsuranceRate.year == year,
-                InsuranceRate.rate_type == rate_type,
-                InsuranceRate.department_id == self.department_id,
-                InsuranceRate.is_active == True
-            ).first()
-
-            if rate_record:
-                rates[rate_type.value] = rate_record.rate_percentage / 100
+        
+        # Получаем ставки для указанной даты
+        # Сначала ищем для конкретного департамента
+        tax_rates_query_dept = self.db.query(TaxRate).filter(
+            TaxRate.is_active == True,
+            TaxRate.department_id == self.department_id,
+            # Ставка должна быть актуальна на calc_date или начаться в течение года
+            or_(
+                # Актуальная ставка на calc_date
+                and_(
+                    TaxRate.effective_from <= calc_date,
+                    or_(
+                        TaxRate.effective_to.is_(None),
+                        TaxRate.effective_to >= calc_date
+                    )
+                ),
+                # Будущая ставка, которая начнет действовать в этом году
+                and_(
+                    TaxRate.effective_from > calc_date,
+                    TaxRate.effective_from <= year_end_date
+                )
+            )
+        ).order_by(TaxRate.effective_from.desc())
+        
+        tax_rates = tax_rates_query_dept.all()
+        
+        # Если не найдены ставки для департамента, ищем глобальные ставки (department_id IS NULL)
+        if not tax_rates:
+            tax_rates_query_global = self.db.query(TaxRate).filter(
+                TaxRate.is_active == True,
+                TaxRate.department_id.is_(None),  # Только глобальные ставки
+                # Ставка должна быть актуальна на calc_date или начаться в течение года
+                or_(
+                    # Актуальная ставка на calc_date
+                    and_(
+                        TaxRate.effective_from <= calc_date,
+                        or_(
+                            TaxRate.effective_to.is_(None),
+                            TaxRate.effective_to >= calc_date
+                        )
+                    ),
+                    # Будущая ставка, которая начнет действовать в этом году
+                    and_(
+                        TaxRate.effective_from > calc_date,
+                        TaxRate.effective_from <= year_end_date
+                    )
+                )
+            ).order_by(TaxRate.effective_from.desc())
+            tax_rates = tax_rates_query_global.all()
+            logger.info(f"Found {len(tax_rates)} global tax rates for year {year}")
+        
+        # Объединяем с дефолтами
+        selected_rates = merge_tax_rates_with_defaults(tax_rates)
+        
+        # Извлекаем нужные ставки страховых взносов + НДФЛ (если есть)
+        # Приоритет: ставка актуальная на calc_date, если есть будущая - берем её
+        for rate_type in [
+            TaxTypeEnum.PENSION_FUND,
+            TaxTypeEnum.MEDICAL_INSURANCE,
+            TaxTypeEnum.SOCIAL_INSURANCE,
+            TaxTypeEnum.INJURY_INSURANCE,
+            TaxTypeEnum.INCOME_TAX,
+        ]:
+            # Ищем ставку для этого типа
+            rate_obj = selected_rates.get(rate_type)
+            
+            # Если есть несколько ставок, ПРИОРИТЕТ будущим ставкам, которые начнут действовать в целевом году
+            matching_rates = [r for r in tax_rates if r.tax_type == rate_type]
+            if matching_rates:
+                # Разделяем на актуальные и будущие
+                current_rates = [r for r in matching_rates if r.effective_from <= calc_date]
+                future_rates = [r for r in matching_rates if r.effective_from > calc_date and r.effective_from <= year_end_date]
+                
+                # ВАЖНО: Будущие ставки имеют приоритет над текущими
+                # Если есть ставка, которая начнет действовать в целевом году, используем её
+                if future_rates:
+                    # Берем самую раннюю будущую ставку (которая начнет действовать первой в целевом году)
+                    rate_obj = min(future_rates, key=lambda r: r.effective_from)
+                    logger.info(f"Using future rate for {rate_type.value} in {year}: {rate_obj.rate * 100}% (effective_from: {rate_obj.effective_from})")
+                elif current_rates:
+                    # Если нет будущих, берем самую позднюю актуальную ставку
+                    rate_obj = max(current_rates, key=lambda r: r.effective_from)
+                else:
+                    rate_obj = None
+            
+            if rate_obj and hasattr(rate_obj, 'rate'):
+                rates[rate_type.value] = Decimal(str(rate_obj.rate))
+                # Check if rate_obj has effective_from (TaxRate) or not (TaxRateDefault)
+                if hasattr(rate_obj, 'effective_from'):
+                    logger.info(f"Found tax rate for {rate_type.value} in {year}: {rates[rate_type.value] * 100}% (effective_from: {rate_obj.effective_from})")
+                else:
+                    logger.info(f"Using default tax rate for {rate_type.value} in {year}: {rates[rate_type.value] * 100}%")
             else:
                 # Дефолтные ставки на случай отсутствия данных
                 defaults = {
@@ -155,8 +274,10 @@ class PayrollScenarioCalculator:
                     TaxTypeEnum.MEDICAL_INSURANCE.value: Decimal('0.051'),
                     TaxTypeEnum.SOCIAL_INSURANCE.value: Decimal('0.029'),
                     TaxTypeEnum.INJURY_INSURANCE.value: Decimal('0.002'),
+                    TaxTypeEnum.INCOME_TAX.value: Decimal('0.13'),
                 }
                 rates[rate_type.value] = defaults.get(rate_type.value, Decimal('0.00'))
+                logger.warning(f"No tax rate found for {rate_type.value} in {year}, using default: {rates[rate_type.value]}")
 
         return rates
 
@@ -243,27 +364,168 @@ class PayrollScenarioCalculator:
         self.db.commit()
         return details
 
+    def _create_scenario_details_from_base_year(
+        self, scenario: PayrollScenario, insurance_rates: Dict[str, Decimal]
+    ) -> List[PayrollScenarioDetail]:
+        """
+        Создать детали сценария от БАЗОВОГО ГОДА с применением процентов изменения
+
+        ВАЖНО: Этот метод создает scenario_details от базового года (PayrollActual),
+        а не от текущего Employee table. Это гарантирует правильное применение
+        процентов изменения относительно базового года.
+
+        Args:
+            scenario: Сценарий с параметрами (headcount_change_percent, salary_change_percent)
+            insurance_rates: Ставки страховых взносов для целевого года
+
+        Returns:
+            List[PayrollScenarioDetail]: Детали сценария
+        """
+        logger.info(f"Creating scenario details from BASE YEAR {scenario.base_year}")
+
+        # 1. Получить уникальных сотрудников из базового года (JOIN с Employee для имени/должности)
+        base_year_employees = self.db.query(
+            PayrollActual.employee_id,
+            Employee.full_name.label('employee_name'),
+            Employee.position.label('position'),
+            func.sum(PayrollActual.total_paid).label('annual_salary'),
+            func.sum(PayrollActual.social_tax_amount).label('annual_insurance')
+        ).join(
+            Employee, PayrollActual.employee_id == Employee.id
+        ).filter(
+            PayrollActual.department_id == self.department_id,
+            PayrollActual.year == scenario.base_year
+        ).group_by(
+            PayrollActual.employee_id,
+            Employee.full_name,
+            Employee.position
+        ).all()
+
+        base_year_count = len(base_year_employees)
+        logger.info(f"Found {base_year_count} employees in base year {scenario.base_year}")
+
+        if base_year_count == 0:
+            logger.warning(f"No employees found in base year {scenario.base_year}, cannot create scenario")
+            return []
+
+        # 2. Применить изменения зарплаты
+        salary_multiplier = Decimal('1.00') + (scenario.salary_change_percent / 100)
+        logger.info(f"Salary multiplier: {salary_multiplier} ({scenario.salary_change_percent}%)")
+
+        # 3. Создать детали для существующих сотрудников базового года
+        details = []
+        total_base_year_salary = Decimal('0.00')
+
+        for emp in base_year_employees:
+            # Годовая зарплата из базового года
+            annual_base_salary = emp.annual_salary or Decimal('0.00')
+            total_base_year_salary += annual_base_salary
+
+            # Применить процент изменения зарплаты
+            # ВАЖНО: annual_salary уже годовая, нужно получить месячную для base_salary
+            monthly_base_salary = (annual_base_salary / 12) * salary_multiplier
+
+            detail = PayrollScenarioDetail(
+                scenario_id=scenario.id,
+                employee_id=emp.employee_id,
+                employee_name=emp.employee_name,
+                position=emp.position,
+                base_salary=monthly_base_salary,  # Месячный оклад
+                monthly_bonus=Decimal('0.00'),  # Бонусы пока не учитываем
+                base_year_salary=annual_base_salary,  # Годовая зарплата базового года
+                base_year_insurance=emp.annual_insurance or Decimal('0.00'),
+                department_id=self.department_id,
+                is_new_hire=False,
+                is_terminated=False,
+            )
+
+            self.db.add(detail)
+            details.append(detail)
+
+        # 4. Применить изменение headcount
+        if scenario.headcount_change_percent != 0:
+            headcount_change = int(base_year_count * scenario.headcount_change_percent / 100)
+            logger.info(f"Headcount change: {headcount_change} people ({scenario.headcount_change_percent}%)")
+
+            if headcount_change > 0:
+                # Добавить новых сотрудников
+                # Средняя месячная зарплата = (total_base_year_salary / base_year_count / 12) * salary_multiplier
+                avg_monthly_salary = (total_base_year_salary / base_year_count / 12) * salary_multiplier
+                logger.info(f"Adding {headcount_change} new employees with avg monthly salary {avg_monthly_salary}")
+
+                for i in range(headcount_change):
+                    detail = PayrollScenarioDetail(
+                        scenario_id=scenario.id,
+                        employee_id=None,
+                        employee_name=f"Новый сотрудник {i+1}",
+                        position="Планируемая позиция",
+                        base_salary=avg_monthly_salary,
+                        monthly_bonus=Decimal('0.00'),
+                        base_year_salary=Decimal('0.00'),  # Не было в базовом году
+                        base_year_insurance=Decimal('0.00'),
+                        department_id=self.department_id,
+                        is_new_hire=True,
+                        is_terminated=False,
+                    )
+                    self.db.add(detail)
+                    details.append(detail)
+
+            elif headcount_change < 0:
+                # Отметить сотрудников на увольнение (первые по списку)
+                terminate_count = min(abs(headcount_change), len(details))
+                logger.info(f"Marking {terminate_count} employees as terminated")
+
+                for i in range(terminate_count):
+                    details[i].is_terminated = True
+                    # Устанавливаем месяц увольнения (например, середина года)
+                    details[i].termination_month = 6
+
+        self.db.commit()
+        logger.info(f"Created {len(details)} scenario details from base year")
+
+        return details
+
     def _get_employee_base_year_data(
         self, employee_id: int, base_year: int
     ) -> Tuple[Decimal, Decimal]:
-        """Получить данные сотрудника за базовый год"""
-        payroll = self.db.query(PayrollActual).filter(
+        """
+        Получить данные сотрудника за базовый год
+
+        Returns:
+            Tuple[Decimal, Decimal]: (годовая зарплата, годовые страховые взносы)
+        """
+        # Получить ВСЕ записи за год (12 месяцев)
+        payroll_records = self.db.query(PayrollActual).filter(
             PayrollActual.employee_id == employee_id,
             PayrollActual.year == base_year
-        ).first()
+        ).all()
 
-        if payroll:
-            return payroll.total_paid, payroll.social_tax_amount
+        if payroll_records:
+            # Суммировать ВСЕ месяцы за год
+            total_salary = sum(p.total_paid for p in payroll_records)
+            total_insurance = sum(p.social_tax_amount for p in payroll_records)
+            return total_salary, total_insurance
         else:
-            # Если нет данных, вернуть текущий оклад
+            # Если нет данных за базовый год, использовать текущий оклад * 12 месяцев
             employee = self.db.query(Employee).get(employee_id)
             if employee:
-                return employee.base_salary * 12, Decimal('0.00')
+                annual_salary = employee.base_salary * 12
+                # Рассчитать страховые взносы за год
+                base_insurance_rates = self._get_insurance_rates(base_year)
+                insurance_calc = self._calculate_insurance_for_employee(
+                    annual_salary, base_insurance_rates
+                )
+                return annual_salary, insurance_calc['total']
 
         return Decimal('0.00'), Decimal('0.00')
 
     def _get_base_year_cost(self, base_year: int) -> Decimal:
-        """Получить общий ФОТ за базовый год"""
+        """
+        Получить общий ФОТ за базовый год (ВСЕ сотрудники)
+
+        ВНИМАНИЕ: Этот метод не используется для сравнения в сценариях!
+        Используйте _get_base_year_cost_for_employees() для корректного сравнения.
+        """
         result = self.db.query(
             func.sum(PayrollActual.total_paid + PayrollActual.social_tax_amount)
         ).filter(
@@ -272,6 +534,69 @@ class PayrollScenarioCalculator:
         ).scalar()
 
         return result or Decimal('0.00')
+
+    def _get_base_year_cost_for_employees(
+        self, base_year: int, scenario_details: List[PayrollScenarioDetail]
+    ) -> Decimal:
+        """
+        Получить общий ФОТ за базовый год для тех же сотрудников, что в сценарии
+
+        Это обеспечивает корректное сравнение "яблоки с яблоками":
+        - Базовый год: те же сотрудники, что в целевом году
+        - Целевой год: сотрудники из scenario_details
+
+        Args:
+            base_year: Базовый год
+            scenario_details: Детали сценария с сотрудниками
+
+        Returns:
+            Decimal: Общий ФОТ за базовый год для указанных сотрудников
+        """
+        total_base_year_cost = Decimal('0.00')
+        base_insurance_rates = self._get_insurance_rates(base_year)
+
+        for detail in scenario_details:
+            # Пропускаем новых сотрудников (их не было в базовом году)
+            if detail.is_new_hire or not detail.employee_id:
+                continue
+
+            # Пропускаем уволенных (не учитываем их в базовом году для сравнения)
+            if detail.is_terminated:
+                continue
+
+            # Получить данные сотрудника за базовый год
+            payroll_actuals = self.db.query(PayrollActual).filter(
+                PayrollActual.employee_id == detail.employee_id,
+                PayrollActual.year == base_year,
+                PayrollActual.department_id == self.department_id
+            ).all()
+
+            if payroll_actuals:
+                # Суммируем все выплаты за год (12 месяцев)
+                year_salary = sum(p.total_paid for p in payroll_actuals)
+                year_insurance = sum(p.social_tax_amount for p in payroll_actuals)
+                employee_total_cost = year_salary + year_insurance
+            else:
+                # Если нет данных за базовый год, используем current employee base_salary * 12
+                employee = self.db.query(Employee).get(detail.employee_id)
+                if employee:
+                    annual_salary = employee.base_salary * 12
+                    # Рассчитываем страховые взносы по ставкам базового года
+                    insurance_calc = self._calculate_insurance_for_employee(
+                        annual_salary, base_insurance_rates
+                    )
+                    employee_total_cost = annual_salary + insurance_calc['total']
+                else:
+                    # Последний fallback - используем плановый оклад из сценария
+                    annual_salary = detail.base_salary * 12
+                    insurance_calc = self._calculate_insurance_for_employee(
+                        annual_salary, base_insurance_rates
+                    )
+                    employee_total_cost = annual_salary + insurance_calc['total']
+
+            total_base_year_cost += employee_total_cost
+
+        return total_base_year_cost
 
 
 class InsuranceImpactAnalyzer:
@@ -297,18 +622,33 @@ class InsuranceImpactAnalyzer:
         # Получить ставки для обоих годов
         base_rates = self._get_all_rates(base_year)
         target_rates = self._get_all_rates(target_year)
+        
+        logger.info(f"Base year {base_year} rates: {base_rates}")
+        logger.info(f"Target year {target_year} rates: {target_rates}")
 
+        # Маппинг английских названий на русские
+        rate_type_labels = {
+            'PENSION_FUND': 'ПФР',
+            'MEDICAL_INSURANCE': 'ФОМС',
+            'SOCIAL_INSURANCE': 'ФСС',
+            'INJURY_INSURANCE': 'Травматизм',
+        }
+        
         # Рассчитать изменения
         rate_changes = {}
         for rate_type in base_rates:
             base_rate = base_rates[rate_type]
             target_rate = target_rates.get(rate_type, base_rate)
+            
+            # Используем русское название как ключ
+            russian_name = rate_type_labels.get(rate_type, rate_type)
 
-            rate_changes[rate_type] = {
+            rate_changes[russian_name] = {
                 'from': float(base_rate * 100),
                 'to': float(target_rate * 100),
                 'change': float((target_rate - base_rate) * 100),
             }
+            logger.info(f"Rate change for {russian_name} ({rate_type}): {base_rate * 100}% -> {target_rate * 100}% (change: {(target_rate - base_rate) * 100}%)")
 
         # Получить данные ФОТ за базовый год
         base_year_payroll = self._get_year_payroll_data(base_year)
@@ -363,22 +703,118 @@ class InsuranceImpactAnalyzer:
         }
 
     def _get_all_rates(self, year: int) -> Dict[str, Decimal]:
-        """Получить все ставки для года"""
+        """Получить все ставки для года из справочника TaxRate
+        
+        Использует TaxRate (справочник налоговых ставок) вместо InsuranceRate.
+        Учитывает будущие ставки, которые начнут действовать в целевом году.
+        """
+        from datetime import date
+        from sqlalchemy import or_, and_
+        
+        # Конвертируем год в дату (1 января указанного года и 31 декабря для поиска будущих ставок)
+        calc_date = date(year, 1, 1)
+        year_end_date = date(year, 12, 31)
+        
+        # Получаем ставки для указанной даты
+        # Сначала ищем для конкретного департамента
+        tax_rates_query_dept = self.db.query(TaxRate).filter(
+            TaxRate.is_active == True,
+            TaxRate.department_id == self.department_id,
+            # Ставка должна быть актуальна на calc_date или начаться в течение года
+            or_(
+                # Актуальная ставка на calc_date
+                and_(
+                    TaxRate.effective_from <= calc_date,
+                    or_(
+                        TaxRate.effective_to.is_(None),
+                        TaxRate.effective_to >= calc_date
+                    )
+                ),
+                # Будущая ставка, которая начнет действовать в этом году
+                and_(
+                    TaxRate.effective_from > calc_date,
+                    TaxRate.effective_from <= year_end_date
+                )
+            )
+        ).order_by(TaxRate.effective_from.desc())
+        
+        tax_rates = tax_rates_query_dept.all()
+        
+        # Если не найдены ставки для департамента, ищем глобальные ставки (department_id IS NULL)
+        if not tax_rates:
+            tax_rates_query_global = self.db.query(TaxRate).filter(
+                TaxRate.is_active == True,
+                TaxRate.department_id.is_(None),  # Глобальные ставки имеют department_id = NULL
+                # Ставка должна быть актуальна на calc_date или начаться в течение года
+                or_(
+                    # Актуальная ставка на calc_date
+                    and_(
+                        TaxRate.effective_from <= calc_date,
+                        or_(
+                            TaxRate.effective_to.is_(None),
+                            TaxRate.effective_to >= calc_date
+                        )
+                    ),
+                    # Будущая ставка, которая начнет действовать в этом году
+                    and_(
+                        TaxRate.effective_from > calc_date,
+                        TaxRate.effective_from <= year_end_date
+                    )
+                )
+            ).order_by(TaxRate.effective_from.desc())
+            tax_rates = tax_rates_query_global.all()
+            logger.info(f"Found {len(tax_rates)} global tax rates (department_id IS NULL) for year {year} in _get_all_rates")
+        
+        # Объединяем с дефолтами
+        selected_rates = merge_tax_rates_with_defaults(tax_rates)
+        
+        # Извлекаем нужные ставки страховых взносов
+        # ПРИОРИТЕТ: будущие ставки > текущие ставки
         rates = {}
-
+        logger.info(f"Total tax_rates found: {len(tax_rates)}")
+        logger.info(f"Selected rates from merge: {list(selected_rates.keys())}")
+        
         for rate_type in [TaxTypeEnum.PENSION_FUND, TaxTypeEnum.MEDICAL_INSURANCE,
                           TaxTypeEnum.SOCIAL_INSURANCE, TaxTypeEnum.INJURY_INSURANCE]:
-            rate_record = self.db.query(InsuranceRate).filter(
-                InsuranceRate.year == year,
-                InsuranceRate.rate_type == rate_type,
-                InsuranceRate.department_id == self.department_id,
-                InsuranceRate.is_active == True
-            ).first()
-
-            if rate_record:
-                rates[rate_type.value] = rate_record.rate_percentage / 100
+            # Ищем ставку для этого типа
+            rate_obj = None
+            
+            # Если есть несколько ставок, берем будущую, если она есть, иначе текущую
+            matching_rates = [r for r in tax_rates if r.tax_type == rate_type]
+            logger.info(f"Found {len(matching_rates)} matching rates for {rate_type.value} in year {year}")
+            
+            if matching_rates:
+                # Разделяем на актуальные и будущие
+                current_rates = [r for r in matching_rates if r.effective_from <= calc_date]
+                future_rates = [r for r in matching_rates if r.effective_from > calc_date and r.effective_from <= year_end_date]
+                
+                logger.info(f"Current rates: {len(current_rates)}, Future rates: {len(future_rates)}")
+                
+                # ВАЖНО: Будущие ставки имеют приоритет
+                if future_rates:
+                    # Берем самую раннюю будущую ставку (которая начнет действовать первой в целевом году)
+                    rate_obj = min(future_rates, key=lambda r: r.effective_from)
+                    logger.info(f"Using future rate for {rate_type.value} in {year}: {rate_obj.rate * 100}% (effective_from: {rate_obj.effective_from})")
+                elif current_rates:
+                    # Если нет будущих, берем самую позднюю актуальную ставку
+                    rate_obj = max(current_rates, key=lambda r: r.effective_from)
+                    logger.info(f"Using current rate for {rate_type.value} in {year}: {rate_obj.rate * 100}% (effective_from: {rate_obj.effective_from})")
+            
+            # Если не нашли в tax_rates, используем selected_rates (может быть TaxRateDefault)
+            if not rate_obj:
+                rate_obj = selected_rates.get(rate_type)
+                if rate_obj:
+                    logger.info(f"Using rate from selected_rates for {rate_type.value}: {rate_obj.rate * 100}%")
+            
+            if rate_obj:
+                # Может быть TaxRate или TaxRateDefault - оба имеют rate
+                if hasattr(rate_obj, 'rate'):
+                    rates[rate_type.value] = Decimal(str(rate_obj.rate))
+                    logger.info(f"Final rate for {rate_type.value} in {year}: {rates[rate_type.value] * 100}%")
+                else:
+                    logger.warning(f"Rate object for {rate_type.value} has no 'rate' attribute")
             else:
-                # Дефолтные ставки
+                # Дефолтные ставки (если ничего не найдено)
                 defaults = {
                     'PENSION_FUND': Decimal('0.22'),
                     'MEDICAL_INSURANCE': Decimal('0.051'),
@@ -386,6 +822,7 @@ class InsuranceImpactAnalyzer:
                     'INJURY_INSURANCE': Decimal('0.002'),
                 }
                 rates[rate_type.value] = defaults.get(rate_type.value, Decimal('0.00'))
+                logger.warning(f"No tax rate found for {rate_type.value} in {year}, using hardcoded default: {rates[rate_type.value] * 100}%")
 
         return rates
 

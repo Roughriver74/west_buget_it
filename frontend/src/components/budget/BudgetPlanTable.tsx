@@ -759,23 +759,43 @@ const BudgetPlanTable = React.forwardRef<
           padding: 8px !important;
         }
 
-        .active-month-header {
-          background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
-          color: #0958d9 !important;
-          font-weight: 600 !important;
-        }
-        .active-month-subheader {
-          background-color: rgba(24, 144, 255, 0.12) !important;
-          color: #0958d9 !important;
-          font-weight: 600 !important;
-        }
-        .active-month-cell {
-          background-color: rgba(222, 242, 255, 0.7) !important;
-          transition: background-color 0.2s ease;
-        }
-        .active-month-cell:hover {
-          background-color: rgba(184, 218, 255, 0.8) !important;
-        }
+        ${mode === 'dark' ? `
+          .active-month-header {
+            background: linear-gradient(90deg, rgba(24, 144, 255, 0.25) 0%, rgba(24, 144, 255, 0.1) 100%) !important;
+            color: #69b7ff !important;
+            font-weight: 600 !important;
+          }
+          .active-month-subheader {
+            background-color: rgba(24, 144, 255, 0.2) !important;
+            color: #69b7ff !important;
+            font-weight: 600 !important;
+          }
+          .active-month-cell {
+            background-color: rgba(24, 144, 255, 0.15) !important;
+            transition: background-color 0.2s ease;
+          }
+          .active-month-cell:hover {
+            background-color: rgba(24, 144, 255, 0.25) !important;
+          }
+        ` : `
+          .active-month-header {
+            background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
+            color: #0958d9 !important;
+            font-weight: 600 !important;
+          }
+          .active-month-subheader {
+            background-color: rgba(24, 144, 255, 0.12) !important;
+            color: #0958d9 !important;
+            font-weight: 600 !important;
+          }
+          .active-month-cell {
+            background-color: rgba(222, 242, 255, 0.7) !important;
+            transition: background-color 0.2s ease;
+          }
+          .active-month-cell:hover {
+            background-color: rgba(184, 218, 255, 0.8) !important;
+          }
+        `}
 
         .ant-table-sticky-scroll {
           display: none;
@@ -817,25 +837,47 @@ const BudgetPlanTable = React.forwardRef<
         }
 
         /* Прозрачная версия кнопок */
-        .budget-scroll-button-transparent {
-          background: rgba(255, 255, 255, 0.75) !important;
-          color: #1890ff !important;
-          border: 2px solid rgba(24, 144, 255, 0.3) !important;
-          box-shadow: 0 2px 12px rgba(24, 144, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.08) !important;
-          backdrop-filter: blur(12px) saturate(180%);
-        }
-        .budget-scroll-button-transparent:hover {
-          background: rgba(255, 255, 255, 0.9) !important;
-          color: #0958d9 !important;
-          border: 2px solid rgba(24, 144, 255, 0.6) !important;
-          transform: translateY(-2px) scale(1.05);
-          box-shadow: 0 4px 16px rgba(24, 144, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12) !important;
-        }
-        .budget-scroll-button-transparent:active {
-          transform: translateY(0) scale(1);
-          background: rgba(255, 255, 255, 0.85) !important;
-          box-shadow: 0 1px 6px rgba(24, 144, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
-        }
+        ${mode === 'dark' ? `
+          .budget-scroll-button-transparent {
+            background: rgba(31, 31, 31, 0.85) !important;
+            color: #69b7ff !important;
+            border: 2px solid rgba(24, 144, 255, 0.4) !important;
+            box-shadow: 0 2px 12px rgba(24, 144, 255, 0.2), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+            backdrop-filter: blur(12px) saturate(180%);
+          }
+          .budget-scroll-button-transparent:hover {
+            background: rgba(38, 38, 38, 0.95) !important;
+            color: #91caff !important;
+            border: 2px solid rgba(24, 144, 255, 0.7) !important;
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 16px rgba(24, 144, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+          }
+          .budget-scroll-button-transparent:active {
+            transform: translateY(0) scale(1);
+            background: rgba(31, 31, 31, 0.9) !important;
+            box-shadow: 0 1px 6px rgba(24, 144, 255, 0.25), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+          }
+        ` : `
+          .budget-scroll-button-transparent {
+            background: rgba(255, 255, 255, 0.75) !important;
+            color: #1890ff !important;
+            border: 2px solid rgba(24, 144, 255, 0.3) !important;
+            box-shadow: 0 2px 12px rgba(24, 144, 255, 0.15), 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+            backdrop-filter: blur(12px) saturate(180%);
+          }
+          .budget-scroll-button-transparent:hover {
+            background: rgba(255, 255, 255, 0.9) !important;
+            color: #0958d9 !important;
+            border: 2px solid rgba(24, 144, 255, 0.6) !important;
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 16px rgba(24, 144, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+          }
+          .budget-scroll-button-transparent:active {
+            transform: translateY(0) scale(1);
+            background: rgba(255, 255, 255, 0.85) !important;
+            box-shadow: 0 1px 6px rgba(24, 144, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+          }
+        `}
 
         /* Голубая полоса прокрутки */
         ::-webkit-scrollbar {
@@ -843,26 +885,49 @@ const BudgetPlanTable = React.forwardRef<
           width: 16px !important;
         }
 
-        ::-webkit-scrollbar-track {
-          background: #f0f0f0 !important;
-          border-radius: 8px !important;
-        }
+        ${mode === 'dark' ? `
+          ::-webkit-scrollbar-track {
+            background: #1f1f1f !important;
+            border-radius: 8px !important;
+          }
 
-        ::-webkit-scrollbar-thumb {
-          background: #1890ff !important;
-          border-radius: 8px !important;
-          border: 3px solid #f0f0f0 !important;
-        }
+          ::-webkit-scrollbar-thumb {
+            background: #1890ff !important;
+            border-radius: 8px !important;
+            border: 3px solid #1f1f1f !important;
+          }
 
-        ::-webkit-scrollbar-thumb:hover {
-          background: #40a9ff !important;
-        }
+          ::-webkit-scrollbar-thumb:hover {
+            background: #40a9ff !important;
+          }
 
-        /* Для Firefox */
-        * {
-          scrollbar-width: thin !important;
-          scrollbar-color: #1890ff #f0f0f0 !important;
-        }
+          /* Для Firefox */
+          * {
+            scrollbar-width: thin !important;
+            scrollbar-color: #1890ff #1f1f1f !important;
+          }
+        ` : `
+          ::-webkit-scrollbar-track {
+            background: #f0f0f0 !important;
+            border-radius: 8px !important;
+          }
+
+          ::-webkit-scrollbar-thumb {
+            background: #1890ff !important;
+            border-radius: 8px !important;
+            border: 3px solid #f0f0f0 !important;
+          }
+
+          ::-webkit-scrollbar-thumb:hover {
+            background: #40a9ff !important;
+          }
+
+          /* Для Firefox */
+          * {
+            scrollbar-width: thin !important;
+            scrollbar-color: #1890ff #f0f0f0 !important;
+          }
+        `}
       `}</style>
     </div>
   )

@@ -85,7 +85,7 @@ Import Default Business Operation Mappings
 Processing 2 department(s)
 Default mappings: 15 operations
 
-Processing department: IT Отдел WEST (ID: 8)
+Processing department: IT Отдел ACME (ID: 8)
   ✓ Found category 'ФОТ' for operation 'ВыплатаЗарплаты'
   + Created mapping: ВыплатаЗарплаты → ФОТ
   ✓ Found category 'НДФЛ' for operation 'ПеречислениеНДФЛ'

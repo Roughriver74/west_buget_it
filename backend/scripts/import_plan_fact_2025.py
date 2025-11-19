@@ -53,11 +53,11 @@ def get_or_create_category(db: Session, name: str) -> BudgetCategory:
 
 def get_or_create_organization(db: Session) -> Organization:
     """Получить или создать организацию по умолчанию"""
-    org = db.query(Organization).filter(Organization.name == "ВЕСТ ООО").first()
+    org = db.query(Organization).filter(Organization.name == "ДЕМО ООО").first()
     if not org:
         org = Organization(
-            name="ВЕСТ ООО",
-            legal_name="Общество с ограниченной ответственностью ВЕСТ",
+            name="ДЕМО ООО",
+            legal_name="Общество с ограниченной ответственностью ДЕМО",
             is_active=True
         )
         db.add(org)

@@ -5,6 +5,7 @@ import apiClient from './client';
 
 export type TaxType = 'INCOME_TAX' | 'PENSION_FUND' | 'MEDICAL_INSURANCE' | 'SOCIAL_INSURANCE' | 'INJURY_INSURANCE';
 export type ScenarioType = 'BASE' | 'OPTIMISTIC' | 'PESSIMISTIC' | 'CUSTOM';
+export type DataSource = 'EMPLOYEES' | 'ACTUAL' | 'PLAN';
 
 export interface InsuranceRate {
   id: number;
@@ -26,6 +27,7 @@ export interface PayrollScenario {
   name: string;
   description?: string;
   scenario_type: ScenarioType;
+  data_source: DataSource;
   target_year: number;
   base_year: number;
   headcount_change_percent: number;
@@ -40,6 +42,36 @@ export interface PayrollScenario {
   department_id: number;
   is_active: boolean;
   created_at: string;
+}
+
+export interface PayrollScenarioDetail {
+  id: number;
+  scenario_id: number;
+  employee_id?: number;
+  employee_name: string;
+  position?: string;
+  is_new_hire: boolean;
+  is_terminated: boolean;
+  termination_month?: number;
+  base_salary: number;
+  monthly_bonus: number;
+  pension_contribution?: number;
+  medical_contribution?: number;
+  social_contribution?: number;
+  injury_contribution?: number;
+  total_insurance?: number;
+  income_tax?: number;
+  total_employee_cost?: number;
+  base_year_salary?: number;
+  base_year_insurance?: number;
+  cost_increase?: number;
+  notes?: string;
+  department_id: number;
+  created_at: string;
+}
+
+export interface PayrollScenarioWithDetails extends PayrollScenario {
+  scenario_details: PayrollScenarioDetail[];
 }
 
 export interface YearlyComparison {
@@ -67,10 +99,10 @@ export interface YearlyComparison {
 export interface ImpactAnalysis {
   base_year: number;
   target_year: number;
-  rate_changes: Record<string, { from: number; to: number; change: number }>;
-  total_impact: number;
-  impact_percent: number;
-  recommendations: Array<{ type: string; description: string; impact: number; details?: any }>;
+  rate_changes: Record<string, { from?: number; to?: number; change?: number }>;
+  total_impact?: number;
+  impact_percent?: number;
+  recommendations?: Array<{ type: string; description: string; impact?: number; details?: any }>;
 }
 
 // ==================== Insurance Rates API ====================
@@ -111,7 +143,7 @@ export const payrollScenarioAPI = {
     return response.data;
   },
 
-  get: async (id: number): Promise<PayrollScenario> => {
+  get: async (id: number): Promise<PayrollScenarioWithDetails> => {
     const response = await apiClient.get(`/payroll-scenarios/scenarios/${id}`);
     return response.data;
   },
@@ -120,6 +152,7 @@ export const payrollScenarioAPI = {
     name: string;
     description?: string;
     scenario_type: ScenarioType;
+    data_source?: DataSource;
     target_year: number;
     base_year: number;
     headcount_change_percent?: number;

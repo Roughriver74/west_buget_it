@@ -2,7 +2,7 @@
 
 ## Server Information
 - **Host**: 31.129.107.178
-- **Domain**: budget-west.shknv.ru (update DNS to point to new server)
+- **Domain**: budget-acme.shknv.ru (update DNS to point to new server)
 - **OS**: Ubuntu 24.04.3 LTS
 - **Application Directory**: /opt/budget-app
 
@@ -80,7 +80,7 @@ After DNS is configured and pointing to new server:
 ssh root@31.129.107.178
 
 # Install SSL certificate
-certbot --nginx -d budget-west.shknv.ru
+certbot --nginx -d budget-acme.shknv.ru
 
 # Follow prompts to:
 # 1. Enter email address
@@ -100,13 +100,13 @@ Check application health:
 
 ```bash
 # Check backend API
-curl https://budget-west.shknv.ru/health
+curl https://budget-acme.shknv.ru/health
 
 # Check frontend
-curl https://budget-west.shknv.ru/
+curl https://budget-acme.shknv.ru/
 
 # Check API docs
-curl https://budget-west.shknv.ru/docs
+curl https://budget-acme.shknv.ru/docs
 ```
 
 ## Configuration Files
@@ -138,7 +138,7 @@ Services:
 
 ### Nginx Configuration
 
-Main config: `/etc/nginx/sites-available/budget-west`
+Main config: `/etc/nginx/sites-available/budget-acme`
 
 Features:
 - Rate limiting (10 req/s for API, 5 req/min for login)
@@ -160,8 +160,8 @@ docker compose -f /opt/budget-app/docker-compose.prod.yml logs -f backend
 docker compose -f /opt/budget-app/docker-compose.prod.yml logs -f frontend
 
 # Nginx logs
-tail -f /var/log/nginx/budget-west-access.log
-tail -f /var/log/nginx/budget-west-error.log
+tail -f /var/log/nginx/budget-acme-access.log
+tail -f /var/log/nginx/budget-acme-error.log
 ```
 
 ### Check Service Health

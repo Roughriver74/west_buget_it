@@ -7,9 +7,16 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
+from pydantic.json_schema import JsonSchemaValue
 
-from app.db.models import TaxTypeEnum, PayrollScenarioTypeEnum
+from app.db.models import TaxTypeEnum, PayrollScenarioTypeEnum, PayrollDataSourceEnum
+
+
+# Custom serializer for Decimal fields to ensure they're sent as numbers (floats) not strings
+def decimal_to_float(value: Decimal | None) -> float | None:
+    """Convert Decimal to float for JSON serialization"""
+    return float(value) if value is not None else None
 
 
 # ==================== Insurance Rate Schemas ====================
@@ -54,6 +61,11 @@ class InsuranceRateInDB(InsuranceRateBase):
     updated_at: Optional[datetime]
     created_by: Optional[int]
 
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('rate_percentage', 'threshold_amount', 'rate_above_threshold', 'total_employer_burden')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
+
     class Config:
         from_attributes = True
 
@@ -65,10 +77,16 @@ class PayrollScenarioBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Название сценария")
     description: Optional[str] = Field(None, description="Описание сценария")
     scenario_type: PayrollScenarioTypeEnum = Field(..., description="Тип сценария")
+    data_source: PayrollDataSourceEnum = Field(PayrollDataSourceEnum.EMPLOYEES, description="Источник данных")
     target_year: int = Field(..., ge=2024, le=2030, description="Год планирования")
     base_year: int = Field(..., ge=2020, le=2030, description="Базовый год для сравнения")
-    headcount_change_percent: Decimal = Field(0, ge=-100, le=100, description="Изменение штата в %")
-    salary_change_percent: Decimal = Field(0, ge=-100, le=100, description="Изменение з/п в %")
+    headcount_change_percent: Decimal = Field(0, ge=-100, le=1000, description="Изменение штата в % (до 10x роста)")
+    salary_change_percent: Decimal = Field(0, ge=-100, le=1000, description="Изменение з/п в % (до 10x роста)")
+
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('headcount_change_percent', 'salary_change_percent')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
 
 
 class PayrollScenarioCreate(PayrollScenarioBase):
@@ -81,8 +99,9 @@ class PayrollScenarioUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     scenario_type: Optional[PayrollScenarioTypeEnum] = None
-    headcount_change_percent: Optional[Decimal] = Field(None, ge=-100, le=100)
-    salary_change_percent: Optional[Decimal] = Field(None, ge=-100, le=100)
+    data_source: Optional[PayrollDataSourceEnum] = None
+    headcount_change_percent: Optional[Decimal] = Field(None, ge=-100, le=1000)
+    salary_change_percent: Optional[Decimal] = Field(None, ge=-100, le=1000)
     is_active: Optional[bool] = None
 
 
@@ -102,6 +121,13 @@ class PayrollScenarioInDB(PayrollScenarioBase):
     updated_at: Optional[datetime]
     created_by: Optional[int]
 
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('headcount_change_percent', 'salary_change_percent',
+                      'total_base_salary', 'total_insurance_cost', 'total_payroll_cost',
+                      'base_year_total_cost', 'cost_difference', 'cost_difference_percent')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
+
     class Config:
         from_attributes = True
 
@@ -118,6 +144,11 @@ class PayrollScenarioDetailBase(BaseModel):
     base_salary: Decimal = Field(..., ge=0, description="Плановый оклад")
     monthly_bonus: Decimal = Field(0, ge=0, description="Месячная премия")
     notes: Optional[str] = None
+
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('base_salary', 'monthly_bonus')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
 
 
 class PayrollScenarioDetailCreate(PayrollScenarioDetailBase):
@@ -157,6 +188,13 @@ class PayrollScenarioDetailInDB(PayrollScenarioDetailBase):
     cost_increase: Optional[Decimal]
     created_at: datetime
     updated_at: Optional[datetime]
+
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('base_salary', 'monthly_bonus', 'pension_contribution', 'medical_contribution',
+                      'social_contribution', 'injury_contribution', 'total_insurance', 'income_tax',
+                      'total_employee_cost', 'base_year_salary', 'base_year_insurance', 'cost_increase')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
 
     class Config:
         from_attributes = True
@@ -201,6 +239,14 @@ class PayrollYearlyComparisonInDB(PayrollYearlyComparisonBase):
     created_at: datetime
     updated_at: Optional[datetime]
 
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('base_year_total_salary', 'base_year_total_insurance', 'base_year_total_cost',
+                      'target_year_total_salary', 'target_year_total_insurance', 'target_year_total_cost',
+                      'total_cost_increase', 'total_cost_increase_percent',
+                      'pension_increase', 'medical_increase', 'social_increase')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
+
     class Config:
         from_attributes = True
 
@@ -230,6 +276,12 @@ class ScenarioCalculationResponse(BaseModel):
     cost_difference_percent: Decimal
     breakdown_by_employee: List[PayrollScenarioDetailInDB]
 
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('total_base_salary', 'total_insurance_cost', 'total_payroll_cost',
+                      'cost_difference', 'cost_difference_percent')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
+
 
 class InsuranceImpactAnalysis(BaseModel):
     """Analysis of insurance rate changes impact"""
@@ -239,3 +291,21 @@ class InsuranceImpactAnalysis(BaseModel):
     total_impact: Decimal  # Total cost increase in rubles
     impact_percent: Decimal  # Impact as percentage
     recommendations: List[Dict[str, Any]]  # Recommendations for optimization
+
+    # Serialize Decimal fields as floats (numbers) instead of strings
+    @field_serializer('total_impact', 'impact_percent')
+    def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
+        return decimal_to_float(value)
+    
+    @field_serializer('rate_changes')
+    def serialize_rate_changes(self, value: Dict[str, Dict[str, Decimal]], _info) -> Dict[str, Dict[str, float]]:
+        """Serialize nested Decimal values in rate_changes to floats"""
+        if not value:
+            return {}
+        return {
+            key: {
+                inner_key: float(inner_value) if isinstance(inner_value, Decimal) else inner_value
+                for inner_key, inner_value in inner_dict.items()
+            }
+            for key, inner_dict in value.items()
+        }

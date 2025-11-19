@@ -3,7 +3,7 @@
 ## Проблемы, которые были исправлены
 
 ### 1. Mixed Content Error
-**Проблема**: HTTPS сайт (https://budget-west.shknv.ru) пытался обращаться к HTTP API (http://localhost:8888), браузер блокировал запросы.
+**Проблема**: HTTPS сайт (https://budget-acme.shknv.ru) пытался обращаться к HTTP API (http://localhost:8888), браузер блокировал запросы.
 
 **Решение**: 
 - Nginx фронтенда теперь проксирует `/api/*` запросы к бэкенду
@@ -71,7 +71,7 @@ docker-compose -f docker-compose.prod.yml logs -f
 ```
 [Браузер] HTTPS
     ↓
-[budget-west.shknv.ru] (Caddy/Cloudflare)
+[budget-acme.shknv.ru] (Caddy/Cloudflare)
     ↓
 [Frontend Container:80] Nginx
     ├─→ /api/* → proxy_pass http://backend:8000/api/v1
@@ -226,7 +226,7 @@ python create_admin.py
 
 2. Должно быть:
    ```
-   CORS_ORIGINS=["https://budget-west.shknv.ru",...]
+   CORS_ORIGINS=["https://budget-acme.shknv.ru",...]
    ```
 
 ### База данных не запускается
@@ -287,7 +287,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## Контакты
 
-- Фронтенд: https://budget-west.shknv.ru
+- Фронтенд: https://budget-acme.shknv.ru
 - API: http://93.189.228.52:8888
 - API Docs: http://93.189.228.52:8888/docs
 - Server: ssh root@93.189.228.52

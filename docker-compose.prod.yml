@@ -38,7 +38,7 @@ services:
 
   # Backend API (FastAPI)
   backend:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/west-budget-backend:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/acme-budget-backend:${VERSION:-latest}
     container_name: budget_backend_prod
     restart: unless-stopped
     env_file:
@@ -66,11 +66,11 @@ services:
 
   # Frontend (React)
   frontend:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/west-budget-frontend:${VERSION:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_USERNAME}/acme-budget-frontend:${VERSION:-latest}
     container_name: budget_frontend_prod
     restart: unless-stopped
     environment:
-      - VITE_API_URL=https://budget-west.shknv.ru
+      - VITE_API_URL=https://budget-acme.shknv.ru
     networks:
       - budget_network
     healthcheck:

@@ -1,20 +1,20 @@
 # Миграция кредитного портфеля (legacy → финальная БД)
 
 Этот документ описывает, как перенести данные кредитного портфеля из
-старого проекта `west-west_fin` (PostgreSQL в docker-compose) в новую
+старого проекта `acme-acme_fin` (PostgreSQL в docker-compose) в новую
 схему `fin_*` текущего приложения.
 
 ## 1. Источник данных
 
 - Legacy docker-compose поднимает PostgreSQL с параметрами:
-  - `POSTGRES_USER=west_user`
-  - `POSTGRES_PASSWORD=west_secure_password_2025`
-  - `POSTGRES_DB=west_fin_dwh`
+  - `POSTGRES_USER=acme_user`
+  - `POSTGRES_PASSWORD=acme_secure_password_2025`
+  - `POSTGRES_DB=acme_fin_dwh`
   - Порт проброшен на `localhost:25432`
 - Можно подключаться напрямую:
   ```bash
-  docker compose -f /Users/evgenijsikunov/projects/west/west_buget_it/west-west_fin/docker-compose.yml \
-    exec postgres psql -U west_user -d west_fin_dwh
+  docker compose -f /Users/evgenijsikunov/projects/acme/acme_buget_it/acme-acme_fin/docker-compose.yml \
+    exec postgres psql -U acme_user -d acme_fin_dwh
   ```
 
 ## 2. Новый скрипт миграции
@@ -39,7 +39,7 @@
 Перед запуском пропишите:
 
 ```bash
-export LEGACY_DATABASE_URL="postgresql://west_user:west_secure_password_2025@localhost:25432/west_fin_dwh"
+export LEGACY_DATABASE_URL="postgresql://acme_user:acme_secure_password_2025@localhost:25432/acme_fin_dwh"
 export DATABASE_URL="postgresql://<current_app_user>:<pass>@<host>/<db>"
 # либо используйте .env (скрипт берёт SessionLocal с текущих настроек)
 ```

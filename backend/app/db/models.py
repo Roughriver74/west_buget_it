@@ -112,6 +112,31 @@ class KPIGoalStatusEnum(str, enum.Enum):
     CANCELLED = "CANCELLED"  # Отменена
 
 
+class EmployeeKPIStatusEnum(str, enum.Enum):
+    """Enum for EmployeeKPI workflow statuses"""
+    DRAFT = "DRAFT"  # Черновик - цели установлены, факт не введен
+    IN_PROGRESS = "IN_PROGRESS"  # В работе - период активен, сотрудник работает над целями
+    UNDER_REVIEW = "UNDER_REVIEW"  # На проверке - факт введен, ждет оценки руководителя
+    APPROVED = "APPROVED"  # Утверждено - руководитель утвердил оценку
+    REJECTED = "REJECTED"  # Отклонено - требуется пересмотр/корректировка
+
+
+class KPITaskStatusEnum(str, enum.Enum):
+    """Enum for KPI task statuses"""
+    TODO = "TODO"  # К выполнению
+    IN_PROGRESS = "IN_PROGRESS"  # В работе
+    DONE = "DONE"  # Выполнено
+    CANCELLED = "CANCELLED"  # Отменено
+
+
+class KPITaskPriorityEnum(str, enum.Enum):
+    """Enum for KPI task priorities"""
+    LOW = "LOW"  # Низкий
+    MEDIUM = "MEDIUM"  # Средний
+    HIGH = "HIGH"  # Высокий
+    CRITICAL = "CRITICAL"  # Критический
+
+
 class RevenueStreamTypeEnum(str, enum.Enum):
     """Enum for revenue stream types"""
     REGIONAL = "REGIONAL"  # Региональные (СПБ, СЗФО, Регионы)
@@ -184,6 +209,17 @@ class DocumentTypeEnum(str, enum.Enum):
     ACT = "ACT"  # Акт
     CONTRACT = "CONTRACT"  # Договор
     OTHER = "OTHER"  # Другое
+
+
+class ModuleEventTypeEnum(str, enum.Enum):
+    """Enum for module event types"""
+    MODULE_ENABLED = "MODULE_ENABLED"  # Модуль включен
+    MODULE_DISABLED = "MODULE_DISABLED"  # Модуль отключен
+    MODULE_EXPIRED = "MODULE_EXPIRED"  # Срок действия модуля истек
+    LIMIT_EXCEEDED = "LIMIT_EXCEEDED"  # Превышен лимит
+    LIMIT_WARNING = "LIMIT_WARNING"  # Предупреждение о приближении к лимиту
+    ACCESS_DENIED = "ACCESS_DENIED"  # Отказ в доступе
+    MODULE_UPDATED = "MODULE_UPDATED"  # Модуль обновлен
 
 
 class Department(Base):
@@ -303,7 +339,7 @@ class Contractor(Base):
 
 
 class Organization(Base):
-    """Organizations (ВЕСТ ООО, ВЕСТ ГРУПП ООО) - SHARED across all departments"""
+    """Organizations (ДЕМО ООО, ДЕМО ГРУПП ООО) - SHARED across all departments"""
     __tablename__ = "organizations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -318,7 +354,7 @@ class Organization(Base):
     inn = Column(String(20), nullable=True, index=True)  # ИНН
     kpp = Column(String(20), nullable=True)  # КПП
     ogrn = Column(String(20), nullable=True)  # ОГРН
-    prefix = Column(String(10), nullable=True)  # Префикс (например: "ВА", "Вест")
+    prefix = Column(String(10), nullable=True)  # Префикс (например: "ВА", "Демо")
     okpo = Column(String(20), nullable=True)  # Код по ОКПО
     status_1c = Column(String(50), nullable=True)  # Статус из 1С ("Действует", "Ликвидирована")
 
@@ -574,6 +610,12 @@ class User(Base):
         return f"<User {self.username} ({self.role})>"
 
 
+class SalaryTypeEnum(str, enum.Enum):
+    """Enum for salary type - how salary is entered"""
+    GROSS = "GROSS"  # Брутто (до вычета НДФЛ) - начисление
+    NET = "NET"      # Нетто (на руки) - желаемая сумма к выплате
+
+
 class EmployeeStatusEnum(str, enum.Enum):
     """Enum for employee statuses"""
     ACTIVE = "ACTIVE"  # Активный сотрудник
@@ -658,8 +700,15 @@ class Employee(Base):
     fire_date = Column(Date, nullable=True)  # Дата увольнения
     status = Column(Enum(EmployeeStatusEnum), nullable=False, default=EmployeeStatusEnum.ACTIVE, index=True)
 
-    # Salary information
-    base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад
+    # Salary information (NEW in Task 1.4: Брутто ↔ Нетто расчет)
+    salary_type = Column(Enum(SalaryTypeEnum), nullable=False, default=SalaryTypeEnum.GROSS, index=True)  # Тип ввода оклада
+    base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад (значение которое ввели)
+
+    # Calculated salary fields (auto-calculated based on salary_type)
+    base_salary_gross = Column(Numeric(15, 2), nullable=True)  # Оклад брутто (до вычета НДФЛ)
+    base_salary_net = Column(Numeric(15, 2), nullable=True)    # Оклад нетто (на руки после НДФЛ)
+    ndfl_amount = Column(Numeric(15, 2), nullable=True)        # Сумма НДФЛ
+    ndfl_rate = Column(Numeric(5, 4), nullable=False, default=0.13)  # Ставка НДФЛ (по умолчанию 13%)
 
     # Bonus base rates (базовые ставки премий)
     monthly_bonus_base = Column(Numeric(15, 2), default=0, nullable=False)  # Базовая месячная премия
@@ -1129,6 +1178,10 @@ class EmployeeKPI(Base):
     # KPI percentage (процент выполнения КПИ)
     kpi_percentage = Column(Numeric(5, 2), nullable=True)  # КПИ% (0-200%, обычно 0-100%)
 
+    # Depremium threshold (порог депремирования)
+    depremium_threshold = Column(Numeric(5, 2), nullable=True, default=10.00)  # Минимальный порог KPI% (по умолчанию 10%)
+    depremium_applied = Column(Boolean, nullable=False, default=False)  # Флаг: было ли применено депремирование
+
     # Bonus type and calculation
     monthly_bonus_type = Column(Enum(BonusTypeEnum), nullable=False, default=BonusTypeEnum.PERFORMANCE_BASED)
     quarterly_bonus_type = Column(Enum(BonusTypeEnum), nullable=False, default=BonusTypeEnum.PERFORMANCE_BASED)
@@ -1149,6 +1202,30 @@ class EmployeeKPI(Base):
     quarterly_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
     annual_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
 
+    # Task complexity bonus component (NEW in Task 3.2)
+    task_complexity_avg = Column(Numeric(5, 2), nullable=True)  # Средняя сложность выполненных задач (1-10)
+    task_complexity_multiplier = Column(Numeric(5, 4), nullable=True)  # Множитель премии по сложности (0.5-2.0)
+    task_complexity_weight = Column(Numeric(5, 2), nullable=True, default=20.00)  # Вес компонента сложности в премии (0-100%, default 20%)
+
+    # Complexity bonus components (calculated)
+    monthly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент месячной премии по сложности
+    quarterly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент квартальной премии по сложности
+    annual_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент годовой премии по сложности
+
+    # Workflow status
+    status = Column(
+        Enum(EmployeeKPIStatusEnum),
+        default=EmployeeKPIStatusEnum.DRAFT,
+        nullable=False,
+        index=True
+    )
+
+    # Approval tracking
+    submitted_at = Column(DateTime, nullable=True)  # Когда отправлено на проверку
+    reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Кто проверил
+    reviewed_at = Column(DateTime, nullable=True)  # Когда проверено
+    rejection_reason = Column(Text, nullable=True)  # Причина отклонения (если REJECTED)
+
     # Department association (multi-tenancy)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
 
@@ -1163,6 +1240,7 @@ class EmployeeKPI(Base):
     employee = relationship("Employee")
     department_rel = relationship("Department")
     goal_achievements = relationship("EmployeeKPIGoal", back_populates="employee_kpi")
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
 
     def __repr__(self):
         return f"<EmployeeKPI Employee#{self.employee_id} {self.year}-{self.month:02d} KPI={self.kpi_percentage}%>"
@@ -1211,6 +1289,95 @@ class EmployeeKPIGoal(Base):
 
     def __repr__(self):
         return f"<EmployeeKPIGoal Employee#{self.employee_id} Goal#{self.goal_id} {self.achievement_percentage}%>"
+
+
+class KPITask(Base):
+    """KPI Task - задачи, привязанные к целям KPI для декомпозиции на выполнимые элементы"""
+    __tablename__ = "kpi_tasks"
+    __table_args__ = (
+        Index('idx_kpi_task_employee', 'employee_id'),
+        Index('idx_kpi_task_goal', 'employee_kpi_goal_id'),
+        Index('idx_kpi_task_status', 'status'),
+        Index('idx_kpi_task_priority', 'priority'),
+        Index('idx_kpi_task_due_date', 'due_date'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Relations
+    employee_kpi_goal_id = Column(
+        Integer,
+        ForeignKey("employee_kpi_goals.id"),
+        nullable=False,
+        index=True
+    )
+    employee_id = Column(
+        Integer,
+        ForeignKey("employees.id"),
+        nullable=False,
+        index=True
+    )
+    assigned_by_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True
+    )
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.id"),
+        nullable=False,
+        index=True
+    )
+
+    # Task details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(
+        Enum(KPITaskStatusEnum),
+        nullable=False,
+        default=KPITaskStatusEnum.TODO,
+        index=True
+    )
+    priority = Column(
+        Enum(KPITaskPriorityEnum),
+        nullable=False,
+        default=KPITaskPriorityEnum.MEDIUM,
+        index=True
+    )
+
+    # Complexity and estimation
+    complexity = Column(Integer, nullable=True)  # 1-10 scale (1=простая, 10=очень сложная)
+    estimated_hours = Column(Numeric(5, 2), nullable=True)  # Оценка времени в часах
+    actual_hours = Column(Numeric(5, 2), nullable=True)  # Фактическое время
+
+    # Progress tracking
+    completion_percentage = Column(
+        Numeric(5, 2),
+        nullable=True,
+        default=0
+    )  # Процент выполнения 0-100%
+
+    # Dates
+    due_date = Column(DateTime, nullable=True, index=True)  # Срок выполнения
+    start_date = Column(DateTime, nullable=True)  # Дата начала
+    completed_at = Column(DateTime, nullable=True)  # Дата завершения
+
+    # Additional information
+    notes = Column(Text, nullable=True)  # Комментарии и заметки
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    employee_kpi_goal = relationship("EmployeeKPIGoal", backref="tasks")
+    employee = relationship("Employee")
+    assigned_by = relationship("User", foreign_keys=[assigned_by_id])
+    department_rel = relationship("Department")
+
+    def __repr__(self):
+        return f"<KPITask #{self.id} '{self.title}' {self.status.value} {self.priority.value}>"
 
 
 # ============================================================================
@@ -1851,7 +2018,7 @@ class BankTransaction(Base):
         return f"<BankTransaction {self.transaction_date} {self.counterparty_name} {self.amount}>"
 
 
-# ==================== Credit Portfolio Models (from West Fin DWH) ====================
+# ==================== Credit Portfolio Models (from Acme Fin DWH) ====================
 
 class FinOrganization(Base):
     """Model for credit portfolio organizations (Организации холдинга)"""
@@ -2236,6 +2403,13 @@ class PayrollScenarioTypeEnum(str, enum.Enum):
     CUSTOM = "CUSTOM"  # Кастомный сценарий
 
 
+class PayrollDataSourceEnum(str, enum.Enum):
+    """Enum for payroll scenario data source"""
+    EMPLOYEES = "EMPLOYEES"  # Текущие сотрудники (employees table)
+    ACTUAL = "ACTUAL"  # Фактические выплаты (payroll_actuals)
+    PLAN = "PLAN"  # Плановые данные (payroll_plans)
+
+
 class PayrollScenario(Base):
     """
     Сценарии планирования ФОТ с учетом изменений в законодательстве
@@ -2256,6 +2430,9 @@ class PayrollScenario(Base):
     name = Column(String(255), nullable=False)  # Название сценария
     description = Column(Text, nullable=True)  # Описание
     scenario_type = Column(Enum(PayrollScenarioTypeEnum), nullable=False, default=PayrollScenarioTypeEnum.BASE)
+
+    # Источник данных для расчета
+    data_source = Column(Enum(PayrollDataSourceEnum), nullable=False, default=PayrollDataSourceEnum.EMPLOYEES)
 
     # Год планирования
     target_year = Column(Integer, nullable=False, index=True)  # Год, на который строится сценарий
@@ -2425,3 +2602,181 @@ class PayrollYearlyComparison(Base):
 
     def __repr__(self):
         return f"<PayrollYearlyComparison {self.base_year} vs {self.target_year}>"
+
+
+# ============================================================================
+# MODULE SYSTEM - Feature enablement and licensing
+# ============================================================================
+
+
+class Module(Base):
+    """Modules - каталог доступных модулей системы"""
+    __tablename__ = "modules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), unique=True, nullable=False, index=True)  # AI_FORECAST, CREDIT_PORTFOLIO, etc.
+    name = Column(String(255), nullable=False)  # "AI & Forecasting", "Credit Portfolio Management"
+    description = Column(Text, nullable=True)  # Подробное описание модуля
+    version = Column(String(20), nullable=True)  # "1.0.0"
+
+    # Зависимости от других модулей
+    dependencies = Column(JSON, nullable=True)  # ["BUDGET_CORE", "INTEGRATIONS_1C"]
+
+    # Активность
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # Метаданные
+    icon = Column(String(50), nullable=True)  # Иконка для UI
+    sort_order = Column(Integer, nullable=True)  # Порядок отображения
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    organization_modules = relationship("OrganizationModule", back_populates="module_rel")
+    module_events = relationship("ModuleEvent", back_populates="module_rel")
+
+    def __repr__(self):
+        return f"<Module {self.code}: {self.name}>"
+
+
+class OrganizationModule(Base):
+    """OrganizationModule - связь организаций с включенными модулями"""
+    __tablename__ = "organization_modules"
+    __table_args__ = (
+        Index('idx_org_module_org_module', 'organization_id', 'module_id', unique=True),
+        Index('idx_org_module_active', 'organization_id', 'is_active'),
+        Index('idx_org_module_expires', 'expires_at'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Связи
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    module_id = Column(Integer, ForeignKey("modules.id"), nullable=False, index=True)
+
+    # Сроки действия
+    enabled_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # NULL = без срока истечения
+
+    # Лимиты (JSON для гибкости)
+    limits = Column(JSON, nullable=True)  # {"max_users": 10, "max_departments": 3, "max_api_calls_per_day": 1000}
+
+    # Активность
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # Кто включил/обновил
+    enabled_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    organization_rel = relationship("Organization")
+    module_rel = relationship("Module", back_populates="organization_modules")
+    enabled_by_rel = relationship("User", foreign_keys=[enabled_by_id])
+    updated_by_rel = relationship("User", foreign_keys=[updated_by_id])
+    feature_limits = relationship("FeatureLimit", back_populates="organization_module_rel", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<OrganizationModule org={self.organization_id} module={self.module_id}>"
+
+
+class FeatureLimit(Base):
+    """FeatureLimit - детальные лимиты для модулей организации"""
+    __tablename__ = "feature_limits"
+    __table_args__ = (
+        Index('idx_feature_limit_org_module', 'organization_module_id', 'limit_type'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Связь с organization_module
+    organization_module_id = Column(Integer, ForeignKey("organization_modules.id"), nullable=False, index=True)
+
+    # Тип лимита
+    limit_type = Column(String(50), nullable=False, index=True)  # "users", "departments", "api_calls", "storage_gb"
+
+    # Значения
+    limit_value = Column(Integer, nullable=False)  # Максимальное значение
+    current_usage = Column(Integer, default=0, nullable=False)  # Текущее использование
+
+    # Предупреждения
+    warning_threshold = Column(Integer, nullable=True)  # Порог предупреждения (например, 80% от лимита)
+    warning_sent = Column(Boolean, default=False, nullable=False)  # Было ли отправлено предупреждение
+
+    # Метаданные
+    notes = Column(Text, nullable=True)  # Примечания
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_checked_at = Column(DateTime, nullable=True)  # Когда последний раз проверяли
+
+    # Relationships
+    organization_module_rel = relationship("OrganizationModule", back_populates="feature_limits")
+
+    def __repr__(self):
+        return f"<FeatureLimit {self.limit_type}: {self.current_usage}/{self.limit_value}>"
+
+    @property
+    def usage_percent(self) -> float:
+        """Процент использования лимита"""
+        if self.limit_value == 0:
+            return 0.0
+        return (self.current_usage / self.limit_value) * 100
+
+    @property
+    def is_exceeded(self) -> bool:
+        """Превышен ли лимит"""
+        return self.current_usage >= self.limit_value
+
+    @property
+    def is_warning_threshold_reached(self) -> bool:
+        """Достигнут ли порог предупреждения"""
+        if not self.warning_threshold:
+            return False
+        return self.current_usage >= self.warning_threshold
+
+
+class ModuleEvent(Base):
+    """ModuleEvent - события модулей для аудита и аналитики"""
+    __tablename__ = "module_events"
+    __table_args__ = (
+        Index('idx_module_event_org_module', 'organization_id', 'module_id'),
+        Index('idx_module_event_type', 'event_type'),
+        Index('idx_module_event_created', 'created_at'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Связи
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    module_id = Column(Integer, ForeignKey("modules.id"), nullable=False, index=True)
+
+    # Тип события
+    event_type = Column(Enum(ModuleEventTypeEnum), nullable=False, index=True)
+
+    # Метаданные события
+    event_metadata = Column(JSON, nullable=True)  # Дополнительная информация
+
+    # Кто инициировал
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # IP и user agent для аудита
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    organization_rel = relationship("Organization")
+    module_rel = relationship("Module", back_populates="module_events")
+    created_by_rel = relationship("User")
+
+    def __repr__(self):
+        return f"<ModuleEvent {self.event_type} org={self.organization_id} module={self.module_id}>"

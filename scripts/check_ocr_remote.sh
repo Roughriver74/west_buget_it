@@ -2,7 +2,7 @@
 # Удаленная проверка OCR зависимостей на production сервере
 
 SERVER="root@93.189.228.52"
-PROJECT_DIR="/root/west_buget_it"  # Измените на ваш путь
+PROJECT_DIR="/root/acme_buget_it"  # Измените на ваш путь
 
 echo "=== Проверка OCR зависимостей на production сервере ==="
 echo ""

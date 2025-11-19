@@ -68,7 +68,7 @@ python scripts/test_invoice_to_1c.py --test-inn "7734640247/7727563778"
 
 ✅ Organization found:
   Ref_Key: e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0
-  Description: ООО ВЕСТ ГРУПП
+  Description: ООО ДЕМО ГРУПП
   ИНН: 7727563778
 ```
 
@@ -108,7 +108,7 @@ VALIDATION RESULT:
 ✅ Counterparty: ООО ТРАСТ ТЕЛЕКОМ
    GUID: a1b2c3d4-...
 
-✅ Organization: ООО ВЕСТ ГРУПП
+✅ Organization: ООО ДЕМО ГРУПП
    GUID: e5f6g7h8-...
 
 ✅ Cash Flow Category: Услуги связи

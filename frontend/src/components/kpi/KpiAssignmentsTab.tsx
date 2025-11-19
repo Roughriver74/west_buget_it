@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Card,
   Button,
@@ -11,7 +11,10 @@ import {
   InputNumber,
   Select,
   message,
+  Alert,
+  Tooltip,
 } from 'antd'
+import { CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -56,6 +59,8 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
   }>({ open: false })
 
   const [assignmentForm] = Form.useForm<EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate>()
+  const [calculatedAchievement, setCalculatedAchievement] = useState<number | null>(null)
+  const [isManualOverride, setIsManualOverride] = useState(false)
 
   // Queries
   const assignmentsQuery = useQuery({
@@ -100,22 +105,42 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
 
   // Mutations
   const upsertAssignmentMutation = useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       id,
       payload,
     }: {
       id?: number
       payload: EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate
     }) => {
+      let result
       if (id) {
-        return kpiApi.updateAssignment(id, payload as EmployeeKPIGoalUpdate)
+        result = await kpiApi.updateAssignment(id, payload as EmployeeKPIGoalUpdate)
+      } else {
+        result = await kpiApi.createAssignment(payload as EmployeeKPIGoalCreate)
       }
-      return kpiApi.createAssignment(payload as EmployeeKPIGoalCreate)
+
+      // Trigger KPI% recalculation if employee_kpi_id is set and achievement_percentage was updated
+      if (
+        result.employee_kpi_id &&
+        payload.achievement_percentage !== null &&
+        payload.achievement_percentage !== undefined
+      ) {
+        try {
+          await kpiApi.recalculateEmployeeKPI(result.employee_kpi_id)
+          message.success('KPI% автоматически пересчитан')
+        } catch (error) {
+          console.error('Failed to recalculate KPI%:', error)
+          // Don't fail the whole operation if recalculation fails
+        }
+      }
+
+      return result
     },
     onSuccess: () => {
       message.success('Назначение KPI обновлено')
       queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
       queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
     },
   })
 
@@ -141,6 +166,35 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
     return map
   }, [employees])
 
+  // Auto-calculate achievement percentage
+  const calculateAchievementPercentage = () => {
+    const targetValue = assignmentForm.getFieldValue('target_value')
+    const actualValue = assignmentForm.getFieldValue('actual_value')
+
+    if (targetValue && targetValue !== 0 && actualValue !== null && actualValue !== undefined) {
+      const calculated = (actualValue / targetValue) * 100
+      setCalculatedAchievement(Number(calculated.toFixed(2)))
+      return Number(calculated.toFixed(2))
+    }
+    setCalculatedAchievement(null)
+    return null
+  }
+
+  // Watch for changes in actual_value and target_value
+  useEffect(() => {
+    if (assignmentModal.open) {
+      const calculated = calculateAchievementPercentage()
+      const currentAchievement = assignmentForm.getFieldValue('achievement_percentage')
+
+      // Check if manually overridden
+      if (calculated !== null && currentAchievement !== null && currentAchievement !== undefined) {
+        setIsManualOverride(Math.abs(calculated - currentAchievement) > 0.1)
+      } else {
+        setIsManualOverride(false)
+      }
+    }
+  }, [assignmentModal.open])
+
   const goalMap = useMemo(() => {
     const map = new Map<number, KPIGoal>()
     goals.forEach((goal) => {
@@ -160,6 +214,9 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
   const onEditAssignment = (assignment?: EmployeeKPIGoal) => {
     setAssignmentModal({ open: true, editing: assignment })
     assignmentForm.resetFields()
+    setCalculatedAchievement(null)
+    setIsManualOverride(false)
+
     if (assignment) {
       assignmentForm.setFieldsValue({
         employee_id: assignment.employee_id,
@@ -181,7 +238,22 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
             ? Number(assignment.achievement_percentage)
             : undefined,
         status: assignment.status,
+        notes: assignment.notes,
       })
+
+      // Calculate and check for manual override
+      setTimeout(() => {
+        const calculated = calculateAchievementPercentage()
+        const current = assignment.achievement_percentage
+        if (
+          calculated !== null &&
+          current !== null &&
+          current !== undefined &&
+          Math.abs(calculated - Number(current)) > 0.1
+        ) {
+          setIsManualOverride(true)
+        }
+      }, 100)
     } else {
       assignmentForm.setFieldsValue({
         year: currentYear,
@@ -383,15 +455,83 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
           </Form.Item>
 
           <Form.Item name="target_value" label="Цель" tooltip="Числовое значение цели">
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber
+              style={{ width: '100%' }}
+              onChange={() => {
+                calculateAchievementPercentage()
+                const current = assignmentForm.getFieldValue('achievement_percentage')
+                if (current !== null && current !== undefined) {
+                  setIsManualOverride(true)
+                }
+              }}
+            />
           </Form.Item>
 
           <Form.Item name="actual_value" label="Факт">
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber
+              style={{ width: '100%' }}
+              onChange={() => {
+                calculateAchievementPercentage()
+                const current = assignmentForm.getFieldValue('achievement_percentage')
+                if (current !== null && current !== undefined) {
+                  setIsManualOverride(true)
+                }
+              }}
+            />
           </Form.Item>
 
-          <Form.Item name="achievement_percentage" label="% выполнения">
-            <InputNumber min={0} max={200} style={{ width: '100%' }} addonAfter="%" />
+          {calculatedAchievement !== null && (
+            <Alert
+              message={
+                <span>
+                  Расчётное значение: <strong>{calculatedAchievement}%</strong>
+                  {isManualOverride && (
+                    <Tooltip title="Руководитель установил отличное значение">
+                      {' '}
+                      <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                    </Tooltip>
+                  )}
+                </span>
+              }
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              action={
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<CalculatorOutlined />}
+                  onClick={() => {
+                    assignmentForm.setFieldsValue({
+                      achievement_percentage: calculatedAchievement,
+                    })
+                    setIsManualOverride(false)
+                  }}
+                >
+                  Применить
+                </Button>
+              }
+            />
+          )}
+
+          <Form.Item
+            name="achievement_percentage"
+            label="% выполнения"
+            tooltip="Процент выполнения цели. Руководитель может установить вручную с обоснованием."
+          >
+            <InputNumber
+              min={0}
+              max={200}
+              style={{ width: '100%' }}
+              addonAfter="%"
+              onChange={(value) => {
+                if (calculatedAchievement !== null && value !== calculatedAchievement) {
+                  setIsManualOverride(true)
+                } else {
+                  setIsManualOverride(false)
+                }
+              }}
+            />
           </Form.Item>
 
           <Form.Item name="status" label="Статус">
@@ -404,8 +544,33 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
             </Select>
           </Form.Item>
 
-          <Form.Item name="notes" label="Комментарии">
-            <Input.TextArea rows={3} />
+          <Form.Item
+            name="notes"
+            label="Комментарии"
+            tooltip={
+              isManualOverride
+                ? 'При ручной корректировке % выполнения рекомендуется указать обоснование'
+                : 'Дополнительные комментарии по оценке'
+            }
+            rules={
+              isManualOverride
+                ? [
+                    {
+                      required: true,
+                      message: 'При ручной корректировке необходимо указать обоснование',
+                    },
+                  ]
+                : undefined
+            }
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder={
+                isManualOverride
+                  ? 'Укажите причину отклонения от расчётного значения...'
+                  : 'Дополнительные комментарии...'
+              }
+            />
           </Form.Item>
         </Form>
       </Modal>

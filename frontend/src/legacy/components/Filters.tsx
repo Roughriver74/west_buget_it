@@ -135,14 +135,14 @@ export default function Filters() {
   const isLoading = organizationsLoading || bankAccountsLoading || contractsLoading
 
   return (
-    <div className="flex flex-wrap gap-4 items-end bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+    <div className="flex flex-wrap gap-4 items-end bg-card border border-border rounded-2xl p-4 shadow-sm">
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-600">Период с:</label>
+        <label className="text-xs font-medium text-foreground/70">Период с:</label>
         <Input type="date" value={localDateFrom} onChange={e => setLocalDateFrom(e.target.value)} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-gray-600">по:</label>
+        <label className="text-xs font-medium text-foreground/70">по:</label>
         <Input type="date" value={localDateTo} onChange={e => setLocalDateTo(e.target.value)} />
       </div>
 

@@ -11,7 +11,17 @@ export interface Employee {
   hire_date?: string;
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
-  base_salary: number;
+
+  // Salary fields (Task 1.4: Брутто ↔ Нетто)
+  salary_type: 'GROSS' | 'NET';  // Тип ввода оклада
+  base_salary: number;  // Значение которое вводит пользователь
+  ndfl_rate: number;  // Ставка НДФЛ (например, 0.13 для 13%)
+
+  // Calculated salary values
+  base_salary_gross?: number;  // Оклад брутто (до вычета НДФЛ)
+  base_salary_net?: number;    // Оклад нетто (на руки)
+  ndfl_amount?: number;        // Сумма НДФЛ
+
   monthly_bonus_base: number;
   quarterly_bonus_base: number;
   annual_bonus_base: number;
@@ -227,7 +237,12 @@ export interface EmployeeCreate {
   hire_date?: string;
   fire_date?: string;
   status: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
+
+  // Salary fields (Task 1.4: Брутто ↔ Нетто)
+  salary_type: 'GROSS' | 'NET';
   base_salary: number;
+  ndfl_rate: number;
+
   monthly_bonus_base?: number;
   quarterly_bonus_base?: number;
   annual_bonus_base?: number;
@@ -245,7 +260,12 @@ export interface EmployeeUpdate {
   hire_date?: string;
   fire_date?: string;
   status?: 'ACTIVE' | 'ON_VACATION' | 'ON_LEAVE' | 'FIRED';
+
+  // Salary fields (Task 1.4: Брутто ↔ Нетто)
+  salary_type?: 'GROSS' | 'NET';
   base_salary?: number;
+  ndfl_rate?: number;
+
   monthly_bonus_base?: number;
   quarterly_bonus_base?: number;
   annual_bonus_base?: number;

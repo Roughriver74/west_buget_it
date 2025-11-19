@@ -14,7 +14,7 @@
 
 	// Устанавливаем значения по умолчанию
 	Если ПустаяСтрока(АдресAPI) Тогда
-		АдресAPI = "https://budget-west.shknv.ru/api/v1";
+		АдресAPI = "https://budget-acme.shknv.ru/api/v1";
 	КонецЕсли;
 
 КонецПроцедуры

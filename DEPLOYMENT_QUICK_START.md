@@ -84,14 +84,14 @@ Expected output: `{"status":"healthy"}`
 Update DNS A record:
 ```
 Type: A
-Name: budget-west.shknv.ru
+Name: budget-acme.shknv.ru
 Value: 31.129.107.178
 TTL: 300 (or default)
 ```
 
 Wait 5-15 minutes for DNS propagation, then test:
 ```bash
-curl http://budget-west.shknv.ru/health
+curl http://budget-acme.shknv.ru/health
 ```
 
 ### 7. Setup SSL Certificate
@@ -102,7 +102,7 @@ After DNS is configured and working:
 ssh root@31.129.107.178
 
 # Install SSL certificate
-certbot --nginx -d budget-west.shknv.ru
+certbot --nginx -d budget-acme.shknv.ru
 
 # Follow the prompts:
 # - Enter your email
@@ -113,8 +113,8 @@ certbot --nginx -d budget-west.shknv.ru
 ## 🎉 Done!
 
 Your application is now deployed and accessible at:
-- **HTTP**: http://budget-west.shknv.ru
-- **HTTPS**: https://budget-west.shknv.ru (after SSL setup)
+- **HTTP**: http://budget-acme.shknv.ru
+- **HTTPS**: https://budget-acme.shknv.ru (after SSL setup)
 
 ## 📋 Quick Commands
 
@@ -170,7 +170,7 @@ docker compose -f docker-compose.prod.yml up -d
 **Fix**: 
 - Check if record is configured correctly
 - Wait 15-30 minutes
-- Test with: `nslookup budget-west.shknv.ru`
+- Test with: `nslookup budget-acme.shknv.ru`
 - Meanwhile use: http://31.129.107.178
 
 ## 📚 More Information

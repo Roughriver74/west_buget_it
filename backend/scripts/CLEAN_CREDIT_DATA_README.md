@@ -15,7 +15,7 @@ ssh root@31.129.107.178
 ### 2. Перейдите в директорию проекта
 
 ```bash
-cd /path/to/west_buget_it/backend
+cd /path/to/acme_buget_it/backend
 ```
 
 ### 3. Активируйте виртуальное окружение

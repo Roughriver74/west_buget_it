@@ -893,18 +893,33 @@ export const BudgetPlanDetailsTable = React.forwardRef<
 
       {/* CSS for Active Month Highlighting */}
       <style>{`
-        .active-month-header {
-          background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
-          color: #0958d9 !important;
-          font-weight: 600 !important;
-        }
-        .active-month-cell {
-          background-color: rgba(222, 242, 255, 0.7) !important;
-          transition: background-color 0.2s ease;
-        }
-        .active-month-cell:hover {
-          background-color: rgba(184, 218, 255, 0.8) !important;
-        }
+        ${mode === 'dark' ? `
+          .active-month-header {
+            background: linear-gradient(90deg, rgba(24, 144, 255, 0.25) 0%, rgba(24, 144, 255, 0.1) 100%) !important;
+            color: #69b7ff !important;
+            font-weight: 600 !important;
+          }
+          .active-month-cell {
+            background-color: rgba(24, 144, 255, 0.15) !important;
+            transition: background-color 0.2s ease;
+          }
+          .active-month-cell:hover {
+            background-color: rgba(24, 144, 255, 0.25) !important;
+          }
+        ` : `
+          .active-month-header {
+            background: linear-gradient(90deg, rgba(24, 144, 255, 0.18) 0%, rgba(24, 144, 255, 0.05) 100%) !important;
+            color: #0958d9 !important;
+            font-weight: 600 !important;
+          }
+          .active-month-cell {
+            background-color: rgba(222, 242, 255, 0.7) !important;
+            transition: background-color 0.2s ease;
+          }
+          .active-month-cell:hover {
+            background-color: rgba(184, 218, 255, 0.8) !important;
+          }
+        `}
       `}</style>
 
       {/* Load Baseline Modal */}

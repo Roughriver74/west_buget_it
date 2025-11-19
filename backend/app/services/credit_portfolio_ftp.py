@@ -1,6 +1,6 @@
 """
 FTP client for downloading credit portfolio XLSX files from remote server
-Адаптировано для west_buget_it из west_fin
+Адаптировано для acme_buget_it из acme_fin
 """
 import os
 import logging

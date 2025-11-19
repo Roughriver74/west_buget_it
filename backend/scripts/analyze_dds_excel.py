@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import openpyxl
 
 # Полный путь к файлу
-file_path = '/Users/evgenijsikunov/projects/west/west_buget_it/xls/Копия ДДС_2025_без доп вкладок_03.10.2025.xlsx'
+file_path = '/Users/evgenijsikunov/projects/acme/acme_buget_it/xls/Копия ДДС_2025_без доп вкладок_03.10.2025.xlsx'
 
 print('=' * 80)
 print('СТРУКТУРА ФАЙЛА ДДС 2025')

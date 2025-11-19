@@ -565,7 +565,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
   if (!departmentId) {
     return (
-      <div className="p-6 bg-white rounded-2xl shadow-sm text-gray-600">
+      <div className="p-6 bg-card rounded-2xl shadow-sm text-foreground/70">
         Пожалуйста, выберите отдел, чтобы просмотреть аналитику кредитного портфеля.
       </div>
     )
@@ -573,8 +573,8 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
   if (hasError) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center bg-white rounded-2xl shadow-sm">
-        <p className="text-gray-600">Не удалось загрузить данные дашборда. Попробуйте еще раз.</p>
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 text-center bg-card rounded-2xl shadow-sm">
+        <p className="text-foreground/70">Не удалось загрузить данные дашборда. Попробуйте еще раз.</p>
         <button
           onClick={handleRefresh}
           className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
@@ -594,13 +594,13 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm"
+      className="space-y-6 bg-card p-5 md:p-6 rounded-2xl shadow-sm"
       id="dashboard-content"
     >
       <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 m-0">Аналитика кредитов и платежей</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-3xl font-bold text-foreground m-0">Аналитика кредитов и платежей</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Период:{' '}
             {filters.dateFrom ? format(parseISO(filters.dateFrom), 'dd.MM.yyyy') : 'Не указано'} -{' '}
             {filters.dateTo ? format(parseISO(filters.dateTo), 'dd.MM.yyyy') : 'Не указано'}
@@ -612,7 +612,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
               currentPage === 'overview'
                 ? 'bg-blue-500 text-white border border-blue-500'
-                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                : 'bg-card text-muted-foreground border border-border hover:bg-muted'
             }`}
           >
             Обзор
@@ -655,42 +655,42 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
           )}
         </button>
         {helpExpanded && (
-          <div className="px-6 pb-5 pt-2 space-y-4 text-sm text-gray-700 border-t border-blue-200 bg-white">
+          <div className="px-6 pb-5 pt-2 space-y-4 text-sm text-foreground/80 border-t border-border bg-card">
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/50">
-                <h4 className="font-semibold text-blue-900 text-sm mb-2">
+              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm mb-2">
                   💰 Получено кредитов
                 </h4>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground/70">
                   Сумма всех поступлений из таблицы «Поступления» с учётом выбранных фильтров.
                 </p>
               </div>
-              <div className="p-4 rounded-xl border border-green-100 bg-green-50/50">
-                <h4 className="font-semibold text-green-900 text-sm mb-2">
+              <div className="p-4 rounded-xl border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30">
+                <h4 className="font-semibold text-green-900 dark:text-green-300 text-sm mb-2">
                   ✓ Погашено тела
                 </h4>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground/70">
                   Сумма всех деталей списаний с типом «тело», источник — «Детализация списаний».
                 </p>
               </div>
-              <div className="p-4 rounded-xl border border-orange-100 bg-orange-50/50">
-                <h4 className="font-semibold text-orange-900 text-sm mb-2">
+              <div className="p-4 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/30">
+                <h4 className="font-semibold text-orange-900 dark:text-orange-300 text-sm mb-2">
                   % Уплачено процентов
                 </h4>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground/70">
                   Сумма деталей списаний с типом «проценты».
                 </p>
               </div>
-              <div className="p-4 rounded-xl border border-red-100 bg-red-50/50">
-                <h4 className="font-semibold text-red-900 text-sm mb-2">
+              <div className="p-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/30">
+                <h4 className="font-semibold text-red-900 dark:text-red-300 text-sm mb-2">
                   📊 Остаток задолженности
                 </h4>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground/70">
                   Получено минус погашено тело. Показывает текущий баланс основного долга.
                 </p>
               </div>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Все показатели автоматически пересчитываются в зависимости от выбранных дат, организаций, банков и договоров.
             </p>
           </div>
@@ -733,10 +733,10 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
       <div className="p-6 bg-white rounded-2xl shadow-sm border border-red-100">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
             🔴 Активные кредиты
           </h2>
-          <div className="px-4 py-1.5 bg-red-100 text-red-600 rounded-full text-sm font-medium">
+          <div className="px-4 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-sm font-medium">
             {activeCredits.length} {activeCredits.length === 1 ? 'договор' : 'договоров'}
           </div>
         </div>
@@ -749,7 +749,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             emptyMessage="Все кредиты погашены!"
           />
         ) : (
-          <div className="py-12 text-center text-gray-500 text-sm">
+          <div className="py-12 text-center text-muted-foreground text-sm">
             Все кредиты погашены!
           </div>
         )}
@@ -757,11 +757,11 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
       {currentPage === 'overview' && (
         <div className="grid gap-5">
-          <div className="p-6 bg-white rounded-2xl shadow-sm">
-            <h2 className="text-lg font-semibold mb-2 text-gray-900">
+          <div className="p-6 bg-card rounded-2xl shadow-sm">
+            <h2 className="text-lg font-semibold mb-2 text-foreground">
               Динамика получения и погашения кредитов
             </h2>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Помесячная динамика поступлений (синий), погашения тела (зелёный) и процентов (оранжевый).
             </p>
             <ResponsiveContainer width="100%" height={360}>
@@ -790,11 +790,11 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             </ResponsiveContainer>
           </div>
 
-          <div className="p-6 bg-white rounded-2xl shadow-sm">
-            <h2 className="text-lg font-semibold mb-2 text-gray-900">
+          <div className="p-6 bg-card rounded-2xl shadow-sm">
+            <h2 className="text-lg font-semibold mb-2 text-foreground">
               Топ-15 кредитных договоров
             </h2>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Сумма выплат по договорам: тело (зелёный) и проценты (оранжевый).
             </p>
             <ResponsiveContainer width="100%" height={480}>
@@ -819,9 +819,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <div className="p-6 bg-white rounded-2xl shadow-sm">
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Топ-10 банковских счетов</h2>
-              <p className="text-xs text-gray-500 mb-4">
+            <div className="p-6 bg-card rounded-2xl shadow-sm">
+              <h2 className="text-lg font-semibold mb-2 text-foreground">Топ-10 банковских счетов</h2>
+              <p className="text-xs text-muted-foreground mb-4">
                 Счета с наибольшим объёмом списаний.
               </p>
               <ResponsiveContainer width="100%" height={360}>
@@ -840,9 +840,9 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
               </ResponsiveContainer>
             </div>
 
-            <div className="p-6 bg-white rounded-2xl shadow-sm">
-              <h2 className="text-lg font-semibold mb-2 text-gray-900">Распределение по организациям</h2>
-              <p className="text-xs text-gray-500 mb-4">
+            <div className="p-6 bg-card rounded-2xl shadow-sm">
+              <h2 className="text-lg font-semibold mb-2 text-foreground">Распределение по организациям</h2>
+              <p className="text-xs text-muted-foreground mb-4">
                 Погашение тела (зелёный) и уплата процентов (оранжевый) по каждому юрлицу.
               </p>
               <ResponsiveContainer width="100%" height={360}>
@@ -869,8 +869,8 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
       {currentPage === 'details' && (
         <div className="grid gap-5">
-          <div className="p-6 bg-white rounded-2xl shadow-sm">
-            <h2 className="text-lg font-semibold mb-3 text-gray-900">Детализация по договорам</h2>
+          <div className="p-6 bg-card rounded-2xl shadow-sm">
+            <h2 className="text-lg font-semibold mb-3 text-foreground">Детализация по договорам</h2>
             <VirtualTable
               data={contractData}
               columns={detailColumns}
@@ -879,8 +879,8 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
               emptyMessage="Нет данных по договорам"
             />
           </div>
-          <div className="p-6 bg-white rounded-2xl shadow-sm">
-            <h2 className="text-lg font-semibold mb-3 text-gray-900">Расшифровка активных кредитов</h2>
+          <div className="p-6 bg-card rounded-2xl shadow-sm">
+            <h2 className="text-lg font-semibold mb-3 text-foreground">Расшифровка активных кредитов</h2>
             <VirtualTable
               data={activeCredits}
               columns={activeCreditColumns}

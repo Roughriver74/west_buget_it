@@ -1,20 +1,20 @@
-# План интеграции West Fin DWH в IT Budget Manager
+# План интеграции Acme Fin DWH в IT Budget Manager
 
 ## 🎯 Цель интеграции
 
-Интегрировать модуль управления кредитным портфелем **West Fin DWH** в основную систему **IT Budget Manager** как новый раздел в меню "Финансы".
+Интегрировать модуль управления кредитным портфелем **Acme Fin DWH** в основную систему **IT Budget Manager** как новый раздел в меню "Финансы".
 
 ---
 
 ## 📊 Что интегрируем
 
-### Источник: West Fin DWH
-- **Путь**: `/Users/evgenijsikunov/projects/west/west_fin/west-west_fin`
+### Источник: Acme Fin DWH
+- **Путь**: `/Users/evgenijsikunov/projects/acme/acme_fin/acme-acme_fin`
 - **Функционал**: Управление кредитным портфелем с автоматическим ETL из 1С
 - **Технологии**: FastAPI + React + PostgreSQL + Redis
 
 ### Целевая система: IT Budget Manager
-- **Путь**: `/Users/evgenijsikunov/projects/west/west_buget_it`
+- **Путь**: `/Users/evgenijsikunov/projects/acme/acme_buget_it`
 - **Архитектура**: Multi-tenancy с JWT auth и RBAC
 
 ---
@@ -23,16 +23,16 @@
 
 ### 1. Адаптация под Multi-Tenancy
 
-**КРИТИЧЕСКИ ВАЖНО:** Все таблицы West Fin должны получить `department_id`
+**КРИТИЧЕСКИ ВАЖНО:** Все таблицы Acme Fin должны получить `department_id`
 
 ```python
-# ДО (west_fin)
+# ДО (acme_fin)
 class Organization(Base):
     __tablename__ = "organizations"
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True)
 
-# ПОСЛЕ (west_buget_it integration)
+# ПОСЛЕ (acme_buget_it integration)
 class FinOrganization(Base):
     __tablename__ = "fin_organizations"
     id = Column(Integer, primary_key=True)
@@ -46,7 +46,7 @@ class FinOrganization(Base):
 
 Чтобы избежать конфликтов с существующими таблицами:
 
-| West Fin | IT Budget Manager |
+| Acme Fin | IT Budget Manager |
 |----------|-------------------|
 | `organizations` | `fin_organizations` |
 | `bank_accounts` | `fin_bank_accounts` |
@@ -59,7 +59,7 @@ class FinOrganization(Base):
 ### 3. Адаптация API Endpoints
 
 ```python
-# West Fin имеет endpoints:
+# Acme Fin имеет endpoints:
 /api/receipts
 /api/expenses
 /api/analytics
@@ -80,7 +80,7 @@ class FinOrganization(Base):
 
 **Файл**: `backend/app/db/models.py`
 
-1. Скопировать модели из west_fin:
+1. Скопировать модели из acme_fin:
    - Organization → FinOrganization
    - BankAccount → FinBankAccount
    - Contract → FinContract
@@ -101,7 +101,7 @@ class FinOrganization(Base):
 
 **Файл**: `backend/app/schemas/credit_portfolio.py` (создать новый)
 
-1. Скопировать schemas из west_fin
+1. Скопировать schemas из acme_fin
 2. Добавить `department_id` в Create schemas (опционально для ADMIN/MANAGER)
 3. Добавить `department_id` в InDB schemas (обязательно)
 
@@ -111,7 +111,7 @@ class FinOrganization(Base):
 
 ```bash
 cd backend
-alembic revision --autogenerate -m "add credit portfolio tables from west_fin"
+alembic revision --autogenerate -m "add credit portfolio tables from acme_fin"
 alembic upgrade head
 ```
 
@@ -119,7 +119,7 @@ alembic upgrade head
 
 **Файл**: `backend/app/api/v1/credit_portfolio.py` (создать новый)
 
-1. Скопировать endpoints из west_fin/backend/app/api/:
+1. Скопировать endpoints из acme_fin/backend/app/api/:
    - `receipts.py` → `credit_portfolio/receipts` routes
    - `expenses.py` → `credit_portfolio/expenses` routes
    - `analytics.py` → `credit_portfolio/analytics` routes
@@ -151,7 +151,7 @@ alembic upgrade head
 
 **Файл**: `backend/app/services/credit_portfolio_import.py` (создать новый)
 
-1. Скопировать из west_fin:
+1. Скопировать из acme_fin:
    - `services/ftp_client.py`
    - `services/parser.py`
    - `services/importer.py`
@@ -173,7 +173,7 @@ alembic upgrade head
 
 **Файл**: `backend/app/scheduler/credit_portfolio_scheduler.py`
 
-1. Скопировать scheduler logic из west_fin
+1. Скопировать scheduler logic из acme_fin
 2. Настроить для каждого department (если нужно)
 
 ### Этап 7: Frontend - API Client
@@ -214,7 +214,7 @@ export const creditPortfolioAPI = {
 
 ### Этап 8: Frontend - Страницы
 
-**Скопировать страницы** из `west_fin/frontend/src/pages`:
+**Скопировать страницы** из `acme_fin/frontend/src/pages`:
 
 1. `CreditPortfolioPage.tsx` (Dashboard)
 2. `CreditPortfolioKPIPage.tsx` (KPI метрики)
@@ -244,7 +244,7 @@ const CreditPortfolioPage = () => {
 
 ### Этап 9: Frontend - Компоненты
 
-**Скопировать компоненты** из `west_fin/frontend/src/components`:
+**Скопировать компоненты** из `acme_fin/frontend/src/components`:
 
 1. Скопировать все компоненты в `frontend/src/components/creditPortfolio/`
 2. Адаптировать импорты
@@ -406,11 +406,11 @@ if current_user.role == UserRoleEnum.ACCOUNTANT:
 - `organizations` - для поставщиков/организаций
 - `expenses` - для заявок на расход
 
-В West Fin тоже есть:
+В Acme Fin тоже есть:
 - `organizations` - для организаций холдинга
 - `expenses` - для списаний по кредитам
 
-**Решение**: Переименовать все таблицы West Fin с префиксом `fin_`
+**Решение**: Переименовать все таблицы Acme Fin с префиксом `fin_`
 
 ### 2. Multi-tenancy обязателен
 
@@ -418,7 +418,7 @@ if current_user.role == UserRoleEnum.ACCOUNTANT:
 
 ### 3. FTP credentials
 
-FTP учетные данные из West Fin:
+FTP учетные данные из Acme Fin:
 ```env
 FTP_HOST=floppisw.beget.tech
 FTP_USER=floppisw_fin
@@ -434,14 +434,14 @@ CREDIT_PORTFOLIO_FTP_PASSWORD=...
 
 ### 4. Redis для кэширования
 
-West Fin использует Redis для кэширования KPI метрик.
+Acme Fin использует Redis для кэширования KPI метрик.
 
 **Опция 1**: Использовать тот же Redis что и основная система
 **Опция 2**: Отказаться от Redis (простые запросы с pagination)
 
 ### 5. Scheduler
 
-West Fin использует APScheduler для автоматического импорта.
+Acme Fin использует APScheduler для автоматического импорта.
 
 **Рекомендация**: Интегрировать в существующий scheduler (если есть) или создать отдельный background task.
 
@@ -470,7 +470,7 @@ West Fin использует APScheduler для автоматического 
 
 ## 🚀 Следующие шаги
 
-1. ✅ Изучить структуру West Fin (DONE)
+1. ✅ Изучить структуру Acme Fin (DONE)
 2. ✅ Создать план интеграции (DONE)
 3. ⏳ Адаптировать модели под multi-tenancy
 4. ⏳ Скопировать и адаптировать backend

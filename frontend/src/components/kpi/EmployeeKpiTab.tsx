@@ -12,9 +12,10 @@ import {
   message,
   Divider,
   Typography,
+  Popconfirm,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { UploadOutlined } from '@ant-design/icons'
+import { UploadOutlined, CalculatorOutlined, SyncOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
@@ -124,6 +125,50 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
     },
   })
 
+  // Mutation for recalculating KPI% for department
+  const recalculateKPIMutation = useMutation({
+    mutationFn: () => {
+      if (!departmentId) {
+        throw new Error('Department ID is required')
+      }
+      return kpiApi.recalculateKPIForDepartment({
+        department_id: departmentId,
+        year: currentYear,
+      })
+    },
+    onSuccess: (data) => {
+      const { statistics } = data
+      message.success(
+        `Пересчитано ${statistics.success} записей KPI. ${statistics.errors > 0 ? `Ошибок: ${statistics.errors}` : ''}`
+      )
+      queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
+      queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка при пересчете KPI: ${error.message || 'Неизвестная ошибка'}`)
+    },
+  })
+
+  // Mutation for recalculating individual employee KPI
+  const recalculateSingleKPIMutation = useMutation({
+    mutationFn: (employeeKpiId: number) => {
+      return kpiApi.recalculateEmployeeKPI(employeeKpiId)
+    },
+    onSuccess: (data) => {
+      const { kpi_percentage, goals_count } = data.data
+      message.success(
+        `KPI пересчитан: ${kpi_percentage !== null ? kpi_percentage.toFixed(2) + '%' : 'N/A'} (на основе ${goals_count} целей)`
+      )
+      queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
+      queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
+    },
+    onError: (error: any) => {
+      message.error(`Ошибка при пересчете KPI: ${error.message || 'Неизвестная ошибка'}`)
+    },
+  })
+
   const employees = employeesQuery.data || []
   const employeeKpis = employeeKpiQuery.data || []
   const goals = goalsQuery.data || []
@@ -210,6 +255,14 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
     setImportModalVisible(true)
   }
 
+  const handleRecalculateKPI = () => {
+    if (!departmentId) {
+      message.error('Отдел не выбран')
+      return
+    }
+    recalculateKPIMutation.mutate()
+  }
+
   const employeeColumns: ColumnsType<EmployeeKPI> = [
     {
       title: 'Сотрудник',
@@ -287,11 +340,22 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
     {
       title: 'Действия',
       key: 'actions',
-      width: 100,
+      width: 180,
       render: (_, record) => (
-        <Button type="link" onClick={() => onEditEmployeeKpi(record)}>
-          Настроить
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            icon={<SyncOutlined />}
+            onClick={() => recalculateSingleKPIMutation.mutate(record.id)}
+            loading={recalculateSingleKPIMutation.isPending}
+            title="Пересчитать KPI% на основе взвешенных целей"
+          >
+            Пересчитать
+          </Button>
+          <Button type="link" onClick={() => onEditEmployeeKpi(record)}>
+            Настроить
+          </Button>
+        </Space>
       ),
     },
   ]
@@ -308,6 +372,20 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
             >
               Импорт из Excel
             </Button>
+            <Popconfirm
+              title="Пересчитать KPI%?"
+              description={`Пересчитать KPI% для всех сотрудников отдела за ${currentYear} год на основе взвешенных достижений по целям?`}
+              onConfirm={handleRecalculateKPI}
+              okText="Да"
+              cancelText="Отмена"
+            >
+              <Button
+                icon={<CalculatorOutlined />}
+                loading={recalculateKPIMutation.isPending}
+              >
+                Пересчитать KPI
+              </Button>
+            </Popconfirm>
             <Button type="primary" onClick={() => onEditEmployeeKpi()}>
               Добавить KPI
             </Button>

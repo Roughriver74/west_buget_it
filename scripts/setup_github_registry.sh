@@ -82,4 +82,4 @@ echo ""
 echo "Test your application:"
 echo "  curl http://31.129.107.178/health"
 echo ""
-https://budget-west.shknv.ru/login
+https://budget-acme.shknv.ru/login

@@ -10,11 +10,11 @@ ssh root@31.129.107.178
 
 ```bash
 # Найдите директорию проекта (обычно в /root или /app)
-cd /root/west_buget_it
+cd /root/acme_buget_it
 # или
-cd /app/west_buget_it
+cd /app/acme_buget_it
 # или используйте find
-find / -name "west_buget_it" -type d 2>/dev/null
+find / -name "acme_buget_it" -type d 2>/dev/null
 ```
 
 ## Шаг 3: Обновите код с GitHub
@@ -156,7 +156,7 @@ SELECT SUM(amount) FROM fin_expenses WHERE department_id = 8;
 ## Быстрая команда (всё в одной строке)
 
 ```bash
-ssh root@31.129.107.178 "cd /root/west_buget_it/backend && ./scripts/check_duplicates_prod.sh"
+ssh root@31.129.107.178 "cd /root/acme_buget_it/backend && ./scripts/check_duplicates_prod.sh"
 ```
 
 ## Помощь

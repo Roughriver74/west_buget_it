@@ -27,6 +27,7 @@ import type { ForecastExpense } from '@/types'
 import type { AIForecastResponse } from '@/api/forecast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import dayjs from 'dayjs'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
@@ -39,6 +40,7 @@ const ForecastPage = () => {
   const nextMonth = currentDate.add(1, 'month')
   const { user } = useAuth()
   const { selectedDepartment } = useDepartment()
+  const { mode } = useTheme()
 
   const [selectedYear, setSelectedYear] = useState(nextMonth.year())
   const [selectedMonth, setSelectedMonth] = useState(nextMonth.month() + 1)
@@ -678,12 +680,21 @@ const ForecastPage = () => {
           </Card>
 
           <style>{`
-            .regular-row {
-              background-color: #f0f5ff !important;
-            }
-            .regular-row:hover {
-              background-color: #e6f0ff !important;
-            }
+            ${mode === 'dark' ? `
+              .regular-row {
+                background-color: #111a2c !important;
+              }
+              .regular-row:hover {
+                background-color: #1a2a3a !important;
+              }
+            ` : `
+              .regular-row {
+                background-color: #f0f5ff !important;
+              }
+              .regular-row:hover {
+                background-color: #e6f0ff !important;
+              }
+            `}
           `}</style>
         </>
       ) : (

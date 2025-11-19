@@ -69,9 +69,9 @@ ssh "$SERVER" "cd $REMOTE_DIR && \
         cp .env .env.backup.\$(date +%Y%m%d-%H%M%S); \
         # Update CORS_ORIGINS if it exists, or add it
         if grep -q '^CORS_ORIGINS=' .env; then \
-            sed -i \"s|^CORS_ORIGINS=.*|CORS_ORIGINS='[\\\"https://budget-west.shknv.ru\\\",\\\"https://api.budget-west.shknv.ru\\\"]'|\" .env; \
+            sed -i \"s|^CORS_ORIGINS=.*|CORS_ORIGINS='[\\\"https://budget-acme.shknv.ru\\\",\\\"https://api.budget-acme.shknv.ru\\\"]'|\" .env; \
         else \
-            echo \"CORS_ORIGINS='[\\\"https://budget-west.shknv.ru\\\",\\\"https://api.budget-west.shknv.ru\\\"]'\" >> .env; \
+            echo \"CORS_ORIGINS='[\\\"https://budget-acme.shknv.ru\\\",\\\"https://api.budget-acme.shknv.ru\\\"]'\" >> .env; \
         fi; \
     else \
         echo '.env file not found - please create it from .env.prod.example'; \
@@ -126,8 +126,8 @@ print_success "Deployment completed!"
 echo "======================================"
 echo ""
 echo "Next steps:"
-echo "1. Test login at: https://budget-west.shknv.ru"
-echo "2. Check API at: https://api.budget-west.shknv.ru/health"
+echo "1. Test login at: https://budget-acme.shknv.ru"
+echo "2. Check API at: https://api.budget-acme.shknv.ru/health"
 echo "3. View full logs: ssh $SERVER 'docker logs -f it_budget_backend_prod'"
 echo ""
 echo "If issues persist, check logs on server:"

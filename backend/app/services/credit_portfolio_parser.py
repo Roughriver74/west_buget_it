@@ -1,7 +1,7 @@
 """
 XLSX parser for processing credit portfolio files
 Handles three types of files: Receipts (Поступления), Expenses (Списания), and Expense Details (Расшифровка)
-Адаптировано для west_buget_it из west_fin
+Адаптировано для acme_buget_it из acme_fin
 """
 import logging
 from pathlib import Path

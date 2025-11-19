@@ -69,7 +69,7 @@ All core entities have a `department_id` foreign key for multi-tenancy:
 ### Tables WITHOUT `department_id` (By Design)
 
 ✅ **Shared Entity**:
-- `organizations` - Shared across all departments (ВЕСТ ООО, ВЕСТ ГРУПП ООО)
+- `organizations` - Shared across all departments (ДЕМО ООО, ДЕМО ГРУПП ООО)
 
 ### Tables with Indirect `department_id` (Through Foreign Keys)
 

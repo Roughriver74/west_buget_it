@@ -59,26 +59,58 @@ def get_insurance_rates(
 ):
     """
     Получить ставки страховых взносов
-
-    - **year**: фильтр по году (опционально)
+    
+    Возвращает по одной ставке для каждого типа (rate_type):
+    - Сначала ищет ставки для указанного/текущего отдела
+    - Если не найдены, возвращает глобальные ставки (любые для года)
+    
+    - **year**: фильтр по году (обязателен для получения глобальных ставок)
     - **department_id**: фильтр по отделу (опционально, только для MANAGER/ADMIN)
     """
-    query = db.query(InsuranceRate)
-
-    # Role-based filtering
+    from sqlalchemy import func
+    
+    # Определяем департамент для поиска
+    target_department_id = None
     if current_user.role == UserRoleEnum.USER:
-        query = query.filter(InsuranceRate.department_id == current_user.department_id)
+        target_department_id = current_user.department_id
     elif department_id:
-        query = query.filter(InsuranceRate.department_id == department_id)
-
-    # Year filter
-    if year:
-        query = query.filter(InsuranceRate.year == year)
-
-    # Active only
-    query = query.filter(InsuranceRate.is_active == True)
-
-    return query.order_by(InsuranceRate.year, InsuranceRate.rate_type).all()
+        target_department_id = department_id
+    
+    if not year:
+        # Если год не указан, возвращаем пустой список или все ставки без фильтра по году
+        query = db.query(InsuranceRate).filter(InsuranceRate.is_active == True)
+        if target_department_id:
+            query = query.filter(InsuranceRate.department_id == target_department_id)
+        return query.order_by(InsuranceRate.year, InsuranceRate.rate_type).all()
+    
+    # Получаем уникальные ставки для каждого типа
+    # Сначала ищем для конкретного отдела, потом глобальные
+    rates = []
+    rate_types = ['PENSION_FUND', 'MEDICAL_INSURANCE', 'SOCIAL_INSURANCE', 'INJURY_INSURANCE']
+    
+    for rate_type in rate_types:
+        # Сначала ищем ставку для конкретного отдела
+        rate_record = None
+        if target_department_id:
+            rate_record = db.query(InsuranceRate).filter(
+                InsuranceRate.year == year,
+                InsuranceRate.rate_type == rate_type,
+                InsuranceRate.department_id == target_department_id,
+                InsuranceRate.is_active == True
+            ).first()
+        
+        # Если не найдена ставка для отдела, ищем любую ставку для этого года (глобальную)
+        if not rate_record:
+            rate_record = db.query(InsuranceRate).filter(
+                InsuranceRate.year == year,
+                InsuranceRate.rate_type == rate_type,
+                InsuranceRate.is_active == True
+            ).order_by(InsuranceRate.department_id.asc()).first()
+        
+        if rate_record:
+            rates.append(rate_record)
+    
+    return rates
 
 
 @router.post("/insurance-rates", response_model=InsuranceRateInDB, status_code=status.HTTP_201_CREATED)
@@ -234,7 +266,11 @@ def get_scenario_with_details(
     """
     Получить сценарий с детальной разбивкой по сотрудникам
     """
-    scenario = db.query(PayrollScenario).filter(
+    from sqlalchemy.orm import joinedload
+
+    scenario = db.query(PayrollScenario).options(
+        joinedload(PayrollScenario.scenario_details)
+    ).filter(
         PayrollScenario.id == scenario_id
     ).first()
 

@@ -26,6 +26,7 @@ import {
   UploadOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { employeeAPI, Employee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
@@ -52,6 +53,7 @@ export default function EmployeesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedDepartment } = useDepartment();
+  const { mode } = useTheme();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [modalVisible, setModalVisible] = useState(false);
@@ -97,7 +99,7 @@ export default function EmployeesPage() {
                 </>
               )}
               {errorDetail.suggestion && (
-                <p style={{ marginTop: 16, fontWeight: 'bold', color: '#1890ff' }}>
+                <p style={{ marginTop: 16, fontWeight: 'bold', color: mode === 'dark' ? '#69b7ff' : '#1890ff' }}>
                   💡 {errorDetail.suggestion}
                 </p>
               )}
@@ -324,7 +326,7 @@ export default function EmployeesPage() {
   return (
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
-        <h1>
+        <h1 style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)' }}>
           <UserOutlined /> Управление сотрудниками
         </h1>
       </div>
@@ -345,7 +347,7 @@ export default function EmployeesPage() {
             <Statistic
               title="Активных сотрудников"
               value={activeEmployees.length}
-              valueStyle={{ color: '#3f8600' }}
+              valueStyle={{ color: mode === 'dark' ? '#73d13d' : '#3f8600' }}
             />
           </Card>
         </Col>
@@ -380,7 +382,7 @@ export default function EmployeesPage() {
               value={totalIncomeTax}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#cf1322' }}
+              valueStyle={{ color: mode === 'dark' ? '#ff7875' : '#cf1322' }}
             />
           </Card>
         </Col>
@@ -391,29 +393,35 @@ export default function EmployeesPage() {
               value={totalSocialTax}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#d46b08' }}
+              valueStyle={{ color: mode === 'dark' ? '#ffa940' : '#d46b08' }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card style={{ backgroundColor: '#f6ffed', border: '1px solid #b7eb8f' }}>
+          <Card style={{ 
+            backgroundColor: mode === 'dark' ? '#162312' : '#f6ffed', 
+            border: mode === 'dark' ? '1px solid #389e0d' : '1px solid #b7eb8f' 
+          }}>
             <Statistic
               title="К выплате сотрудникам (Net)"
               value={totalNet}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#52c41a', fontWeight: 'bold' }}
+              valueStyle={{ color: mode === 'dark' ? '#73d13d' : '#52c41a', fontWeight: 'bold' }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card style={{ backgroundColor: '#fff7e6', border: '1px solid #ffd591' }}>
+          <Card style={{ 
+            backgroundColor: mode === 'dark' ? '#2b2111' : '#fff7e6', 
+            border: mode === 'dark' ? '1px solid #fa8c16' : '1px solid #ffd591' 
+          }}>
             <Statistic
               title="Полная стоимость для компании"
               value={totalEmployerCost}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#fa8c16', fontWeight: 'bold' }}
+              valueStyle={{ color: mode === 'dark' ? '#ffa940' : '#fa8c16', fontWeight: 'bold' }}
             />
           </Card>
         </Col>

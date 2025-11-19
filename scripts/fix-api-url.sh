@@ -37,7 +37,7 @@ fi
 echo ""
 echo -e "${YELLOW}Выберите решение:${NC}"
 echo "1) Использовать nginx proxy (РЕКОМЕНДУЕТСЯ) - VITE_API_URL=/api"
-echo "2) Использовать прямой HTTPS URL - VITE_API_URL=https://api.budget-west.shknv.ru"
+echo "2) Использовать прямой HTTPS URL - VITE_API_URL=https://api.budget-acme.shknv.ru"
 echo "3) Показать текущие переменные окружения"
 echo "4) Только перезапустить frontend"
 echo "5) Выход"
@@ -70,20 +70,20 @@ case $choice in
         echo ""
         echo -e "${GREEN}✅ Готово!${NC}"
         echo "Теперь frontend использует nginx proxy."
-        echo "API запросы идут через: https://budget-west.shknv.ru/api/v1/..."
+        echo "API запросы идут через: https://budget-acme.shknv.ru/api/v1/..."
         ;;
 
     2)
         echo ""
-        echo -e "${GREEN}Устанавливаю VITE_API_URL=https://api.budget-west.shknv.ru${NC}"
+        echo -e "${GREEN}Устанавливаю VITE_API_URL=https://api.budget-acme.shknv.ru${NC}"
 
-        export VITE_API_URL="https://api.budget-west.shknv.ru"
+        export VITE_API_URL="https://api.budget-acme.shknv.ru"
 
         echo "Останавливаю frontend..."
         docker-compose down frontend 2>/dev/null || docker stop it_budget_frontend_prod 2>/dev/null
 
         echo "Пересоздаю контейнер с новой конфигурацией..."
-        VITE_API_URL="https://api.budget-west.shknv.ru" docker-compose up -d frontend
+        VITE_API_URL="https://api.budget-acme.shknv.ru" docker-compose up -d frontend
 
         echo ""
         echo "Ждём 5 секунд..."
@@ -157,7 +157,7 @@ echo -e "${GREEN}Что делать дальше:${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
 echo "1. Откройте браузер в режиме Инкогнито: Ctrl+Shift+N"
-echo "2. Зайдите на https://budget-west.shknv.ru"
+echo "2. Зайдите на https://budget-acme.shknv.ru"
 echo "3. Откройте DevTools (F12) → Console"
 echo "4. Выполните: console.log(window.ENV_CONFIG)"
 echo "5. Убедитесь что VITE_API_URL правильный"

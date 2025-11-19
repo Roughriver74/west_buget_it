@@ -6,7 +6,7 @@
 
 ```bash
 # Убедитесь, что вы находитесь в корне проекта
-cd /Users/evgenijsikunov/projects/west/west_buget_it
+cd /Users/evgenijsikunov/projects/acme/acme_buget_it
 
 # Запустить PostgreSQL, Backend и Frontend
 docker-compose up -d
@@ -183,8 +183,8 @@ npm run lint
 - Интернет (OPEX)
 
 **Организации:**
-- ВЕСТ ООО
-- ВЕСТ ГРУПП ООО
+- ДЕМО ООО
+- ДЕМО ГРУПП ООО
 
 **Заявки:**
 - Все заявки из файла "заявки на расходы по дням.xlsx"

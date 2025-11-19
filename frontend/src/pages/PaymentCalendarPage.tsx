@@ -25,6 +25,7 @@ import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types
 import { formatCurrency } from '@/utils/formatters'
 import PaymentForecastChart from '@/components/forecast/PaymentForecastChart'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Text } = Typography
@@ -32,6 +33,7 @@ const { Option } = Select
 
 const PaymentCalendarPage = () => {
   const { selectedDepartment } = useDepartment()
+  const { mode } = useTheme()
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
   const [categoryId, setCategoryId] = useState<number | undefined>()
   const [modalVisible, setModalVisible] = useState(false)
@@ -619,18 +621,33 @@ const PaymentCalendarPage = () => {
       </Modal>
 
       <style>{`
-        .forecast-row {
-          background-color: #e6f7ff !important;
-        }
-        .forecast-row:hover {
-          background-color: #bae7ff !important;
-        }
-        .planned-row {
-          background-color: #fff7e6 !important;
-        }
-        .planned-row:hover {
-          background-color: #ffd591 !important;
-        }
+        ${mode === 'dark' ? `
+          .forecast-row {
+            background-color: #111a2c !important;
+          }
+          .forecast-row:hover {
+            background-color: #1a2a3a !important;
+          }
+          .planned-row {
+            background-color: #2b2111 !important;
+          }
+          .planned-row:hover {
+            background-color: #3a2a1a !important;
+          }
+        ` : `
+          .forecast-row {
+            background-color: #e6f7ff !important;
+          }
+          .forecast-row:hover {
+            background-color: #bae7ff !important;
+          }
+          .planned-row {
+            background-color: #fff7e6 !important;
+          }
+          .planned-row:hover {
+            background-color: #ffd591 !important;
+          }
+        `}
       `}</style>
     </div>
   )

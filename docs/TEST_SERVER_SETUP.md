@@ -4,7 +4,7 @@
 
 **Сервер**: 46.173.18.143 (root)
 **Пароль**: z!e1823%DkEY
-**Директория проекта**: /root/west_budget_test
+**Директория проекта**: /root/acme_budget_test
 **Ветка**: test
 
 ## URLs
@@ -32,7 +32,7 @@
 
 ## Конфигурация (.env)
 
-Файл `/root/west_budget_test/.env`:
+Файл `/root/acme_budget_test/.env`:
 
 ```bash
 # Database
@@ -71,7 +71,7 @@ ADMIN_PASSWORD=admin123test
 
 ## Docker Compose
 
-Файл: `/root/west_budget_test/docker-compose.test.yml`
+Файл: `/root/acme_budget_test/docker-compose.test.yml`
 
 **Важные моменты**:
 
@@ -93,7 +93,7 @@ ADMIN_PASSWORD=admin123test
 1. **TEST_SERVER_SSH_KEY** - приватный SSH ключ для доступа к серверу
 2. **TEST_SERVER_IP** - `46.173.18.143`
 3. **TEST_SERVER_USER** - `root`
-4. **TEST_SERVER_PROJECT_PATH** - `/root/west_budget_test`
+4. **TEST_SERVER_PROJECT_PATH** - `/root/acme_budget_test`
 
 ### Как работает CI/CD
 
@@ -101,7 +101,7 @@ ADMIN_PASSWORD=admin123test
 2. Workflow подключается по SSH к серверу
 3. Выполняет на сервере:
    ```bash
-   cd /root/west_budget_test
+   cd /root/acme_budget_test
    git fetch origin test
    git reset --hard origin/test
    docker compose -f docker-compose.test.yml down
@@ -191,7 +191,7 @@ op.execute('DROP TABLE IF EXISTS table CASCADE')
 
 ```bash
 ssh root@46.173.18.143
-cd /root/west_budget_test
+cd /root/acme_budget_test
 ```
 
 ### Управление контейнерами
@@ -257,7 +257,7 @@ alembic downgrade -1
 ### Обновление с GitHub
 
 ```bash
-cd /root/west_budget_test
+cd /root/acme_budget_test
 git fetch origin test
 git reset --hard origin/test
 docker compose -f docker-compose.test.yml down
@@ -288,7 +288,7 @@ curl "http://46.173.18.143:8889/api/v1/departments/?is_active=true" \
 ## Структура проекта на сервере
 
 ```
-/root/west_budget_test/
+/root/acme_budget_test/
 ├── .git/                           # Git репозиторий
 ├── .env                            # Environment переменные (TEST)
 ├── docker-compose.test.yml         # Docker Compose для тестового сервера
@@ -384,9 +384,9 @@ curl "http://46.173.18.143:8889/api/v1/departments/?is_active=true" \
 
 ## Контакты и ссылки
 
-- **GitHub Repository**: https://github.com/[your-repo]/west_budget_it
-- **GitHub Actions**: https://github.com/[your-repo]/west_budget_it/actions
-- **Ветка test**: https://github.com/[your-repo]/west_budget_it/tree/test
+- **GitHub Repository**: https://github.com/[your-repo]/acme_budget_it
+- **GitHub Actions**: https://github.com/[your-repo]/acme_budget_it/actions
+- **Ветка test**: https://github.com/[your-repo]/acme_budget_it/tree/test
 
 ## История изменений
 
@@ -395,7 +395,7 @@ curl "http://46.173.18.143:8889/api/v1/departments/?is_active=true" \
 - ✅ Создан тестовый сервер на 46.173.18.143
 - ✅ Настроен беспарольный SSH доступ
 - ✅ Установлены Docker, Docker Compose, git
-- ✅ Клонирован репозиторий в /root/west_budget_test
+- ✅ Клонирован репозиторий в /root/acme_budget_test
 - ✅ Настроены .env файлы для тестовой среды
 - ✅ Исправлены ошибки миграций базы данных
 - ✅ Исправлен запуск backend контейнера (добавлен uvicorn command)

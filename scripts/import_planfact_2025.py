@@ -4,7 +4,7 @@
 Импортирует:
 1. План (лист "План") -> BudgetPlan
 2. Факт (лист "факт") -> Expense
-3. ФОТ (лист "ВЕСТ") -> PayrollPlan
+3. ФОТ (лист "ДЕМО") -> PayrollPlan
 """
 
 import sys
@@ -44,7 +44,7 @@ from app.db.models import (
 # Константы
 EXCEL_FILE = project_root / "xls" / "Планфакт2025.xlsx"
 YEAR = 2025
-DEFAULT_DEPARTMENT_CODE = "WEST"  # Код отдела по умолчанию
+DEFAULT_DEPARTMENT_CODE = "ACME"  # Код отдела по умолчанию
 
 
 # Маппинг названий месяцев
@@ -243,7 +243,7 @@ def import_expenses(db: Session, excel_file: Path, dept: Department):
     df = pd.read_excel(excel_file, sheet_name='факт')
 
     # Получаем или создаем организацию по умолчанию
-    org = get_or_create_organization(db, "ВЕСТ ООО", dept.id)
+    org = get_or_create_organization(db, "ДЕМО ООО", dept.id)
 
     imported_count = 0
 
@@ -310,13 +310,13 @@ def import_expenses(db: Session, excel_file: Path, dept: Department):
 
 
 def import_payroll(db: Session, excel_file: Path, dept: Department):
-    """Импорт ФОТ из листа 'ВЕСТ'"""
+    """Импорт ФОТ из листа 'ДЕМО'"""
     print("\n" + "="*80)
-    print("ИМПОРТ ФОТ (лист 'ВЕСТ')")
+    print("ИМПОРТ ФОТ (лист 'ДЕМО')")
     print("="*80)
 
     # Читаем лист
-    df = pd.read_excel(excel_file, sheet_name='ВЕСТ')
+    df = pd.read_excel(excel_file, sheet_name='ДЕМО')
 
     # Удаляем существующие планы ФОТ для этого отдела и года
     db.query(PayrollPlan).filter(

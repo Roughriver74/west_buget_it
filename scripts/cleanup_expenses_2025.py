@@ -40,11 +40,11 @@ def main():
 
         # Найдем IT отдел
         it_department = db.query(Department).filter(
-            Department.code == "WEST"
+            Department.code == "ACME"
         ).first()
 
         if not it_department:
-            print("✗ Ошибка: IT отдел (код WEST) не найден!")
+            print("✗ Ошибка: IT отдел (код ACME) не найден!")
             sys.exit(1)
 
         print(f"\n✓ Найден отдел: {it_department.name} (ID: {it_department.id}, код: {it_department.code})")

@@ -1,9 +1,12 @@
-import { Drawer, Descriptions, Table, Space, Tag, Typography, Divider, Statistic, Row, Col } from 'antd'
+import { useState } from 'react'
+import { Drawer, Descriptions, Table, Space, Tag, Typography, Divider, Statistic, Row, Col, Button, Tooltip } from 'antd'
+import { CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import type { EmployeeKPI, KPIGoalStatus } from '@/api/kpi'
 import type { Employee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
+import { ComplexityBonusBreakdown } from './ComplexityBonusBreakdown'
 
 const { Text } = Typography
 
@@ -31,12 +34,21 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
   employee,
   employeeKpis,
 }) => {
+  const [breakdownModalOpen, setBreakdownModalOpen] = useState(false)
+  const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null)
+
   if (!employee) {
     return null
   }
 
   // Filter KPIs for this employee
   const employeeRecords = employeeKpis.filter((kpi) => kpi.employee_id === employee.id)
+
+  // Handler for opening complexity breakdown
+  const handleViewComplexityBreakdown = (kpiId: number) => {
+    setSelectedKpiId(kpiId)
+    setBreakdownModalOpen(true)
+  }
 
   // Calculate statistics
   const totalKpiRecords = employeeRecords.length
@@ -109,6 +121,79 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
       key: 'annual_bonus',
       width: 130,
       render: (value) => formatCurrency(Number(value || 0)),
+    },
+    {
+      title: (
+        <Tooltip title="Средняя сложность завершенных задач">
+          <Space size={4}>
+            <span>Сложность</span>
+            <InfoCircleOutlined style={{ fontSize: 12 }} />
+          </Space>
+        </Tooltip>
+      ),
+      key: 'complexity',
+      width: 120,
+      align: 'center',
+      render: (_, record) => {
+        if (!record.task_complexity_avg) {
+          return <Text type="secondary">—</Text>
+        }
+
+        const complexity = Number(record.task_complexity_avg)
+        let color = '#d9d9d9'
+        if (complexity >= 7) color = '#fa8c16'
+        else if (complexity >= 4) color = '#1890ff'
+        else if (complexity >= 1) color = '#52c41a'
+
+        return (
+          <Tag color={color} style={{ fontWeight: 600 }}>
+            {complexity.toFixed(1)} / 10
+          </Tag>
+        )
+      },
+    },
+    {
+      title: (
+        <Tooltip title="Множитель премии по сложности (0.70-1.30)">
+          <Space size={4}>
+            <span>Множитель</span>
+            <InfoCircleOutlined style={{ fontSize: 12 }} />
+          </Space>
+        </Tooltip>
+      ),
+      key: 'multiplier',
+      width: 110,
+      align: 'center',
+      render: (_, record) => {
+        if (!record.task_complexity_multiplier) {
+          return <Text type="secondary">—</Text>
+        }
+
+        const multiplier = Number(record.task_complexity_multiplier)
+        const color = multiplier > 1 ? '#52c41a' : multiplier < 1 ? '#fa8c16' : '#1890ff'
+
+        return (
+          <Text strong style={{ color }}>
+            {multiplier.toFixed(2)}×
+          </Text>
+        )
+      },
+    },
+    {
+      title: 'Действия',
+      key: 'actions',
+      width: 100,
+      align: 'center',
+      render: (_, record) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<CalculatorOutlined />}
+          onClick={() => handleViewComplexityBreakdown(record.id)}
+        >
+          Детали
+        </Button>
+      ),
     },
     {
       title: 'Цели',
@@ -203,11 +288,18 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
             columns={historyColumns}
             dataSource={employeeRecords}
             pagination={false}
-            scroll={{ x: 800 }}
+            scroll={{ x: 1200 }}
             size="small"
           />
         </div>
       </Space>
+
+      {/* Complexity Bonus Breakdown Modal */}
+      <ComplexityBonusBreakdown
+        open={breakdownModalOpen}
+        onClose={() => setBreakdownModalOpen(false)}
+        employeeKpiId={selectedKpiId}
+      />
     </Drawer>
   )
 }

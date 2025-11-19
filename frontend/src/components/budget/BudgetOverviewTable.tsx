@@ -6,6 +6,7 @@ import { budgetApi } from '@/api'
 import type { BudgetOverviewCategory } from '@/api/budget'
 import QuickExpenseModal from './QuickExpenseModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { getApiBaseUrl } from '@/config/api'
 
 interface BudgetOverviewTableProps {
@@ -16,6 +17,7 @@ interface BudgetOverviewTableProps {
 const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }) => {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
   const { selectedDepartment } = useDepartment()
+  const { mode } = useTheme()
 
   // Загрузка данных обзора
   const { data: overview, isLoading } = useQuery({
@@ -295,28 +297,53 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
       />
 
       <style>{`
-        .parent-row {
-          background-color: #fafafa !important;
-          font-weight: 500;
-        }
-        .parent-row:hover {
-          background-color: #f0f0f0 !important;
-        }
-        .child-row {
-          background-color: #ffffff !important;
-        }
-        .child-row:hover {
-          background-color: #f5f5f5 !important;
-        }
-        .subtotal-row {
-          background-color: #f0f5ff !important;
-          font-weight: 600;
-        }
-        .grand-total-row {
-          background-color: #e6f7ff !important;
-          font-weight: 700;
-          font-size: 15px;
-        }
+        ${mode === 'dark' ? `
+          .parent-row {
+            background-color: #262626 !important;
+            font-weight: 500;
+          }
+          .parent-row:hover {
+            background-color: #303030 !important;
+          }
+          .child-row {
+            background-color: #1f1f1f !important;
+          }
+          .child-row:hover {
+            background-color: #262626 !important;
+          }
+          .subtotal-row {
+            background-color: #1a1a2e !important;
+            font-weight: 600;
+          }
+          .grand-total-row {
+            background-color: #252540 !important;
+            font-weight: 700;
+            font-size: 15px;
+          }
+        ` : `
+          .parent-row {
+            background-color: #fafafa !important;
+            font-weight: 500;
+          }
+          .parent-row:hover {
+            background-color: #f0f0f0 !important;
+          }
+          .child-row {
+            background-color: #ffffff !important;
+          }
+          .child-row:hover {
+            background-color: #f5f5f5 !important;
+          }
+          .subtotal-row {
+            background-color: #f0f5ff !important;
+            font-weight: 600;
+          }
+          .grand-total-row {
+            background-color: #e6f7ff !important;
+            font-weight: 700;
+            font-size: 15px;
+          }
+        `}
       `}</style>
     </div>
   )

@@ -53,7 +53,7 @@
 Откройте файл `backend/scripts/cron_hourly_sync.sh` и убедитесь, что пути корректны:
 
 ```bash
-PROJECT_DIR="/Users/evgenijsikunov/projects/west/west_buget_it/backend"
+PROJECT_DIR="/Users/evgenijsikunov/projects/acme/acme_buget_it/backend"
 VENV_DIR="$PROJECT_DIR/venv"
 LOG_DIR="$PROJECT_DIR/logs"
 ```
@@ -61,7 +61,7 @@ LOG_DIR="$PROJECT_DIR/logs"
 ### Шаг 2: Сделать скрипт исполняемым
 
 ```bash
-chmod +x /Users/evgenijsikunov/projects/west/west_buget_it/backend/scripts/cron_hourly_sync.sh
+chmod +x /Users/evgenijsikunov/projects/acme/acme_buget_it/backend/scripts/cron_hourly_sync.sh
 ```
 
 ### Шаг 3: Настроить переменные окружения (если нужно)
@@ -89,7 +89,7 @@ crontab -e
 
 ```cron
 # 1C Bank Transactions Hourly Sync
-0 * * * * /Users/evgenijsikunov/projects/west/west_buget_it/backend/scripts/cron_hourly_sync.sh
+0 * * * * /Users/evgenijsikunov/projects/acme/acme_buget_it/backend/scripts/cron_hourly_sync.sh
 ```
 
 **Альтернативные расписания:**
@@ -125,14 +125,14 @@ crontab -l
 ### Ручной запуск скрипта
 
 ```bash
-cd /Users/evgenijsikunov/projects/west/west_buget_it/backend
+cd /Users/evgenijsikunov/projects/acme/acme_buget_it/backend
 ./scripts/cron_hourly_sync.sh
 ```
 
 ### Проверка логов
 
 ```bash
-tail -f /Users/evgenijsikunov/projects/west/west_buget_it/backend/logs/sync_hourly.log
+tail -f /Users/evgenijsikunov/projects/acme/acme_buget_it/backend/logs/sync_hourly.log
 ```
 
 ### Ожидаемый вывод (успешная синхронизация):

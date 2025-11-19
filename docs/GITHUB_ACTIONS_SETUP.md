@@ -36,7 +36,7 @@ cat ~/.ssh/id_rsa
 ### 4. `TEST_SERVER_PROJECT_PATH`
 **Описание**: Путь к проекту на тестовом сервере
 
-**Значение**: `/root/west_budget_test`
+**Значение**: `/root/acme_budget_test`
 
 ## Как настроить GitHub Secrets
 

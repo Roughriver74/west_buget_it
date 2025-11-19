@@ -5,7 +5,7 @@
 #
 
 # Переменные окружения
-PROJECT_DIR="/Users/evgenijsikunov/projects/west/west_buget_it/backend"
+PROJECT_DIR="/Users/evgenijsikunov/projects/acme/acme_buget_it/backend"
 VENV_DIR="$PROJECT_DIR/venv"
 LOG_DIR="$PROJECT_DIR/logs"
 LOG_FILE="$LOG_DIR/sync_hourly.log"

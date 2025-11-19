@@ -6,7 +6,16 @@ export type KPIGoalCreate = components['schemas']['KPIGoalCreate']
 export type KPIGoalUpdate = components['schemas']['KPIGoalUpdate']
 export type KPIGoalStatus = components['schemas']['KPIGoalStatusEnum']
 
-export type EmployeeKPI = components['schemas']['EmployeeKPIWithGoals']
+// Task Complexity Bonus Extension (Task 3.2)
+export type EmployeeKPI = components['schemas']['EmployeeKPIWithGoals'] & {
+  task_complexity_avg?: number | null
+  task_complexity_multiplier?: number | null
+  task_complexity_weight?: number | null
+  monthly_bonus_complexity?: number | null
+  quarterly_bonus_complexity?: number | null
+  annual_bonus_complexity?: number | null
+}
+
 export type EmployeeKPICreate = components['schemas']['EmployeeKPICreate']
 export type EmployeeKPIUpdate = components['schemas']['EmployeeKPIUpdate']
 
@@ -202,6 +211,74 @@ export const kpiApi = {
         },
       }
     )
+    return data
+  },
+
+  // ==================== KPI Auto-Calculation ====================
+
+  /**
+   * Автоматический пересчет KPI% для конкретной записи EmployeeKPI
+   */
+  recalculateEmployeeKPI: async (employeeKpiId: number): Promise<{
+    success: boolean
+    message: string
+    data: {
+      employee_kpi_id: number
+      kpi_percentage: number | null
+      total_weight: number
+      goals_count: number
+      goals: Array<{
+        goal_id: number
+        goal_name: string
+        achievement_percentage: number
+        weight: number
+        weighted_achievement: number
+      }>
+    }
+  }> => {
+    const { data } = await apiClient.post(`kpi/employees/kpi/${employeeKpiId}/recalculate`)
+    return data
+  },
+
+  /**
+   * Пересчет KPI% для сотрудника за конкретный период
+   */
+  recalculateKPIForPeriod: async (params: {
+    employee_id: number
+    year: number
+    month: number
+  }): Promise<{
+    success: boolean
+    message: string
+    data: any
+  }> => {
+    const { data } = await apiClient.post('kpi/recalculate-period', null, { params })
+    return data
+  },
+
+  /**
+   * Массовый пересчет KPI% для всех сотрудников отдела за период
+   */
+  recalculateKPIForDepartment: async (params: {
+    department_id: number
+    year?: number
+    month?: number
+  }): Promise<{
+    success: boolean
+    message: string
+    statistics: {
+      total: number
+      success: number
+      errors: number
+      error_details: Array<{
+        employee_kpi_id: number
+        employee_id: number
+        period: string
+        error: string
+      }>
+    }
+  }> => {
+    const { data } = await apiClient.post('kpi/recalculate-department', null, { params })
     return data
   },
 }

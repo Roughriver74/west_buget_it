@@ -2,7 +2,7 @@
 """Initialize database with seed data"""
 
 import sys
-sys.path.insert(0, '/home/user/west_buget_it/backend')
+sys.path.insert(0, '/home/user/acme_buget_it/backend')
 
 from datetime import datetime
 from app.db.session import SessionLocal, engine
@@ -115,15 +115,15 @@ def seed_database():
         # Add organizations
         organizations = [
             Organization(
-                name="ВЕСТ ООО",
-                legal_name="Общество с ограниченной ответственностью ВЕСТ",
+                name="ДЕМО ООО",
+                legal_name="Общество с ограниченной ответственностью ДЕМО",
                 is_active=True,
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             ),
             Organization(
-                name="ВЕСТ ГРУПП ООО",
-                legal_name="Общество с ограниченной ответственностью ВЕСТ ГРУПП",
+                name="ДЕМО ГРУПП ООО",
+                legal_name="Общество с ограниченной ответственностью ДЕМО ГРУПП",
                 is_active=True,
                 created_at=datetime.now(),
                 updated_at=datetime.now()

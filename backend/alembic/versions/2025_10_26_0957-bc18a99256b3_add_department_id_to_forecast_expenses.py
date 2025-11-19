@@ -30,7 +30,7 @@ def upgrade() -> None:
             sa.Column('department_id', sa.Integer(), nullable=True)
         )
 
-        # Step 2: Set default department_id for existing records (department_id=2 is IT Отдел WEST)
+        # Step 2: Set default department_id for existing records (department_id=2 is IT Отдел ACME)
         op.execute('UPDATE forecast_expenses SET department_id = 2 WHERE department_id IS NULL')
 
         # Step 3: Make the column NOT NULL

@@ -74,21 +74,21 @@ export function MultiSelect({
 
   return (
     <div className={`relative flex flex-col gap-1.5 ${className}`} ref={dropdownRef}>
-      {label && <label className="text-xs font-medium text-gray-600">{label}</label>}
+      {label && <label className="text-xs font-medium text-foreground/70">{label}</label>}
 
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="flex items-center justify-between w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex items-center justify-between w-full border border-border rounded-lg px-3 py-2 text-sm bg-card hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
       >
-        <span className="truncate text-left">{displayText()}</span>
-        <ChevronDown size={16} className="text-gray-500 flex-shrink-0 ml-2" />
+        <span className="truncate text-left text-foreground">{displayText()}</span>
+        <ChevronDown size={16} className="text-muted-foreground flex-shrink-0 ml-2" />
       </button>
 
-      {hint && <span className="text-[10px] text-gray-400 leading-tight">{hint}</span>}
+      {hint && <span className="text-[10px] text-muted-foreground leading-tight">{hint}</span>}
 
       {isOpen && (
-        <div className="absolute z-50 top-full left-0 mt-2 w-full min-w-[280px] rounded-xl border border-gray-200 bg-white shadow-2xl p-3">
+        <div className="absolute z-50 top-full left-0 mt-2 w-full min-w-[280px] rounded-xl border border-border bg-card shadow-2xl p-3">
           <div className="relative mb-2">
             <Input
               value={search}
@@ -96,21 +96,21 @@ export function MultiSelect({
               placeholder={searchPlaceholder}
               className="pl-9"
             />
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           </div>
 
-          <div className="flex justify-between items-center mb-2 text-xs text-gray-500">
+          <div className="flex justify-between items-center mb-2 text-xs text-muted-foreground">
             <div className="flex gap-2">
               <button
                 type="button"
-                className="text-blue-600 hover:underline"
+                className="text-primary hover:underline"
                 onClick={selectAll}
               >
                 Выбрать все
               </button>
               <button
                 type="button"
-                className="text-blue-600 hover:underline disabled:text-gray-400"
+                className="text-primary hover:underline disabled:text-muted-foreground"
                 onClick={clearAll}
                 disabled={selected.length === 0}
               >
@@ -121,9 +121,9 @@ export function MultiSelect({
           </div>
 
           <div className="max-h-64 overflow-y-auto pr-1">
-            {isLoading && <div className="text-sm text-gray-500 py-4 text-center">Загружаем...</div>}
+            {isLoading && <div className="text-sm text-muted-foreground py-4 text-center">Загружаем...</div>}
             {!isLoading && filteredOptions.length === 0 && (
-              <div className="text-sm text-gray-500 py-4 text-center">Ничего не найдено</div>
+              <div className="text-sm text-muted-foreground py-4 text-center">Ничего не найдено</div>
             )}
             {!isLoading &&
               filteredOptions.map(option => (

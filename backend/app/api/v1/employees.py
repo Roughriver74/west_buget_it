@@ -27,6 +27,7 @@ from app.schemas.payroll import (
 )
 from app.utils.auth import get_current_active_user
 from app.services.tax_rate_utils import merge_tax_rates_with_defaults
+from app.services.salary_calculator import SalaryCalculator
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -253,6 +254,17 @@ async def create_employee(
     # Create new employee with assigned department_id
     employee_dict = employee_data.model_dump(exclude={'department_id'})
     employee_dict['department_id'] = department_id
+
+    # Calculate gross/net salary values (Task 1.4: Брутто ↔ Нетто)
+    salary_calc_result = SalaryCalculator.calculate_salaries(
+        base_salary=employee_data.base_salary,
+        salary_type=employee_data.salary_type,
+        ndfl_rate=employee_data.ndfl_rate
+    )
+    employee_dict['base_salary_gross'] = salary_calc_result['base_salary_gross']
+    employee_dict['base_salary_net'] = salary_calc_result['base_salary_net']
+    employee_dict['ndfl_amount'] = salary_calc_result['ndfl_amount']
+
     new_employee = Employee(**employee_dict)
     db.add(new_employee)
     db.commit()
@@ -306,6 +318,25 @@ async def update_employee(
 
     # Update employee fields
     update_data = employee_data.model_dump(exclude_unset=True)
+
+    # If salary-related fields are being updated, recalculate gross/net values (Task 1.4: Брутто ↔ Нетто)
+    salary_changed = any(field in update_data for field in ['base_salary', 'salary_type', 'ndfl_rate'])
+    if salary_changed:
+        # Get current values or use updated ones
+        base_salary = update_data.get('base_salary', employee.base_salary)
+        salary_type = update_data.get('salary_type', employee.salary_type)
+        ndfl_rate = update_data.get('ndfl_rate', employee.ndfl_rate)
+
+        # Recalculate
+        salary_calc_result = SalaryCalculator.calculate_salaries(
+            base_salary=base_salary,
+            salary_type=salary_type,
+            ndfl_rate=ndfl_rate
+        )
+        update_data['base_salary_gross'] = salary_calc_result['base_salary_gross']
+        update_data['base_salary_net'] = salary_calc_result['base_salary_net']
+        update_data['ndfl_amount'] = salary_calc_result['ndfl_amount']
+
     for field, value in update_data.items():
         setattr(employee, field, value)
 

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Select, DatePicker, message } from 'antd';
+import { useEffect, useState } from 'react';
+import { Modal, Form, Input, InputNumber, Select, DatePicker, message, Radio, Space, Alert } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeAPI, Employee, EmployeeCreate, EmployeeUpdate } from '../../api/payroll';
 import { useDepartment } from '../../contexts/DepartmentContext';
@@ -31,6 +31,43 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
 
   // Check if user can select department (ADMIN/MANAGER)
   const canSelectDepartment = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+
+  // State for salary calculations (Task 1.4: Брутто ↔ Нетто)
+  const [calculatedSalaries, setCalculatedSalaries] = useState<{
+    gross: number | null;
+    net: number | null;
+    ndfl: number | null;
+  }>({ gross: null, net: null, ndfl: null });
+
+  // Calculate gross/net salaries based on type
+  const calculateSalaries = (baseSalary: number | undefined, salaryType: string, ndflRate: number) => {
+    if (!baseSalary || baseSalary <= 0) {
+      setCalculatedSalaries({ gross: null, net: null, ndfl: null });
+      return;
+    }
+
+    const rate = ndflRate || 0.13; // Default NDFL rate 13%
+
+    if (salaryType === 'GROSS') {
+      // User entered gross, calculate net
+      const net = baseSalary * (1 - rate);
+      const ndfl = baseSalary - net;
+      setCalculatedSalaries({
+        gross: baseSalary,
+        net: parseFloat(net.toFixed(2)),
+        ndfl: parseFloat(ndfl.toFixed(2))
+      });
+    } else {
+      // User entered net, calculate gross
+      const gross = baseSalary / (1 - rate);
+      const ndfl = gross - baseSalary;
+      setCalculatedSalaries({
+        gross: parseFloat(gross.toFixed(2)),
+        net: baseSalary,
+        ndfl: parseFloat(ndfl.toFixed(2))
+      });
+    }
+  };
 
   // Create mutation
   const createMutation = useMutation({
@@ -70,7 +107,19 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
         annual_bonus_base: employee.annual_bonus_base ? Number(employee.annual_bonus_base) : undefined,
         hire_date: employee.hire_date ? dayjs(employee.hire_date) : null,
         fire_date: employee.fire_date ? dayjs(employee.fire_date) : null,
+        // Task 1.4: Salary type fields
+        salary_type: employee.salary_type || 'GROSS',
+        ndfl_rate: employee.ndfl_rate ? Number(employee.ndfl_rate) : 0.13,
       });
+
+      // Calculate initial values for edit mode
+      if (employee.base_salary) {
+        calculateSalaries(
+          Number(employee.base_salary),
+          employee.salary_type || 'GROSS',
+          employee.ndfl_rate ? Number(employee.ndfl_rate) : 0.13
+        );
+      }
     } else if (visible) {
       form.resetFields();
       // Set default values for new employee
@@ -78,7 +127,11 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
         status: 'ACTIVE',
         // Set default department to selected one
         department_id: selectedDepartment?.id,
+        // Task 1.4: Default salary settings
+        salary_type: 'GROSS',
+        ndfl_rate: 0.13,
       });
+      setCalculatedSalaries({ gross: null, net: null, ndfl: null });
     }
   }, [visible, employee, form, selectedDepartment]);
 
@@ -168,9 +221,34 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <Input placeholder="EMP-001" />
         </Form.Item>
 
+        {/* Task 1.4: Salary Type Toggle (Брутто/Нетто) */}
+        <Form.Item
+          name="salary_type"
+          label="Тип ввода оклада"
+          rules={[{ required: true }]}
+        >
+          <Radio.Group
+            onChange={(e) => {
+              const baseSalary = form.getFieldValue('base_salary');
+              const ndflRate = form.getFieldValue('ndfl_rate') || 0.13;
+              calculateSalaries(baseSalary, e.target.value, ndflRate);
+            }}
+          >
+            <Radio.Button value="GROSS">Брутто (до вычета НДФЛ)</Radio.Button>
+            <Radio.Button value="NET">Нетто (на руки)</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
+
         <Form.Item
           name="base_salary"
-          label="Оклад"
+          label={
+            <Space>
+              <span>Оклад</span>
+              <span style={{ color: '#888', fontWeight: 'normal' }}>
+                ({form.getFieldValue('salary_type') === 'GROSS' ? 'до вычета НДФЛ' : 'на руки после НДФЛ'})
+              </span>
+            </Space>
+          }
           rules={[
             { required: true, message: 'Введите оклад' },
             { type: 'number', min: 0, message: 'Оклад не может быть отрицательным' },
@@ -179,6 +257,11 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <InputNumber
             style={{ width: '100%' }}
             placeholder="50000"
+            onChange={(value) => {
+              const salaryType = form.getFieldValue('salary_type') || 'GROSS';
+              const ndflRate = form.getFieldValue('ndfl_rate') || 0.13;
+              calculateSalaries(value as number, salaryType, ndflRate);
+            }}
             formatter={(value) => {
               if (value === undefined || value === null || value === '') return '';
               return `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -193,6 +276,63 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
             addonAfter="₽"
           />
         </Form.Item>
+
+        <Form.Item
+          name="ndfl_rate"
+          label="Ставка НДФЛ"
+          rules={[
+            { required: true, message: 'Введите ставку НДФЛ' },
+            { type: 'number', min: 0, max: 1, message: 'Ставка должна быть от 0 до 1 (например, 0.13 для 13%)' },
+          ]}
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            placeholder="0.13"
+            step={0.01}
+            onChange={(value) => {
+              const baseSalary = form.getFieldValue('base_salary');
+              const salaryType = form.getFieldValue('salary_type') || 'GROSS';
+              calculateSalaries(baseSalary, salaryType, value as number);
+            }}
+            formatter={(value) => {
+              if (value === undefined || value === null || value === '') return '';
+              return `${(Number(value) * 100).toFixed(0)}%`;
+            }}
+            parser={(value) => {
+              if (!value) return undefined as any;
+              const cleaned = value.replace('%', '').trim();
+              if (cleaned === '') return undefined as any;
+              const num = Number(cleaned) / 100;
+              return isNaN(num) ? undefined as any : num;
+            }}
+          />
+        </Form.Item>
+
+        {/* Calculated salary breakdown */}
+        {calculatedSalaries.gross !== null && calculatedSalaries.net !== null && (
+          <Alert
+            message="Расчет заработной платы"
+            description={
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Брутто (начисление):</span>
+                  <strong>{calculatedSalaries.gross?.toLocaleString('ru-RU')} ₽</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>НДФЛ ({((form.getFieldValue('ndfl_rate') || 0.13) * 100).toFixed(0)}%):</span>
+                  <strong style={{ color: '#cf1322' }}>- {calculatedSalaries.ndfl?.toLocaleString('ru-RU')} ₽</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #d9d9d9', paddingTop: 8 }}>
+                  <span>Нетто (на руки):</span>
+                  <strong style={{ color: '#3f8600', fontSize: 16 }}>{calculatedSalaries.net?.toLocaleString('ru-RU')} ₽</strong>
+                </div>
+              </Space>
+            }
+            type="info"
+            showIcon
+            style={{ marginBottom: 24 }}
+          />
+        )}
 
         <Form.Item
           name="monthly_bonus_base"

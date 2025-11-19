@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Скрипт для обновления сопоставления подразделения FTP для отдела WEST
+Скрипт для обновления сопоставления подразделения FTP для отдела ACME
 """
 
 import sys
@@ -33,16 +33,16 @@ def main():
 
     try:
         print("="*80)
-        print("ОБНОВЛЕНИЕ СОПОСТАВЛЕНИЯ FTP ДЛЯ ОТДЕЛА WEST")
+        print("ОБНОВЛЕНИЕ СОПОСТАВЛЕНИЯ FTP ДЛЯ ОТДЕЛА ACME")
         print("="*80)
 
-        # Найдем отдел WEST
+        # Найдем отдел ACME
         department = db.query(Department).filter(
-            Department.code == "WEST"
+            Department.code == "ACME"
         ).first()
 
         if not department:
-            print("✗ Ошибка: Отдел с кодом WEST не найден!")
+            print("✗ Ошибка: Отдел с кодом ACME не найден!")
             sys.exit(1)
 
         print(f"\n✓ Найден отдел:")
@@ -52,7 +52,7 @@ def main():
         print(f"  Текущее FTP сопоставление: {department.ftp_subdivision_name or 'не указано'}")
 
         # Обновляем поле ftp_subdivision_name
-        new_subdivision_name = "(ВЕСТ) IT"
+        new_subdivision_name = "(ДЕМО) IT"
         department.ftp_subdivision_name = new_subdivision_name
 
         db.commit()
@@ -64,8 +64,8 @@ def main():
         print("\n" + "="*80)
         print("✓ ОБНОВЛЕНИЕ ЗАВЕРШЕНО УСПЕШНО!")
         print("="*80)
-        print("\nТеперь при импорте из FTP заявки с подразделением '(ВЕСТ) IT'")
-        print("будут автоматически привязываться к отделу WEST")
+        print("\nТеперь при импорте из FTP заявки с подразделением '(ДЕМО) IT'")
+        print("будут автоматически привязываться к отделу ACME")
 
     except Exception as e:
         print(f"\n✗ Ошибка: {e}")

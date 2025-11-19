@@ -2,7 +2,7 @@
 """Add test data to the database"""
 
 import sys
-sys.path.insert(0, '/home/user/west_buget_it/backend')
+sys.path.insert(0, '/home/user/acme_buget_it/backend')
 
 from datetime import datetime, timedelta
 from decimal import Decimal

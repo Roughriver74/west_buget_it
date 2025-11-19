@@ -62,8 +62,8 @@ def import_organizations(db: Session):
     print("\nImporting organizations...")
 
     orgs_data = [
-        {"name": "ВЕСТ ООО", "legal_name": "Общество с ограниченной ответственностью ВЕСТ"},
-        {"name": "ВЕСТ ГРУПП ООО", "legal_name": "Общество с ограниченной ответственностью ВЕСТ ГРУПП"},
+        {"name": "ДЕМО ООО", "legal_name": "Общество с ограниченной ответственностью ДЕМО"},
+        {"name": "ДЕМО ГРУПП ООО", "legal_name": "Общество с ограниченной ответственностью ДЕМО ГРУПП"},
     ]
 
     for org_data in orgs_data:

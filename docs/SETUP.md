@@ -108,7 +108,7 @@ Frontend будет доступен на http://localhost:5173
 ## Структура проекта
 
 ```
-west_budget_it/
+acme_budget_it/
 ├── backend/                 # FastAPI backend
 │   ├── app/
 │   │   ├── api/v1/         # API endpoints

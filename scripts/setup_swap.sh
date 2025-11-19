@@ -107,5 +107,5 @@ ssh "$SERVER" "free -h"
 echo ""
 
 echo "Теперь можно попробовать снова собрать Docker образ:"
-echo "Выполните rebuild: ssh $SERVER 'cd /root/west_buget_it && docker-compose -f docker-compose.prod.yml build --no-cache backend'"
+echo "Выполните rebuild: ssh $SERVER 'cd /root/acme_buget_it && docker-compose -f docker-compose.prod.yml build --no-cache backend'"
 echo ""

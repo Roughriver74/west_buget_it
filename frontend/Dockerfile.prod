@@ -10,7 +10,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Build argument for API URL
-ARG VITE_API_URL=https://budget-west.shknv.ru
+ARG VITE_API_URL=https://budget-acme.shknv.ru
 ENV VITE_API_URL=$VITE_API_URL
 
 # Copy source code (AFTER setting build args to prevent cache invalidation)

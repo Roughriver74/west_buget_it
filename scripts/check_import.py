@@ -37,8 +37,8 @@ def main():
         print("="*80)
 
         # Проверяем отдел
-        dept_count = db.query(Department).filter(Department.code == "WEST").count()
-        print(f"\nОтделы с кодом WEST: {dept_count}")
+        dept_count = db.query(Department).filter(Department.code == "ACME").count()
+        print(f"\nОтделы с кодом ACME: {dept_count}")
 
         # Проверяем категории бюджета
         category_count = db.query(BudgetCategory).count()

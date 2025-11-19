@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { message } from 'antd';
 import { getApiBaseUrl } from '../config/api';
 import { logger } from '../utils/logger';
+import { profileApi, type UserProfileUpdatePayload } from '../api/profile';
 
 export interface User {
   id: number;
@@ -26,6 +27,8 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  updateProfile: (updates: UserProfileUpdatePayload) => Promise<User>;
   isAuthenticated: boolean;
   hasRole: (role: string | string[]) => boolean;
 }
@@ -48,44 +51,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
+  const fetchCurrentUser = useCallback(async (options?: { silent?: boolean }) => {
+    const savedToken = localStorage.getItem('token');
+
+    if (!savedToken) {
+      if (!options?.silent) {
+        setLoading(false);
+      }
+      return null;
+    }
+
+    if (!options?.silent) {
+      setLoading(true);
+    }
+
+    try {
+      const currentUser = await profileApi.getCurrent();
+      setUser(currentUser);
+      setToken(savedToken);
+      logger.auth('User loaded successfully', { username: currentUser.username });
+      return currentUser;
+    } catch (error) {
+      logger.error('[Auth] Failed to load user:', error);
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+      return null;
+    } finally {
+      if (!options?.silent) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
   // Load user on mount if token exists
   useEffect(() => {
-    const loadUser = async () => {
-      const savedToken = localStorage.getItem('token');
-
-      if (savedToken) {
-        try {
-          const response = await fetch(`${getApiBaseUrl()}/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${savedToken}`,
-            },
-          });
-
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-            setToken(savedToken);
-            logger.auth('User loaded successfully', { username: userData.username });
-          } else {
-            // Token is invalid, clear it
-            logger.warn('[Auth] Token validation failed, clearing');
-            localStorage.removeItem('token');
-            setToken(null);
-            setUser(null);
-          }
-        } catch (error) {
-          logger.error('[Auth] Failed to load user:', error);
-          localStorage.removeItem('token');
-          setToken(null);
-          setUser(null);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    loadUser();
-  }, []);
+    fetchCurrentUser();
+  }, [fetchCurrentUser]);
 
   // Listen for unauthorized events from API interceptor
   useEffect(() => {
@@ -171,6 +173,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     message.info('Logged out successfully');
   };
 
+  const refreshUser = async () => {
+    await fetchCurrentUser({ silent: true });
+  };
+
+  const updateProfile = async (updates: UserProfileUpdatePayload) => {
+    try {
+      const updatedUser = await profileApi.updateProfile(updates);
+      setUser(updatedUser);
+      message.success('Профиль обновлен');
+      return updatedUser;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Не удалось обновить профиль';
+      message.error(errorMessage);
+      logger.error('[Auth] Failed to update profile:', error);
+      throw error;
+    }
+  };
+
   const hasRole = (role: string | string[]): boolean => {
     if (!user) return false;
 
@@ -194,6 +214,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     login,
     register,
     logout,
+    refreshUser,
+    updateProfile,
     isAuthenticated,
     hasRole,
   };

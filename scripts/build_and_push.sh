@@ -140,8 +140,8 @@ if [ -n "$BACKEND_CONTAINER" ]; then
 fi
 
 # Если используется docker-compose
-if [ -d "/root/west_buget_it" ]; then
-    cd /root/west_buget_it
+if [ -d "/root/acme_buget_it" ]; then
+    cd /root/acme_buget_it
     echo "Запуск через docker-compose..."
     docker-compose -f docker-compose.prod.yml up -d backend
 else
@@ -163,7 +163,7 @@ else
     echo "⚠️  Контейнер не перезапущен"
     echo ""
     echo "Для перезапуска выполните на сервере:"
-    echo "  ssh $SERVER 'cd /root/west_buget_it && docker-compose -f docker-compose.prod.yml up -d backend'"
+    echo "  ssh $SERVER 'cd /root/acme_buget_it && docker-compose -f docker-compose.prod.yml up -d backend'"
 fi
 
 # Очистка локального tarball

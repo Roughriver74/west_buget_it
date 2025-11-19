@@ -18,9 +18,9 @@ NEW_SERVER="31.129.107.178"
 
 # Old database (Docker)
 OLD_CONTAINER="postgres-sskow88ckgsk4ossc8s8440k-093812936523"
-OLD_DB_NAME="west_fin_dwh"
-OLD_DB_USER="west_user"
-OLD_DB_PASSWORD="west_secure_password_2025"
+OLD_DB_NAME="acme_fin_dwh"
+OLD_DB_USER="acme_user"
+OLD_DB_PASSWORD="acme_secure_password_2025"
 
 # New database (Production)
 NEW_CONTAINER="budget_db_prod"
@@ -138,7 +138,7 @@ echo ""
 echo "📁 Backup files saved in: $TEMP_DIR"
 echo ""
 echo "🔍 Next steps:"
-echo "1. Test application: https://budget-west.shknv.ru/login"
+echo "1. Test application: https://budget-acme.shknv.ru/login"
 echo "2. Verify all data is present"
 echo "3. Check application logs for errors"
 echo ""

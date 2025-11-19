@@ -21,7 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
     handlers=[
-        logging.FileHandler('/Users/evgenijsikunov/projects/west/west_buget_it/backend/logs/sync_hourly.log'),
+        logging.FileHandler('/Users/evgenijsikunov/projects/acme/acme_buget_it/backend/logs/sync_hourly.log'),
         logging.StreamHandler()
     ]
 )

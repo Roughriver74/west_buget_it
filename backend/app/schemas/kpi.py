@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from app.db.models import BonusTypeEnum, KPIGoalStatusEnum
+from app.db.models import BonusTypeEnum, KPIGoalStatusEnum, EmployeeKPIStatusEnum
 
 
 # ============ KPI Goal Schemas ============
@@ -62,6 +62,10 @@ class EmployeeKPIBase(BaseModel):
     month: int = Field(..., ge=1, le=12)
     kpi_percentage: Optional[Decimal] = Field(None, ge=0, le=200, description="КПИ% (0-200)")
 
+    # Depremium threshold
+    depremium_threshold: Decimal = Field(10.00, ge=0, le=100, description="Порог депремирования (%)")
+    depremium_applied: bool = False
+
     # Bonus types
     monthly_bonus_type: BonusTypeEnum = BonusTypeEnum.PERFORMANCE_BASED
     quarterly_bonus_type: BonusTypeEnum = BonusTypeEnum.PERFORMANCE_BASED
@@ -82,6 +86,19 @@ class EmployeeKPIBase(BaseModel):
     quarterly_bonus_fixed_part: Optional[Decimal] = Field(None, ge=0, le=100)
     annual_bonus_fixed_part: Optional[Decimal] = Field(None, ge=0, le=100)
 
+    # Task complexity bonus component (NEW in Task 3.2)
+    task_complexity_avg: Optional[Decimal] = Field(None, ge=1, le=10, description="Средняя сложность задач (1-10)")
+    task_complexity_multiplier: Optional[Decimal] = Field(None, ge=0.5, le=2.0, description="Множитель премии по сложности")
+    task_complexity_weight: Decimal = Field(20.00, ge=0, le=100, description="Вес компонента сложности в премии (%)")
+
+    # Complexity bonus components
+    monthly_bonus_complexity: Optional[Decimal] = Field(None, ge=0, description="Компонент месячной премии по сложности")
+    quarterly_bonus_complexity: Optional[Decimal] = Field(None, ge=0, description="Компонент квартальной премии по сложности")
+    annual_bonus_complexity: Optional[Decimal] = Field(None, ge=0, description="Компонент годовой премии по сложности")
+
+    # Workflow status
+    status: EmployeeKPIStatusEnum = EmployeeKPIStatusEnum.DRAFT
+
     department_id: int
     notes: Optional[str] = None
 
@@ -97,6 +114,10 @@ class EmployeeKPIUpdate(BaseModel):
     year: Optional[int] = Field(None, ge=2020, le=2100)
     month: Optional[int] = Field(None, ge=1, le=12)
     kpi_percentage: Optional[Decimal] = Field(None, ge=0, le=200)
+
+    # Depremium threshold
+    depremium_threshold: Optional[Decimal] = Field(None, ge=0, le=100)
+    depremium_applied: Optional[bool] = None
 
     # Bonus types
     monthly_bonus_type: Optional[BonusTypeEnum] = None
@@ -118,6 +139,19 @@ class EmployeeKPIUpdate(BaseModel):
     quarterly_bonus_fixed_part: Optional[Decimal] = Field(None, ge=0, le=100)
     annual_bonus_fixed_part: Optional[Decimal] = Field(None, ge=0, le=100)
 
+    # Task complexity bonus component (NEW in Task 3.2)
+    task_complexity_avg: Optional[Decimal] = Field(None, ge=1, le=10)
+    task_complexity_multiplier: Optional[Decimal] = Field(None, ge=0.5, le=2.0)
+    task_complexity_weight: Optional[Decimal] = Field(None, ge=0, le=100)
+
+    # Complexity bonus components
+    monthly_bonus_complexity: Optional[Decimal] = Field(None, ge=0)
+    quarterly_bonus_complexity: Optional[Decimal] = Field(None, ge=0)
+    annual_bonus_complexity: Optional[Decimal] = Field(None, ge=0)
+
+    # Workflow status
+    status: Optional[EmployeeKPIStatusEnum] = None
+
     department_id: Optional[int] = None
     notes: Optional[str] = None
 
@@ -127,6 +161,12 @@ class EmployeeKPIInDB(EmployeeKPIBase):
     id: int
     created_at: datetime
     updated_at: datetime
+
+    # Approval tracking
+    submitted_at: Optional[datetime] = None
+    reviewed_by_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
+    rejection_reason: Optional[str] = None
 
     class Config:
         from_attributes = True

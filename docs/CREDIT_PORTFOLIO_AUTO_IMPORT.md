@@ -422,7 +422,7 @@ tail -f backend.log | grep scheduler
 # Успешный импорт
 [INFO] Starting scheduled credit portfolio import
 [INFO] Downloaded 3 files from FTP
-[INFO] Department ООО Вест: 3/3 files imported
+[INFO] Department ООО Демо: 3/3 files imported
 [INFO] Scheduled import completed: 3 files imported, 0 failed
 
 # Ошибка

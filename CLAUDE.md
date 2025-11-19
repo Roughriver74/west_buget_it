@@ -20,6 +20,116 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 👥 Payroll & KPI-based bonuses
 - 🔐 Multi-tenancy & role-based access (5 roles)
 - 📊 Advanced analytics & forecasting
+- 🎛️ **Modular architecture** with license-level feature control (NEW)
+
+## 🎛️ Module System - Feature Access Control
+
+**Module System** - централизованная система управления доступом к функциям приложения на уровне организации.
+
+### Архитектура
+
+```
+Backend API Protection ──┐
+                         ├──> Module Access Control
+Frontend UI Hiding   ────┘
+```
+
+### Доступные модули
+
+| Code | Name | Description |
+|------|------|-------------|
+| `BUDGET_CORE` | Базовый модуль | Основной функционал (всегда включен) |
+| `AI_FORECAST` | AI прогнозирование | Bank transactions + AI classification |
+| `CREDIT_PORTFOLIO` | Кредитный портфель | Финансовый портфель + FTP import |
+| `REVENUE_BUDGET` | Бюджет доходов | Планирование доходов + LTV метрики |
+| `PAYROLL_KPI` | KPI и бонусы | Система KPI для сотрудников |
+| `INTEGRATIONS_1C` | Интеграция с 1С | OData синхронизация |
+| `FOUNDER_DASHBOARD` | Дашборд учредителя | Executive dashboard |
+| `ADVANCED_ANALYTICS` | Расширенная аналитика | Продвинутые отчеты |
+| `MULTI_DEPARTMENT` | Мультиотдельность | Управление отделами |
+
+### Backend: Защита API
+
+```python
+from app.core.module_guard import require_module
+
+@router.get("/credit-portfolio/contracts")
+def get_contracts(
+    module_access = Depends(require_module("CREDIT_PORTFOLIO")),  # ← Module check
+    current_user = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(Contract).all()
+```
+
+### Frontend: Условный рендеринг
+
+```typescript
+import { useModules } from '@/contexts/ModulesContext'
+import { ModuleGate } from '@/components/common/ModuleGate'
+
+// Вариант 1: Hook
+const { hasModule } = useModules()
+if (hasModule('CREDIT_PORTFOLIO')) {
+  return <CreditPortfolioWidget />
+}
+
+// Вариант 2: Component
+<ModuleGate moduleCode="AI_FORECAST">
+  <AiForecastFeature />
+</ModuleGate>
+
+// Вариант 3: HOC
+export default ModuleGuard(CreditPortfolioPage, 'CREDIT_PORTFOLIO')
+```
+
+### API для управления модулями (ADMIN только)
+
+```bash
+# Включить модуль для организации
+POST /api/v1/modules/enable
+{
+  "module_code": "CREDIT_PORTFOLIO",
+  "organization_id": 1,
+  "expires_at": "2026-12-31T23:59:59Z",
+  "limits": { "max_contracts": 100 }
+}
+
+# Отключить модуль
+POST /api/v1/modules/disable
+{
+  "module_code": "CREDIT_PORTFOLIO",
+  "organization_id": 1
+}
+
+# Получить включенные модули
+GET /api/v1/modules/enabled/my
+```
+
+### Быстрый старт
+
+```bash
+# 1. Загрузить модули в БД
+cd backend
+python scripts/seed_modules.py
+
+# 2. Включить модуль для организации (через SQL)
+INSERT INTO organization_modules (organization_id, module_id, is_active)
+SELECT 1, id, true FROM modules WHERE code = 'AI_FORECAST';
+
+# 3. Frontend автоматически скроет/покажет элементы
+# 4. Backend автоматически защитит API endpoints
+```
+
+**Полная документация**: [docs/MODULES.md](docs/MODULES.md)
+
+**Ключевые файлы**:
+- Backend: `backend/app/services/module_service.py`, `backend/app/core/module_guard.py`
+- Frontend: `frontend/src/contexts/ModulesContext.tsx`, `frontend/src/components/common/ModuleGate.tsx`
+- DB Models: `backend/app/db/models.py` (Module, OrganizationModule, ModuleEvent, FeatureLimit)
+- Seed: `backend/scripts/seed_modules.py`
+
+---
 
 ## Development Commands
 
@@ -32,10 +142,7 @@ ssh root@31.129.107.178
 
 **Troubleshooting deployment issues**:
 
-- [Auto Proxy Restart Guide](docs/AUTO_PROXY_RESTART.md) - автоматический рестарт Traefik после деплоя
-- [Memory Optimization](docs/MEMORY_OPTIMIZATION.md) - решение проблемы потери доступа через 15-20 минут (OOM)
-- [Memory Fix Quick Reference](docs/MEMORY_FIX.md) - краткая памятка по проблеме с памятью
-- [Traefik 504 Fix](docs/TRAEFIK_504_FIX.md) - исправление периодических ошибок 504 Gateway Timeout
+Для решения проблем с деплоем обращайтесь к логам и используйте стандартные инструменты диагностики.
 
 ### Quick Start
 ```bash
@@ -682,8 +789,8 @@ payment = db.query(BankTransaction).filter_by(expense_id=expense.id).first()
 # Связь: BankTransaction.organization_id → Organization.id
 # Определяет нашу организацию (плательщика)
 
-# Пример: все транзакции организации "ООО Вест"
-org = db.query(Organization).filter_by(short_name="Вест").first()
+# Пример: все транзакции организации "ООО Демо"
+org = db.query(Organization).filter_by(short_name="Демо").first()
 transactions = db.query(BankTransaction).filter_by(organization_id=org.id).all()
 ```
 
@@ -2679,6 +2786,52 @@ GET /api/v1/founder/dashboard/budget-execution
 - Alerts and notifications
 
 **Доступ**: Только для пользователей с ролью FOUNDER
+
+---
+
+## 📝 Правила создания документации
+
+### ⚠️ ВАЖНО: Документация только для новой функциональности
+
+**НЕ создавайте документацию для:**
+- ❌ Исправлений багов (bug fixes)
+- ❌ Рефакторинга существующего кода
+- ❌ Оптимизаций производительности
+- ❌ Исправлений деплоя или конфигурации
+- ❌ Отчетов о сессиях разработки
+- ❌ Аудитов кода
+
+**Создавайте документацию ТОЛЬКО для:**
+- ✅ Новой функциональности (новые модули, фичи)
+- ✅ Новых API endpoints
+- ✅ Новых workflow и процессов
+- ✅ Руководств пользователя для новых возможностей
+- ✅ Архитектурных решений для новых компонентов
+
+### Где размещать документацию
+
+**Папка `docs/`** - только для документации реальной функциональности:
+- Руководства по использованию (`*_GUIDE.md`)
+- Описания интеграций (`*_INTEGRATION.md`)
+- Планы развития (`*_PLAN.md`)
+- Архитектурная документация (`ARCHITECTURE.md`, `MULTI_TENANCY_*.md`)
+
+**НЕ размещайте в `docs/`:**
+- Отчеты о фиксах (`*_FIX.md`, `*_DEBUG.md`)
+- Сессионные отчеты (`SESSION_*.md`)
+- Отчеты об аудите (`*_AUDIT.md`, `*_REPORT.md`)
+
+### Примеры правильной документации
+
+✅ **Хорошо:**
+- `docs/BANK_TRANSACTIONS_IMPORT_GUIDE.md` - руководство по использованию функционала
+- `docs/1C_INTEGRATION_GUIDE.md` - описание интеграции
+- `docs/PAYROLL_KPI_PLAN.md` - план новой функциональности
+
+❌ **Плохо:**
+- `docs/MEMORY_FIX.md` - исправление бага
+- `docs/SESSION_SUMMARY_2025-10-30.md` - отчет о сессии
+- `docs/BUGFIX_REPORT.md` - отчет об исправлениях
 
 ---
 

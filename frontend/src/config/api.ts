@@ -3,6 +3,8 @@
  * Supports both build-time (VITE_API_URL) and runtime (window.ENV_CONFIG) configuration
  */
 
+const API_OVERRIDE_STORAGE_KEY = 'app-api-url-override';
+
 // Extend Window interface to include ENV_CONFIG
 declare global {
   interface Window {
@@ -12,8 +14,21 @@ declare global {
   }
 }
 
+const getStoredApiOverride = (): string | null => {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  const override = window.localStorage.getItem(API_OVERRIDE_STORAGE_KEY);
+  const trimmed = override?.trim();
+  return trimmed ? trimmed : null;
+};
+
 // Get API URL from runtime config (Docker) or build-time env (development)
 const getRawApiUrl = (): string => {
+  // Priority 0: Local admin override for debugging (stored in localStorage)
+  const overrideUrl = getStoredApiOverride();
+  if (overrideUrl) {
+    return overrideUrl;
+  }
+
   // Priority 1: Runtime configuration (for Docker/production)
   if (typeof window !== 'undefined' && window.ENV_CONFIG?.VITE_API_URL) {
     // Check if it's still a placeholder (not replaced by entrypoint)
@@ -50,6 +65,9 @@ export const getApiBaseUrl = (): string => {
   // Otherwise append full /api/v1
   return `${rawApiUrl}/api/v1`;
 };
+
+export const getApiOverride = getStoredApiOverride;
+export { API_OVERRIDE_STORAGE_KEY };
 
 // Deprecated: Use getApiBaseUrl() instead for dynamic runtime config
 // This is kept for backwards compatibility but may use stale build-time values

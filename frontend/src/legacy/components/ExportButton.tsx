@@ -145,14 +145,14 @@ export default function ExportButton({ targetId, fileName = 'export', data }: Ex
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg z-[1000] min-w-[200px] p-2"
+            className="absolute top-full right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-[1000] min-w-[200px] p-2"
           >
             <motion.button
-              whileHover={{ backgroundColor: '#F3F4F6' }}
+              whileHover={{ backgroundColor: 'var(--muted)' }}
               onClick={exportToImage}
               disabled={exporting}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-gray-700 text-left transition-colors',
+                'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-foreground text-left transition-colors',
                 exporting && 'opacity-50 cursor-not-allowed'
               )}
             >
@@ -161,11 +161,11 @@ export default function ExportButton({ targetId, fileName = 'export', data }: Ex
             </motion.button>
 
             <motion.button
-              whileHover={{ backgroundColor: '#F3F4F6' }}
+              whileHover={{ backgroundColor: 'var(--muted)' }}
               onClick={exportToPDF}
               disabled={exporting}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-gray-700 text-left transition-colors',
+                'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-foreground text-left transition-colors',
                 exporting && 'opacity-50 cursor-not-allowed'
               )}
             >
@@ -175,11 +175,11 @@ export default function ExportButton({ targetId, fileName = 'export', data }: Ex
 
             {data && (
               <motion.button
-                whileHover={{ backgroundColor: '#F3F4F6' }}
+                whileHover={{ backgroundColor: 'var(--muted)' }}
                 onClick={exportToCSV}
                 disabled={exporting}
                 className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-gray-700 text-left transition-colors',
+                  'flex items-center gap-3 w-full px-3 py-2.5 bg-transparent border-none rounded-md cursor-pointer text-sm text-foreground text-left transition-colors',
                   exporting && 'opacity-50 cursor-not-allowed'
                 )}
               >

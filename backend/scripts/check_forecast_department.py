@@ -51,7 +51,7 @@ with engine.connect() as conn:
             WHERE department_id IS NULL
         """))
         conn.commit()
-        print("✓ Updated all records to department_id=2 (IT Отдел WEST)")
+        print("✓ Updated all records to department_id=2 (IT Отдел ACME)")
     else:
         print("\n✓ All records have department_id assigned")
 

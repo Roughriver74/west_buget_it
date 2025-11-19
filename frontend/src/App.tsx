@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { DepartmentProvider } from './contexts/DepartmentContext'
+import { ModulesProvider } from './contexts/ModulesContext'
 import AppLayout from './components/common/AppLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoadingState from './components/common/LoadingState'
@@ -17,6 +18,10 @@ import DashboardPage from './pages/DashboardPage'
 
 // Founder module
 const FounderDashboardPage = lazy(() => import('./pages/FounderDashboardPage'))
+
+// Account
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 // Lazy-loaded pages (code splitting by module)
 
@@ -47,6 +52,7 @@ const OrganizationDetailPage = lazy(() => import('./pages/OrganizationDetailPage
 const BusinessOperationMappingsPage = lazy(() => import('./pages/BusinessOperationMappingsPage'))
 const TaxRatesPage = lazy(() => import('./pages/TaxRatesPage'))
 const PayrollScenariosPage = lazy(() => import('./pages/PayrollScenariosPage'))
+const PayrollScenarioDetailPage = lazy(() => import('./pages/PayrollScenarioDetailPage'))
 
 // Admin module
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage'))
@@ -63,6 +69,7 @@ const PayrollAnalyticsPage = lazy(() => import('./pages/PayrollAnalyticsPage'))
 const KpiManagementPage = lazy(() => import('./pages/KpiManagementPage'))
 const KPIAnalyticsPage = lazy(() => import('./pages/KPIAnalyticsPage'))
 const NDFLCalculatorPage = lazy(() => import('./pages/NDFLCalculatorPage'))
+const SalaryCalculatorPage = lazy(() => import('./pages/SalaryCalculatorPage'))
 
 // Revenue module
 const RevenueDashboardPage = lazy(() => import('./pages/RevenueDashboardPage'))
@@ -104,12 +111,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DepartmentProvider>
-                    <AppLayout>
-                      <Suspense fallback={<LoadingState />}>
-                        <Routes>
+                    <ModulesProvider>
+                      <AppLayout>
+                        <Suspense fallback={<LoadingState />}>
+                          <Routes>
                           <Route path="/" element={<Navigate to="/dashboard" replace />} />
                           <Route path="/dashboard" element={<DashboardPage />} />
                           <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
+                          <Route path="/profile" element={<ProfilePage />} />
+                          <Route path="/settings" element={<SettingsPage />} />
 
                           {/* Founder dashboard - FOUNDER and ADMIN only */}
                           <Route
@@ -269,6 +279,14 @@ function App() {
                             </ProtectedRoute>
                           }
                         />
+                        <Route
+                          path="/payroll/scenarios/:id"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER']}>
+                              <PayrollScenarioDetailPage />
+                            </ProtectedRoute>
+                          }
+                        />
 
                         {/* Business Operation Mappings - ADMIN and MANAGER only */}
                         <Route
@@ -368,6 +386,14 @@ function App() {
                           }
                         />
                         <Route
+                          path="/payroll/salary-calculator"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
+                              <SalaryCalculatorPage />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
                           path="/kpi/analytics"
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
@@ -413,9 +439,10 @@ function App() {
                         <Route path="/analytics/unified-dashboard" element={<UnifiedFinancialDashboardPage />} />
                         <Route path="/payment-calendar" element={<PaymentCalendarPage />} />
                         <Route path="/forecast" element={<ForecastPage />} />
-                        </Routes>
-                      </Suspense>
-                    </AppLayout>
+                          </Routes>
+                        </Suspense>
+                      </AppLayout>
+                    </ModulesProvider>
                   </DepartmentProvider>
                 </ProtectedRoute>
               }

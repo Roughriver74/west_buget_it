@@ -47,5 +47,5 @@ def analyze_ftp_file(file_path):
         sys.exit(1)
 
 if __name__ == "__main__":
-    file_path = "/Users/evgenijsikunov/projects/west/west_buget_it/xls/Zayavki na raszkhod(spisok) XLSX.xlsx"
+    file_path = "/Users/evgenijsikunov/projects/acme/acme_buget_it/xls/Zayavki na raszkhod(spisok) XLSX.xlsx"
     analyze_ftp_file(file_path)

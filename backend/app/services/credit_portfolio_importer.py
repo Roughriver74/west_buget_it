@@ -1,6 +1,6 @@
 """
 Data importer with UPSERT logic for loading credit portfolio XLSX data into PostgreSQL
-Адаптировано для west_buget_it из west_fin с поддержкой multi-tenancy
+Адаптировано для acme_buget_it из acme_fin с поддержкой multi-tenancy
 """
 import logging
 from typing import List, Dict, Tuple

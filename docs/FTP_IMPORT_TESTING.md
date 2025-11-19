@@ -142,7 +142,7 @@ tail -f backend/logs/app.log | grep -i "import"
 Если тестирование выявит проблемы:
 
 ```bash
-cd /Users/evgenijsikunov/projects/west/west_buget_it
+cd /Users/evgenijsikunov/projects/acme/acme_buget_it
 git checkout backend/app/services/ftp_import_service.py
 git checkout backend/app/api/v1/expenses.py
 git checkout backend/cron_ftp_import.py

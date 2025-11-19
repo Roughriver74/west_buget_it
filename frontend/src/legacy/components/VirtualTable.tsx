@@ -45,20 +45,20 @@ export default function VirtualTable<T extends Record<string, any>>({
 
   if (!data || data.length === 0) {
     return (
-      <div className="p-5 text-center bg-gray-50 rounded-lg border border-gray-200">
-        <p className="text-sm text-gray-600 m-0">{emptyMessage}</p>
+      <div className="p-5 text-center bg-muted rounded-lg border border-border">
+        <p className="text-sm text-muted-foreground m-0">{emptyMessage}</p>
       </div>
     )
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-      <div className="bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">
+    <div className="border border-border rounded-lg overflow-hidden bg-card">
+      <div className="bg-muted border-b-2 border-border sticky top-0 z-10">
         <div className="flex px-4 py-3 gap-3">
           {columns.map((column, index) => (
             <div
               key={index}
-              className="text-xs font-semibold text-gray-700 uppercase tracking-wider"
+              className="text-xs font-semibold text-foreground/80 uppercase tracking-wider"
               style={{
                 flex: column.flex || 1,
                 minWidth: column.minWidth || (isMobile ? '80px' : '100px'),
@@ -85,9 +85,9 @@ export default function VirtualTable<T extends Record<string, any>>({
                 <div
                   key={startIndex + idx}
                   className={cn(
-                    'border-b border-gray-200 transition-colors',
-                    isEven ? 'bg-gray-50' : 'bg-white',
-                    onRowClick && 'cursor-pointer hover:bg-gray-100'
+                    'border-b border-border transition-colors',
+                    isEven ? 'bg-muted/50' : 'bg-card',
+                    onRowClick && 'cursor-pointer hover:bg-muted'
                   )}
                   style={{ height: actualRowHeight }}
                   onClick={() => onRowClick && onRowClick(item, startIndex + idx)}
@@ -96,7 +96,7 @@ export default function VirtualTable<T extends Record<string, any>>({
                     {columns.map((column, colIndex) => (
                       <div
                         key={colIndex}
-                        className="text-sm text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap"
+                        className="text-sm text-foreground overflow-hidden text-ellipsis whitespace-nowrap"
                         style={{
                           flex: column.flex || 1,
                           minWidth: column.minWidth || (isMobile ? '80px' : '100px'),
@@ -115,8 +115,8 @@ export default function VirtualTable<T extends Record<string, any>>({
         </div>
       </div>
 
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-[13px] text-gray-600 text-center">
-        Всего записей: <strong>{data.length.toLocaleString()}</strong>
+      <div className="px-4 py-3 bg-muted border-t border-border text-[13px] text-muted-foreground text-center">
+        Всего записей: <strong className="text-foreground">{data.length.toLocaleString()}</strong>
       </div>
     </div>
   )

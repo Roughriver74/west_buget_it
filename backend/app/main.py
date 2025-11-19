@@ -11,7 +11,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions, business_operation_mappings, credit_portfolio, sync_1c, tax_rates, payroll_scenarios
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, kpi_tasks, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions, business_operation_mappings, credit_portfolio, sync_1c, tax_rates, payroll_scenarios, modules, admin_settings
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -182,6 +182,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.API_PREFIX}/auth", tags=["Authentication"])
 app.include_router(departments.router, prefix=f"{settings.API_PREFIX}/departments", tags=["Departments"])
+app.include_router(modules.router, prefix=f"{settings.API_PREFIX}/modules", tags=["Modules"])
 app.include_router(audit.router, prefix=f"{settings.API_PREFIX}/audit", tags=["Audit Logs"])
 app.include_router(expenses.router, prefix=f"{settings.API_PREFIX}/expenses", tags=["Expenses"])
 app.include_router(categories.router, prefix=f"{settings.API_PREFIX}/categories", tags=["Categories"])
@@ -200,6 +201,7 @@ app.include_router(payroll.router, prefix=f"{settings.API_PREFIX}/payroll", tags
 app.include_router(tax_rates.router, prefix=f"{settings.API_PREFIX}/tax-rates", tags=["Tax Rates"])
 app.include_router(payroll_scenarios.router, prefix=f"{settings.API_PREFIX}/payroll-scenarios", tags=["Payroll Scenarios"])
 app.include_router(kpi.router, prefix=f"{settings.API_PREFIX}/kpi", tags=["KPI"])
+app.include_router(kpi_tasks.router, prefix=f"{settings.API_PREFIX}/kpi/tasks", tags=["KPI Tasks"])
 app.include_router(templates.router, prefix=f"{settings.API_PREFIX}/templates", tags=["Templates"])
 app.include_router(comprehensive_report.router, prefix=f"{settings.API_PREFIX}/reports/comprehensive", tags=["Comprehensive Report"])
 
@@ -242,6 +244,9 @@ app.include_router(credit_portfolio.router, prefix=f"{settings.API_PREFIX}/credi
 
 # 1C Catalog Synchronization (Синхронизация справочников 1С)
 app.include_router(sync_1c.router, prefix=f"{settings.API_PREFIX}/sync/1c", tags=["1C Catalog Sync"])
+
+# Admin Settings (sensitive config)
+app.include_router(admin_settings.router, prefix=f"{settings.API_PREFIX}/admin", tags=["Admin Settings"])
 
 
 @app.on_event("startup")

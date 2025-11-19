@@ -8,6 +8,7 @@ export { budgetApi } from './budget'
 export { forecastApi } from './forecast'
 export { departmentsApi } from './departments'
 export { usersApi } from './users'
+export { profileApi } from './profile'
 export {
   employeeAPI,
   payrollPlanAPI,
@@ -22,3 +23,4 @@ export { invoiceProcessingApi } from './invoiceProcessing'
 export { founderDashboardApi } from './founderDashboard'
 export { bankTransactionsApi } from './bankTransactions'
 export { creditPortfolioApi } from './creditPortfolio'
+export { adminConfigApi } from './adminConfig'

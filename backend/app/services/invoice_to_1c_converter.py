@@ -194,7 +194,7 @@ class InvoiceTo1CConverter:
                 # Стратегия 1: Поиск по названию покупателя
                 if buyer_name:
                     logger.debug(f"Trying to find organization by buyer name: {buyer_name}")
-                    # Поиск по частичному совпадению названия (например "ВЕСТ" в "ООО ВЕСТ ЛОГИСТИК")
+                    # Поиск по частичному совпадению названия (например "ДЕМО" в "ООО ДЕМО ЛОГИСТИК")
                     organizations_by_name = self.db.query(Organization).filter(
                         Organization.is_active == True,
                         Organization.external_id_1c.isnot(None),
@@ -203,7 +203,7 @@ class InvoiceTo1CConverter:
 
                     for org in organizations_by_name:
                         org_name = (org.short_name or org.name or '').upper()
-                        if 'ВЕСТ' in buyer_name.upper() and 'ВЕСТ' in org_name:
+                        if 'ДЕМО' in buyer_name.upper() and 'ДЕМО' in org_name:
                             organization = org
                             buyer_inn = org.inn
                             logger.debug(f"Found organization by name match: {org.short_name} (INN: {org.inn})")

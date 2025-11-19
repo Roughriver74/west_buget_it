@@ -3,7 +3,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from app.db.models import EmployeeStatusEnum
+from app.db.models import EmployeeStatusEnum, SalaryTypeEnum
 
 
 # ============ Employee Schemas ============
@@ -17,7 +17,20 @@ class EmployeeBase(BaseModel):
     hire_date: Optional[date] = None
     fire_date: Optional[date] = None
     status: EmployeeStatusEnum = EmployeeStatusEnum.ACTIVE
-    base_salary: Decimal = Field(..., ge=0)
+
+    # Salary calculation fields (Task 1.4: Брутто ↔ Нетто)
+    salary_type: SalaryTypeEnum = Field(
+        SalaryTypeEnum.GROSS,
+        description="Тип ввода оклада: GROSS (брутто, до вычета НДФЛ) или NET (нетто, на руки)"
+    )
+    base_salary: Decimal = Field(..., ge=0, description="Оклад (значение которое вводит пользователь)")
+    ndfl_rate: Decimal = Field(
+        Decimal("0.13"),
+        ge=0,
+        lt=1,
+        description="Ставка НДФЛ (по умолчанию 13% = 0.13)"
+    )
+
     # Bonus base rates (базовые ставки премий)
     monthly_bonus_base: Decimal = Field(0, ge=0, description="Базовая месячная премия")
     quarterly_bonus_base: Optional[Decimal] = Field(None, ge=0, description="Базовая квартальная премия (опционально)")
@@ -45,7 +58,12 @@ class EmployeeUpdate(BaseModel):
     hire_date: Optional[date] = None
     fire_date: Optional[date] = None
     status: Optional[EmployeeStatusEnum] = None
+
+    # Salary calculation fields (Task 1.4: Брутто ↔ Нетто)
+    salary_type: Optional[SalaryTypeEnum] = None
     base_salary: Optional[Decimal] = Field(None, ge=0)
+    ndfl_rate: Optional[Decimal] = Field(None, ge=0, lt=1)
+
     # Bonus base rates (optional for update)
     monthly_bonus_base: Optional[Decimal] = Field(None, ge=0)
     quarterly_bonus_base: Optional[Decimal] = Field(None, ge=0)
@@ -59,6 +77,12 @@ class EmployeeInDB(EmployeeBase):
     """Schema for employee in database"""
     id: int
     department_id: int
+
+    # Calculated salary fields (Task 1.4: Брутто ↔ Нетто)
+    base_salary_gross: Optional[Decimal] = Field(None, description="Оклад брутто (до вычета НДФЛ)")
+    base_salary_net: Optional[Decimal] = Field(None, description="Оклад нетто (на руки после НДФЛ)")
+    ndfl_amount: Optional[Decimal] = Field(None, description="Сумма НДФЛ")
+
     created_at: datetime
     updated_at: datetime
 

@@ -148,7 +148,7 @@ curl -X PUT "http://localhost:8000/api/v1/invoice-processing/123/category" \
     },
     "organization": {
       "guid": "e5f6g7h8-...",
-      "name": "ООО ВЕСТ ГРУПП"
+      "name": "ООО ДЕМО ГРУПП"
     },
     "cash_flow_category": {
       "guid": "i9j0k1l2-...",

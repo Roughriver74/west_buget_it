@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""Migrate contractors from 'del' department to 'IT Отдел WEST' department"""
+"""Migrate contractors from 'del' department to 'IT Отдел ACME' department"""
 
 import sys
-sys.path.insert(0, '/Users/evgenijsikunov/projects/west/west_buget_it/backend')
+sys.path.insert(0, '/Users/evgenijsikunov/projects/acme/acme_buget_it/backend')
 
 from app.db.session import SessionLocal
 from app.db.models import Contractor, Department
 
 def migrate_contractors():
-    """Migrate all contractors from 'del' to 'IT Отдел WEST'"""
+    """Migrate all contractors from 'del' to 'IT Отдел ACME'"""
 
     db = SessionLocal()
 
     try:
         # Find the departments
         del_dept = db.query(Department).filter(Department.name == "del").first()
-        it_dept = db.query(Department).filter(Department.name == "IT Отдел WEST").first()
+        it_dept = db.query(Department).filter(Department.name == "IT Отдел ACME").first()
 
         if not del_dept:
             print("❌ Error: 'del' department not found")
             return
 
         if not it_dept:
-            print("❌ Error: 'IT Отдел WEST' department not found")
+            print("❌ Error: 'IT Отдел ACME' department not found")
             return
 
         print(f"\n📊 Department Information:")
@@ -85,7 +85,7 @@ def migrate_contractors():
 if __name__ == "__main__":
     print("\n" + "="*60)
     print("  Contractor Migration Script")
-    print("  From: 'del' → To: 'IT Отдел WEST'")
+    print("  From: 'del' → To: 'IT Отдел ACME'")
     print("="*60 + "\n")
 
     migrate_contractors()

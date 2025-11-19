@@ -158,7 +158,7 @@ log ""
 # Проверка сетевой доступности
 log_section "10. Проверка доступности приложения"
 log "--- Проверка frontend ---"
-FRONTEND_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://budget-west.shknv.ru)
+FRONTEND_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://budget-acme.shknv.ru)
 if [ "$FRONTEND_CODE" = "200" ]; then
     log "${GREEN}✅ Frontend доступен (HTTP $FRONTEND_CODE)${NC}"
 else
@@ -166,7 +166,7 @@ else
 fi
 
 log "--- Проверка backend health ---"
-BACKEND_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://budget-west.shknv.ru/api/v1/health)
+BACKEND_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://budget-acme.shknv.ru/api/v1/health)
 if [ "$BACKEND_CODE" = "200" ]; then
     log "${GREEN}✅ Backend доступен (HTTP $BACKEND_CODE)${NC}"
 else

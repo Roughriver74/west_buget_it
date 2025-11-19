@@ -8,6 +8,7 @@ import { KpiGoalsTab } from '@/components/kpi/KpiGoalsTab'
 import { EmployeeKpiTab } from '@/components/kpi/EmployeeKpiTab'
 import { KpiAssignmentsTab } from '@/components/kpi/KpiAssignmentsTab'
 import { KpiCalendar } from '@/components/kpi/KpiCalendar'
+import KpiAllTasksTab from '@/components/kpi/KpiAllTasksTab'
 
 const { Title } = Typography
 
@@ -40,6 +41,10 @@ const KPIManagementPage = () => {
 
         <Tabs.TabPane tab="Назначения целей" key="assignments">
           <KpiAssignmentsTab departmentId={departmentId} year={currentYear} />
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="Задачи KPI" key="tasks">
+          <KpiAllTasksTab departmentId={departmentId} />
         </Tabs.TabPane>
 
         <Tabs.TabPane tab="Календарь бонусов" key="calendar">

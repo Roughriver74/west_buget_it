@@ -168,7 +168,7 @@ const DepartmentFormModal: React.FC<DepartmentFormModalProps> = ({
             { max: 255, message: 'Максимум 255 символов' },
           ]}
         >
-          <Input placeholder="Например: (ВЕСТ) IT" />
+          <Input placeholder="Например: (ДЕМО) IT" />
         </Form.Item>
 
         <Form.Item

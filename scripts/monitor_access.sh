@@ -2,8 +2,8 @@
 # Непрерывный мониторинг доступности приложения для отслеживания момента потери доступа
 
 SERVER="root@93.189.228.52"
-FRONTEND_URL="https://budget-west.shknv.ru"
-BACKEND_URL="https://budget-west.shknv.ru/api/v1/health"
+FRONTEND_URL="https://budget-acme.shknv.ru"
+BACKEND_URL="https://budget-acme.shknv.ru/api/v1/health"
 CHECK_INTERVAL=30  # Проверка каждые 30 секунд
 LOG_FILE="./monitoring_$(date +%Y%m%d_%H%M%S).log"
 

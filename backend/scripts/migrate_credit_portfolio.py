@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Миграция данных кредитного портфеля из legacy БД (west_fin_dwh) в текущую схему fin_*.
+Миграция данных кредитного портфеля из legacy БД (acme_fin_dwh) в текущую схему fin_*.
 
 Использование:
     poetry run python backend/scripts/migrate_credit_portfolio.py \
-        --legacy-url postgresql://user:pass@localhost:25432/west_fin_dwh \
+        --legacy-url postgresql://user:pass@localhost:25432/acme_fin_dwh \
         --department-id 8
 
 По умолчанию берет цель из настроек приложения (SessionLocal), а источник — из

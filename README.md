@@ -33,7 +33,7 @@
 ## Структура проекта
 
 ```
-west_budget_it/
+acme_budget_it/
 ├── backend/           # FastAPI бэкенд
 ├── frontend/          # React фронтенд
 ├── docker-compose.yml

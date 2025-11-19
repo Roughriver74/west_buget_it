@@ -1,7 +1,7 @@
 """add default_category_id to departments
 
 Revision ID: 2025_11_19_2124
-Revises: 2025_11_19_2026
+Revises: 7265be4a81c3
 Create Date: 2025-11-19 21:24:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '2025_11_19_2124'
-down_revision = '2025_11_19_2026'
+down_revision = '7265be4a81c3'
 branch_labels = None
 depends_on = None
 

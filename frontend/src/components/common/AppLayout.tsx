@@ -33,6 +33,7 @@ import {
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useModules } from '../../contexts/ModulesContext'
 import DepartmentSelector from './DepartmentSelector'
 import ApiTokensDrawer from '../admin/ApiTokensDrawer'
 
@@ -51,6 +52,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const { mode, toggleTheme } = useTheme()
+  const { hasModule } = useModules()
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
@@ -100,7 +102,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   ]
 
   // Build menu items based on user role
-  const founderMenuItem = (user?.role === 'FOUNDER' || user?.role === 'ADMIN') ? [{
+  const founderMenuItem = ((user?.role === 'FOUNDER' || user?.role === 'ADMIN') && hasModule('FOUNDER_DASHBOARD')) ? [{
 		key: '/founder/dashboard',
 		icon: <TrophyOutlined />,
 		label: <Link to='/founder/dashboard'>Дашборд учредителя</Link>,
@@ -189,12 +191,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 			],
 		},
 
-		{
+		...(hasModule('AI_FORECAST') || hasModule('CREDIT_PORTFOLIO') ? [{
 			key: 'finance-submenu',
 			icon: <DollarCircleOutlined />,
 			label: 'Финансы',
 			children: [
-				{
+				...(hasModule('AI_FORECAST') ? [{
 					key: 'bank-transactions-submenu',
 					icon: <BankOutlined />,
 					label: 'Банковские операции',
@@ -210,8 +212,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 							label: <Link to='/bank-transactions/analytics'>Аналитика</Link>,
 						},
 					],
-				},
-				{
+				}] : []),
+				...(hasModule('CREDIT_PORTFOLIO') ? [{
 					key: 'credit-portfolio-submenu',
 					icon: <CreditCardOutlined />,
 					label: 'Кредитный портфель',
@@ -247,11 +249,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 							label: <Link to='/credit-portfolio/contracts'>Договоры</Link>,
 						},
 					],
-				},
+				}] : []),
 			],
-		},
+		}] : []),
 
-		{
+		...(hasModule('REVENUE_BUDGET') ? [{
 			key: 'revenue-submenu',
 			icon: <RiseOutlined />,
 			label: 'Доходы',
@@ -297,7 +299,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					label: <Link to='/revenue/analytics'>Аналитика доходов</Link>,
 				},
 			],
-		},
+		}] : []),
 
 		{
 			key: '/payment-calendar',
@@ -310,11 +312,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 			icon: <BarChartOutlined />,
 			label: 'Аналитика',
 			children: [
-				{
+				...(hasModule('AI_FORECAST') ? [{
 					key: '/forecast',
 					icon: <FundOutlined />,
 					label: <Link to='/forecast'>Прогноз расходов</Link>,
-				},
+				}] : []),
 				{
 					key: '/analytics',
 					label: <Link to='/analytics'>Дашборд</Link>,
@@ -323,10 +325,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/analytics/balance',
 					label: <Link to='/analytics/balance'>План-Факт-Остаток</Link>,
 				},
-				{
+				...(hasModule('ADVANCED_ANALYTICS') ? [{
 					key: '/analytics/extended',
 					label: <Link to='/analytics/extended'>Расширенная аналитика</Link>,
-				},
+				}] : []),
 			],
 		},
 
@@ -347,14 +349,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					key: '/payroll/actuals',
 					label: <Link to='/payroll/actuals'>Фактические выплаты</Link>,
 				},
-				{
+				...(hasModule('PAYROLL_KPI') ? [{
 					key: '/payroll/kpi',
 					label: <Link to='/payroll/kpi'>KPI сотрудников</Link>,
-				},
-				{
+				}] : []),
+				...(hasModule('PAYROLL_KPI') ? [{
 					key: '/kpi/analytics',
 					label: <Link to='/kpi/analytics'>Аналитика КПИ</Link>,
-				},
+				}] : []),
 				{
 					key: '/payroll/analytics',
 					label: <Link to='/payroll/analytics'>Аналитика ФОТ</Link>,

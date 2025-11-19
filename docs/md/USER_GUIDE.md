@@ -37,7 +37,7 @@
 
 ```bash
 # Перейти в директорию проекта
-cd /home/user/west_buget_it
+cd /home/user/acme_buget_it
 
 # Запуск backend
 cd backend
@@ -327,7 +327,7 @@ A: В базе данных SQLite (для разработки) или PostgreS
 
 ### Сообщить об ошибке
 
-GitHub Issues: https://github.com/Roughriver74/west_buget_it/issues
+GitHub Issues: https://github.com/Roughriver74/acme_buget_it/issues
 
 ---
 
@@ -335,7 +335,7 @@ GitHub Issues: https://github.com/Roughriver74/west_buget_it/issues
 
 - **API Documentation**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
-- **GitHub Repository**: https://github.com/Roughriver74/west_buget_it
+- **GitHub Repository**: https://github.com/Roughriver74/acme_buget_it
 - **Technical Documentation**: См. ARCHITECTURE.md, PROJECT_SUMMARY.md
 
 ---

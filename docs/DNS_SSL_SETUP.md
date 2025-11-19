@@ -21,7 +21,7 @@ Add the following A record in your DNS provider:
 
 ```
 Type: A
-Name: budget-west.shknv.ru (or @ for root domain)
+Name: budget-acme.shknv.ru (or @ for root domain)
 Value: 31.129.107.178
 TTL: 300 (or default)
 ```
@@ -41,10 +41,10 @@ After adding the A record, wait 5-30 minutes and verify:
 
 ```bash
 # Check DNS resolution
-nslookup budget-west.shknv.ru
+nslookup budget-acme.shknv.ru
 
 # Should return:
-# Name:    budget-west.shknv.ru
+# Name:    budget-acme.shknv.ru
 # Address: 31.129.107.178
 ```
 
@@ -54,13 +54,13 @@ Or use online tools:
 
 Test HTTP access via domain (before SSL):
 ```bash
-curl http://budget-west.shknv.ru/health
+curl http://budget-acme.shknv.ru/health
 # Should return: {"status":"healthy"}
 ```
 
 ## Step 2: Install SSL Certificate
 
-**IMPORTANT**: Only proceed after DNS is working and `budget-west.shknv.ru` resolves to `31.129.107.178`!
+**IMPORTANT**: Only proceed after DNS is working and `budget-acme.shknv.ru` resolves to `31.129.107.178`!
 
 ### Install Certificate with Let's Encrypt
 
@@ -70,7 +70,7 @@ SSH to the server and run:
 ssh root@31.129.107.178
 
 # Install SSL certificate
-certbot --nginx -d budget-west.shknv.ru
+certbot --nginx -d budget-acme.shknv.ru
 ```
 
 ### Certbot Prompts
@@ -85,7 +85,7 @@ You'll be asked:
 ### Expected Output
 
 ```
-Congratulations! You have successfully enabled HTTPS on budget-west.shknv.ru
+Congratulations! You have successfully enabled HTTPS on budget-acme.shknv.ru
 ```
 
 ### Verify SSL Certificate
@@ -94,15 +94,15 @@ Test HTTPS access:
 
 ```bash
 # From your computer
-curl https://budget-west.shknv.ru/health
+curl https://budget-acme.shknv.ru/health
 # Should return: {"status":"healthy"}
 
 # Check certificate details
-curl -v https://budget-west.shknv.ru/health 2>&1 | grep "SSL"
+curl -v https://budget-acme.shknv.ru/health 2>&1 | grep "SSL"
 ```
 
 Open in browser:
-- https://budget-west.shknv.ru
+- https://budget-acme.shknv.ru
 
 You should see a valid SSL certificate (green padlock in browser).
 
@@ -112,7 +112,7 @@ The Nginx configuration should already be correct from our deployment. Verify it
 
 ```bash
 ssh root@31.129.107.178
-cat /etc/nginx/sites-available/budget-west
+cat /etc/nginx/sites-available/budget-acme
 ```
 
 It should have:
@@ -131,7 +131,7 @@ cd /opt/budget-app
 nano .env.prod
 
 # Update CORS_ORIGINS to:
-CORS_ORIGINS=["https://budget-west.shknv.ru"]
+CORS_ORIGINS=["https://budget-acme.shknv.ru"]
 
 # Restart backend
 docker compose -f docker-compose.prod.yml restart backend
@@ -180,13 +180,13 @@ systemctl status certbot.timer
 **Solutions**:
 ```bash
 # Check DNS first
-nslookup budget-west.shknv.ru
+nslookup budget-acme.shknv.ru
 
 # Check Nginx is running
 systemctl status nginx
 
 # Check port 80 is accessible
-curl http://budget-west.shknv.ru/.well-known/acme-challenge/test
+curl http://budget-acme.shknv.ru/.well-known/acme-challenge/test
 ```
 
 ### Certificate Already Exists Error
@@ -196,10 +196,10 @@ curl http://budget-west.shknv.ru/.well-known/acme-challenge/test
 **Solution**:
 ```bash
 # Expand existing certificate
-certbot --nginx -d budget-west.shknv.ru --expand
+certbot --nginx -d budget-acme.shknv.ru --expand
 
 # Or force renewal
-certbot --nginx -d budget-west.shknv.ru --force-renewal
+certbot --nginx -d budget-acme.shknv.ru --force-renewal
 ```
 
 ### Mixed Content Warnings in Browser
@@ -214,9 +214,9 @@ certbot --nginx -d budget-west.shknv.ru --force-renewal
 
 After SSL installation, test:
 
-- [ ] HTTPS health endpoint: `https://budget-west.shknv.ru/health`
-- [ ] HTTPS frontend: `https://budget-west.shknv.ru`
-- [ ] HTTP redirects to HTTPS: `http://budget-west.shknv.ru` → `https://...`
+- [ ] HTTPS health endpoint: `https://budget-acme.shknv.ru/health`
+- [ ] HTTPS frontend: `https://budget-acme.shknv.ru`
+- [ ] HTTP redirects to HTTPS: `http://budget-acme.shknv.ru` → `https://...`
 - [ ] Valid SSL certificate (green padlock in browser)
 - [ ] Login works
 - [ ] API calls work
@@ -227,7 +227,7 @@ After SSL installation, test:
 After SSL is installed, verify security headers:
 
 ```bash
-curl -I https://budget-west.shknv.ru | grep -E "(Strict|X-Frame|X-Content)"
+curl -I https://budget-acme.shknv.ru | grep -E "(Strict|X-Frame|X-Content)"
 ```
 
 Should see:
@@ -239,7 +239,7 @@ Should see:
 
 - **Certificate expires**: 90 days (auto-renews at 60 days)
 - **Renewal logs**: `/var/log/letsencrypt/letsencrypt.log`
-- **Certificate location**: `/etc/letsencrypt/live/budget-west.shknv.ru/`
+- **Certificate location**: `/etc/letsencrypt/live/budget-acme.shknv.ru/`
 - **Renewal hook**: None needed, Nginx auto-reloads
 
 ## Need Help?
@@ -248,5 +248,5 @@ If you encounter issues:
 
 1. Check Nginx logs: `tail -f /var/log/nginx/error.log`
 2. Check Certbot logs: `tail -f /var/log/letsencrypt/letsencrypt.log`
-3. Verify DNS: `nslookup budget-west.shknv.ru`
-4. Test HTTP first: `curl http://budget-west.shknv.ru/health`
+3. Verify DNS: `nslookup budget-acme.shknv.ru`
+4. Test HTTP first: `curl http://budget-acme.shknv.ru/health`

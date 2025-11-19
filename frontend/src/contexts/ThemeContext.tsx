@@ -4,11 +4,14 @@ import type { ThemeConfig } from 'antd'
 import ruRU from 'antd/locale/ru_RU'
 
 type ThemeMode = 'light' | 'dark'
+type ComponentSize = 'small' | 'middle' | 'large'
 
 interface ThemeContextType {
   mode: ThemeMode
   toggleTheme: () => void
   setTheme: (mode: ThemeMode) => void
+  componentSize: ComponentSize
+  setComponentSize: (size: ComponentSize) => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -88,6 +91,7 @@ interface ThemeProviderProps {
 }
 
 const THEME_STORAGE_KEY = 'app-theme-mode'
+const COMPONENT_SIZE_STORAGE_KEY = 'app-component-size'
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   // Initialize theme from localStorage or system preference
@@ -105,6 +109,14 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     return 'light'
   })
 
+  const [componentSize, setComponentSize] = useState<ComponentSize>(() => {
+    const saved = localStorage.getItem(COMPONENT_SIZE_STORAGE_KEY)
+    if (saved === 'small' || saved === 'middle' || saved === 'large') {
+      return saved
+    }
+    return 'middle'
+  })
+
   // Save theme to localStorage when it changes
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, mode)
@@ -112,6 +124,10 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     // Update document root for additional styling if needed
     document.documentElement.setAttribute('data-theme', mode)
   }, [mode])
+
+  useEffect(() => {
+    localStorage.setItem(COMPONENT_SIZE_STORAGE_KEY, componentSize)
+  }, [componentSize])
 
   const toggleTheme = () => {
     setMode((prev) => (prev === 'light' ? 'dark' : 'light'))
@@ -125,13 +141,15 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
     mode,
     toggleTheme,
     setTheme,
+    componentSize,
+    setComponentSize,
   }
 
   const currentTheme = mode === 'dark' ? darkTheme : lightTheme
 
   return (
     <ThemeContext.Provider value={value}>
-      <ConfigProvider theme={currentTheme} locale={ruRU}>
+      <ConfigProvider theme={currentTheme} locale={ruRU} componentSize={componentSize}>
         {children}
       </ConfigProvider>
     </ThemeContext.Provider>

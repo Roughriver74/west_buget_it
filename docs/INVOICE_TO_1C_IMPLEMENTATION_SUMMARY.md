@@ -343,7 +343,7 @@ python scripts/test_invoice_to_1c.py --invoice-id 1 --no-attachment
 ✅ 1C connection successful
 ✅ Found 48 synced categories
 ✅ Contractor found: ООО ТРАСТ ТЕЛЕКОМ
-✅ Organization found: ООО ВЕСТ ГРУПП
+✅ Organization found: ООО ДЕМО ГРУПП
 ✅ Validation PASSED
 ✅ EXPENSE REQUEST CREATED!
 Ref_Key (GUID): a1810a57-b6eb-11f0-ad7f-74563c634acb

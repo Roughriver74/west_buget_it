@@ -49,12 +49,12 @@ def main():
             print(f"  FTP Подразделение: {dept.ftp_subdivision_name or 'не указано'}")
             print()
 
-        # Проверяем конкретное сопоставление для "(ВЕСТ) IT"
+        # Проверяем конкретное сопоставление для "(ДЕМО) IT"
         print("="*80)
-        print("ПОИСК ОТДЕЛА ПО FTP ПОДРАЗДЕЛЕНИЮ '(ВЕСТ) IT'")
+        print("ПОИСК ОТДЕЛА ПО FTP ПОДРАЗДЕЛЕНИЮ '(ДЕМО) IT'")
         print("="*80)
 
-        subdivision_name = "(ВЕСТ) IT"
+        subdivision_name = "(ДЕМО) IT"
 
         # Точное совпадение
         dept = db.query(Department).filter(

@@ -49,7 +49,7 @@ tail -f logs/1c_catalog_sync.log
 crontab -e
 
 # Добавить строку (заменить /path/to на реальный путь):
-0 2 * * * /Users/evgenijsikunov/projects/west/west_buget_it/backend/scripts/cron_daily_1c_sync.sh
+0 2 * * * /Users/evgenijsikunov/projects/acme/acme_buget_it/backend/scripts/cron_daily_1c_sync.sh
 
 # Сохранить и выйти
 ```
@@ -63,7 +63,7 @@ ssh root@31.129.107.178
 
 2. Скопировать проект:
 ```bash
-cd /path/to/west_buget_it/backend
+cd /path/to/acme_buget_it/backend
 ```
 
 3. Добавить в crontab:
@@ -73,10 +73,10 @@ crontab -e
 
 ```cron
 # 1C Catalog Sync - Daily at 2 AM
-0 2 * * * /path/to/west_buget_it/backend/scripts/cron_daily_1c_sync.sh
+0 2 * * * /path/to/acme_buget_it/backend/scripts/cron_daily_1c_sync.sh
 
 # Alternative: Weekly on Sunday at 3 AM (менее частая синхронизация)
-0 3 * * 0 /path/to/west_buget_it/backend/scripts/cron_daily_1c_sync.sh
+0 3 * * 0 /path/to/acme_buget_it/backend/scripts/cron_daily_1c_sync.sh
 ```
 
 4. Проверить crontab:
@@ -88,7 +88,7 @@ crontab -l
 
 ```bash
 # На следующий день после 02:00
-cd /path/to/west_buget_it/backend
+cd /path/to/acme_buget_it/backend
 tail -100 logs/1c_catalog_sync.log
 ```
 
@@ -142,7 +142,7 @@ sudo nano /etc/logrotate.d/1c-catalog-sync
 
 Содержимое:
 ```
-/path/to/west_buget_it/backend/logs/1c_catalog_sync.log {
+/path/to/acme_buget_it/backend/logs/1c_catalog_sync.log {
     daily
     rotate 30
     compress

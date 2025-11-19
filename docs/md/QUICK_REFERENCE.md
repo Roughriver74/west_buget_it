@@ -42,7 +42,7 @@
 
 #### Backend (если остановлен)
 ```bash
-cd /Users/evgenijsikunov/projects/west/west_buget_it/backend
+cd /Users/evgenijsikunov/projects/acme/acme_buget_it/backend
 source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > ../backend.log 2>&1 &
 echo $! > ../backend.pid
@@ -50,7 +50,7 @@ echo $! > ../backend.pid
 
 #### Frontend (если остановлен)
 ```bash
-cd /Users/evgenijsikunov/projects/west/west_buget_it/frontend
+cd /Users/evgenijsikunov/projects/acme/acme_buget_it/frontend
 npm run dev > ../frontend.log 2>&1 &
 echo $! > ../frontend.pid
 ```
@@ -94,7 +94,7 @@ python3 scripts/import_plan_fact_2025.py
 
 ### Структура Excel файла
 
-Файл должен находиться здесь: `/Users/evgenijsikunov/projects/west/west_buget_it/Планфакт2025.xlsx`
+Файл должен находиться здесь: `/Users/evgenijsikunov/projects/acme/acme_buget_it/Планфакт2025.xlsx`
 
 **Формат листа 1 (План):**
 ```
@@ -364,7 +364,7 @@ VITE_API_URL=http://localhost:8000
 
 Все отчеты и документация находятся в корне проекта:
 ```
-/Users/evgenijsikunov/projects/west/west_buget_it/
+/Users/evgenijsikunov/projects/acme/acme_buget_it/
 ```
 
 ---
