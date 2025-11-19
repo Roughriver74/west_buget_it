@@ -2,6 +2,7 @@
 API endpoints for Module Management
 """
 
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -194,6 +195,8 @@ def get_my_enabled_modules(
 ):
     """
     Get list of modules enabled for current user's organization.
+    
+    TEMPORARILY DISABLED: Module system is disabled - returns all modules or empty list.
 
     **Access**: All authenticated users
 
@@ -202,27 +205,31 @@ def get_my_enabled_modules(
 
     **Returns**: EnabledModulesResponse with list of enabled modules
     """
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User does not belong to an organization",
-        )
-
     module_service = ModuleService(db)
 
-    # Get enabled modules
-    modules = module_service.get_enabled_modules(
-        organization_id=current_user.organization_id,
-        include_expired=include_expired,
-    )
-
-    # Get organization details
-    organization = db.query(Organization).filter_by(id=current_user.organization_id).first()
+    # TEMPORARILY DISABLED: Module system is disabled
+    # Return all modules since hasModule() always returns True on frontend
+    # Get all active modules and convert to enabled format
+    all_modules = module_service.get_all_modules(active_only=True)
+    
+    modules = []
+    for module in all_modules:
+        modules.append({
+            "code": module.code,
+            "name": module.name,
+            "description": module.description,
+            "version": module.version,
+            "icon": module.icon,
+            "enabled_at": datetime.utcnow(),  # Set current time as enabled_at
+            "expires_at": None,
+            "limits": {},
+            "is_expired": False,
+        })
 
     return EnabledModulesResponse(
         modules=modules,
-        organization_id=current_user.organization_id,
-        organization_name=organization.short_name if organization else "Unknown",
+        organization_id=1,  # TEMPORARILY DISABLED: Use default org ID since User doesn't have organization_id
+        organization_name="All",  # TEMPORARILY DISABLED
     )
 
 

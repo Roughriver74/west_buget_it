@@ -31,22 +31,52 @@ jobs:
           SERVER_IP: ${{ secrets.TEST_SERVER_IP }}
           SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
           PROJECT_PATH: ${{ secrets.TEST_SERVER_PROJECT_PATH }}
+          GITHUB_REPO: ${{ github.repository }}
         run: |
           ssh $SERVER_USER@$SERVER_IP << 'ENDSSH'
             set -e
             echo "🚀 Starting deployment to test server..."
 
-            # Navigate to project directory
-            cd $PROJECT_PATH || exit 1
+            # Navigate to project directory or create it
+            if [ ! -d "$PROJECT_PATH" ]; then
+              echo "📁 Creating project directory..."
+              mkdir -p "$PROJECT_PATH"
+            fi
+            
+            cd "$PROJECT_PATH" || exit 1
 
-            # Pull latest changes from test branch
-            echo "📥 Pulling latest changes..."
-            git fetch origin test
-            git reset --hard origin/test
+            # Check if git repository exists, if not - clone or initialize
+            if [ ! -d .git ]; then
+              echo "📥 Git repository not found. Checking if directory is empty..."
+              if [ "$(ls -A 2>/dev/null)" ]; then
+                echo "⚠️  Directory is not empty. Initializing git repository..."
+                git init
+                git remote add origin "git@github.com:$GITHUB_REPO.git" 2>/dev/null || git remote set-url origin "git@github.com:$GITHUB_REPO.git"
+                git fetch origin test
+                git checkout -b test origin/test || true
+              else
+                echo "📥 Cloning repository..."
+                git clone -b test "git@github.com:$GITHUB_REPO.git" .
+              fi
+            else
+              # Ensure remote is set
+              if ! git remote get-url origin &>/dev/null; then
+                git remote add origin "git@github.com:$GITHUB_REPO.git"
+              fi
+              
+              # Pull latest changes from test branch
+              echo "📥 Pulling latest changes..."
+              git fetch origin test || {
+                echo "⚠️  Failed to fetch, trying to set remote..."
+                git remote set-url origin "git@github.com:$GITHUB_REPO.git"
+                git fetch origin test
+              }
+              git reset --hard origin/test || git checkout -b test origin/test
+            fi
 
             # Stop containers
             echo "🛑 Stopping containers..."
-            docker compose -f docker-compose.test.yml down
+            docker compose -f docker-compose.test.yml down || true
 
             # Rebuild and start containers
             echo "🔨 Building and starting containers..."
