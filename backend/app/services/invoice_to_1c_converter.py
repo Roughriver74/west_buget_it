@@ -176,28 +176,117 @@ class InvoiceTo1CConverter:
                 result.add_error(f"Ошибка при поиске контрагента в 1С: {str(e)}")
                 logger.error(f"Failed to search counterparty: {e}", exc_info=True)
 
-        # 4. Получение организации из базы данных (через department)
+        # 4. Получение организации (покупателя) по ИНН из parsed_data
         try:
-            # Найти организацию, связанную с department invoice
-            organization = self.db.query(Organization).filter(
-                Organization.department_id == invoice.department_id,
-                Organization.is_active == True,
-                Organization.external_id_1c.isnot(None)
-            ).first()
+            # Извлечь buyer INN из parsed_data
+            buyer_inn = None
+            buyer_name = None
+            if invoice.parsed_data and isinstance(invoice.parsed_data, dict):
+                buyer = invoice.parsed_data.get('buyer', {})
+                buyer_inn = buyer.get('inn')
+                buyer_name = buyer.get('name')
 
-            if not organization:
-                result.add_error(
-                    f"Организация для отдела (department_id={invoice.department_id}) не найдена или не синхронизирована с 1С. "
-                    f"Убедитесь, что организация создана в базе данных и синхронизирована с 1С (external_id_1c заполнен)."
-                )
-            else:
-                result.organization_guid = organization.external_id_1c
-                result.organization_name = organization.short_name or organization.name
-                logger.info(f"Found organization from DB: {result.organization_name} (GUID: {result.organization_guid})")
+            # Если ИНН не найден, попробуем fallback-стратегии
+            organization = None
+            if not buyer_inn:
+                logger.warning(f"Buyer INN not found in parsed_data, attempting fallback strategies")
+
+                # Стратегия 1: Поиск по названию покупателя
+                if buyer_name:
+                    logger.info(f"Trying to find organization by buyer name: {buyer_name}")
+                    # Поиск по частичному совпадению названия (например "ВЕСТ" в "ООО ВЕСТ ЛОГИСТИК")
+                    organizations_by_name = self.db.query(Organization).filter(
+                        Organization.is_active == True,
+                        Organization.external_id_1c.isnot(None),
+                        Organization.inn.isnot(None)
+                    ).all()
+
+                    for org in organizations_by_name:
+                        org_name = (org.short_name or org.name or '').upper()
+                        if 'ВЕСТ' in buyer_name.upper() and 'ВЕСТ' in org_name:
+                            organization = org
+                            buyer_inn = org.inn
+                            logger.info(f"Found organization by name match: {org.short_name} (INN: {org.inn})")
+                            break
+
+                # Стратегия 2: Использовать первую активную организацию с ИНН
+                if not organization:
+                    logger.info("Trying to use first active organization with INN and 1C sync")
+                    organization = self.db.query(Organization).filter(
+                        Organization.is_active == True,
+                        Organization.external_id_1c.isnot(None),
+                        Organization.inn.isnot(None)
+                    ).first()
+
+                    if organization:
+                        buyer_inn = organization.inn
+                        logger.info(f"Using first active organization as fallback: {organization.short_name} (INN: {organization.inn})")
+                    else:
+                        result.add_error(
+                            f"ИНН покупателя не найден в распознанных данных счета, и не удалось найти подходящую организацию. "
+                            f"Проверьте качество распознавания или добавьте данные вручную."
+                        )
+
+            if buyer_inn:
+                logger.info(f"Found buyer INN: {buyer_inn}")
+
+                # Если организация еще не найдена (не было fallback), искать в БД по ИНН
+                if not organization:
+                    organization = self.db.query(Organization).filter(
+                        Organization.inn == buyer_inn,
+                        Organization.is_active == True
+                    ).first()
+
+                if organization and organization.external_id_1c:
+                    # Организация найдена в БД и синхронизирована с 1С
+                    result.organization_guid = organization.external_id_1c
+                    result.organization_name = organization.short_name or organization.name
+                    logger.info(f"Found organization in DB by INN: {result.organization_name} (GUID: {result.organization_guid})")
+                else:
+                    # Организация не найдена в БД или не синхронизирована - ищем в 1С
+                    logger.info(f"Organization not found in DB or not synced, fetching from 1C by INN: {buyer_inn}")
+                    org_1c_data = self.odata_client.get_organization_by_inn(buyer_inn)
+
+                    if org_1c_data:
+                        org_guid = org_1c_data.get('Ref_Key')
+                        org_name = org_1c_data.get('Description', '') or org_1c_data.get('Наименование', '')
+
+                        result.organization_guid = org_guid
+                        result.organization_name = org_name
+                        logger.info(f"Found organization in 1C: {org_name} (GUID: {org_guid})")
+
+                        # Создать или обновить организацию в БД
+                        if organization:
+                            # Обновить external_id_1c
+                            organization.external_id_1c = org_guid
+                            if not organization.name:
+                                organization.name = org_name
+                            logger.info(f"Updated organization in DB with 1C GUID")
+                        else:
+                            # Создать новую организацию
+                            buyer_data = invoice.parsed_data.get('buyer', {})
+                            organization = Organization(
+                                name=org_name,
+                                short_name=buyer_data.get('name', org_name)[:255],
+                                inn=buyer_inn,
+                                kpp=buyer_data.get('kpp'),
+                                external_id_1c=org_guid,
+                                department_id=invoice.department_id,
+                                is_active=True
+                            )
+                            self.db.add(organization)
+                            logger.info(f"Created new organization in DB: {org_name}")
+
+                        self.db.commit()
+                    else:
+                        result.add_error(
+                            f"Организация с ИНН {buyer_inn} не найдена ни в базе данных, ни в 1С. "
+                            f"Создайте организацию '{buyer.get('name', 'N/A')}' в 1С или базе данных."
+                        )
 
         except Exception as e:
-            result.add_error(f"Ошибка при получении организации из базы данных: {str(e)}")
-            logger.error(f"Failed to fetch organization from DB: {e}", exc_info=True)
+            result.add_error(f"Ошибка при получении организации: {str(e)}")
+            logger.error(f"Failed to fetch organization: {e}", exc_info=True)
 
         # 5. Получение подразделения (subdivision) из department и поиск GUID в 1С
         try:
@@ -241,7 +330,8 @@ class InvoiceTo1CConverter:
     def create_expense_request_in_1c(
         self,
         invoice: ProcessedInvoice,
-        upload_attachment: bool = True
+        upload_attachment: bool = True,
+        user_comment: Optional[str] = None
     ) -> str:
         """
         Создать заявку на расход в 1С из invoice
@@ -249,6 +339,7 @@ class InvoiceTo1CConverter:
         Args:
             invoice: Обработанный invoice
             upload_attachment: Загружать ли прикрепленный PDF файл (если есть)
+            user_comment: Комментарий пользователя для заявки
 
         Returns:
             GUID созданной заявки в 1С (Ref_Key)
@@ -295,9 +386,9 @@ class InvoiceTo1CConverter:
             "СуммаДокумента": amount_int,
             "Валюта_Key": self.RUB_CURRENCY_GUID,
 
-            # Формы оплаты (все доступные)
+            # Формы оплаты (безналичная, как в 1С)
             "ФормаОплатыНаличная": True,
-            "ФормаОплатыБезналичная": True,
+            "ФормаОплатыБезналичная": False,  # Только одна форма может быть True
             "ФормаОплатыПлатежнаяКарта": False,
 
             # Назначение и дата платежа
@@ -308,6 +399,10 @@ class InvoiceTo1CConverter:
             "Контрагент_Key": validation_result.counterparty_guid,
             "Партнер_Key": validation_result.counterparty_guid,
             "БанковскийСчетКонтрагента_Key": self.EMPTY_GUID,  # Пустой - не знаем конкретный счет
+
+            # Данные счета поставщика
+            "вс_НомерПоДаннымПоставщика": invoice.invoice_number or "",
+            "вс_ДатаПоДаннымПоставщика": invoice.invoice_date.isoformat() + "T00:00:00",
 
             # Ответственные
             "КтоЗаявил_Key": self.DEFAULT_REQUESTER_GUID,
@@ -321,15 +416,16 @@ class InvoiceTo1CConverter:
             "ВариантОплаты": "ПредоплатаДоПоступления",
 
             # Комментарий
-            "Комментарий": f"Создано автоматически из счета №{invoice.invoice_number}",
+            "Комментарий": user_comment or f"Создано автоматически из счета №{invoice.invoice_number}",
             "ФормаОплатыЗаявки": "",
 
             # Табличная часть РасшифровкаПлатежа
             "РасшифровкаПлатежа": [
                 {
-                    "НомерСтроки": 1,
+                    "LineNumber": 1,
                     "Номенклатура_Key": self.EMPTY_GUID,
                     "СтатьяРасходов_Key": validation_result.cash_flow_category_guid,
+                    "СтатьяДвиженияДенежныхСредств_Key": validation_result.cash_flow_category_guid,
                     "Сумма": amount_int,
                     "СуммаБезНДС": amount_without_vat,
                     "СуммаНДС": vat_amount,

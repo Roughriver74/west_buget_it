@@ -529,7 +529,7 @@ async def import_categories(
 @router.post("/sync/1c", status_code=status.HTTP_200_OK)
 def sync_categories_from_1c(
     department_id: Optional[int] = Query(None, description="Department ID (required for sync)"),
-    include_folders: bool = Query(False, description="Include folders/groups from 1C"),
+    include_folders: bool = Query(True, description="Include folders/groups from 1C (default: True)"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):

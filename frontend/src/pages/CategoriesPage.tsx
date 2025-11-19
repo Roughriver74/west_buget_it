@@ -188,25 +188,34 @@ const CategoriesPage: React.FC = () => {
 
           const { statistics } = response.data
 
-          message.success(
-            `Синхронизация завершена! Создано: ${statistics.total_created}, Обновлено: ${statistics.total_updated}, Пропущено: ${statistics.total_skipped}`
-          )
-
-          if (statistics.errors && statistics.errors.length > 0) {
-            Modal.warning({
-              title: 'Предупреждения при синхронизации',
-              content: (
-                <div>
-                  {statistics.errors.map((error: string, index: number) => (
-                    <div key={index}>{error}</div>
-                  ))}
-                </div>
-              ),
-              width: 600,
-            })
-          }
-
-          window.location.reload()
+          // Показать детальную информацию о синхронизации
+          Modal.success({
+            title: '✅ Синхронизация завершена!',
+            content: (
+              <div>
+                <p><strong>Всего загружено из 1С:</strong> {statistics.total_fetched}</p>
+                <p><strong>Обработано:</strong> {statistics.total_processed}</p>
+                <p><strong>Создано новых:</strong> {statistics.total_created}</p>
+                <p><strong>Обновлено:</strong> {statistics.total_updated}</p>
+                <p><strong>Без изменений:</strong> {statistics.total_unchanged}</p>
+                {statistics.total_skipped > 0 && (
+                  <p style={{ color: '#ff4d4f' }}><strong>⚠️ Пропущено (ошибки):</strong> {statistics.total_skipped}</p>
+                )}
+                {statistics.errors && statistics.errors.length > 0 && (
+                  <div style={{ marginTop: 16, color: '#ff4d4f' }}>
+                    <strong>⚠️ Предупреждения:</strong>
+                    {statistics.errors.map((error: string, index: number) => (
+                      <div key={index} style={{ marginTop: 4 }}>{error}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ),
+            okText: 'Обновить страницу',
+            onOk: () => {
+              window.location.reload()
+            },
+          })
         } catch (error: any) {
           console.error('1C sync error:', error)
           message.error(

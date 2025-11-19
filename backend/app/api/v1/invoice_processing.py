@@ -873,7 +873,8 @@ async def create_1c_expense_request_from_invoice(
         # Создать заявку в 1С
         external_id_1c = converter.create_expense_request_in_1c(
             invoice=invoice,
-            upload_attachment=request.upload_attachment
+            upload_attachment=request.upload_attachment,
+            user_comment=request.user_comment
         )
 
         return Create1CExpenseRequestResponse(

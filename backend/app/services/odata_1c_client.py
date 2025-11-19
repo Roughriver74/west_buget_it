@@ -8,6 +8,7 @@ import logging
 import base64
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date
+from pathlib import Path
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -31,6 +32,7 @@ class OData1CClient:
         self.base_url = base_url.rstrip('/')
         self.username = username
         self.password = password
+        self.custom_auth_token = custom_auth_token
         self.session = requests.Session()
 
         # Use custom auth token if provided, otherwise use username/password
@@ -73,7 +75,84 @@ class OData1CClient:
         Raises:
             requests.exceptions.RequestException: On request errors
         """
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        # Для POST запросов используем http.client (как в работающем test_invoice.py)
+        # чтобы избежать двойного кодирования URL от requests library
+        if method == 'POST' and data:
+            import http.client
+            import json as json_lib
+            from urllib.parse import quote, urlparse
+
+            # Парсим base_url для получения host и base path
+            parsed = urlparse(self.base_url)
+
+            # Кодируем endpoint (кириллицу)
+            encoded_endpoint = quote(endpoint, safe='/:?=.$&_')
+            # Формируем полный путь: base_path + endpoint + query params
+            # Например: /trade/odata/standard.odata/Document_ЗаявкаНаРасходованиеДенежныхСредств?$format=json
+            full_endpoint = f"{parsed.path}/{encoded_endpoint}?$format=json"
+
+            # Создаем connection
+            conn = http.client.HTTPConnection(parsed.netloc, timeout=timeout)
+
+            try:
+                # Готовим payload
+                payload = json_lib.dumps(data, ensure_ascii=False).encode('utf-8')
+
+                # Подготовка Authorization header
+                if self.custom_auth_token:
+                    auth_header = self.custom_auth_token
+                elif self.username is not None and self.password is not None:
+                    # Генерируем Basic Auth header вручную (как в test_invoice.py)
+                    auth_string = f"{self.username}:{self.password}"
+                    auth_b64 = base64.b64encode(auth_string.encode('utf-8')).decode('ascii')
+                    auth_header = f"Basic {auth_b64}"
+                else:
+                    auth_header = self.session.headers.get('Authorization')
+                    if not auth_header:
+                        raise ValueError("Authorization is not configured for 1C OData POST request")
+
+                # Отправляем запрос
+                conn.request(
+                    method,
+                    full_endpoint,
+                    payload,
+                    {
+                        'Authorization': auth_header,
+                        'Content-Type': 'application/json; charset=utf-8'
+                    }
+                )
+
+                # Получаем ответ
+                http_response = conn.getresponse()
+                response_data = http_response.read()
+
+                # Проверяем статус
+                if http_response.status >= 400:
+                    error_text = response_data.decode('utf-8')
+                    logger.error(f"HTTP error: {http_response.status} {http_response.reason}")
+                    logger.error(f"URL: {self.base_url}/{full_endpoint}")
+                    logger.error(f"Response: {error_text}")
+                    raise requests.exceptions.HTTPError(
+                        f"{http_response.status} {http_response.reason}",
+                        response=type('obj', (object,), {
+                            'status_code': http_response.status,
+                            'text': error_text,
+                            'content': response_data
+                        })()
+                    )
+
+                # Парсим JSON
+                if response_data:
+                    return json_lib.loads(response_data.decode('utf-8'))
+                return {}
+
+            finally:
+                conn.close()
+
+        # Для GET и других запросов используем requests как раньше
+        from urllib.parse import quote
+        encoded_endpoint = quote(endpoint.lstrip('/'), safe='/:?=.$&_')
+        url = f"{self.base_url}/{encoded_endpoint}"
 
         try:
             response = self.session.request(
@@ -92,7 +171,24 @@ class OData1CClient:
             return response.json()
 
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error: {e}, URL: {url}, Response: {e.response.text if e.response else 'N/A'}")
+            # Детальное логирование ошибки от 1С
+            error_details = "N/A"
+            if e.response is not None:
+                try:
+                    # Попытаться декодировать как JSON
+                    error_json = e.response.json()
+                    error_details = f"JSON: {error_json}"
+                except:
+                    # Если не JSON, показать текст
+                    error_details = f"Text: {e.response.text[:500]}" if e.response.text else "Empty response"
+
+                logger.error(f"HTTP error: {e}")
+                logger.error(f"URL: {url}")
+                logger.error(f"Status code: {e.response.status_code}")
+                logger.error(f"Response: {error_details}")
+                logger.error(f"Response headers: {dict(e.response.headers)}")
+            else:
+                logger.error(f"HTTP error: {e}, URL: {url}, Response: N/A")
             raise
         except requests.exceptions.RequestException as e:
             logger.error(f"Request error: {e}, URL: {url}")
@@ -465,10 +561,10 @@ class OData1CClient:
 
     def get_subdivision_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """
-        Получить подразделение по наименованию
+        Получить подразделение по наименованию из справочника СтруктураПредприятия
 
         Args:
-            name: Наименование подразделения (например: "Москва", "СПБ")
+            name: Наименование подразделения (например: "(ВЕСТ) IT", "Москва")
 
         Returns:
             Данные подразделения (включая Ref_Key) или None
@@ -477,11 +573,16 @@ class OData1CClient:
             return None
 
         try:
-            # Фильтр по наименованию (Description или другое поле в 1С)
+            # Фильтр по наименованию (Description в справочнике СтруктураПредприятия)
             filter_str = f"Description eq '{name}'"
+            endpoint_with_params = f"Catalog_СтруктураПредприятия?$format=json&$filter={filter_str}&$top=1"
+
+            logger.info(f"Searching subdivision by name: '{name}'")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
+
             response = self._make_request(
                 method='GET',
-                endpoint=f"Catalog_Подразделения?$filter={filter_str}&$format=json&$top=1"
+                endpoint=endpoint_with_params
             )
 
             # Проверить результат
@@ -490,7 +591,7 @@ class OData1CClient:
                 logger.info(f"Found subdivision '{name}' with GUID: {subdivision.get('Ref_Key')}")
                 return subdivision
             else:
-                logger.warning(f"Subdivision '{name}' not found in 1C")
+                logger.warning(f"Subdivision '{name}' not found in 1C Catalog_СтруктураПредприятия")
                 return None
 
         except Exception as e:
@@ -608,7 +709,7 @@ class OData1CClient:
 
     def get_cash_flow_categories(
         self,
-        top: int = 100,
+        top: int = 1000,
         skip: int = 0,
         include_folders: bool = True
     ) -> List[Dict[str, Any]]:
@@ -616,18 +717,23 @@ class OData1CClient:
         Получить статьи движения денежных средств из 1С
 
         Args:
-            top: Количество записей (max 1000)
+            top: Количество записей (max 1000, default 1000)
             skip: Пропустить N записей (для пагинации)
             include_folders: Включать папки (группы) в результат
 
         Returns:
-            Список статей ДДС
+            Список статей ДДС (только активные, не помеченные на удаление)
+
+        Note:
+            Применяется фильтр DeletionMark eq false для загрузки только активных категорий
         """
         top_value = min(top, 1000)
 
-        endpoint_with_params = f'Catalog_СтатьиДвиженияДенежныхСредств?$top={top_value}&$format=json&$skip={skip}'
+        # ОБЯЗАТЕЛЬНЫЙ фильтр: только активные (не помеченные на удаление)
+        filter_str = "DeletionMark eq false"
+        endpoint_with_params = f'Catalog_СтатьиДвиженияДенежныхСредств?$top={top_value}&$format=json&$skip={skip}&$filter={filter_str}'
 
-        logger.info(f"Fetching cash flow categories: top={top}, skip={skip}")
+        logger.info(f"Fetching cash flow categories: top={top_value}, skip={skip}, filter={filter_str}")
 
         response = self._make_request(
             method='GET',
@@ -641,7 +747,7 @@ class OData1CClient:
         if not include_folders:
             results = [r for r in results if not r.get('IsFolder', False)]
 
-        logger.info(f"Fetched {len(results)} cash flow categories")
+        logger.info(f"Fetched {len(results)} cash flow categories (active only)")
 
         return results
 
@@ -753,6 +859,14 @@ class OData1CClient:
         """
         logger.info(f"Creating expense request in 1C: {data.get('НазначениеПлатежа', 'N/A')[:50]}...")
 
+        # Детальное логирование JSON payload перед отправкой
+        import json
+        try:
+            json_payload = json.dumps(data, ensure_ascii=False, indent=2)
+            logger.info(f"JSON payload being sent to 1C:\n{json_payload}")
+        except Exception as log_err:
+            logger.warning(f"Failed to serialize payload for logging: {log_err}")
+
         try:
             response = self._make_request(
                 method='POST',
@@ -861,26 +975,67 @@ class OData1CClient:
             return False
 
 
+_ODATA_ENV_LOADED = False
+
+
+def _ensure_odata_env_loaded():
+    """
+    Ensure .env files are loaded so os.getenv picks up OData credentials.
+    """
+    global _ODATA_ENV_LOADED
+    if _ODATA_ENV_LOADED:
+        return
+
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        _ODATA_ENV_LOADED = True
+        return
+
+    service_path = Path(__file__).resolve()
+    backend_dir = service_path.parents[2]  # .../backend
+    project_root = backend_dir.parent
+
+    env_candidates = [
+        project_root / ".env",
+        backend_dir / ".env"
+    ]
+
+    for env_path in env_candidates:
+        if env_path.is_file():
+            load_dotenv(env_path, override=False)
+
+    _ODATA_ENV_LOADED = True
+
+
 def create_1c_client_from_env() -> OData1CClient:
     """
     Создать клиент 1С OData из переменных окружения
 
     Environment variables:
         ODATA_1C_URL: Base URL for OData
-        ODATA_1C_USERNAME: Username
-        ODATA_1C_PASSWORD: Password
+        ODATA_1C_USERNAME: Username (used if custom token is not set)
+        ODATA_1C_PASSWORD: Password (used if custom token is not set)
+        ODATA_1C_CUSTOM_AUTH_TOKEN: Optional full Authorization header value (e.g. \"Basic ...\")
 
     Returns:
         Configured OData1CClient instance
     """
     import os
 
+    _ensure_odata_env_loaded()
+
     url = os.getenv('ODATA_1C_URL', 'http://10.10.100.77/trade/odata/standard.odata')
     username = os.getenv('ODATA_1C_USERNAME', 'odata.user')
     password = os.getenv('ODATA_1C_PASSWORD', 'ak228Hu2hbs28')
+    custom_auth = os.getenv('ODATA_1C_CUSTOM_AUTH_TOKEN')
 
-    return OData1CClient(
-        base_url=url,
-        username=username,
-        password=password
-    )
+    client_kwargs: Dict[str, Any] = {'base_url': url}
+
+    if custom_auth:
+        client_kwargs['custom_auth_token'] = custom_auth.strip()
+    else:
+        client_kwargs['username'] = username
+        client_kwargs['password'] = password
+
+    return OData1CClient(**client_kwargs)

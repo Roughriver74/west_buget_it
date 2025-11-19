@@ -296,6 +296,7 @@ class Invoice1CValidationResponse(BaseModel):
 class Create1CExpenseRequestRequest(BaseModel):
     """Запрос на создание заявки на расход в 1С"""
     upload_attachment: bool = Field(default=True, description="Загружать ли прикрепленный файл")
+    user_comment: Optional[str] = Field(None, description="Комментарий пользователя для заявки")
 
 
 class Create1CExpenseRequestResponse(BaseModel):

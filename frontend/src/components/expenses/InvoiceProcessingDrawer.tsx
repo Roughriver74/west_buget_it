@@ -60,11 +60,13 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
   const { selectedDepartment } = useDepartment()
   const [form] = Form.useForm()
   const [categoryForm] = Form.useForm()
+  const [send1CForm] = Form.useForm()
 
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<ProcessedInvoiceDetail | null>(null)
   const [createExpenseModalVisible, setCreateExpenseModalVisible] = useState(false)
   const [setCategoryModalVisible, setSetCategoryModalVisible] = useState(false)
+  const [send1CModalVisible, setSend1CModalVisible] = useState(false)
   const [searchText, setSearchText] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<InvoiceProcessingStatus | undefined>()
   const [validationResult, setValidationResult] = useState<any>(null)
@@ -89,11 +91,12 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
     enabled: !!selectedDepartment && visible,
   })
 
-  // Fetch cash flow categories from 1C
+  // Категории ДДС из 1С - это общий справочник для всех пользователей
+  // Не фильтруем по департаменту, загружаем все категории с external_id_1c
   const { data: cashFlowCategories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['cashFlowCategories', selectedDepartment?.id],
-    queryFn: () => invoiceProcessingApi.getCashFlowCategories(selectedDepartment?.id),
-    enabled: !!selectedDepartment && visible,
+    queryKey: ['cashFlowCategories', 'all'],
+    queryFn: () => invoiceProcessingApi.getCashFlowCategories(undefined),
+    enabled: visible,
   })
 
   // Process mutation (for re-processing existing invoices from table)
@@ -136,12 +139,15 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
   const updateCategoryMutation = useMutation({
     mutationFn: (values: { category_id: number; desired_payment_date: string }) =>
       invoiceProcessingApi.updateCategory(selectedInvoice!.id, values),
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success('Категория и дата оплаты установлены!')
       setSetCategoryModalVisible(false)
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
       if (selectedInvoice) {
-        loadInvoiceDetails(selectedInvoice.id)
+        // Обновляем детали счета
+        await loadInvoiceDetails(selectedInvoice.id)
+        // Автоматически открываем модальное окно отправки в 1С
+        setSend1CModalVisible(true)
       }
     },
     onError: (error: any) => {
@@ -172,12 +178,14 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
 
   // Create in 1C mutation
   const createIn1CMutation = useMutation({
-    mutationFn: (invoiceId: number) =>
-      invoiceProcessingApi.createIn1C(invoiceId, true),
+    mutationFn: ({ invoiceId, userComment }: { invoiceId: number; userComment?: string }) =>
+      invoiceProcessingApi.createIn1C(invoiceId, true, userComment),
     onSuccess: (data) => {
       if (data.success) {
         message.success('Заявка на расход успешно создана в 1С!')
         setValidationResult(null)
+        setSend1CModalVisible(false)
+        send1CForm.resetFields()
         queryClient.invalidateQueries({ queryKey: ['invoices'] })
         if (selectedInvoice) {
           loadInvoiceDetails(selectedInvoice.id)
@@ -374,6 +382,27 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
               Обработать
             </Button>
           )}
+          {record.status === 'PROCESSED' && record.category_id && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<CloudUploadOutlined />}
+              onClick={async () => {
+                try {
+                  const details = await invoiceProcessingApi.getById(record.id)
+                  setSelectedInvoice(details)
+                  setSend1CModalVisible(true)
+                } catch (error: any) {
+                  message.error(
+                    `Ошибка загрузки: ${error.response?.data?.detail || error.message}`
+                  )
+                }
+              }}
+              loading={createIn1CMutation.isPending}
+            >
+              → 1С
+            </Button>
+          )}
           <Button
             size="small"
             icon={<EyeOutlined />}
@@ -533,21 +562,29 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
                   Проверить для 1С
                 </Button>
               ),
-            // Кнопка отправки в 1С
-            selectedInvoice.status === 'PROCESSED' &&
-              selectedInvoice.category_id &&
-              !selectedInvoice.external_id_1c && (
-                <Button
-                  key="create-1c"
-                  type="primary"
-                  icon={<CloudUploadOutlined />}
-                  onClick={() => createIn1CMutation.mutate(selectedInvoice.id)}
-                  loading={createIn1CMutation.isPending}
-                  disabled={validationResult && !validationResult.is_valid}
-                >
-                  Отправить в 1С
-                </Button>
-              ),
+            // Кнопка отправки в 1С (всегда показываем для тестирования)
+            selectedInvoice.status === 'PROCESSED' && (
+              <Button
+                key="create-1c"
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                onClick={() => {
+                  console.log('Кнопка нажата, selectedInvoice:', selectedInvoice)
+                  console.log('Category ID:', selectedInvoice.category_id)
+                  if (!selectedInvoice.category_id) {
+                    message.warning('Сначала установите категорию ДДС!')
+                    setSetCategoryModalVisible(true)
+                  } else {
+                    console.log('Открываем модальное окно отправки в 1С')
+                    setSend1CModalVisible(true)
+                  }
+                }}
+                loading={createIn1CMutation.isPending}
+                disabled={validationResult && !validationResult.is_valid}
+              >
+                Отправить в 1С
+              </Button>
+            ),
             // Кнопка создания расхода (старый функционал)
             selectedInvoice.status === 'PROCESSED' &&
               !selectedInvoice.expense_id && (
@@ -949,6 +986,89 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Send to 1C Modal with Comment */}
+      {selectedInvoice && (
+        <Modal
+          title="Отправить заявку в 1С"
+          open={send1CModalVisible}
+          onCancel={() => {
+            setSend1CModalVisible(false)
+            send1CForm.resetFields()
+          }}
+          onOk={() => send1CForm.submit()}
+          confirmLoading={createIn1CMutation.isPending}
+          okText="Отправить"
+          cancelText="Отмена"
+          width={600}
+        >
+          <Alert
+            message="Отправка заявки на расход в 1С"
+            description="Вы можете добавить комментарий, который будет отображаться в назначении платежа в 1С."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form
+            form={send1CForm}
+            layout="vertical"
+            onFinish={(values) => {
+              createIn1CMutation.mutate({
+                invoiceId: selectedInvoice.id,
+                userComment: values.user_comment,
+              })
+            }}
+          >
+            <Form.Item
+              name="user_comment"
+              label="Комментарий (опционально)"
+            >
+              <TextArea
+                rows={4}
+                placeholder="Введите комментарий для заявки (будет добавлен в назначение платежа)"
+                maxLength={500}
+                showCount
+              />
+            </Form.Item>
+
+            {selectedInvoice.invoice_number && (
+              <Alert
+                message={
+                  <>
+                    <Text strong>Счет: </Text>
+                    <Text>{selectedInvoice.invoice_number}</Text>
+                    <br />
+                    <Text strong>Поставщик: </Text>
+                    <Text>{selectedInvoice.supplier_name || 'Не указан'}</Text>
+                    <br />
+                    <Text strong>Сумма: </Text>
+                    <Text>{selectedInvoice.total_amount?.toLocaleString('ru-RU')} ₽</Text>
+                    <br />
+                    <Text strong>Дата оплаты: </Text>
+                    <Text>
+                      {selectedInvoice.desired_payment_date
+                        ? dayjs(selectedInvoice.desired_payment_date).format('DD.MM.YYYY')
+                        : 'Не указана'}
+                    </Text>
+                  </>
+                }
+                style={{ marginTop: 8 }}
+              />
+            )}
+
+            {selectedInvoice.external_id_1c && (
+              <Alert
+                message="Внимание!"
+                description="Эта заявка уже была отправлена в 1С ранее. Повторная отправка создаст дубликат."
+                type="warning"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+          </Form>
+        </Modal>
+      )}
     </>
   )
 }

@@ -14,6 +14,7 @@ import {
   Spin,
   Progress,
   Result,
+  Input,
 } from 'antd'
 import {
   InboxOutlined,
@@ -22,6 +23,7 @@ import {
   CloudUploadOutlined,
   CheckCircleOutlined,
   LoadingOutlined,
+  CommentOutlined,
 } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UploadFile, UploadProps } from 'antd'
@@ -51,11 +53,12 @@ const QuickInvoiceUpload: React.FC<QuickInvoiceUploadProps> = ({ onSuccess }) =>
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string; external_id?: string } | null>(null)
 
-  // Fetch cash flow categories
+  // Категории ДДС из 1С - это общий справочник для всех пользователей
+  // Не фильтруем по департаменту, загружаем все категории с external_id_1c
   const { data: cashFlowCategories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ['cashFlowCategories', selectedDepartment?.id],
-    queryFn: () => invoiceProcessingApi.getCashFlowCategories(selectedDepartment?.id),
-    enabled: !!selectedDepartment,
+    queryKey: ['cashFlowCategories', 'all'],
+    queryFn: () => invoiceProcessingApi.getCashFlowCategories(undefined),
+    enabled: true,
   })
 
   // Steps configuration
@@ -101,7 +104,11 @@ const QuickInvoiceUpload: React.FC<QuickInvoiceUploadProps> = ({ onSuccess }) =>
   }
 
   // Main processing function
-  const handleSubmit = async (values: { category_id: number; desired_payment_date: Dayjs }) => {
+  const handleSubmit = async (values: {
+    category_id: number
+    desired_payment_date: Dayjs
+    user_comment?: string
+  }) => {
     if (fileList.length === 0) {
       message.error('Выберите файл для загрузки')
       return
@@ -149,7 +156,11 @@ const QuickInvoiceUpload: React.FC<QuickInvoiceUploadProps> = ({ onSuccess }) =>
       // Step 5: Create in 1C
       setCurrentStep('create')
       setProgress(90)
-      const createResult = await invoiceProcessingApi.createIn1C(newInvoiceId, true)
+      const createResult = await invoiceProcessingApi.createIn1C(
+        newInvoiceId,
+        true,
+        values.user_comment
+      )
       if (!createResult.success) {
         throw new Error(createResult.message)
       }
@@ -348,6 +359,25 @@ const QuickInvoiceUpload: React.FC<QuickInvoiceUploadProps> = ({ onSuccess }) =>
                 style={{ width: '100%' }}
                 placeholder="Выберите дату"
                 suffixIcon={<CalendarOutlined />}
+              />
+            </Form.Item>
+
+            {/* User Comment */}
+            <Form.Item
+              name="user_comment"
+              label={
+                <Space>
+                  <CommentOutlined />
+                  <Text strong>Комментарий</Text>
+                </Space>
+              }
+            >
+              <Input.TextArea
+                size="large"
+                rows={3}
+                placeholder="Введите комментарий для заявки (опционально)"
+                maxLength={500}
+                showCount
               />
             </Form.Item>
 

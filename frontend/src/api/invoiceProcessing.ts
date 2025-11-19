@@ -162,11 +162,15 @@ export const invoiceProcessingApi = {
    */
   createIn1C: async (
     invoiceId: number,
-    uploadAttachment: boolean = true
+    uploadAttachment: boolean = true,
+    userComment?: string
   ): Promise<Create1CExpenseRequestResponse> => {
     const { data } = await apiClient.post(
       `invoices/invoice-processing/${invoiceId}/create-1c-expense-request`,
-      { upload_attachment: uploadAttachment }
+      {
+        upload_attachment: uploadAttachment,
+        user_comment: userComment,
+      }
     )
     return data
   },
