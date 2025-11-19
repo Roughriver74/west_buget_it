@@ -18,8 +18,10 @@ from app.db.models import (
     PayrollYearlyComparison,
     Employee,
     PayrollActual,
+    PayrollPlan,
     TaxTypeEnum,
     PayrollScenarioTypeEnum,
+    PayrollDataSourceEnum,
     TaxRate,
 )
 from app.services.tax_rate_utils import merge_tax_rates_with_defaults
@@ -71,10 +73,17 @@ class PayrollScenarioCalculator:
         ).delete()
         self.db.commit()
 
-        # Создаем новые детали от базового года с учетом параметров сценария
-        scenario_details = self._create_scenario_details_from_base_year(
-            scenario, insurance_rates
-        )
+        # Создаем новые детали в зависимости от источника данных
+        if scenario.data_source == PayrollDataSourceEnum.PLAN:
+            # Если источник данных - план, используем данные из PayrollPlan
+            scenario_details = self._create_scenario_details_from_plan(
+                scenario, insurance_rates
+            )
+        else:
+            # Для EMPLOYEES и ACTUAL используем данные из PayrollActual
+            scenario_details = self._create_scenario_details_from_base_year(
+                scenario, insurance_rates
+            )
 
         # Рассчитать каждого сотрудника
         total_headcount = 0
@@ -84,49 +93,72 @@ class PayrollScenarioCalculator:
         total_payroll_cost = Decimal('0.00')
 
         for detail in scenario_details:
-            # Учитываем уволенных сотрудников - они не считаются в численности
-            # но их зарплата может считаться частично (если указан termination_month)
-            if detail.is_terminated:
-                # Если указан месяц увольнения, считаем зарплату только до этого месяца
-                if detail.termination_month:
-                    months_worked = detail.termination_month
+            # Если источник данных - план, детали уже рассчитаны с суммами из плана
+            # Просто суммируем уже рассчитанные значения
+            if scenario.data_source == PayrollDataSourceEnum.PLAN:
+                # Для планов все уже рассчитано в _create_scenario_details_from_plan
+                if not detail.is_terminated:
+                    total_headcount += 1
+                
+                # Аккумулировать итоги из уже рассчитанных значений
+                # Для планов годовая зарплата = total_employee_cost - total_insurance
+                # (это уже рассчитано в _create_scenario_details_from_plan)
+                if detail.total_employee_cost and detail.total_insurance:
+                    # Годовая зарплата из плана с учетом процента изменения
+                    annual_salary = detail.total_employee_cost - detail.total_insurance
                 else:
-                    months_worked = 0  # Уволен сразу, не считаем
+                    # Fallback: используем месячный оклад * 12
+                    annual_salary = detail.base_salary * 12
+                
+                total_base_salary += annual_salary
+                total_insurance += detail.total_insurance or Decimal('0.00')
+                total_income_tax += detail.income_tax or Decimal('0.00')
+                total_payroll_cost += detail.total_employee_cost or Decimal('0.00')
             else:
-                total_headcount += 1
-                months_worked = 12
+                # Для EMPLOYEES и ACTUAL пересчитываем как раньше
+                # Учитываем уволенных сотрудников - они не считаются в численности
+                # но их зарплата может считаться частично (если указан termination_month)
+                if detail.is_terminated:
+                    # Если указан месяц увольнения, считаем зарплату только до этого месяца
+                    if detail.termination_month:
+                        months_worked = detail.termination_month
+                    else:
+                        months_worked = 0  # Уволен сразу, не считаем
+                else:
+                    total_headcount += 1
+                    months_worked = 12
 
-            # ВАЖНО: detail.base_salary хранит МЕСЯЧНЫЙ оклад
-            # Для годового расчета умножаем на количество отработанных месяцев
-            annual_salary = (detail.base_salary + detail.monthly_bonus) * months_worked
+                # ВАЖНО: detail.base_salary хранит МЕСЯЧНЫЙ оклад
+                # Для годового расчета умножаем на количество отработанных месяцев
+                annual_salary = (detail.base_salary + detail.monthly_bonus) * months_worked
 
-            # Рассчитать страховые взносы на ГОДОВУЮ зарплату (пропорционально месяцам)
-            insurance_calc = self._calculate_insurance_for_employee(
-                annual_salary,
-                insurance_rates
-            )
+                # Рассчитать страховые взносы на ГОДОВУЮ зарплату (пропорционально месяцам)
+                insurance_calc = self._calculate_insurance_for_employee(
+                    annual_salary,
+                    insurance_rates
+                )
 
-            # Рассчитать НДФЛ на ГОДОВУЮ зарплату (13% дефолт или ставка из справочника)
-            income_tax_rate = insurance_rates.get('INCOME_TAX', Decimal('0.13'))
-            income_tax = annual_salary * income_tax_rate
+                # Рассчитать НДФЛ на ГОДОВУЮ зарплату (13% дефолт или ставка из справочника)
+                income_tax_rate = insurance_rates.get('INCOME_TAX', Decimal('0.13'))
+                income_tax = annual_salary * income_tax_rate
 
-            # Обновить детали (сохраняем годовые значения)
-            detail.pension_contribution = insurance_calc['pension']
-            detail.medical_contribution = insurance_calc['medical']
-            detail.social_contribution = insurance_calc['social']
-            detail.injury_contribution = insurance_calc['injury']
-            detail.total_insurance = insurance_calc['total']
-            detail.income_tax = income_tax
-            detail.total_employee_cost = (
-                annual_salary +
-                insurance_calc['total']
-            )
+                # Обновить детали (сохраняем годовые значения)
+                detail.pension_contribution = insurance_calc['pension']
+                detail.medical_contribution = insurance_calc['medical']
+                detail.social_contribution = insurance_calc['social']
+                detail.injury_contribution = insurance_calc['injury']
+                detail.total_insurance = insurance_calc['total']
+                detail.income_tax = income_tax
+                detail.total_employee_cost = (
+                    annual_salary +
+                    insurance_calc['total']
+                )
 
-            # Аккумулировать итоги (годовые суммы)
-            total_base_salary += annual_salary
-            total_insurance += insurance_calc['total']
-            total_income_tax += income_tax
-            total_payroll_cost += detail.total_employee_cost
+                # Аккумулировать итоги (годовые суммы)
+                total_base_salary += annual_salary
+                total_insurance += insurance_calc['total']
+                total_income_tax += income_tax
+                total_payroll_cost += detail.total_employee_cost
 
         # Обновить сценарий
         scenario.total_headcount = total_headcount
@@ -135,7 +167,12 @@ class PayrollScenarioCalculator:
         scenario.total_payroll_cost = total_payroll_cost
 
         # Рассчитать сравнение с базовым годом (используем тех же сотрудников)
-        base_year_cost = self._get_base_year_cost_for_employees(scenario.base_year, scenario_details)
+        # Если источник данных - план, используем планы для базового года
+        base_year_cost = self._get_base_year_cost_for_employees(
+            scenario.base_year, 
+            scenario_details,
+            data_source=scenario.data_source
+        )
         scenario.base_year_total_cost = base_year_cost
         scenario.cost_difference = total_payroll_cost - base_year_cost
         scenario.cost_difference_percent = (
@@ -536,7 +573,8 @@ class PayrollScenarioCalculator:
         return result or Decimal('0.00')
 
     def _get_base_year_cost_for_employees(
-        self, base_year: int, scenario_details: List[PayrollScenarioDetail]
+        self, base_year: int, scenario_details: List[PayrollScenarioDetail],
+        data_source: PayrollDataSourceEnum = PayrollDataSourceEnum.ACTUAL
     ) -> Decimal:
         """
         Получить общий ФОТ за базовый год для тех же сотрудников, что в сценарии
@@ -565,17 +603,42 @@ class PayrollScenarioCalculator:
                 continue
 
             # Получить данные сотрудника за базовый год
-            payroll_actuals = self.db.query(PayrollActual).filter(
-                PayrollActual.employee_id == detail.employee_id,
-                PayrollActual.year == base_year,
-                PayrollActual.department_id == self.department_id
-            ).all()
+            if data_source == PayrollDataSourceEnum.PLAN:
+                # Если источник данных - план, используем планы
+                payroll_plans = self.db.query(PayrollPlan).filter(
+                    PayrollPlan.employee_id == detail.employee_id,
+                    PayrollPlan.year == base_year,
+                    PayrollPlan.department_id == self.department_id
+                ).all()
+                
+                if payroll_plans:
+                    # Суммируем все плановые суммы за год (total_planned)
+                    year_salary = sum(p.total_planned for p in payroll_plans)
+                    # Рассчитать страховые взносы от годовой суммы из плана
+                    insurance_calc = self._calculate_insurance_for_employee(
+                        year_salary, base_insurance_rates
+                    )
+                    year_insurance = insurance_calc['total']
+                    employee_total_cost = year_salary + year_insurance
+                else:
+                    employee_total_cost = Decimal('0.00')
+            else:
+                # Для ACTUAL и EMPLOYEES используем фактические выплаты
+                payroll_actuals = self.db.query(PayrollActual).filter(
+                    PayrollActual.employee_id == detail.employee_id,
+                    PayrollActual.year == base_year,
+                    PayrollActual.department_id == self.department_id
+                ).all()
 
-            if payroll_actuals:
-                # Суммируем все выплаты за год (12 месяцев)
-                year_salary = sum(p.total_paid for p in payroll_actuals)
-                year_insurance = sum(p.social_tax_amount for p in payroll_actuals)
-                employee_total_cost = year_salary + year_insurance
+                if payroll_actuals:
+                    # Суммируем все выплаты за год (12 месяцев)
+                    year_salary = sum(p.total_paid for p in payroll_actuals)
+                    year_insurance = sum(p.social_tax_amount for p in payroll_actuals)
+                    employee_total_cost = year_salary + year_insurance
+                else:
+                    employee_total_cost = Decimal('0.00')
+            
+            if employee_total_cost == 0:
             else:
                 # Если нет данных за базовый год, используем current employee base_salary * 12
                 employee = self.db.query(Employee).get(detail.employee_id)
@@ -597,6 +660,164 @@ class PayrollScenarioCalculator:
             total_base_year_cost += employee_total_cost
 
         return total_base_year_cost
+
+    def _create_scenario_details_from_plan(
+        self, scenario: PayrollScenario, insurance_rates: Dict[str, Decimal]
+    ) -> List[PayrollScenarioDetail]:
+        """
+        Создать детали сценария из ПЛАНА (PayrollPlan) для базового года
+        
+        Когда источник данных - план, используем суммы из PayrollPlan.total_planned
+        вместо пересчета по сотрудникам.
+        
+        Args:
+            scenario: Сценарий с параметрами
+            insurance_rates: Ставки страховых взносов для целевого года
+            
+        Returns:
+            List[PayrollScenarioDetail]: Детали сценария из планов
+        """
+        logger.info(f"Creating scenario details from PLAN for base year {scenario.base_year}")
+        
+        # Получить уникальных сотрудников из планов базового года
+        # Группируем по сотрудникам и суммируем total_planned за весь год
+        plan_data = self.db.query(
+            PayrollPlan.employee_id,
+            Employee.full_name.label('employee_name'),
+            Employee.position.label('position'),
+            func.sum(PayrollPlan.total_planned).label('annual_planned'),  # Годовая сумма из плана
+            func.sum(PayrollPlan.base_salary).label('total_base_salary'),  # Для расчета среднего оклада
+        ).join(
+            Employee, PayrollPlan.employee_id == Employee.id
+        ).filter(
+            PayrollPlan.department_id == self.department_id,
+            PayrollPlan.year == scenario.base_year
+        ).group_by(
+            PayrollPlan.employee_id,
+            Employee.full_name,
+            Employee.position
+        ).all()
+        
+        plan_count = len(plan_data)
+        logger.info(f"Found {plan_count} employees with plans in base year {scenario.base_year}")
+        
+        if plan_count == 0:
+            logger.warning(f"No plans found in base year {scenario.base_year}, cannot create scenario")
+            return []
+        
+        # Применить изменения зарплаты
+        salary_multiplier = Decimal('1.00') + (scenario.salary_change_percent / 100)
+        logger.info(f"Salary multiplier: {salary_multiplier} ({scenario.salary_change_percent}%)")
+        
+        # Создать детали для сотрудников из плана
+        details = []
+        
+        for plan in plan_data:
+            # Годовая сумма из плана (total_planned за весь год)
+            annual_planned = plan.annual_planned or Decimal('0.00')
+            
+            # Применить процент изменения к общей сумме из плана
+            adjusted_annual = annual_planned * salary_multiplier
+            
+            # Получить средний месячный оклад для расчета (используем для расчета страховых взносов)
+            # Средний месячный оклад = total_base_salary / 12
+            avg_monthly_base = (plan.total_base_salary / 12) if plan.total_base_salary else Decimal('0.00')
+            adjusted_monthly_base = avg_monthly_base * salary_multiplier
+            
+            # Рассчитать страховые взносы от скорректированной годовой суммы
+            insurance_calc = self._calculate_insurance_for_employee(
+                adjusted_annual,
+                insurance_rates
+            )
+            
+            # Рассчитать НДФЛ от годовой суммы из плана
+            income_tax_rate = insurance_rates.get('INCOME_TAX', Decimal('0.13'))
+            income_tax = adjusted_annual * income_tax_rate
+            
+            # Получить базовый год для сравнения (используем те же планы)
+            base_year_salary = annual_planned
+            # Рассчитать страховые взносы базового года (для сравнения)
+            base_insurance_rates = self._get_insurance_rates(scenario.base_year)
+            base_insurance_calc = self._calculate_insurance_for_employee(
+                annual_planned,
+                base_insurance_rates
+            )
+            base_year_insurance = base_insurance_calc['total']
+            
+            detail = PayrollScenarioDetail(
+                scenario_id=scenario.id,
+                employee_id=plan.employee_id,
+                employee_name=plan.employee_name,
+                position=plan.position,
+                base_salary=adjusted_monthly_base,  # Месячный оклад (для отображения)
+                monthly_bonus=Decimal('0.00'),  # Премии уже включены в total_planned
+                # Сохраняем годовые суммы для расчета
+                pension_contribution=insurance_calc['pension'],
+                medical_contribution=insurance_calc['medical'],
+                social_contribution=insurance_calc['social'],
+                injury_contribution=insurance_calc['injury'],
+                total_insurance=insurance_calc['total'],
+                income_tax=income_tax,
+                total_employee_cost=adjusted_annual + insurance_calc['total'],
+                base_year_salary=base_year_salary,
+                base_year_insurance=base_year_insurance,
+                department_id=self.department_id,
+                is_new_hire=False,
+                is_terminated=False,
+            )
+            
+            self.db.add(detail)
+            details.append(detail)
+        
+        # Применить изменение headcount
+        if scenario.headcount_change_percent != 0:
+            headcount_change = int(plan_count * scenario.headcount_change_percent / 100)
+            logger.info(f"Headcount change: {headcount_change} people ({scenario.headcount_change_percent}%)")
+            
+            if headcount_change > 0:
+                # Добавить новых сотрудников (средняя зарплата из планов)
+                avg_annual = sum(p.annual_planned for p in plan_data) / plan_count if plan_data else Decimal('50000') * 12
+                avg_monthly = avg_annual / 12
+                
+                for i in range(headcount_change):
+                    adjusted_avg = avg_monthly * salary_multiplier
+                    adjusted_annual = avg_annual * salary_multiplier
+                    
+                    insurance_calc = self._calculate_insurance_for_employee(
+                        adjusted_annual,
+                        insurance_rates
+                    )
+                    
+                    detail = PayrollScenarioDetail(
+                        scenario_id=scenario.id,
+                        employee_id=None,
+                        employee_name=f"Новый сотрудник {i+1}",
+                        position="Планируемая позиция",
+                        base_salary=adjusted_avg,
+                        monthly_bonus=Decimal('0.00'),
+                        pension_contribution=insurance_calc['pension'],
+                        medical_contribution=insurance_calc['medical'],
+                        social_contribution=insurance_calc['social'],
+                        injury_contribution=insurance_calc['injury'],
+                        total_insurance=insurance_calc['total'],
+                        income_tax=adjusted_annual * insurance_rates.get('INCOME_TAX', Decimal('0.13')),
+                        total_employee_cost=adjusted_annual + insurance_calc['total'],
+                        is_new_hire=True,
+                        department_id=self.department_id,
+                    )
+                    self.db.add(detail)
+                    details.append(detail)
+            
+            elif headcount_change < 0:
+                # Отметить сотрудников на увольнение
+                for i in range(abs(headcount_change)):
+                    if i < len(details):
+                        details[i].is_terminated = True
+        
+        self.db.commit()
+        logger.info(f"Created {len(details)} scenario details from PLAN")
+        
+        return details
 
 
 class InsuranceImpactAnalyzer:

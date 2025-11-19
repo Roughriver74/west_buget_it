@@ -472,12 +472,12 @@ export default function EmployeeDetailPage() {
                       <Descriptions.Item label="Оклад введен как">
                         <Tag color="green">Нетто (на руки)</Tag>
                       </Descriptions.Item>
-                      <Descriptions.Item label="Net (на руки)">
+                      <Descriptions.Item label="Net (на руки, после всех вычетов)">
                         <strong style={{ color: '#52c41a' }}>
                           {formatCurrency(employee.base_salary)}
                         </strong>
                       </Descriptions.Item>
-                      <Descriptions.Item label="Gross (начислено)">
+                      <Descriptions.Item label="Gross (до вычета налогов, начислено)">
                         <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
                       </Descriptions.Item>
                     </>

@@ -9,6 +9,7 @@ import {
   Tag,
   Input,
   Select,
+  Radio,
   message,
   Popconfirm,
   Statistic,
@@ -225,6 +226,9 @@ export default function EmployeesPage() {
   // Calculate effective tax rate for display
   const effectiveNDFLRate = totalGross > 0 ? (totalIncomeTax / totalGross) * 100 : 13;
 
+  // Переключатель между Net и Gross ФОТ
+  const [fotDisplayMode, setFotDisplayMode] = useState<'net' | 'gross'>('net');
+
   const columns = [
     {
       title: 'ФИО',
@@ -402,9 +406,19 @@ export default function EmployeesPage() {
             backgroundColor: mode === 'dark' ? '#162312' : '#f6ffed', 
             border: mode === 'dark' ? '1px solid #389e0d' : '1px solid #b7eb8f' 
           }}>
+            <div style={{ marginBottom: 12 }}>
+              <Radio.Group 
+                value={fotDisplayMode} 
+                onChange={(e) => setFotDisplayMode(e.target.value)}
+                size="small"
+              >
+                <Radio.Button value="net">Net</Radio.Button>
+                <Radio.Button value="gross">Gross</Radio.Button>
+              </Radio.Group>
+            </div>
             <Statistic
-              title="К выплате сотрудникам (Net)"
-              value={totalNet}
+              title={fotDisplayMode === 'net' ? 'К выплате сотрудникам (Net)' : 'Годовой ФОТ (начислено)'}
+              value={fotDisplayMode === 'net' ? totalNet : totalGross}
               precision={0}
               suffix="₽"
               valueStyle={{ color: mode === 'dark' ? '#73d13d' : '#52c41a', fontWeight: 'bold' }}
