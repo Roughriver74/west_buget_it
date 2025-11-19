@@ -32,9 +32,10 @@ jobs:
           SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
           PROJECT_PATH: ${{ secrets.TEST_SERVER_PROJECT_PATH }}
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh $SERVER_USER@$SERVER_IP "export PROJECT_PATH='$PROJECT_PATH'; export GITHUB_REPO='$GITHUB_REPO'; bash -s" << 'ENDSSH'
-            set -e
+          ssh $SERVER_USER@$SERVER_IP "export PROJECT_PATH='$PROJECT_PATH'; export GITHUB_REPO='$GITHUB_REPO'; export GITHUB_TOKEN='$GITHUB_TOKEN'; bash -s" << 'ENDSSH'
+            set -euo pipefail
             echo "🚀 Starting deployment to test server..."
             echo "📁 Project path: $PROJECT_PATH"
 
@@ -43,6 +44,15 @@ jobs:
               echo "❌ Error: PROJECT_PATH is not set!"
               exit 1
             fi
+
+            # Ensure GitHub token is available for cloning/fetching
+            if [ -z "${GITHUB_TOKEN:-}" ]; then
+              echo "❌ Error: GITHUB_TOKEN is not available in the remote session"
+              exit 1
+            fi
+
+            GIT_CLONE_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git"
+            GIT_UPSTREAM_URL="https://github.com/${GITHUB_REPO}.git"
 
             # Navigate to project directory or create it
             if [ ! -d "$PROJECT_PATH" ]; then
@@ -58,27 +68,35 @@ jobs:
               if [ "$(ls -A 2>/dev/null)" ]; then
                 echo "⚠️  Directory is not empty. Initializing git repository..."
                 git init
-                git remote add origin "git@github.com:$GITHUB_REPO.git" 2>/dev/null || git remote set-url origin "git@github.com:$GITHUB_REPO.git"
+                git remote add origin "$GIT_CLONE_URL" 2>/dev/null || git remote set-url origin "$GIT_CLONE_URL"
                 git fetch origin test
-                git checkout -b test origin/test || true
+                git checkout -b test origin/test || git checkout test
               else
                 echo "📥 Cloning repository..."
-                git clone -b test "git@github.com:$GITHUB_REPO.git" .
+                git clone -b test "$GIT_CLONE_URL" .
               fi
+              # Remove token from remote after successful clone/init
+              git remote set-url origin "$GIT_UPSTREAM_URL"
             else
               # Ensure remote is set
               if ! git remote get-url origin &>/dev/null; then
-                git remote add origin "git@github.com:$GITHUB_REPO.git"
+                git remote add origin "$GIT_CLONE_URL"
               fi
-              
+
+              # Always use token URL for fetch to avoid auth issues on the server
+              git remote set-url origin "$GIT_CLONE_URL"
+
               # Pull latest changes from test branch
               echo "📥 Pulling latest changes..."
               git fetch origin test || {
                 echo "⚠️  Failed to fetch, trying to set remote..."
-                git remote set-url origin "git@github.com:$GITHUB_REPO.git"
+                git remote set-url origin "$GIT_CLONE_URL"
                 git fetch origin test
               }
-              git reset --hard origin/test || git checkout -b test origin/test
+              git reset --hard origin/test || git checkout -B test origin/test
+
+              # Reset remote back to upstream URL without token
+              git remote set-url origin "$GIT_UPSTREAM_URL"
             fi
 
             # Stop containers

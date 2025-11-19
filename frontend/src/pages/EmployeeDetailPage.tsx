@@ -153,8 +153,14 @@ export default function EmployeeDetailPage() {
     );
   }
 
-  const totalPlanned = sortedPlans.reduce((sum, p) => sum + Number(p.total_planned), 0);
-  const totalPaid = sortedActuals.reduce((sum, a) => sum + Number(a.total_paid), 0);
+  // Рассчитываем только за текущий год
+  const currentYear = new Date().getFullYear();
+  const totalPlanned = sortedPlans
+    .filter(p => p.year === currentYear)
+    .reduce((sum, p) => sum + Number(p.total_planned), 0);
+  const totalPaid = sortedActuals
+    .filter(a => a.year === currentYear)
+    .reduce((sum, a) => sum + Number(a.total_paid), 0);
   // Salary history columns
   const salaryHistoryColumns = [
     {
@@ -365,7 +371,7 @@ export default function EmployeeDetailPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Всего запланировано"
+              title={`Всего запланировано (${currentYear})`}
               value={totalPlanned}
               precision={2}
               suffix="₽"
@@ -375,7 +381,7 @@ export default function EmployeeDetailPage() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Всего выплачено"
+              title={`Всего выплачено (${currentYear})`}
               value={totalPaid}
               precision={2}
               suffix="₽"
@@ -436,36 +442,72 @@ export default function EmployeeDetailPage() {
           <Row gutter={16}>
             <Col span={12}>
               <Card type="inner" title="НДФЛ" style={{ marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Рассчитывается от годовой зарплаты
+                </div>
                 <Statistic
-                  title="Ставка"
+                  title="Ставка (эффективная)"
                   value={taxCalculation.income_tax_rate_percent}
                   precision={1}
                   suffix="%"
                 />
                 <Statistic
-                  title="Сумма"
+                  title="Сумма (месячная)"
                   value={taxCalculation.income_tax}
                   precision={2}
                   suffix="₽"
                   style={{ marginTop: '16px' }}
                 />
+                {taxCalculation.annual_income_tax && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                    Годовой НДФЛ: {formatCurrency(taxCalculation.annual_income_tax)}
+                  </div>
+                )}
               </Card>
 
               <Card type="inner" title="Зарплата">
                 <Descriptions column={1}>
-                  <Descriptions.Item label="Gross (начислено)">
-                    <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Net (на руки)">
-                    <strong style={{ color: '#52c41a' }}>
-                      {formatCurrency(taxCalculation.net_salary)}
-                    </strong>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Стоимость для компании">
+                  {taxCalculation.salary_type === 'NET' ? (
+                    <>
+                      <Descriptions.Item label="Оклад введен как">
+                        <Tag color="green">Нетто (на руки)</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Net (на руки)">
+                        <strong style={{ color: '#52c41a' }}>
+                          {formatCurrency(employee.base_salary)}
+                        </strong>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Gross (начислено)">
+                        <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
+                      </Descriptions.Item>
+                    </>
+                  ) : (
+                    <>
+                      <Descriptions.Item label="Оклад введен как">
+                        <Tag color="blue">Брутто (до вычета НДФЛ)</Tag>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Gross (начислено)">
+                        <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
+                      </Descriptions.Item>
+                      <Descriptions.Item label="Net (на руки)">
+                        <strong style={{ color: '#52c41a' }}>
+                          {formatCurrency(taxCalculation.net_salary)}
+                        </strong>
+                      </Descriptions.Item>
+                    </>
+                  )}
+                  <Descriptions.Item label="Стоимость для компании (месячная)">
                     <strong style={{ color: '#fa8c16' }}>
                       {formatCurrency(taxCalculation.employer_total_cost)}
                     </strong>
                   </Descriptions.Item>
+                  {taxCalculation.annual_employer_total_cost && (
+                    <Descriptions.Item label="Стоимость для компании (годовая)">
+                      <strong style={{ color: '#fa8c16' }}>
+                        {formatCurrency(taxCalculation.annual_employer_total_cost)}
+                      </strong>
+                    </Descriptions.Item>
+                  )}
                 </Descriptions>
               </Card>
             </Col>

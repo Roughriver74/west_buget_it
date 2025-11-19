@@ -28,6 +28,8 @@ from app.schemas.payroll import (
 from app.utils.auth import get_current_active_user
 from app.services.tax_rate_utils import merge_tax_rates_with_defaults
 from app.services.salary_calculator import SalaryCalculator
+from app.utils.ndfl_calculator import calculate_progressive_ndfl, calculate_gross_from_net
+from app.db.models import SalaryTypeEnum
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 
@@ -524,7 +526,10 @@ async def get_employee_tax_calculation(
     """
     Get tax calculation for employee's current salary
 
-    Returns НДФЛ, ПФР, ФОМС, ФСС breakdown based on current tax rates
+    Returns НДФЛ, ПФР, ФОМС, ФСС breakdown based on current tax rates.
+    
+    НДФЛ рассчитывается от годовой зарплаты по прогрессивной шкале.
+    Страховые взносы рассчитываются от месячного оклада (gross) из справочников.
     """
     from sqlalchemy import and_, or_
     from datetime import date
@@ -544,8 +549,37 @@ async def get_employee_tax_calculation(
             detail="Employee not found"
         )
 
-    gross_amount = Decimal(str(employee.base_salary))
     today = date.today()
+    current_year = today.year
+    
+    # Определяем месячный оклад в зависимости от salary_type
+    base_salary_input = Decimal(str(employee.base_salary))
+    monthly_gross_salary = base_salary_input
+    
+    if employee.salary_type == SalaryTypeEnum.NET:
+        # Если оклад введен как NET, пересчитываем в GROSS для месячного оклада
+        # Используем простую формулу для месячного оклада
+        ndfl_rate = employee.ndfl_rate or Decimal("0.13")
+        monthly_gross_salary = base_salary_input / (Decimal("1") - ndfl_rate)
+    
+    # Рассчитываем годовую зарплату (gross)
+    monthly_bonus = Decimal(str(employee.monthly_bonus_base or 0))
+    quarterly_bonus = Decimal(str(employee.quarterly_bonus_base or 0))
+    annual_bonus = Decimal(str(employee.annual_bonus_base or 0))
+    
+    # Годовая зарплата = (месячный оклад + месячная премия) * 12 + квартальная премия * 4 + годовая премия
+    annual_gross_salary = (monthly_gross_salary + monthly_bonus) * Decimal("12") + quarterly_bonus * Decimal("4") + annual_bonus
+    
+    # Рассчитываем НДФЛ от годовой зарплаты по прогрессивной шкале
+    ndfl_calculation = calculate_progressive_ndfl(annual_gross_salary, current_year)
+    annual_ndfl = Decimal(str(ndfl_calculation['total_tax']))
+    ndfl_effective_rate = Decimal(str(ndfl_calculation['effective_rate'])) / Decimal("100")  # Конвертируем из процентов
+    
+    # Месячный НДФЛ (для отображения) = годовой НДФЛ / 12
+    monthly_ndfl = annual_ndfl / Decimal("12")
+    
+    # Для расчета страховых взносов используем месячный gross оклад
+    gross_amount = monthly_gross_salary
 
     # Get active tax rates for current date (department-specific + global)
     tax_rates = db.query(TaxRate).filter(
@@ -577,24 +611,22 @@ async def get_employee_tax_calculation(
     breakdown = {}
 
     # Calculate taxes
+    # НДФЛ уже рассчитан от годовой зарплаты, используем его
+    income_tax = monthly_ndfl
+    income_tax_rate = ndfl_effective_rate
+    
+    breakdown["income_tax"] = {
+        "rate": float(income_tax_rate),
+        "rate_percent": float(ndfl_calculation['effective_rate']),
+        "amount": float(income_tax),
+        "description": f"НДФЛ (прогрессивная шкала, годовой доход: {annual_gross_salary:,.0f} ₽)"
+    }
+    
+    # Calculate other taxes (страховые взносы от месячного оклада)
     for tax_rate in selected_rates.values():
         if tax_rate.tax_type == TaxTypeEnum.INCOME_TAX:
-            # НДФЛ
-            if tax_rate.threshold_amount and gross_amount > tax_rate.threshold_amount:
-                amount_below = tax_rate.threshold_amount
-                amount_above = gross_amount - tax_rate.threshold_amount
-                income_tax = (amount_below * tax_rate.rate) + (amount_above * (tax_rate.rate_above_threshold or tax_rate.rate))
-                income_tax_rate = tax_rate.rate_above_threshold or tax_rate.rate
-            else:
-                income_tax = gross_amount * tax_rate.rate
-                income_tax_rate = tax_rate.rate
-
-            breakdown["income_tax"] = {
-                "rate": float(income_tax_rate),
-                "rate_percent": float(income_tax_rate * 100),
-                "amount": float(income_tax),
-                "description": tax_rate.name
-            }
+            # НДФЛ уже рассчитан, пропускаем
+            continue
 
         elif tax_rate.tax_type == TaxTypeEnum.PENSION_FUND:
             # ПФР
@@ -642,13 +674,19 @@ async def get_employee_tax_calculation(
     total_social_contributions = pension_fund + medical_insurance + social_insurance
     net_amount = gross_amount - income_tax
     employer_cost = gross_amount + total_social_contributions
+    
+    # Годовая стоимость для компании
+    annual_employer_cost = (gross_amount + total_social_contributions) * Decimal("12") + quarterly_bonus * Decimal("4") + annual_bonus
 
     return {
         "employee_id": employee_id,
         "employee_name": employee.full_name,
-        "gross_salary": float(gross_amount),
-        "income_tax": float(income_tax),
-        "income_tax_rate_percent": float(income_tax_rate * 100),
+        "salary_type": employee.salary_type.value,  # Добавляем тип зарплаты
+        "gross_salary": float(gross_amount),  # Месячный gross оклад
+        "annual_gross_salary": float(annual_gross_salary),  # Годовая зарплата (gross)
+        "income_tax": float(income_tax),  # Месячный НДФЛ
+        "annual_income_tax": float(annual_ndfl),  # Годовой НДФЛ
+        "income_tax_rate_percent": float(ndfl_calculation['effective_rate']),  # Эффективная ставка НДФЛ
         "social_contributions": {
             "pension_fund": float(pension_fund),
             "pension_fund_rate_percent": float(pension_fund_rate * 100),
@@ -658,7 +696,8 @@ async def get_employee_tax_calculation(
             "social_insurance_rate_percent": float(social_insurance_rate * 100),
             "total": float(total_social_contributions)
         },
-        "net_salary": float(net_amount),
-        "employer_total_cost": float(employer_cost),
+        "net_salary": float(net_amount),  # Месячный net оклад
+        "employer_total_cost": float(employer_cost),  # Месячная стоимость для компании
+        "annual_employer_total_cost": float(annual_employer_cost),  # Годовая стоимость для компании
         "breakdown": breakdown
     }

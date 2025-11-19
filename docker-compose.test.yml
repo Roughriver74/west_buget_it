@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: budget_db_test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-it_budget_db_test}
+      POSTGRES_USER: ${DB_USER:-budget_user_test}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-t5bz300CK7a3IgVAGt0sBg}
+    volumes:
+      - postgres_data_test:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-54330}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-budget_user_test} -d ${DB_NAME:-it_budget_db_test}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: budget_redis_test
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_test:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: budget_backend_test
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-budget_user_test}:${DB_PASSWORD:-t5bz300CK7a3IgVAGt0sBg}@db:5432/${DB_NAME:-it_budget_db_test}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-it_budget_db_test}
+      DB_USER: ${DB_USER:-budget_user_test}
+      DB_PASSWORD: ${DB_PASSWORD:-t5bz300CK7a3IgVAGt0sBg}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      USE_REDIS: "true"
+      DEBUG: ${DEBUG:-True}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://46.173.18.143:3002","http://localhost:3002"]}'
+    ports:
+      - "${BACKEND_PORT:-8889}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: budget_frontend_test
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://46.173.18.143:8889/api/v1}
+    ports:
+      - "${FRONTEND_PORT:-3002}:5173"
+    depends_on:
+      backend:
+        condition: service_started
+    command: npm run dev -- --host --port 5173
+    # Healthcheck intentionally omitted (curl is absent in the frontend image)
+
+volumes:
+  postgres_data_test:
+  redis_data_test:

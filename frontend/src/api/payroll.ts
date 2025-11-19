@@ -51,9 +51,12 @@ export interface SalaryHistory {
 export interface TaxCalculation {
   employee_id: number;
   employee_name: string;
-  gross_salary: number;
-  income_tax: number;
-  income_tax_rate_percent: number;
+  salary_type?: 'GROSS' | 'NET';  // Тип ввода оклада
+  gross_salary: number;  // Месячный gross оклад
+  annual_gross_salary?: number;  // Годовая зарплата (gross)
+  income_tax: number;  // Месячный НДФЛ
+  annual_income_tax?: number;  // Годовой НДФЛ
+  income_tax_rate_percent: number;  // Эффективная ставка НДФЛ
   social_contributions: {
     pension_fund: number;
     pension_fund_rate_percent: number;
@@ -63,8 +66,9 @@ export interface TaxCalculation {
     social_insurance_rate_percent: number;
     total: number;
   };
-  net_salary: number;
-  employer_total_cost: number;
+  net_salary: number;  // Месячный net оклад
+  employer_total_cost: number;  // Месячная стоимость для компании
+  annual_employer_total_cost?: number;  // Годовая стоимость для компании
   breakdown: {
     [key: string]: {
       rate: number;
