@@ -78,7 +78,7 @@ const ContractorsPage = () => {
   const handleDownloadTemplate = async () => {
     try {
       const API_BASE = getApiBaseUrl()
-      const url = `${API_URL}/api/v1/templates/download/contractors`
+      const url = `${API_BASE}/api/v1/templates/download/contractors`
 
       // Get token from localStorage
       const token = localStorage.getItem('token')

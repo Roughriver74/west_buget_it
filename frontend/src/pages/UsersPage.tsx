@@ -342,7 +342,7 @@ const UsersPage = () => {
                 },
                 showSizeChanger: true,
                 showTotal: (total) => `Всего ${total} пользователей`,
-                pageSizeOptions: PAGINATION_CONFIG.OPTIONS_STRINGS,
+                pageSizeOptions: [...PAGINATION_CONFIG.OPTIONS_STRINGS],
               }}
               scroll={{ x: 1200 }}
             />
