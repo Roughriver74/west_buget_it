@@ -9,20 +9,22 @@ from decimal import Decimal
 from typing import Dict, List, Tuple
 from datetime import datetime
 
+from app.core import constants
+
 
 # Tax brackets for 2025+ (progressive 5-tier system)
+# Convert from constants to match existing format (threshold, rate) tuples
 TAX_BRACKETS_2025 = [
-    (Decimal('2400000'), Decimal('0.13')),    # До 2,4 млн - 13%
-    (Decimal('5000000'), Decimal('0.15')),    # 2,4-5 млн - 15%
-    (Decimal('20000000'), Decimal('0.18')),   # 5-20 млн - 18%
-    (Decimal('50000000'), Decimal('0.20')),   # 20-50 млн - 20%
-    (None, Decimal('0.22')),                   # Свыше 50 млн - 22%
+    (Decimal(str(bracket['threshold'])) if bracket['threshold'] != float('inf') else None,
+     Decimal(str(bracket['rate'])))
+    for bracket in constants.TAX_BRACKETS_2025
 ]
 
 # Tax brackets for 2024 (two-tier system)
 TAX_BRACKETS_2024 = [
-    (Decimal('5000000'), Decimal('0.13')),    # До 5 млн - 13%
-    (None, Decimal('0.15')),                   # Свыше 5 млн - 15%
+    (Decimal(str(bracket['threshold'])) if bracket['threshold'] != float('inf') else None,
+     Decimal(str(bracket['rate'])))
+    for bracket in constants.TAX_BRACKETS_2024
 ]
 
 
@@ -178,8 +180,8 @@ def calculate_monthly_ndfl_withholding(
 def calculate_gross_from_net(
     net_income: Decimal,
     year: int = None,
-    tolerance: Decimal = Decimal('0.01'),
-    max_iterations: int = 50
+    tolerance: Decimal = None,
+    max_iterations: int = None
 ) -> Dict[str, any]:
     """
     Calculate gross income from desired net income (reverse calculation).
@@ -206,12 +208,21 @@ def calculate_gross_from_net(
     if year is None:
         year = datetime.now().year
 
+    if tolerance is None:
+        tolerance = Decimal(str(constants.TAX_CALCULATION_TOLERANCE))
+
+    if max_iterations is None:
+        max_iterations = constants.TAX_CALCULATION_MAX_ITERATIONS
+
     net_income = Decimal(str(net_income))
 
     # Initial bounds for binary search
     # Lower bound: net income itself (assumes 0% tax)
     # Upper bound: net income / (1 - max_rate) to account for highest tax bracket
-    max_rate = Decimal('0.22') if year >= 2025 else Decimal('0.15')
+    # Get max rate from constants
+    max_rate_2025 = Decimal(str(constants.TAX_BRACKETS_2025[-1]['rate']))  # 0.22
+    max_rate_2024 = Decimal(str(constants.TAX_BRACKETS_2024[-1]['rate']))  # 0.15
+    max_rate = max_rate_2025 if year >= 2025 else max_rate_2024
     lower_bound = net_income
     upper_bound = net_income / (Decimal('1') - max_rate)
 

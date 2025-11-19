@@ -7,6 +7,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core import constants
 from app.db.models import (
     BankTransaction,
     BudgetCategory,
@@ -219,15 +220,15 @@ class TransactionClassifier:
                 # Exact word match (highest score)
                 if f" {keyword_lower} " in f" {text_lower} ":
                     matched_keywords.append(keyword)
-                    score += 10
+                    score += constants.AI_KEYWORD_EXACT_SCORE
                 # Starts with keyword
                 elif text_lower.startswith(keyword_lower):
                     matched_keywords.append(keyword)
-                    score += 8
+                    score += constants.AI_KEYWORD_START_SCORE
                 # Contains keyword
                 elif keyword_lower in text_lower:
                     matched_keywords.append(keyword)
-                    score += 5
+                    score += constants.AI_KEYWORD_CONTAINS_SCORE
 
             # Consider match if at least one keyword matched
             if score > 0 and score > best_score:
@@ -235,10 +236,13 @@ class TransactionClassifier:
                 best_match = cat_id
                 best_keywords = matched_keywords
 
-        if best_match and best_score >= 5:  # Min threshold
+        if best_match and best_score >= constants.AI_MIN_SCORE_THRESHOLD:
             # Calculate confidence (0.0 - 1.0)
             # Score of 10 = 0.9 confidence, 5 = 0.7, etc.
-            confidence = min(0.7 + (best_score / 50), 0.95)
+            confidence = min(
+                constants.AI_CONFIDENCE_MIN_BASE + (best_score / constants.AI_SCORE_TO_CONFIDENCE_DIVISOR),
+                constants.AI_CONFIDENCE_MAX_CAP
+            )
 
             return (best_match, confidence, best_keywords)
 
@@ -284,7 +288,7 @@ class TransactionClassifier:
         # 1. Check historical data (high confidence)
         historical = self._get_historical_category(counterparty_inn, department_id)
         if historical:
-            return historical['category_id'], 0.95, f"Исторические данные: контрагент всегда относится к категории '{historical['category_name']}' ({historical['count']} транзакций)"
+            return historical['category_id'], constants.AI_HISTORICAL_CONFIDENCE, f"Исторические данные: контрагент всегда относится к категории '{historical['category_name']}' ({historical['count']} транзакций)"
 
         # 2. Analyze payment purpose text (with transaction type context)
         if payment_purpose:
@@ -297,7 +301,7 @@ class TransactionClassifier:
             name_based = self._analyze_text(counterparty_name, department_id, transaction_type)
             if name_based:
                 category_id, confidence, reasoning = name_based
-                return category_id, confidence * 0.8, f"По имени контрагента: {reasoning}"
+                return category_id, confidence * constants.AI_NAME_BASED_CONFIDENCE_MULTIPLIER, f"По имени контрагента: {reasoning}"
 
         # 4. Fallback to default categories based on transaction type
         if transaction_type:
@@ -305,9 +309,9 @@ class TransactionClassifier:
             if default_category:
                 category_id, category_name = default_category
                 if transaction_type == 'CREDIT':
-                    return category_id, 0.6, f"Доход от покупателя (по умолчанию для CREDIT)"
+                    return category_id, constants.AI_DEFAULT_CREDIT_CONFIDENCE, f"Доход от покупателя (по умолчанию для CREDIT)"
                 else:
-                    return category_id, 0.5, f"Расход на поставщика (по умолчанию для DEBIT)"
+                    return category_id, constants.AI_DEFAULT_DEBIT_CONFIDENCE, f"Расход на поставщика (по умолчанию для DEBIT)"
 
         # No match found
         return None, 0.0, "Не удалось автоматически определить категорию"
@@ -343,7 +347,7 @@ class TransactionClassifier:
             func.count(BankTransaction.id).desc()
         ).first()
 
-        if result and result.count >= 2:  # At least 2 historical transactions
+        if result and result.count >= constants.AI_MIN_HISTORICAL_TRANSACTIONS:
             return {
                 'category_id': result.category_id,
                 'category_name': result.name,
@@ -427,13 +431,16 @@ class TransactionClassifier:
 
             if match_count > 0:
                 # Calculate confidence based on number of matches
-                base_confidence = min(0.7 + (match_count * 0.1), 0.95)
+                base_confidence = min(
+                    constants.AI_CONFIDENCE_MIN_BASE + (match_count * constants.AI_MATCH_COUNT_MULTIPLIER),
+                    constants.AI_CONFIDENCE_MAX_CAP
+                )
 
                 # Boost confidence if category matches transaction type
                 if transaction_type == 'CREDIT' and category_pattern in self.REVENUE_KEYWORDS:
-                    base_confidence = min(base_confidence + 0.1, 0.95)
+                    base_confidence = min(base_confidence + constants.AI_CREDIT_TYPE_BOOST, constants.AI_CONFIDENCE_MAX_CAP)
                 elif transaction_type == 'DEBIT' and category_pattern in self.SUPPLIER_KEYWORDS:
-                    base_confidence = min(base_confidence + 0.05, 0.95)
+                    base_confidence = min(base_confidence + constants.AI_DEBIT_TYPE_BOOST, constants.AI_CONFIDENCE_MAX_CAP)
 
                 matches.append({
                     'pattern': category_pattern,
@@ -666,7 +673,7 @@ class RegularPaymentDetector:
             interval_std = (sum((x - avg_interval) ** 2 for x in intervals) / len(intervals)) ** 0.5
 
             # If interval is consistent (low variance), it's a regular payment
-            if interval_std < avg_interval * 0.3:  # Less than 30% variation
+            if interval_std < avg_interval * constants.REGULAR_PAYMENT_PATTERN_THRESHOLD:
                 category = None
                 if group.category_id:
                     category = self.db.query(BudgetCategory).filter(
