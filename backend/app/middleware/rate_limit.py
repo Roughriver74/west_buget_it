@@ -29,10 +29,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Default limits: 100 requests per minute, 1000 requests per hour
     """
 
-    def __init__(self, app, requests_per_minute: int = 100, requests_per_hour: int = 1000):
+    def __init__(
+        self,
+        app,
+        requests_per_minute: int = None,
+        requests_per_hour: int = None
+    ):
         super().__init__(app)
-        self.requests_per_minute = requests_per_minute
-        self.requests_per_hour = requests_per_hour
+        self.requests_per_minute = requests_per_minute or settings.RATE_LIMIT_DEFAULT_REQUESTS_PER_MINUTE
+        self.requests_per_hour = requests_per_hour or settings.RATE_LIMIT_DEFAULT_REQUESTS_PER_HOUR
 
         # Initialize Redis if enabled and available
         self.use_redis = settings.USE_REDIS and REDIS_AVAILABLE
@@ -46,8 +51,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     db=settings.REDIS_DB,
                     password=settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None,
                     decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
+                    socket_connect_timeout=settings.REDIS_SOCKET_TIMEOUT,
+                    socket_timeout=settings.REDIS_SOCKET_TIMEOUT,
                 )
                 # Test connection
                 self.redis_client.ping()
@@ -61,7 +66,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not self.use_redis:
             log_info("Rate limiting using in-memory storage (not distributed)", "RateLimit")
             self.request_times: Dict[str, list] = defaultdict(list)
-            self.cleanup_interval = 300  # 5 minutes
+            self.cleanup_interval = settings.RATE_LIMIT_CLEANUP_INTERVAL
             self.last_cleanup = time.time()
 
     def _get_client_ip(self, request: Request) -> str:
@@ -100,9 +105,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             # Set expiration on first increment (TTL)
             if minute_count == 1:
-                self.redis_client.expire(minute_key, 120)  # 2 minutes buffer
+                self.redis_client.expire(minute_key, settings.REDIS_MINUTE_WINDOW_TTL)
             if hour_count == 1:
-                self.redis_client.expire(hour_key, 7200)  # 2 hours buffer
+                self.redis_client.expire(hour_key, settings.REDIS_HOUR_WINDOW_TTL)
 
             # Check limits
             if minute_count > self.requests_per_minute:

@@ -100,7 +100,7 @@ def get_revenue_plan_details(
     revenue_stream_id: Optional[int] = Query(None, description="Filter by revenue stream"),
     revenue_category_id: Optional[int] = Query(None, description="Filter by revenue category"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(settings.REVENUE_PLAN_DETAILS_PAGE_SIZE, ge=1, le=settings.MAX_REVENUE_PLAN_DETAILS_PAGE_SIZE),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
