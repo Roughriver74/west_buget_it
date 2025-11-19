@@ -326,22 +326,31 @@ export default function PayrollScenariosPage() {
 
           <Divider />
 
-          <Descriptions title="Изменения ставок" bordered column={2} size="small">
-            {Object.entries(impactAnalysis.rate_changes).map(([type, change]) => (
-              <Descriptions.Item
-                key={type}
-                label={type}
-                span={2}
-              >
-                <Space>
-                  <Tag>{change.from.toFixed(1)}%</Tag>
-                  →
-                  <Tag color="volcano">{change.to.toFixed(1)}%</Tag>
-                  <Tag color="red">(+{change.change.toFixed(1)} п.п.)</Tag>
-                </Space>
-              </Descriptions.Item>
-            ))}
-          </Descriptions>
+          {impactAnalysis.rate_changes && Object.keys(impactAnalysis.rate_changes).length > 0 && (
+            <Descriptions title="Изменения ставок" bordered column={2} size="small">
+              {Object.entries(impactAnalysis.rate_changes).map(([type, change]) => {
+                // Safe number conversion with fallback
+                const fromValue = typeof change?.from === 'number' ? change.from : 0;
+                const toValue = typeof change?.to === 'number' ? change.to : 0;
+                const changeValue = typeof change?.change === 'number' ? change.change : 0;
+
+                return (
+                  <Descriptions.Item
+                    key={type}
+                    label={type}
+                    span={2}
+                  >
+                    <Space>
+                      <Tag>{fromValue.toFixed(1)}%</Tag>
+                      →
+                      <Tag color="volcano">{toValue.toFixed(1)}%</Tag>
+                      <Tag color="red">(+{changeValue.toFixed(1)} п.п.)</Tag>
+                    </Space>
+                  </Descriptions.Item>
+                );
+              })}
+            </Descriptions>
+          )}
 
           {impactAnalysis.recommendations && impactAnalysis.recommendations.length > 0 && (
             <>
