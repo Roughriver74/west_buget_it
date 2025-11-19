@@ -279,17 +279,17 @@ export default function PayrollScenariosPage() {
             description={
               <div>
                 <p>
-                  {impactAnalysis.total_impact > 0 ? (
+                  {typeof impactAnalysis.total_impact === 'number' && impactAnalysis.total_impact > 0 ? (
                     <>
                       Ожидается <strong>рост</strong> затрат на ФОТ на{' '}
                       <strong>{formatCurrency(impactAnalysis.total_impact)}</strong>{' '}
                       ({formatPercent(impactAnalysis.impact_percent)}) из-за изменений ставок страховых взносов.
                     </>
-                  ) : impactAnalysis.total_impact < 0 ? (
+                  ) : typeof impactAnalysis.total_impact === 'number' && impactAnalysis.total_impact < 0 ? (
                     <>
                       Ожидается <strong>снижение</strong> затрат на ФОТ на{' '}
-                      <strong>{formatCurrency(Math.abs(impactAnalysis.total_impact))}</strong>{' '}
-                      ({formatPercent(Math.abs(impactAnalysis.impact_percent))}) из-за изменений ставок страховых взносов.
+                      <strong>{formatCurrency(typeof impactAnalysis.total_impact === 'number' ? Math.abs(impactAnalysis.total_impact) : 0)}</strong>{' '}
+                      ({formatPercent(typeof impactAnalysis.impact_percent === 'number' ? Math.abs(impactAnalysis.impact_percent) : 0)}) из-за изменений ставок страховых взносов.
                     </>
                   ) : (
                     'Изменения в ставках страховых взносов не ожидаются.'
@@ -297,7 +297,7 @@ export default function PayrollScenariosPage() {
                 </p>
               </div>
             }
-            type={impactAnalysis.total_impact > 0 ? 'warning' : impactAnalysis.total_impact < 0 ? 'success' : 'info'}
+            type={typeof impactAnalysis.total_impact === 'number' && impactAnalysis.total_impact > 0 ? 'warning' : typeof impactAnalysis.total_impact === 'number' && impactAnalysis.total_impact < 0 ? 'success' : 'info'}
             showIcon
             style={{ marginBottom: '24px' }}
           />
@@ -306,7 +306,7 @@ export default function PayrollScenariosPage() {
             <Col span={6}>
               <Statistic
                 title="Общее влияние"
-                value={impactAnalysis.total_impact}
+                value={typeof impactAnalysis.total_impact === 'number' ? impactAnalysis.total_impact : 0}
                 precision={0}
                 suffix="₽"
                 valueStyle={{ color: '#cf1322' }}
@@ -315,7 +315,7 @@ export default function PayrollScenariosPage() {
             <Col span={6}>
               <Statistic
                 title="Рост в процентах"
-                value={impactAnalysis.impact_percent}
+                value={typeof impactAnalysis.impact_percent === 'number' ? impactAnalysis.impact_percent : 0}
                 precision={1}
                 suffix="%"
                 prefix={<RiseOutlined />}
