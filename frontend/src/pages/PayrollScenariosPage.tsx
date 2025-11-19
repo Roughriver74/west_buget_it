@@ -21,7 +21,8 @@ import {
 } from 'antd';
 import {
   BarChartOutlined,
-  Calculator OutlinedPlusOutlined,
+  CalculatorOutlined,
+  PlusOutlined,
   ReloadOutlined,
   RiseOutlined,
   FallOutlined,
