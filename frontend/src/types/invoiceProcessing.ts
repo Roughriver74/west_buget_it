@@ -137,6 +137,7 @@ export interface ProcessedInvoiceListItem {
   supplier_name?: string | null
   total_amount?: number | null
   expense_id?: number | null
+  category_id?: number | null
   external_id_1c?: string | null
   created_in_1c_at?: string | null
   created_at: string
