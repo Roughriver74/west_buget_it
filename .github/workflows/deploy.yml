@@ -21,8 +21,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch full git history for metadata extraction
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -37,9 +35,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main-${{ github.sha }}
+            type=raw,value=latest
 
       - name: Extract metadata for Frontend
         id: meta-frontend
@@ -47,9 +44,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main-${{ github.sha }}
+            type=raw,value=latest
 
       - name: Build and push Backend image
         uses: docker/build-push-action@v5
