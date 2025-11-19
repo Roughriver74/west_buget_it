@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tantml:parameter>
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Button,
@@ -63,7 +63,7 @@ export default function PayrollScenariosPage() {
   const [targetYear, setTargetYear] = useState(currentYear + 1);
 
   // Fetch impact analysis (flexible years)
-  const { data: impactAnalysis, isLoading: analysisLoading } = useQuery({
+  const { data: impactAnalysis, isLoading: analysisLoading } = useQuery<ImpactAnalysis>({
     queryKey: ['payroll-impact-analysis', selectedDepartment?.id, baseYear, targetYear],
     queryFn: () =>
       payrollAnalysisAPI.getImpactAnalysis({
@@ -71,7 +71,7 @@ export default function PayrollScenariosPage() {
         target_year: targetYear,
         department_id: selectedDepartment?.id,
       }),
-    enabled: !!selectedDepartment && baseYear && targetYear,
+    enabled: !!selectedDepartment && !!baseYear && !!targetYear,
   });
 
   // Fetch scenarios
