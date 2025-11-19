@@ -44,8 +44,8 @@ DEFAULT_TAX_RATES: Dict[TaxTypeEnum, TaxRateDefault] = {
     ),
     TaxTypeEnum.INJURY_INSURANCE: TaxRateDefault(
         tax_type=TaxTypeEnum.INJURY_INSURANCE,
-        name="Страхование от несчастных случаев (0%)",
-        rate=Decimal("0"),
+        name="Страхование от несчастных случаев (0.2%)",
+        rate=Decimal("0.002"),
     ),
 }
 
@@ -77,4 +77,3 @@ def merge_tax_rates_with_defaults(
             selected[tax_type] = default_rate
 
     return selected
-

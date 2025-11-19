@@ -329,16 +329,18 @@ def initialize_default_tax_rates(
     """Initialize default Russian tax rates for 2025 (ADMIN/ACCOUNTANT only, global)"""
     check_access(current_user)
 
-    # Check if already initialized globally
-    existing = db.query(TaxRate).filter(
+    # Load existing global rates to avoid duplicates
+    existing_global_rates = db.query(TaxRate).filter(
         TaxRate.department_id.is_(None)
-    ).first()
-
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Tax rates already exist globally"
+    ).all()
+    existing_keys = {
+        (
+            rate.tax_type,
+            rate.effective_from,
+            rate.effective_to
         )
+        for rate in existing_global_rates
+    }
 
     # Default tax rates for Russia 2025
     default_rates = [
@@ -382,10 +384,31 @@ def initialize_default_tax_rates(
             "effective_from": date(2025, 1, 1),
             "effective_to": None,
         },
+        {
+            "tax_type": TaxTypeEnum.INJURY_INSURANCE,
+            "name": "Травматизм (0.2%)",
+            "description": "Страхование от несчастных случаев и профзаболеваний",
+            "rate": Decimal("0.002"),
+            "threshold_amount": None,
+            "rate_above_threshold": None,
+            "effective_from": date(2025, 1, 1),
+            "effective_to": None,
+        },
     ]
 
     # Create tax rates
+    created_count = 0
     for rate_data in default_rates:
+        signature = (
+            rate_data["tax_type"],
+            rate_data["effective_from"],
+            rate_data["effective_to"],
+        )
+
+        # Skip if the same global rate already exists
+        if signature in existing_keys:
+            continue
+
         tax_rate = TaxRate(
             **rate_data,
             department_id=None,
@@ -393,10 +416,11 @@ def initialize_default_tax_rates(
             created_by_id=current_user.id
         )
         db.add(tax_rate)
+        created_count += 1
 
     db.commit()
 
     return {
         "message": "Default tax rates initialized successfully",
-        "count": len(default_rates)
+        "count": created_count
     }

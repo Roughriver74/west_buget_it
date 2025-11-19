@@ -72,7 +72,7 @@ export const ModuleGate: React.FC<ModuleGateProps> = ({
   loadingComponent,
   showError = true,
 }) => {
-  const { hasModule, getModule, isLoading, isError } = useModules()
+  const { getModule, isLoading, isError } = useModules()
 
   // Loading state
   if (isLoading && showLoading) {
@@ -108,7 +108,8 @@ export const ModuleGate: React.FC<ModuleGateProps> = ({
 
   // Check if module is enabled
   // TEMPORARILY DISABLED: Module system is disabled - always allow access
-  const moduleEnabled = true // TEMPORARILY DISABLED: hasModule(moduleCode)
+  // const moduleEnabled = hasModule(moduleCode) // TEMPORARILY DISABLED
+  const moduleEnabled = true
 
   if (!moduleEnabled) {
     // Show custom fallback if provided

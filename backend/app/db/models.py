@@ -15,11 +15,105 @@ from sqlalchemy import (
     Text,
     JSON,
     func,
+    TypeDecorator,
 )
 from sqlalchemy.orm import relationship
 import enum
 
 from .session import Base
+
+
+class FlexibleEnumType(TypeDecorator):
+    """
+    Custom enum type that handles legacy values from database.
+    Automatically converts old Russian values and other legacy formats to current enum values.
+    """
+    impl = Enum
+    cache_ok = True
+
+    def __init__(self, enum_class, *args, **kwargs):
+        self.enum_class = enum_class
+        # Map legacy values to current enum values
+        self.legacy_mapping = self._get_legacy_mapping(enum_class)
+        super().__init__(enum_class, *args, **kwargs)
+
+    def _get_legacy_mapping(self, enum_class):
+        """Get mapping of legacy values to current enum values"""
+        if enum_class == ExpenseStatusEnum:
+            return {
+                'Черновик': 'DRAFT',
+                'ЧЕРНОВИК': 'DRAFT',
+                'На согласовании': 'PENDING',
+                'НА СОГЛАСОВАНИИ': 'PENDING',
+                'К оплате': 'PENDING',
+                'К ОПЛАТЕ': 'PENDING',
+                'Оплачена': 'PAID',
+                'ОПЛАЧЕНА': 'PAID',
+                'Оплачено': 'PAID',
+                'ОПЛАЧЕНО': 'PAID',
+                'Отклонена': 'REJECTED',
+                'ОТКЛОНЕНА': 'REJECTED',
+                'Закрыта': 'CLOSED',
+                'ЗАКРЫТА': 'CLOSED',
+                'PAID': 'PAID',  # Sometimes stored as uppercase
+            }
+        elif enum_class == BudgetStatusEnum:
+            return {
+                'Черновик': 'DRAFT',
+                'ЧЕРНОВИК': 'DRAFT',
+                'Утверждено': 'APPROVED',
+                'УТВЕРЖДЕНО': 'APPROVED',
+            }
+        return {}
+
+    def process_result_value(self, value, dialect):
+        """Convert legacy values from database to current enum values"""
+        if value is None:
+            return None
+        
+        # If it's already a valid enum value, return it
+        try:
+            return self.enum_class(value)
+        except ValueError:
+            pass
+        
+        # Try to convert legacy value
+        value_str = str(value).strip()
+        
+        # Check legacy mapping
+        if value_str in self.legacy_mapping:
+            mapped_value = self.legacy_mapping[value_str]
+            try:
+                return self.enum_class(mapped_value)
+            except ValueError:
+                pass
+        
+        # Try case-insensitive match
+        value_upper = value_str.upper()
+        for legacy_val, enum_val in self.legacy_mapping.items():
+            if legacy_val.upper() == value_upper:
+                try:
+                    return self.enum_class(enum_val)
+                except ValueError:
+                    pass
+        
+        # If still not found, try direct enum lookup (case-insensitive)
+        for enum_val in self.enum_class:
+            if enum_val.value.upper() == value_upper:
+                return enum_val
+        
+        # Last resort: return default or raise error
+        # For backward compatibility, try to return a sensible default
+        if self.enum_class == ExpenseStatusEnum:
+            return ExpenseStatusEnum.DRAFT
+        elif self.enum_class == BudgetStatusEnum:
+            return BudgetStatusEnum.DRAFT
+        
+        # If no default available, log and return first enum value
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Unknown enum value '{value}' for {self.enum_class.__name__}, using default")
+        return list(self.enum_class)[0]
 
 
 class ExpenseTypeEnum(str, enum.Enum):
@@ -398,7 +492,7 @@ class Expense(Base):
     payment_date = Column(DateTime, nullable=True)
 
     # Status
-    status = Column(Enum(ExpenseStatusEnum), nullable=False, default=ExpenseStatusEnum.DRAFT, index=True)
+    status = Column(FlexibleEnumType(ExpenseStatusEnum), nullable=False, default=ExpenseStatusEnum.DRAFT, index=True)
     is_paid = Column(Boolean, default=False, nullable=False, index=True)
     is_closed = Column(Boolean, default=False, nullable=False, index=True)
 
@@ -494,7 +588,7 @@ class BudgetPlan(Base):
     opex_planned = Column(Numeric(15, 2), default=0, nullable=False)
 
     # Status (для всего года - все записи одного года имеют одинаковый статус)
-    status = Column(Enum(BudgetStatusEnum), default=BudgetStatusEnum.DRAFT, nullable=False, index=True)
+    status = Column(FlexibleEnumType(BudgetStatusEnum), default=BudgetStatusEnum.DRAFT, nullable=False, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -56,7 +56,7 @@ export const ModulesProvider: React.FC<ModulesProviderProps> = ({ children }) =>
 
   // Helper: Check if module is enabled
   // TEMPORARILY DISABLED: Module system is disabled - all modules return True
-  const hasModule = (moduleCode: ModuleCode | string): boolean => {
+  const hasModule = (_moduleCode: ModuleCode | string): boolean => {
     // TEMPORARILY DISABLED: Always return true
     return true
     // Original code:
