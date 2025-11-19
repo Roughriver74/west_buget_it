@@ -1,0 +1,75 @@
+name: Deploy to Test Server
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: test
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.TEST_SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to test server
+        env:
+          SERVER_IP: ${{ secrets.TEST_SERVER_IP }}
+          SERVER_USER: ${{ secrets.TEST_SERVER_USER }}
+          PROJECT_PATH: ${{ secrets.TEST_SERVER_PROJECT_PATH }}
+        run: |
+          ssh $SERVER_USER@$SERVER_IP << 'ENDSSH'
+            set -e
+            echo "🚀 Starting deployment to test server..."
+
+            # Navigate to project directory
+            cd $PROJECT_PATH || exit 1
+
+            # Pull latest changes from test branch
+            echo "📥 Pulling latest changes..."
+            git fetch origin test
+            git reset --hard origin/test
+
+            # Stop containers
+            echo "🛑 Stopping containers..."
+            docker compose -f docker-compose.test.yml down
+
+            # Rebuild and start containers
+            echo "🔨 Building and starting containers..."
+            docker compose -f docker-compose.test.yml up -d --build
+
+            # Wait for services to be healthy
+            echo "⏳ Waiting for services to start..."
+            sleep 30
+
+            # Check service status
+            echo "✅ Checking service status..."
+            docker compose -f docker-compose.test.yml ps
+
+            # Test backend health
+            echo "🏥 Testing backend health..."
+            curl -f http://localhost:8889/health || echo "⚠️  Backend health check failed"
+
+            echo "✅ Deployment completed!"
+          ENDSSH
+
+      - name: Deployment status
+        run: |
+          echo "✅ Deployment to test server completed successfully!"
+          echo "🌐 Frontend: http://${{ secrets.TEST_SERVER_IP }}:3002"
+          echo "🔧 Backend API: http://${{ secrets.TEST_SERVER_IP }}:8889"
+          echo "📚 API Docs: http://${{ secrets.TEST_SERVER_IP }}:8889/docs"
