@@ -31,6 +31,7 @@ from app.schemas import (
 from app.utils.auth import get_current_active_user
 from app.utils.logger import logger, log_error, log_info
 from app.services.cache import cache_service
+from app.core.config import settings
 
 router = APIRouter(dependencies=[Depends(get_current_active_user)])
 

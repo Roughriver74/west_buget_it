@@ -388,25 +388,25 @@ class OData1CClient:
             if date_from.year == date_to.year and date_from.month == date_to.month:
                 filter_str = f'{mandatory_filters} and year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
                 endpoint_with_params += f'&$filter={filter_str}'
-                # Removed duplicate log
+                logger.info(f"Using OData filter for cash receipts: {filter_str}")
             else:
                 # Для диапазона используем фильтр по году
                 year_filter = date_from.year - 1
                 filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
                 endpoint_with_params += f'&$filter={filter_str}'
-                # Removed duplicate log
+                logger.info(f"Using OData filter for cash receipts: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем по году
             year_filter = date_from.year - 1
             filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
             endpoint_with_params += f'&$filter={filter_str}'
-            # Removed duplicate log
+            logger.info(f"Using OData filter for cash receipts: {filter_str}")
         else:
             # Без дат - только обязательные фильтры
             endpoint_with_params += f'&$filter={mandatory_filters}'
-            logger.debug(f"Using OData filter: {mandatory_filters}")
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
-        logger.debug(f"Fetching cash receipts: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
+        logger.info(f"Fetching cash receipts (PKO): date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
         response = self._make_request(
             method='GET',
@@ -468,25 +468,25 @@ class OData1CClient:
             if date_from.year == date_to.year and date_from.month == date_to.month:
                 filter_str = f'{mandatory_filters} and year(Date) eq {date_from.year} and month(Date) eq {date_from.month}'
                 endpoint_with_params += f'&$filter={filter_str}'
-                # Removed duplicate log
+                logger.info(f"Using OData filter for cash payments: {filter_str}")
             else:
                 # Для диапазона используем фильтр по году
                 year_filter = date_from.year - 1
                 filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
                 endpoint_with_params += f'&$filter={filter_str}'
-                # Removed duplicate log
+                logger.info(f"Using OData filter for cash payments: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем по году
             year_filter = date_from.year - 1
             filter_str = f'{mandatory_filters} and year(Date) gt {year_filter}'
             endpoint_with_params += f'&$filter={filter_str}'
-            # Removed duplicate log
+            logger.info(f"Using OData filter for cash payments: {filter_str}")
         else:
             # Без дат - только обязательные фильтры
             endpoint_with_params += f'&$filter={mandatory_filters}'
-            logger.debug(f"Using OData filter: {mandatory_filters}")
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
-        logger.debug(f"Fetching cash payments: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
+        logger.info(f"Fetching cash payments (RKO): date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
         response = self._make_request(
             method='GET',
@@ -571,8 +571,8 @@ class OData1CClient:
             filter_str = f"Description eq '{name}'"
             endpoint_with_params = f"Catalog_СтруктураПредприятия?$format=json&$filter={filter_str}&$top=1"
 
-            logger.debug(f"Searching subdivision by name: '{name}'")
-            logger.debug(f"Request URL: {self.base_url}/{endpoint_with_params}")
+            logger.info(f"Searching subdivision by name: '{name}'")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
 
             response = self._make_request(
                 method='GET',
@@ -582,7 +582,7 @@ class OData1CClient:
             # Проверить результат
             if response and 'value' in response and len(response['value']) > 0:
                 subdivision = response['value'][0]
-                logger.debug(f"Found subdivision '{name}' with GUID: {subdivision.get('Ref_Key')}")
+                logger.info(f"Found subdivision '{name}' with GUID: {subdivision.get('Ref_Key')}")
                 return subdivision
             else:
                 logger.warning(f"Subdivision '{name}' not found in 1C Catalog_СтруктураПредприятия")
@@ -634,23 +634,23 @@ class OData1CClient:
             # Используем точный фильтр по диапазону дат (Date >= start AND Date <= end)
             filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00' and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
-            logger.debug(f"Using OData filter: {filter_str}")
+            logger.info(f"Using OData filter: {filter_str}")
         elif date_from:
             # Только начальная дата - фильтруем начиная с даты
             filter_str = f"{mandatory_filters} and Date ge datetime'{date_from.isoformat()}T00:00:00'"
             endpoint_with_params += f'&$filter={filter_str}'
-            logger.debug(f"Using OData filter: {filter_str}")
+            logger.info(f"Using OData filter: {filter_str}")
         elif date_to:
             # Только конечная дата - фильтруем до даты
             filter_str = f"{mandatory_filters} and Date le datetime'{date_to.isoformat()}T23:59:59'"
             endpoint_with_params += f'&$filter={filter_str}'
-            logger.debug(f"Using OData filter: {filter_str}")
+            logger.info(f"Using OData filter: {filter_str}")
         else:
             # Без дат - только обязательные фильтры
             endpoint_with_params += f'&$filter={mandatory_filters}'
-            logger.debug(f"Using OData filter: {mandatory_filters}")
+            logger.info(f"Using OData filter: {mandatory_filters}")
 
-        logger.debug(f"Fetching expense requests: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
+        logger.info(f"Fetching expense requests: date_from={date_from}, date_to={date_to}, top={top}, skip={skip}")
 
         response = self._make_request(
             method='GET',
@@ -688,7 +688,7 @@ class OData1CClient:
 
         endpoint_with_params = f'Catalog_Организации?$top={top_value}&$format=json&$skip={skip}'
 
-        logger.debug(f"Fetching organizations: top={top}, skip={skip}")
+        logger.info(f"Fetching organizations: top={top}, skip={skip}")
 
         response = self._make_request(
             method='GET',
@@ -727,7 +727,7 @@ class OData1CClient:
         filter_str = "DeletionMark eq false"
         endpoint_with_params = f'Catalog_СтатьиДвиженияДенежныхСредств?$top={top_value}&$format=json&$skip={skip}&$filter={filter_str}'
 
-        logger.debug(f"Fetching cash flow categories: top={top_value}, skip={skip}, filter={filter_str}")
+        logger.info(f"Fetching cash flow categories: top={top_value}, skip={skip}, filter={filter_str}")
 
         response = self._make_request(
             method='GET',
@@ -763,8 +763,8 @@ class OData1CClient:
             filter_str = f"ИНН eq '{inn}'"
             endpoint_with_params = f"Catalog_Контрагенты?$top=1&$format=json&$filter={filter_str}"
 
-            logger.debug(f"Searching counterparty by INN: {inn}")
-            logger.debug(f"Request URL: {self.base_url}/{endpoint_with_params}")
+            logger.info(f"Searching counterparty by INN: {inn}")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
 
             response = self._make_request(
                 method='GET',
@@ -776,7 +776,7 @@ class OData1CClient:
 
             results = response.get('value', [])
             if results:
-                logger.debug(f"Found counterparty with INN {inn}: {results[0].get('Description')}")
+                logger.info(f"Found counterparty with INN {inn}: {results[0].get('Description')}")
                 return results[0]  # Возвращаем первого найденного
             else:
                 logger.warning(f"Counterparty with INN {inn} not found in 1C")
@@ -804,8 +804,8 @@ class OData1CClient:
             filter_str = f"ИНН eq '{inn}'"
             endpoint_with_params = f"Catalog_Организации?$top=1&$format=json&$filter={filter_str}"
 
-            logger.debug(f"Searching organization by INN: {inn}")
-            logger.debug(f"Request URL: {self.base_url}/{endpoint_with_params}")
+            logger.info(f"Searching organization by INN: {inn}")
+            logger.info(f"Request URL: {self.base_url}/{endpoint_with_params}")
 
             response = self._make_request(
                 method='GET',
@@ -817,7 +817,7 @@ class OData1CClient:
 
             results = response.get('value', [])
             if results:
-                logger.debug(f"Found organization with INN {inn}: {results[0].get('Description')}")
+                logger.info(f"Found organization with INN {inn}: {results[0].get('Description')}")
                 return results[0]  # Возвращаем первую найденную
             else:
                 logger.warning(f"Organization with INN {inn} not found in 1C")
@@ -857,7 +857,7 @@ class OData1CClient:
         import json
         try:
             json_payload = json.dumps(data, ensure_ascii=False, indent=2)
-            logger.debug(f"JSON payload being sent to 1C:\n{json_payload}")
+            logger.info(f"JSON payload being sent to 1C:\n{json_payload}")
         except Exception as log_err:
             logger.warning(f"Failed to serialize payload for logging: {log_err}")
 
@@ -927,7 +927,7 @@ class OData1CClient:
                 "Расширение": file_extension or "pdf"
             }
 
-            logger.debug(f"Uploading attachment: {filename} ({len(file_content)} bytes) to owner {owner_guid}")
+            logger.info(f"Uploading attachment: {filename} ({len(file_content)} bytes) to owner {owner_guid}")
 
             # ПРИМЕЧАНИЕ: Endpoint может отличаться в зависимости от конфигурации 1С
             # Возможные варианты:
@@ -940,7 +940,7 @@ class OData1CClient:
                 data=attachment_data
             )
 
-            logger.debug(f"Attachment uploaded successfully")
+            logger.info(f"Attachment uploaded successfully")
             return response
 
         except Exception as e:

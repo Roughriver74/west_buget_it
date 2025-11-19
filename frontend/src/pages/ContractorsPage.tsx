@@ -9,11 +9,12 @@ import type { UploadProps } from 'antd'
 import axios from 'axios'
 import ContractorFormModal from '@/components/contractors/ContractorFormModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 const ContractorsPage = () => {
   const [page, setPage] = useState(1)
@@ -76,7 +77,7 @@ const ContractorsPage = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const API_BASE = getApiBaseUrl()
       const url = `${API_URL}/api/v1/templates/download/contractors`
 
       // Get token from localStorage

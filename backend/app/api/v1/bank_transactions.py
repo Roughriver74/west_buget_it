@@ -72,6 +72,7 @@ from app.utils.excel_export import encode_filename_header
 from app.services.bank_transaction_import import BankTransactionImporter
 from app.services.transaction_classifier import TransactionClassifier, RegularPaymentDetector
 from app.services.odata_sync import ODataBankTransactionSync, ODataSyncConfig
+from app.core import constants
 
 logger = logging.getLogger(__name__)
 
@@ -650,13 +651,13 @@ def get_matching_expenses(
 
     # Search for expenses
     # 1. Same amount (±5%)
-    amount_min = tx.amount * Decimal('0.95')
-    amount_max = tx.amount * Decimal('1.05')
+    amount_min = tx.amount * Decimal(str(constants.AMOUNT_MATCHING_TOLERANCE_MIN))
+    amount_max = tx.amount * Decimal(str(constants.AMOUNT_MATCHING_TOLERANCE_MAX))
 
     # 2. Date range (±30 days from transaction)
     from datetime import timedelta
-    date_min = tx.transaction_date - timedelta(days=30)
-    date_max = tx.transaction_date + timedelta(days=30)
+    date_min = tx.transaction_date - timedelta(days=constants.DATE_MATCHING_TOLERANCE_DAYS)
+    date_max = tx.transaction_date + timedelta(days=constants.DATE_MATCHING_TOLERANCE_DAYS)
 
     query = db.query(Expense).filter(
         and_(
@@ -1336,7 +1337,7 @@ def _get_bank_transactions_analytics_impl(
 
     # AI metrics
     categorized_transactions = [t for t in transactions if t.category_id is not None]
-    auto_categorized = [t for t in categorized_transactions if t.category_confidence and t.category_confidence >= 0.9]
+    auto_categorized = [t for t in categorized_transactions if t.category_confidence and t.category_confidence >= constants.CONFIDENCE_HIGH_THRESHOLD]
     regular_payments = [t for t in transactions if t.is_regular_payment]
 
     avg_confidence = None
@@ -1700,10 +1701,10 @@ def _get_bank_transactions_analytics_impl(
 
     # AI Performance
     confidence_brackets = [
-        ('High (≥90%)', 0.9, 1.0),
-        ('Medium (70-90%)', 0.7, 0.9),
-        ('Low (50-70%)', 0.5, 0.7),
-        ('Very Low (<50%)', 0.0, 0.5),
+        ('High (≥90%)', constants.CONFIDENCE_HIGH_THRESHOLD, 1.0),
+        ('Medium (70-90%)', constants.CONFIDENCE_MEDIUM_THRESHOLD, constants.CONFIDENCE_HIGH_THRESHOLD),
+        ('Low (50-70%)', constants.CONFIDENCE_LOW_THRESHOLD, constants.CONFIDENCE_MEDIUM_THRESHOLD),
+        ('Very Low (<50%)', 0.0, constants.CONFIDENCE_LOW_THRESHOLD),
     ]
 
     confidence_distribution = []
@@ -1724,8 +1725,8 @@ def _get_bank_transactions_analytics_impl(
             percent_of_total=float(count / len(categorized_transactions) * 100) if categorized_transactions else 0
         ))
 
-    high_confidence_count = len([t for t in categorized_transactions if t.category_confidence and t.category_confidence >= 0.9])
-    low_confidence_count = len([t for t in categorized_transactions if t.category_confidence and t.category_confidence < 0.7])
+    high_confidence_count = len([t for t in categorized_transactions if t.category_confidence and t.category_confidence >= constants.CONFIDENCE_HIGH_THRESHOLD])
+    low_confidence_count = len([t for t in categorized_transactions if t.category_confidence and t.category_confidence < constants.CONFIDENCE_MEDIUM_THRESHOLD])
 
     ai_performance = AIPerformanceData(
         confidence_distribution=confidence_distribution,
@@ -1738,7 +1739,7 @@ def _get_bank_transactions_analytics_impl(
 
     # Low confidence items
     low_confidence_items = []
-    for t in [t for t in transactions if t.category_confidence and t.category_confidence < 0.7][:50]:
+    for t in [t for t in transactions if t.category_confidence and t.category_confidence < constants.CONFIDENCE_MEDIUM_THRESHOLD][:50]:
         low_confidence_items.append(LowConfidenceItem(
             transaction_id=t.id,
             transaction_date=t.transaction_date,

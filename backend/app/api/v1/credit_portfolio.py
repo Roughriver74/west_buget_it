@@ -30,6 +30,7 @@ from app.schemas.credit_portfolio import (
 )
 from app.utils.auth import get_current_active_user
 from app.services.cache import cache_service
+from app.core.config import settings
 
 router = APIRouter()
 

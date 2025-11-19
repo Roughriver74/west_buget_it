@@ -12,8 +12,17 @@ from datetime import datetime
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# Define log levels
-LOG_LEVEL = logging.INFO
+# Define log levels - environment-based configuration
+# Development: INFO, Production: WARNING, Debug: DEBUG
+_LOG_LEVEL_MAP = {
+    'DEBUG': logging.DEBUG,
+    'INFO': logging.INFO,
+    'WARNING': logging.WARNING,
+    'ERROR': logging.ERROR,
+    'CRITICAL': logging.CRITICAL
+}
+_LOG_LEVEL_ENV = os.getenv('LOG_LEVEL', 'WARNING').upper()
+LOG_LEVEL = _LOG_LEVEL_MAP.get(_LOG_LEVEL_ENV, logging.WARNING)
 
 # Check if running in production (Docker container)
 IS_PRODUCTION = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true' or os.path.exists('/app')
@@ -51,12 +60,12 @@ def setup_logger(name: str = "app", level: int = LOG_LEVEL) -> logging.Logger:
             LOGS_DIR = Path(__file__).parent.parent.parent / "logs"
             LOGS_DIR.mkdir(exist_ok=True)
 
-            # File handler with rotation (10MB max, keep 5 backup files)
+            # File handler with rotation (5MB max, keep 3 backup files)
             log_file = LOGS_DIR / f"{name}.log"
             file_handler = RotatingFileHandler(
                 log_file,
-                maxBytes=10 * 1024 * 1024,  # 10MB
-                backupCount=5,
+                maxBytes=5 * 1024 * 1024,  # 5MB (reduced from 10MB)
+                backupCount=3,  # Reduced from 5
                 encoding='utf-8'
             )
             file_handler.setLevel(level)
@@ -68,8 +77,8 @@ def setup_logger(name: str = "app", level: int = LOG_LEVEL) -> logging.Logger:
             error_log_file = LOGS_DIR / f"{name}_errors.log"
             error_handler = RotatingFileHandler(
                 error_log_file,
-                maxBytes=10 * 1024 * 1024,  # 10MB
-                backupCount=5,
+                maxBytes=5 * 1024 * 1024,  # 5MB (reduced from 10MB)
+                backupCount=3,  # Reduced from 5
                 encoding='utf-8'
             )
             error_handler.setLevel(logging.ERROR)

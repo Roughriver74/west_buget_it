@@ -3,8 +3,9 @@ import { Card, Statistic } from 'antd'
 import { DollarOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
+import { getApiBaseUrl } from '@/config/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 interface TotalAmountWidgetProps {
   title: string

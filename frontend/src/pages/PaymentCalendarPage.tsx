@@ -25,6 +25,7 @@ import type { PaymentCalendarDay, PaymentDetail, ForecastExpense } from '@/types
 import { formatCurrency } from '@/utils/formatters'
 import PaymentForecastChart from '@/components/forecast/PaymentForecastChart'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -45,7 +46,7 @@ const PaymentCalendarPage = () => {
     try {
       const departmentParam = selectedDepartment?.id ? `?department_id=${selectedDepartment.id}` : ''
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/forecast/export/${currentYear}/${currentMonth}${departmentParam}`,
+        `${getApiBaseUrl()}/forecast/export/${currentYear}/${currentMonth}${departmentParam}`,
         {
           method: 'GET',
         }

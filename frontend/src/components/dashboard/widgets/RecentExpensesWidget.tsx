@@ -6,8 +6,9 @@ import axios from 'axios'
 import { getExpenseStatusLabel, getExpenseStatusColor } from '@/utils/formatters'
 import dayjs from 'dayjs'
 import { ExpenseStatus } from '@/types'
+import { getApiBaseUrl } from '@/config/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 interface RecentExpensesWidgetProps {
   title: string

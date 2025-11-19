@@ -3,6 +3,7 @@ import { Modal, Upload, message, Alert, Statistic, Row, Col, Typography, Button,
 import { InboxOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/api/client';
+import { getApiBaseUrl } from '@/config/api'
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
@@ -79,7 +80,7 @@ export default function BudgetPlanImportModal({ visible, versionId, onCancel }: 
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const API_URL = getApiBaseUrl();
       const url = `${API_URL}/budget/planning/versions/template/download`;
 
       // Get token from localStorage

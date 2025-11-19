@@ -12,6 +12,7 @@ import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPay
 import InvoiceProcessingDrawer from '@/components/expenses/InvoiceProcessingDrawer'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import dayjs from 'dayjs'
+import { getApiBaseUrl } from '@/config/api'
 
 const { RangePicker } = DatePicker
 
@@ -135,7 +136,7 @@ const ExpensesPage = () => {
       if (dateRange?.[1]) params.append('date_to', dateRange[1].toISOString())
 
       const token = localStorage.getItem('token')
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const apiUrl = getApiBaseUrl()
       const url = `${apiUrl}/api/v1/expenses/export?${params.toString()}`
 
       const response = await fetch(url, {

@@ -5,8 +5,9 @@ import { PlusOutlined, EditOutlined } from '@ant-design/icons'
 import axios from 'axios'
 import CustomDashboard from '@/components/dashboard/CustomDashboard'
 import type { DashboardConfig } from '@/types'
+import { getApiBaseUrl } from '@/config/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 const { Option } = Select
 

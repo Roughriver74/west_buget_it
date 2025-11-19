@@ -6,6 +6,7 @@ import { budgetApi } from '@/api'
 import type { BudgetOverviewCategory } from '@/api/budget'
 import QuickExpenseModal from './QuickExpenseModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { getApiBaseUrl } from '@/config/api'
 
 interface BudgetOverviewTableProps {
   year: number
@@ -23,7 +24,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
   })
 
   const handleExport = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const apiUrl = getApiBaseUrl()
     let url = `${apiUrl}/api/v1/budget/overview/${year}/${month}/export`
     if (selectedDepartment?.id) {
       url += `?department_id=${selectedDepartment.id}`

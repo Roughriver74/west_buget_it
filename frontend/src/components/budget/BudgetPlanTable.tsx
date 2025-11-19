@@ -7,6 +7,7 @@ import EditableCell from './EditableCell'
 import CopyPlanModal from './CopyPlanModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { getApiBaseUrl } from '@/config/api'
 
 interface BudgetPlanTableProps {
   year: number
@@ -97,7 +98,7 @@ const BudgetPlanTable = React.forwardRef<
   }
 
   const handleExport = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const apiUrl = getApiBaseUrl()
     const url = `${apiUrl}/api/v1/budget/plans/year/${year}/export`
     window.open(url, '_blank')
     message.success('Экспорт начат. Файл скоро будет загружен.')

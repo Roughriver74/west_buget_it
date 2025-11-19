@@ -93,19 +93,16 @@ log_info(
 )
 
 
-# Request logging middleware
+# Request logging middleware - optimized (only slow requests and errors)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log all HTTP requests with timing"""
+    """Log slow HTTP requests (>5s) and errors"""
     start_time = time.time()
 
     # Get user info if available
     user = "anonymous"
     if hasattr(request.state, "user") and request.state.user:
         user = getattr(request.state.user, "username", "unknown")
-
-    # Log request
-    logger.info(f"Request: {request.method} {request.url.path} - User: {user}")
 
     # Process request
     try:
@@ -114,11 +111,19 @@ async def log_requests(request: Request, call_next):
         # Calculate processing time
         process_time = time.time() - start_time
 
-        # Log response
-        logger.info(
-            f"Response: {request.method} {request.url.path} - "
-            f"Status: {response.status_code} - Time: {process_time:.2f}s"
-        )
+        # Log only slow requests (> 5 seconds)
+        if process_time > 5.0:
+            logger.warning(
+                f"Slow request: {request.method} {request.url.path} - "
+                f"User: {user} - Status: {response.status_code} - Time: {process_time:.2f}s"
+            )
+
+        # Log only error responses (>= 400)
+        if response.status_code >= 400:
+            logger.error(
+                f"Failed request: {request.method} {request.url.path} - "
+                f"User: {user} - Status: {response.status_code} - Time: {process_time:.2f}s"
+            )
 
         # Add timing header
         response.headers["X-Process-Time"] = str(process_time)

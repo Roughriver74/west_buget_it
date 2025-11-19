@@ -85,6 +85,17 @@ AI_MEDIUM_CONFIDENCE_THRESHOLD = 0.5  # Needs review if confidence < 50%
 # Regular Payment Detection
 REGULAR_PAYMENT_PATTERN_THRESHOLD = 0.3  # 30% variation threshold for pattern detection
 
+# Bank Transaction Matching
+AMOUNT_MATCHING_TOLERANCE = 0.05  # ±5% tolerance for amount matching
+AMOUNT_MATCHING_TOLERANCE_MIN = 0.95  # 95% of amount (1 - tolerance)
+AMOUNT_MATCHING_TOLERANCE_MAX = 1.05  # 105% of amount (1 + tolerance)
+DATE_MATCHING_TOLERANCE_DAYS = 30  # ±30 days tolerance for date matching
+
+# Transaction Confidence Thresholds (for analytics/reporting)
+CONFIDENCE_HIGH_THRESHOLD = 0.9  # High confidence (≥90%)
+CONFIDENCE_MEDIUM_THRESHOLD = 0.7  # Medium confidence (70-89%)
+CONFIDENCE_LOW_THRESHOLD = 0.5  # Low confidence (50-69%)
+
 # Invoice AI Parser
 AI_PARSER_TEMPERATURE = 0.1  # Low temperature for consistent parsing
 AI_PARSER_MAX_TOKENS = 4000  # Maximum tokens for AI response

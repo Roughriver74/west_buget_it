@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
 import type { KPIImportResult } from '@/api/kpi'
 import dayjs from 'dayjs'
+import { getApiBaseUrl } from '@/config/api'
 
 const { Dragger } = Upload
 const { Title, Text, Paragraph } = Typography
@@ -52,7 +53,7 @@ const ImportKPIModal: React.FC<ImportKPIModalProps> = ({ visible, onCancel }) =>
 
   const handleDownloadTemplate = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const API_URL = getApiBaseUrl()
       const url = `${API_URL}/api/v1/templates/download/kpi`
 
       // Get token from localStorage

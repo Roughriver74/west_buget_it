@@ -4,8 +4,9 @@ import { UploadOutlined, DeleteOutlined, DownloadOutlined, FileOutlined } from '
 import type { UploadFile, UploadProps } from 'antd'
 import { Attachment } from '../../types'
 import axios from 'axios'
+import { getApiBaseUrl } from '@/config/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE = getApiBaseUrl()
 
 interface AttachmentManagerProps {
   expenseId?: number

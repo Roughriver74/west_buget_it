@@ -157,7 +157,7 @@ class InvoiceTo1CConverter:
             else:
                 result.cash_flow_category_guid = category.external_id_1c
                 result.cash_flow_category_name = category.name
-                logger.info(f"Found cash flow category: {category.name} ({category.external_id_1c})")
+                logger.debug(f"Found cash flow category: {category.name} ({category.external_id_1c})")
 
         # 3. Проверка наличия контрагента в 1С (по ИНН)
         if invoice.supplier_inn:
@@ -166,7 +166,7 @@ class InvoiceTo1CConverter:
                 if counterparty:
                     result.counterparty_guid = counterparty.get('Ref_Key')
                     result.counterparty_name = counterparty.get('Description')
-                    logger.info(f"Found counterparty in 1C: {result.counterparty_name}")
+                    logger.debug(f"Found counterparty in 1C: {result.counterparty_name}")
                 else:
                     result.add_error(
                         f"Контрагент с ИНН {invoice.supplier_inn} не найден в 1С. "
@@ -193,7 +193,7 @@ class InvoiceTo1CConverter:
 
                 # Стратегия 1: Поиск по названию покупателя
                 if buyer_name:
-                    logger.info(f"Trying to find organization by buyer name: {buyer_name}")
+                    logger.debug(f"Trying to find organization by buyer name: {buyer_name}")
                     # Поиск по частичному совпадению названия (например "ВЕСТ" в "ООО ВЕСТ ЛОГИСТИК")
                     organizations_by_name = self.db.query(Organization).filter(
                         Organization.is_active == True,
@@ -206,7 +206,7 @@ class InvoiceTo1CConverter:
                         if 'ВЕСТ' in buyer_name.upper() and 'ВЕСТ' in org_name:
                             organization = org
                             buyer_inn = org.inn
-                            logger.info(f"Found organization by name match: {org.short_name} (INN: {org.inn})")
+                            logger.debug(f"Found organization by name match: {org.short_name} (INN: {org.inn})")
                             break
 
                 # Стратегия 2: Использовать первую активную организацию с ИНН
@@ -220,7 +220,7 @@ class InvoiceTo1CConverter:
 
                     if organization:
                         buyer_inn = organization.inn
-                        logger.info(f"Using first active organization as fallback: {organization.short_name} (INN: {organization.inn})")
+                        logger.debug(f"Using first active organization as fallback: {organization.short_name} (INN: {organization.inn})")
                     else:
                         result.add_error(
                             f"ИНН покупателя не найден в распознанных данных счета, и не удалось найти подходящую организацию. "
@@ -228,7 +228,7 @@ class InvoiceTo1CConverter:
                         )
 
             if buyer_inn:
-                logger.info(f"Found buyer INN: {buyer_inn}")
+                logger.debug(f"Found buyer INN: {buyer_inn}")
 
                 # Если организация еще не найдена (не было fallback), искать в БД по ИНН
                 if not organization:
@@ -241,10 +241,10 @@ class InvoiceTo1CConverter:
                     # Организация найдена в БД и синхронизирована с 1С
                     result.organization_guid = organization.external_id_1c
                     result.organization_name = organization.short_name or organization.name
-                    logger.info(f"Found organization in DB by INN: {result.organization_name} (GUID: {result.organization_guid})")
+                    logger.debug(f"Found organization in DB by INN: {result.organization_name} (GUID: {result.organization_guid})")
                 else:
                     # Организация не найдена в БД или не синхронизирована - ищем в 1С
-                    logger.info(f"Organization not found in DB or not synced, fetching from 1C by INN: {buyer_inn}")
+                    logger.debug(f"Organization not found in DB or not synced, fetching from 1C by INN: {buyer_inn}")
                     org_1c_data = self.odata_client.get_organization_by_inn(buyer_inn)
 
                     if org_1c_data:
@@ -253,7 +253,7 @@ class InvoiceTo1CConverter:
 
                         result.organization_guid = org_guid
                         result.organization_name = org_name
-                        logger.info(f"Found organization in 1C: {org_name} (GUID: {org_guid})")
+                        logger.debug(f"Found organization in 1C: {org_name} (GUID: {org_guid})")
 
                         # Создать или обновить организацию в БД
                         if organization:
@@ -261,7 +261,7 @@ class InvoiceTo1CConverter:
                             organization.external_id_1c = org_guid
                             if not organization.name:
                                 organization.name = org_name
-                            logger.info(f"Updated organization in DB with 1C GUID")
+                            logger.debug(f"Updated organization in DB with 1C GUID")
                         else:
                             # Создать новую организацию
                             buyer_data = invoice.parsed_data.get('buyer', {})
@@ -275,7 +275,7 @@ class InvoiceTo1CConverter:
                                 is_active=True
                             )
                             self.db.add(organization)
-                            logger.info(f"Created new organization in DB: {org_name}")
+                            logger.debug(f"Created new organization in DB: {org_name}")
 
                         self.db.commit()
                     else:
@@ -295,7 +295,7 @@ class InvoiceTo1CConverter:
 
             if department and department.ftp_subdivision_name:
                 subdivision_name = department.ftp_subdivision_name.strip()
-                logger.info(f"Found subdivision name from department: '{subdivision_name}'")
+                logger.debug(f"Found subdivision name from department: '{subdivision_name}'")
 
                 # Попытаться найти подразделение в 1С по имени
                 subdivision_data = self.odata_client.get_subdivision_by_name(subdivision_name)
@@ -303,7 +303,7 @@ class InvoiceTo1CConverter:
                 if subdivision_data:
                     result.subdivision_guid = subdivision_data.get('Ref_Key')
                     result.subdivision_name = subdivision_name
-                    logger.info(f"Found subdivision in 1C: {subdivision_name} (GUID: {result.subdivision_guid})")
+                    logger.debug(f"Found subdivision in 1C: {subdivision_name} (GUID: {result.subdivision_guid})")
                 else:
                     result.add_warning(
                         f"Подразделение '{subdivision_name}' не найдено в 1С. "
@@ -439,11 +439,11 @@ class InvoiceTo1CConverter:
         # Добавить подразделение только если оно найдено (1С не принимает пустой GUID)
         if validation_result.subdivision_guid:
             expense_request_data["Подразделение_Key"] = validation_result.subdivision_guid
-            logger.info(f"Adding subdivision to request: {validation_result.subdivision_name} (GUID: {validation_result.subdivision_guid})")
+            logger.debug(f"Adding subdivision to request: {validation_result.subdivision_name} (GUID: {validation_result.subdivision_guid})")
         else:
-            logger.info("No subdivision found, omitting Подразделение_Key field from request")
+            logger.debug("No subdivision found, omitting Подразделение_Key field from request")
 
-        logger.info(f"1C expense request data prepared (complete format): {expense_request_data}")
+        logger.debug(f"1C expense request data prepared (complete format): {expense_request_data}")
 
         # 3. Создание документа в 1С
         try:
@@ -453,7 +453,7 @@ class InvoiceTo1CConverter:
             if not ref_key:
                 raise Exception("1C returned empty Ref_Key")
 
-            logger.info(f"Expense request created in 1C with Ref_Key: {ref_key}")
+            logger.debug(f"Expense request created in 1C with Ref_Key: {ref_key}")
 
             # 4. (Опционально) Загрузка файла invoice
             if upload_attachment and invoice.file_path:
@@ -470,7 +470,7 @@ class InvoiceTo1CConverter:
                     )
 
                     if attachment_result:
-                        logger.info(f"Attachment uploaded successfully to 1C")
+                        logger.debug(f"Attachment uploaded successfully to 1C")
                     else:
                         logger.warning(f"Failed to upload attachment to 1C (non-critical)")
 
@@ -482,7 +482,7 @@ class InvoiceTo1CConverter:
             invoice.created_in_1c_at = datetime.utcnow()
             self.db.commit()
 
-            logger.info(f"Invoice {invoice.id} updated with external_id_1c={ref_key}")
+            logger.debug(f"Invoice {invoice.id} updated with external_id_1c={ref_key}")
 
             return ref_key
 
@@ -553,8 +553,8 @@ class InvoiceTo1CConverter:
             ).first()
 
             if category:
-                logger.info(f"Suggested category: {category.name} (id={category.id})")
+                logger.debug(f"Suggested category: {category.name} (id={category.id})")
                 return category.id
 
-        logger.info("No suitable category found")
+        logger.debug("No suitable category found")
         return None

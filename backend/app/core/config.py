@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     """Application settings with validation"""
 
     # Application
-    APP_NAME: str = "IT Budget Manager"
+    APP_NAME: str = "Budget Manager"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
     API_PREFIX: str = "/api/v1"
@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     # AI для обработки счетов (VseGPT)
     VSEGPT_API_KEY: str | None = None
     VSEGPT_BASE_URL: str = "https://api.vsegpt.ru/v1"
-    VSEGPT_MODEL: str = "vis-openai/gpt-5-mini"
+    VSEGPT_MODEL: str = "google/gemini-2.5-flash-lite-pre-0925-thinking"
 
     # OCR настройки
     OCR_LANGUAGE: str = "rus+eng"
@@ -133,6 +133,12 @@ class Settings(BaseSettings):
     C1_BASE_URL: str = "http://localhost:8080"
     C1_USERNAME: str = "api_user"
     C1_PASSWORD: str = "api_password"
+
+    # 1C OData Integration
+    ODATA_1C_URL: str = "http://10.10.100.77/trade/odata/standard.odata"
+    ODATA_1C_USERNAME: str = "odata.user"
+    ODATA_1C_PASSWORD: str = "ak228Hu2hbs28"
+    ODATA_1C_CUSTOM_AUTH_TOKEN: str = "Basic 0KjQuNC60YPQvdC+0LLQlTohUUFaMndzeA=="
 
     # Credit Portfolio FTP (для автоматического импорта из 1С)
     CREDIT_PORTFOLIO_FTP_HOST: str = "floppisw.beget.tech"

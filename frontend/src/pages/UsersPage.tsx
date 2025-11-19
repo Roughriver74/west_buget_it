@@ -28,6 +28,7 @@ import { usersApi } from '@/api'
 import type { UserListItem } from '@/api/users'
 import UserFormModal from '@/components/users/UserFormModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { PAGINATION_CONFIG } from '@/config/pagination'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -341,7 +342,7 @@ const UsersPage = () => {
                 },
                 showSizeChanger: true,
                 showTotal: (total) => `Всего ${total} пользователей`,
-                pageSizeOptions: ['10', '20', '50', '100'],
+                pageSizeOptions: PAGINATION_CONFIG.OPTIONS_STRINGS,
               }}
               scroll={{ x: 1200 }}
             />
