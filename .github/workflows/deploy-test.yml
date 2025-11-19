@@ -33,9 +33,16 @@ jobs:
           PROJECT_PATH: ${{ secrets.TEST_SERVER_PROJECT_PATH }}
           GITHUB_REPO: ${{ github.repository }}
         run: |
-          ssh $SERVER_USER@$SERVER_IP << 'ENDSSH'
+          ssh $SERVER_USER@$SERVER_IP "export PROJECT_PATH='$PROJECT_PATH'; export GITHUB_REPO='$GITHUB_REPO'; bash -s" << 'ENDSSH'
             set -e
             echo "🚀 Starting deployment to test server..."
+            echo "📁 Project path: $PROJECT_PATH"
+
+            # Validate PROJECT_PATH is set
+            if [ -z "$PROJECT_PATH" ]; then
+              echo "❌ Error: PROJECT_PATH is not set!"
+              exit 1
+            fi
 
             # Navigate to project directory or create it
             if [ ! -d "$PROJECT_PATH" ]; then
