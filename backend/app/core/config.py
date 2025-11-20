@@ -141,7 +141,7 @@ class Settings(BaseSettings):
     ODATA_1C_CUSTOM_AUTH_TOKEN: str = "Basic 0KjQuNC60YPQvdC+0LLQlTohUUFaMndzeA=="
 
     # 1C OData File Upload Configuration
-    ODATA_1C_ATTACHMENT_ENDPOINT: str = "InformationRegister_ПрисоединенныеФайлы"
+    ODATA_1C_ATTACHMENT_ENDPOINT: str = "Catalog_Файлы"
     ODATA_1C_MAX_FILE_SIZE_MB: int = 6  # Максимальный размер файла в МБ
 
     @property
