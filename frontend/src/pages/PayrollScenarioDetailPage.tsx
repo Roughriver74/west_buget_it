@@ -474,20 +474,13 @@ export const PayrollScenarioDetailPage: React.FC = () => {
       width: 130,
       align: 'right' as const,
       render: (_: any, record: any) => {
-        // Рассчитываем годовую ЗП с учетом всех премий
-        const monthlyTotal = (record.base_salary + record.monthly_bonus) * 12;
-        
-        // Получаем данные сотрудника для квартальных и годовых премий
-        let quarterlyBonus = 0;
-        let annualBonus = 0;
-        
-        if (record.employee_id && employeesMap.has(record.employee_id)) {
-          const employee = employeesMap.get(record.employee_id)!;
-          quarterlyBonus = (employee.quarterly_bonus_base || 0) * 4;
-          annualBonus = employee.annual_bonus_base || 0;
-        }
-        
-        const annual = monthlyTotal + quarterlyBonus + annualBonus;
+        // ИСПРАВЛЕНО: На бэкенде total_employee_cost уже содержит годовую стоимость
+        // Годовая ЗП = total_employee_cost - total_insurance (зарплата без взносов)
+        // Или можно просто (base_salary + monthly_bonus) * 12, если нет уволенных
+        const months_worked = record.is_terminated && record.termination_month
+          ? record.termination_month
+          : 12;
+        const annual = (record.base_salary + record.monthly_bonus) * months_worked;
         return <Text strong>{formatCurrency(annual)}</Text>;
       },
     },
