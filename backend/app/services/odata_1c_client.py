@@ -879,6 +879,90 @@ class OData1CClient:
             logger.error(f"Failed to create expense request in 1C: {e}")
             raise
 
+    def upload_attachment_to_expense_request(
+        self,
+        file_content: bytes,
+        filename: str,
+        owner_guid: str,
+        file_extension: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Загрузить файл к заявке на расход в 1С
+
+        Использует endpoint: Catalog_ЗаявкаНаРасходованиеДенежныхСредствПрисоединенныеФайлы
+
+        Args:
+            file_content: Содержимое файла (bytes)
+            filename: Имя файла (с расширением)
+            owner_guid: GUID заявки на расход (ВладелецФайла_Key)
+            file_extension: Расширение файла (без точки), например "pdf" или "png"
+
+        Returns:
+            Созданное вложение или None при ошибке
+        """
+        if not file_content:
+            logger.warning("File content is empty, skipping upload")
+            return None
+
+        # Определить расширение если не указано
+        if not file_extension and '.' in filename:
+            file_extension = filename.split('.')[-1].lower()
+
+        # Кодирование в Base64
+        base64_content = base64.b64encode(file_content).decode('utf-8')
+
+        # Определить MIME type по расширению
+        mime_types = {
+            'pdf': 'application/pdf',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'tiff': 'image/tiff',
+            'tif': 'image/tiff'
+        }
+        mime_type = mime_types.get(file_extension.lower(), 'application/octet-stream')
+
+        # Данные для создания вложения (из работающего примера пользователя)
+        attachment_data = {
+            "Description": filename,
+            "Расширение": file_extension or "pdf",
+            "ТипХраненияФайла": "ВИнформационнойБазе",
+            "ВладелецФайла_Key": owner_guid,
+            "ФайлХранилище_Type": mime_type,
+            "ФайлХранилище_Base64Data": base64_content,
+            "Размер": len(file_content)
+        }
+
+        logger.info(
+            f"📎 Uploading attachment to 1C expense request:\n"
+            f"   Filename: {filename}\n"
+            f"   Extension: {file_extension or 'pdf'}\n"
+            f"   MIME type: {mime_type}\n"
+            f"   Original size: {len(file_content)} bytes ({len(file_content) / 1024:.1f} KB)\n"
+            f"   Base64 size: {len(base64_content)} bytes ({len(base64_content) / 1024:.1f} KB)\n"
+            f"   Owner GUID: {owner_guid}"
+        )
+
+        try:
+            # Endpoint для прикрепленных файлов заявок на расход
+            endpoint = "Catalog_ЗаявкаНаРасходованиеДенежныхСредствПрисоединенныеФайлы"
+
+            response = self._make_request(
+                method='POST',
+                endpoint=endpoint,
+                data=attachment_data
+            )
+
+            logger.info(f"✅ Attachment uploaded successfully: {response}")
+            return response
+
+        except Exception as e:
+            logger.error(f"❌ Failed to upload attachment: {e}", exc_info=True)
+            # Не прерываем процесс если не удалось загрузить файл
+            return None
+
     def upload_attachment_base64(
         self,
         file_content: bytes,
@@ -888,7 +972,7 @@ class OData1CClient:
         endpoint: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Загрузить файл в 1С через Base64 encoding
+        Загрузить файл в 1С через Base64 encoding (общий метод)
 
         Args:
             file_content: Содержимое файла (bytes)
