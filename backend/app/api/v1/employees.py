@@ -257,7 +257,7 @@ async def create_employee(
     employee_dict = employee_data.model_dump(exclude={'department_id'})
     employee_dict['department_id'] = department_id
 
-    # Calculate gross/net salary values (Task 1.4: Брутто ↔ Нетто)
+    # Calculate gross/net salary values (Task 1.4: Gross ↔ Net)
     salary_calc_result = SalaryCalculator.calculate_salaries(
         base_salary=employee_data.base_salary,
         salary_type=employee_data.salary_type,
@@ -321,7 +321,7 @@ async def update_employee(
     # Update employee fields
     update_data = employee_data.model_dump(exclude_unset=True)
 
-    # If salary-related fields are being updated, recalculate gross/net values (Task 1.4: Брутто ↔ Нетто)
+    # If salary-related fields are being updated, recalculate gross/net values (Task 1.4: Gross ↔ Net)
     salary_changed = any(field in update_data for field in ['base_salary', 'salary_type', 'ndfl_rate'])
     if salary_changed:
         # Get current values or use updated ones

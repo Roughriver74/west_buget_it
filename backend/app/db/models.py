@@ -697,8 +697,8 @@ class User(Base):
 
 class SalaryTypeEnum(str, enum.Enum):
     """Enum for salary type - how salary is entered"""
-    GROSS = "GROSS"  # Брутто (до вычета НДФЛ) - начисление
-    NET = "NET"      # Нетто (на руки) - желаемая сумма к выплате
+    GROSS = "GROSS"  # Gross (до вычета НДФЛ) - начисление
+    NET = "NET"      # Net (на руки) - желаемая сумма к выплате
 
 
 class EmployeeStatusEnum(str, enum.Enum):
@@ -785,13 +785,13 @@ class Employee(Base):
     fire_date = Column(Date, nullable=True)  # Дата увольнения
     status = Column(Enum(EmployeeStatusEnum), nullable=False, default=EmployeeStatusEnum.ACTIVE, index=True)
 
-    # Salary information (NEW in Task 1.4: Брутто ↔ Нетто расчет)
+    # Salary information (NEW in Task 1.4: Gross ↔ Net расчет)
     salary_type = Column(Enum(SalaryTypeEnum), nullable=False, default=SalaryTypeEnum.GROSS, index=True)  # Тип ввода оклада
     base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад (значение которое ввели)
 
     # Calculated salary fields (auto-calculated based on salary_type)
-    base_salary_gross = Column(Numeric(15, 2), nullable=True)  # Оклад брутто (до вычета НДФЛ)
-    base_salary_net = Column(Numeric(15, 2), nullable=True)    # Оклад нетто (на руки после НДФЛ)
+    base_salary_gross = Column(Numeric(15, 2), nullable=True)  # Оклад gross (до вычета НДФЛ)
+    base_salary_net = Column(Numeric(15, 2), nullable=True)    # Оклад net (на руки после НДФЛ)
     ndfl_amount = Column(Numeric(15, 2), nullable=True)        # Сумма НДФЛ
     ndfl_rate = Column(Numeric(5, 4), nullable=False, default=0.13)  # Ставка НДФЛ (по умолчанию 13%)
 

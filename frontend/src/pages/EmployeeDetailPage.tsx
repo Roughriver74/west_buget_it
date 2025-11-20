@@ -470,7 +470,7 @@ export default function EmployeeDetailPage() {
                   {taxCalculation.salary_type === 'NET' ? (
                     <>
                       <Descriptions.Item label="Оклад введен как">
-                        <Tag color="green">Нетто (на руки)</Tag>
+                        <Tag color="green">Net (на руки)</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Net (на руки, после всех вычетов)">
                         <strong style={{ color: '#52c41a' }}>
@@ -484,7 +484,7 @@ export default function EmployeeDetailPage() {
                   ) : (
                     <>
                       <Descriptions.Item label="Оклад введен как">
-                        <Tag color="blue">Брутто (до вычета НДФЛ)</Tag>
+                        <Tag color="blue">Gross (до вычета НДФЛ)</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Gross (до вычета налогов, начислено)">
                         <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
