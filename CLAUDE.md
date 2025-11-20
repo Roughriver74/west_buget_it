@@ -3013,10 +3013,15 @@ const scrollToColumn = useCallback((columnIndex: number) => {
 - **Achievement Tracking**: Track actual vs. target performance
 - **Performance Bonuses**: Calculate bonuses based on KPI achievement
 - **Monthly/Quarterly Tracking**: Support for different bonus periods
+- **Goal Templates** (NEW v0.9.0): Reusable templates with predefined goals and weights, bulk apply to employees
+- **Auto-create EmployeeKPI** (NEW v0.9.0): Automated monthly KPI creation via scheduler (1st of month, 00:01 MSK)
+- **Auto-sync with Payroll** (NEW v0.9.0): Automatic PayrollPlan sync on EmployeeKPI approval
+- **Bulk Operations** (NEW v0.9.0): Mass assign goals to multiple employees with single API call, validation & error handling
 
 ### Payroll Enhancements
 - **Bonus Types**: FIXED, PERFORMANCE_BASED, MIXED bonus types
 - **KPI Integration**: Link bonuses to KPI achievements
+- **Auto-sync from KPI** (NEW v0.9.0): Calculated bonuses automatically update PayrollPlan when KPI approved
 - **Analytics**: Breakdown of salary components (base, bonuses, etc.)
 
 ### Bank Transactions (v0.6.0) 🏦

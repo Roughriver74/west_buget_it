@@ -14,7 +14,8 @@ import pandas as pd
 from app.db.session import get_db
 from app.db.models import (
     KPIGoal, EmployeeKPI, EmployeeKPIGoal, Employee, User, UserRoleEnum, Department,
-    BonusTypeEnum, KPIGoalStatusEnum, EmployeeStatusEnum, EmployeeKPIStatusEnum
+    BonusTypeEnum, KPIGoalStatusEnum, EmployeeStatusEnum, EmployeeKPIStatusEnum,
+    KPIGoalTemplate, KPIGoalTemplateItem
 )
 from app.schemas.kpi import (
     KPIGoalCreate,
@@ -31,6 +32,14 @@ from app.schemas.kpi import (
     KPIEmployeeSummary,
     KPIDepartmentSummary,
     KPIGoalProgress,
+    KPIGoalTemplateCreate,
+    KPIGoalTemplateUpdate,
+    KPIGoalTemplateInDB,
+    KPIGoalTemplateWithGoals,
+    ApplyTemplateRequest,
+    ApplyTemplateResponse,
+    BulkAssignGoalsRequest,
+    BulkAssignGoalsResponse,
 )
 from app.utils.auth import get_current_active_user
 from app.services.kpi_calculation_service import KPICalculationService
@@ -968,6 +977,185 @@ async def create_employee_kpi_goal(
     db.refresh(goal_assignment)
 
     return goal_assignment
+
+
+@router.post("/employee-kpi-goals/bulk-assign", response_model=BulkAssignGoalsResponse)
+async def bulk_assign_goals(
+    request: BulkAssignGoalsRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Массовое назначение цели нескольким сотрудникам одновременно.
+
+    Позволяет быстро назначить одну цель множеству сотрудников с одинаковыми параметрами.
+
+    **Permissions**: MANAGER, ADMIN
+    **Returns**: Статистика успешных/неуспешных назначений
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Проверяем права (только MANAGER/ADMIN)
+    if current_user.role not in [UserRoleEnum.MANAGER, UserRoleEnum.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only MANAGER or ADMIN can bulk assign goals"
+        )
+
+    # Проверяем существование цели
+    goal = db.query(KPIGoal).filter(KPIGoal.id == request.goal_id).first()
+    if not goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"KPI Goal with id {request.goal_id} not found"
+        )
+
+    # Получаем всех сотрудников
+    employees = db.query(Employee).filter(
+        Employee.id.in_(request.employee_ids),
+        Employee.is_active == True
+    ).all()
+
+    if not employees:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active employees found with provided IDs"
+        )
+
+    # Проверяем доступ к отделам
+    accessible_employee_ids = [
+        emp.id for emp in employees
+        if check_department_access(current_user, emp.department_id)
+    ]
+
+    if not accessible_employee_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No access to any of the specified employees"
+        )
+
+    # Счетчики
+    assigned_count = 0
+    skipped_count = 0
+    error_count = 0
+    details = []
+    errors = []
+
+    # Обрабатываем каждого сотрудника
+    for employee in employees:
+        employee_id = employee.id
+
+        # Пропускаем если нет доступа
+        if employee_id not in accessible_employee_ids:
+            skipped_count += 1
+            details.append({
+                "employee_id": employee_id,
+                "employee_name": employee.full_name,
+                "status": "skipped",
+                "reason": "No access to employee's department"
+            })
+            continue
+
+        # Проверяем, что цель из того же отдела
+        if goal.department_id != employee.department_id:
+            error_count += 1
+            error_msg = f"Employee {employee.full_name} (ID: {employee_id}): Goal is from different department"
+            errors.append(error_msg)
+            details.append({
+                "employee_id": employee_id,
+                "employee_name": employee.full_name,
+                "status": "error",
+                "reason": "Goal from different department"
+            })
+            continue
+
+        # Проверяем существование дубликата
+        existing = db.query(EmployeeKPIGoal).filter(
+            and_(
+                EmployeeKPIGoal.employee_id == employee_id,
+                EmployeeKPIGoal.goal_id == request.goal_id,
+                EmployeeKPIGoal.year == request.year,
+                EmployeeKPIGoal.month == request.month
+            )
+        ).first()
+
+        if existing:
+            skipped_count += 1
+            details.append({
+                "employee_id": employee_id,
+                "employee_name": employee.full_name,
+                "status": "skipped",
+                "reason": "Goal already assigned for this period"
+            })
+            continue
+
+        # Создаем назначение
+        try:
+            goal_assignment = EmployeeKPIGoal(
+                employee_id=employee_id,
+                goal_id=request.goal_id,
+                year=request.year,
+                month=request.month,
+                weight=request.weight,
+                target_value=request.target_value,
+                actual_value=None,
+                achievement_percentage=None,
+                notes=f"Bulk assigned by {current_user.full_name}"
+            )
+            db.add(goal_assignment)
+            db.flush()  # Flush для получения ID, но не commit ещё
+
+            assigned_count += 1
+            details.append({
+                "employee_id": employee_id,
+                "employee_name": employee.full_name,
+                "assignment_id": goal_assignment.id,
+                "status": "assigned"
+            })
+
+            logger.info(
+                f"Bulk assigned goal#{request.goal_id} to employee#{employee_id} "
+                f"for {request.year}-{request.month:02d}"
+            )
+
+        except Exception as e:
+            error_count += 1
+            error_msg = f"Employee {employee.full_name} (ID: {employee_id}): {str(e)}"
+            errors.append(error_msg)
+            details.append({
+                "employee_id": employee_id,
+                "employee_name": employee.full_name,
+                "status": "error",
+                "reason": str(e)
+            })
+            logger.error(f"Failed to bulk assign goal to employee#{employee_id}: {e}")
+
+    # Commit всех успешных назначений
+    if assigned_count > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to commit bulk assignments: {str(e)}"
+            )
+
+    # Формируем response
+    success = assigned_count > 0
+    message = f"Bulk assignment completed: {assigned_count} assigned, {skipped_count} skipped, {error_count} errors"
+
+    return BulkAssignGoalsResponse(
+        success=success,
+        message=message,
+        total_employees=len(request.employee_ids),
+        assigned_count=assigned_count,
+        skipped_count=skipped_count,
+        error_count=error_count,
+        details=details,
+        errors=errors
+    )
 
 
 @router.put("/employee-kpi-goals/{assignment_id}", response_model=EmployeeKPIGoalInDB)
@@ -2101,7 +2289,8 @@ def submit_employee_kpi_for_review(
 @router.post("/employees/kpi/{employee_kpi_id}/approve")
 def approve_employee_kpi(
     employee_kpi_id: int,
-    auto_sync_payroll: bool = Query(True, description="Автоматически синхронизировать с PayrollActual"),
+    auto_sync_payroll_plan: bool = Query(True, description="Автоматически синхронизировать с PayrollPlan"),
+    auto_sync_payroll_actual: bool = Query(False, description="Автоматически синхронизировать с PayrollActual"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -2110,7 +2299,9 @@ def approve_employee_kpi(
 
     Переход: UNDER_REVIEW → APPROVED
 
-    После утверждения опционально выполняется автоматическая синхронизация с PayrollActual.
+    После утверждения:
+    1. Автоматически синхронизируются рассчитанные бонусы с PayrollPlan (план зарплаты)
+    2. Опционально синхронизируются с PayrollActual (факт зарплаты)
 
     **Permissions**: MANAGER, ADMIN
     """
@@ -2157,20 +2348,35 @@ def approve_employee_kpi(
     audit_service = KPIAuditService(db)
     audit_service.log_approve(employee_kpi, current_user)
 
-    # Автоматическая синхронизация с PayrollActual (если включено)
-    sync_result = None
-    if auto_sync_payroll:
+    # Автоматическая синхронизация с Payroll
+    sync_plan_result = None
+    sync_actual_result = None
+
+    # 1. Синхронизация с PayrollPlan (план зарплаты) - основная логика
+    if auto_sync_payroll_plan:
         try:
             from app.services.payroll_kpi_sync_service import PayrollKPISyncService
             sync_service = PayrollKPISyncService(db)
-            sync_result = sync_service.sync_employee_kpi_to_payroll(
+            sync_plan_result = sync_service.sync_employee_kpi_to_payroll_plan(
+                employee_kpi_id=employee_kpi_id
+            )
+            logger.info(f"PayrollPlan synced: {sync_plan_result['action']} (ID: {sync_plan_result['payroll_plan_id']})")
+        except Exception as e:
+            # Логируем ошибку, но не прерываем workflow
+            logger.error(f"Failed to sync PayrollPlan after approval: {e}")
+
+    # 2. Опциональная синхронизация с PayrollActual (факт зарплаты)
+    if auto_sync_payroll_actual:
+        try:
+            from app.services.payroll_kpi_sync_service import PayrollKPISyncService
+            sync_service = PayrollKPISyncService(db)
+            sync_actual_result = sync_service.sync_employee_kpi_to_payroll(
                 employee_kpi_id=employee_kpi_id,
                 base_salary=None  # Берётся из Employee.base_salary
             )
+            logger.info(f"PayrollActual synced: {sync_actual_result['action']} (ID: {sync_actual_result['payroll_actual_id']})")
         except Exception as e:
             # Логируем ошибку, но не прерываем workflow
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Failed to sync PayrollActual after approval: {e}")
 
     return {
@@ -2181,8 +2387,10 @@ def approve_employee_kpi(
             "status": employee_kpi.status,
             "reviewed_by_id": employee_kpi.reviewed_by_id,
             "reviewed_at": employee_kpi.reviewed_at.isoformat(),
-            "payroll_synced": sync_result is not None,
-            "sync_details": sync_result if sync_result else None
+            "payroll_plan_synced": sync_plan_result is not None,
+            "payroll_actual_synced": sync_actual_result is not None,
+            "sync_plan_details": sync_plan_result if sync_plan_result else None,
+            "sync_actual_details": sync_actual_result if sync_actual_result else None
         }
     }
 
@@ -2459,5 +2667,413 @@ def get_employee_kpi_audit_history(
         "total_records": len(history),
         "history": history
     }
+
+
+# ============================================================================
+# AUTOMATION: Auto-create EmployeeKPI Records
+# ============================================================================
+
+@router.post("/auto-create-monthly")
+def auto_create_monthly_employee_kpis(
+    year: int = Query(..., description="Year for KPI records", ge=2020, le=2100),
+    month: int = Query(..., description="Month for KPI records (1-12)", ge=1, le=12),
+    department_id: Optional[int] = Query(None, description="Department ID (None = all departments)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger automatic creation of EmployeeKPI records for specified month
+
+    This endpoint allows ADMIN/MANAGER to manually create EmployeeKPI records
+    without waiting for the scheduled job. Useful for:
+    - Testing the auto-creation logic
+    - Creating KPIs for a specific past/future month
+    - Re-running creation if scheduled job failed
+
+    **Permissions**: ADMIN or MANAGER only
+
+    **Logic**:
+    - Creates EmployeeKPI records with DRAFT status for all active employees
+    - Copies goals from previous month if available
+    - Otherwise creates default goals from department's active KPI goals
+    - Skips employees that already have KPI record for this year/month
+
+    **Returns**: Statistics of created records
+    """
+    # Check permissions - only ADMIN or MANAGER can trigger auto-creation
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN or MANAGER can trigger auto-creation of EmployeeKPI records"
+        )
+
+    # Import service
+    from app.services.employee_kpi_auto_creator import EmployeeKPIAutoCreator
+
+    try:
+        # Create auto-creator instance
+        creator = EmployeeKPIAutoCreator(db)
+
+        # Run auto-creation
+        result = creator.create_monthly_kpis(
+            year=year,
+            month=month,
+            department_id=department_id
+        )
+
+        return {
+            "success": True,
+            "message": f"Auto-creation completed for {year}-{month:02d}",
+            "statistics": result
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error during auto-creation: {str(e)}"
+        )
+
+
+# ========================================
+# KPI Goal Templates Endpoints
+# ========================================
+
+@router.get("/templates", response_model=List[KPIGoalTemplateWithGoals])
+def get_kpi_goal_templates(
+    department_id: Optional[int] = Query(None, description="Department ID filter"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all KPI goal templates
+
+    Permissions:
+    - USER: Only templates from their department
+    - MANAGER/ADMIN: Can view all departments or filter by department_id
+    """
+    query = db.query(KPIGoalTemplate)
+
+    # Apply department filtering based on role
+    if current_user.role == UserRoleEnum.USER:
+        # USER can only see templates from their department
+        query = query.filter(KPIGoalTemplate.department_id == current_user.department_id)
+    elif department_id:
+        # MANAGER/ADMIN can filter by department
+        query = query.filter(KPIGoalTemplate.department_id == department_id)
+
+    # Filter by active status
+    if is_active is not None:
+        query = query.filter(KPIGoalTemplate.is_active == is_active)
+
+    templates = query.order_by(KPIGoalTemplate.created_at.desc()).all()
+    return templates
+
+
+@router.get("/templates/{template_id}", response_model=KPIGoalTemplateWithGoals)
+def get_kpi_goal_template(
+    template_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific KPI goal template by ID"""
+    template = db.query(KPIGoalTemplate).filter(KPIGoalTemplate.id == template_id).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template with ID {template_id} not found"
+        )
+
+    # Check department access
+    if current_user.role == UserRoleEnum.USER and template.department_id != current_user.department_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view templates from your department"
+        )
+
+    return template
+
+
+@router.post("/templates", response_model=KPIGoalTemplateWithGoals, status_code=status.HTTP_201_CREATED)
+def create_kpi_goal_template(
+    template_data: KPIGoalTemplateCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new KPI goal template with goals
+
+    Permissions: ADMIN or MANAGER only
+    """
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN or MANAGER can create templates"
+        )
+
+    # Validate total weight sums to 100%
+    total_weight = sum(item.weight for item in template_data.template_goals)
+    if total_weight != 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Total weight must be 100%, got {total_weight}%"
+        )
+
+    # Verify all goals exist and belong to the same department
+    goal_ids = [item.goal_id for item in template_data.template_goals]
+    goals = db.query(KPIGoal).filter(KPIGoal.id.in_(goal_ids)).all()
+
+    if len(goals) != len(goal_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="One or more goals not found"
+        )
+
+    for goal in goals:
+        if goal.department_id != template_data.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Goal '{goal.name}' does not belong to the specified department"
+            )
+
+    # Create template
+    new_template = KPIGoalTemplate(
+        name=template_data.name,
+        description=template_data.description,
+        department_id=template_data.department_id,
+        is_active=template_data.is_active,
+        created_by_id=current_user.id
+    )
+
+    db.add(new_template)
+    db.flush()  # Get template ID
+
+    # Create template items
+    for item_data in template_data.template_goals:
+        template_item = KPIGoalTemplateItem(
+            template_id=new_template.id,
+            goal_id=item_data.goal_id,
+            weight=item_data.weight,
+            default_target_value=item_data.default_target_value,
+            display_order=item_data.display_order
+        )
+        db.add(template_item)
+
+    db.commit()
+    db.refresh(new_template)
+
+    return new_template
+
+
+@router.put("/templates/{template_id}", response_model=KPIGoalTemplateWithGoals)
+def update_kpi_goal_template(
+    template_id: int,
+    template_data: KPIGoalTemplateUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing KPI goal template
+
+    Permissions: ADMIN or MANAGER only
+    """
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN or MANAGER can update templates"
+        )
+
+    template = db.query(KPIGoalTemplate).filter(KPIGoalTemplate.id == template_id).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template with ID {template_id} not found"
+        )
+
+    # Update basic fields
+    if template_data.name is not None:
+        template.name = template_data.name
+    if template_data.description is not None:
+        template.description = template_data.description
+    if template_data.is_active is not None:
+        template.is_active = template_data.is_active
+
+    # Update template goals if provided
+    if template_data.template_goals is not None:
+        # Validate total weight
+        total_weight = sum(item.weight for item in template_data.template_goals)
+        if total_weight != 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Total weight must be 100%, got {total_weight}%"
+            )
+
+        # Delete existing items
+        db.query(KPIGoalTemplateItem).filter(KPIGoalTemplateItem.template_id == template_id).delete()
+
+        # Create new items
+        for item_data in template_data.template_goals:
+            template_item = KPIGoalTemplateItem(
+                template_id=template.id,
+                goal_id=item_data.goal_id,
+                weight=item_data.weight,
+                default_target_value=item_data.default_target_value,
+                display_order=item_data.display_order
+            )
+            db.add(template_item)
+
+    db.commit()
+    db.refresh(template)
+
+    return template
+
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_kpi_goal_template(
+    template_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a KPI goal template
+
+    Permissions: ADMIN or MANAGER only
+    """
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN or MANAGER can delete templates"
+        )
+
+    template = db.query(KPIGoalTemplate).filter(KPIGoalTemplate.id == template_id).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template with ID {template_id} not found"
+        )
+
+    db.delete(template)
+    db.commit()
+
+    return None
+
+
+@router.post("/templates/{template_id}/apply", response_model=ApplyTemplateResponse)
+def apply_template_to_employees(
+    template_id: int,
+    apply_request: ApplyTemplateRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Apply a KPI goal template to multiple employees for a specific period
+
+    Creates EmployeeKPIGoal records for each employee with the template's goals and weights.
+
+    Permissions: ADMIN or MANAGER only
+    """
+    # Check permissions
+    if current_user.role not in [UserRoleEnum.ADMIN, UserRoleEnum.MANAGER]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only ADMIN or MANAGER can apply templates"
+        )
+
+    # Get template
+    template = db.query(KPIGoalTemplate).filter(KPIGoalTemplate.id == template_id).first()
+
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Template with ID {template_id} not found"
+        )
+
+    if not template.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot apply inactive template"
+        )
+
+    # Validate employees exist and are active
+    employees = db.query(Employee).filter(
+        Employee.id.in_(apply_request.employee_ids),
+        Employee.is_active == True
+    ).all()
+
+    if len(employees) != len(apply_request.employee_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="One or more employees not found or inactive"
+        )
+
+    employees_updated = 0
+    goals_created = 0
+    errors = []
+
+    for employee in employees:
+        try:
+            # Get or create EmployeeKPI for this period
+            employee_kpi = db.query(EmployeeKPI).filter(
+                and_(
+                    EmployeeKPI.employee_id == employee.id,
+                    EmployeeKPI.year == apply_request.year,
+                    EmployeeKPI.month == apply_request.month
+                )
+            ).first()
+
+            if not employee_kpi:
+                # Create new EmployeeKPI
+                employee_kpi = EmployeeKPI(
+                    employee_id=employee.id,
+                    department_id=employee.department_id,
+                    year=apply_request.year,
+                    month=apply_request.month,
+                    status=EmployeeKPIStatusEnum.DRAFT
+                )
+                db.add(employee_kpi)
+                db.flush()
+
+            # Delete existing goals for this period (to replace with template)
+            db.query(EmployeeKPIGoal).filter(
+                EmployeeKPIGoal.employee_kpi_id == employee_kpi.id
+            ).delete()
+
+            # Create goals from template
+            for template_item in template.template_goals:
+                goal = EmployeeKPIGoal(
+                    employee_id=employee.id,
+                    employee_kpi_id=employee_kpi.id,
+                    goal_id=template_item.goal_id,
+                    year=apply_request.year,
+                    month=apply_request.month,
+                    target_value=template_item.default_target_value or template_item.goal.target_value,
+                    weight=template_item.weight,
+                    actual_value=0.0,
+                    achievement_percentage=0.0,
+                    status=KPIGoalStatusEnum.ACTIVE
+                )
+                db.add(goal)
+                goals_created += 1
+
+            employees_updated += 1
+
+        except Exception as e:
+            errors.append(f"Employee {employee.full_name}: {str(e)}")
+
+    db.commit()
+
+    return ApplyTemplateResponse(
+        success=len(errors) == 0,
+        message=f"Applied template to {employees_updated} employees, created {goals_created} goals",
+        employees_updated=employees_updated,
+        goals_created=goals_created,
+        errors=errors
+    )
 
 

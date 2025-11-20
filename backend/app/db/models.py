@@ -177,6 +177,7 @@ class UserRoleEnum(str, enum.Enum):
     FOUNDER = "FOUNDER"  # Учредитель - дашборд с ключевыми показателями по всем отделам
     MANAGER = "MANAGER"  # Руководитель - доступ ко всем отделам, сводная аналитика
     ACCOUNTANT = "ACCOUNTANT"  # Финансист - справочники и НДФЛ, доступ ко всем отделам
+    HR = "HR"  # Сотрудник отдела кадров - доступ к модулю HR_DEPARTMENT для всех отделов
     USER = "USER"  # Пользователь отдела - доступ только к своему отделу
     REQUESTER = "REQUESTER"  # Запросчик заявок/расходов (ограниченные права)
 
@@ -1235,9 +1236,82 @@ class KPIGoal(Base):
     # Relationships
     department_rel = relationship("Department")
     employee_goals = relationship("EmployeeKPIGoal", back_populates="goal")
+    template_items = relationship("KPIGoalTemplateItem", back_populates="goal")
 
     def __repr__(self):
         return f"<KPIGoal {self.name} (weight={self.weight})>"
+
+
+class KPIGoalTemplate(Base):
+    """KPI Goal Template (шаблон набора целей для быстрого назначения сотрудникам)
+
+    Позволяет менеджерам создавать повторно используемые наборы целей (например, "Продажи Q1", "IT Стандарт")
+    и быстро применять их к сотрудникам, сокращая ручную работу.
+    """
+    __tablename__ = "kpi_goal_templates"
+    __table_args__ = (
+        Index('idx_kpi_template_dept_active', 'department_id', 'is_active'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Template information
+    name = Column(String(255), nullable=False, index=True)  # Название шаблона
+    description = Column(Text, nullable=True)  # Описание
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Active status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    created_by = relationship("User")
+    template_goals = relationship("KPIGoalTemplateItem", back_populates="template", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<KPIGoalTemplate {self.name} ({len(self.template_goals)} goals)>"
+
+
+class KPIGoalTemplateItem(Base):
+    """KPI Goal Template Item (цель в шаблоне с весом)
+
+    Связывает KPIGoal с шаблоном и задает вес для этой цели.
+    При применении шаблона создаются EmployeeKPIGoal записи с этими весами.
+    """
+    __tablename__ = "kpi_goal_template_items"
+    __table_args__ = (
+        Index('idx_template_item_template', 'template_id'),
+        Index('idx_template_item_goal', 'goal_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Relations
+    template_id = Column(Integer, ForeignKey("kpi_goal_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    goal_id = Column(Integer, ForeignKey("kpi_goals.id"), nullable=False, index=True)
+
+    # Weight for this goal in the template (0-100%)
+    weight = Column(Numeric(5, 2), nullable=False)  # Вес цели в шаблоне
+
+    # Default target value (optional, can override goal's default target_value)
+    default_target_value = Column(Numeric(15, 2), nullable=True)
+
+    # Order in template (for UI display)
+    display_order = Column(Integer, nullable=False, default=0)
+
+    # Relationships
+    template = relationship("KPIGoalTemplate", back_populates="template_goals")
+    goal = relationship("KPIGoal", back_populates="template_items")
+
+    def __repr__(self):
+        return f"<KPIGoalTemplateItem Template#{self.template_id} Goal#{self.goal_id} weight={self.weight}%>"
 
 
 class EmployeeKPI(Base):
@@ -2487,9 +2561,11 @@ class PayrollScenarioDetail(Base):
     is_terminated = Column(Boolean, default=False, nullable=False)  # Увольнение
     termination_month = Column(Integer, nullable=True)  # Месяц увольнения (1-12)
 
-    # Плановый оклад
+    # Плановый оклад и премии
     base_salary = Column(Numeric(15, 2), nullable=False)
     monthly_bonus = Column(Numeric(15, 2), default=0, nullable=False)
+    quarterly_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Квартальная премия
+    annual_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Годовая премия
 
     # Расчет страховых взносов (по новым ставкам)
     pension_contribution = Column(Numeric(15, 2), nullable=True)  # ПФР

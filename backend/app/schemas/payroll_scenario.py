@@ -143,10 +143,12 @@ class PayrollScenarioDetailBase(BaseModel):
     termination_month: Optional[int] = Field(None, ge=1, le=12, description="Месяц увольнения")
     base_salary: Decimal = Field(..., ge=0, description="Плановый оклад")
     monthly_bonus: Decimal = Field(0, ge=0, description="Месячная премия")
+    quarterly_bonus: Decimal = Field(0, ge=0, description="Квартальная премия")
+    annual_bonus: Decimal = Field(0, ge=0, description="Годовая премия")
     notes: Optional[str] = None
 
     # Serialize Decimal fields as floats (numbers) instead of strings
-    @field_serializer('base_salary', 'monthly_bonus')
+    @field_serializer('base_salary', 'monthly_bonus', 'quarterly_bonus', 'annual_bonus')
     def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:
         return decimal_to_float(value)
 
@@ -167,6 +169,8 @@ class PayrollScenarioDetailUpdate(BaseModel):
     termination_month: Optional[int] = Field(None, ge=1, le=12)
     base_salary: Optional[Decimal] = Field(None, ge=0)
     monthly_bonus: Optional[Decimal] = Field(None, ge=0)
+    quarterly_bonus: Optional[Decimal] = Field(None, ge=0)
+    annual_bonus: Optional[Decimal] = Field(None, ge=0)
     notes: Optional[str] = None
 
 
@@ -190,7 +194,8 @@ class PayrollScenarioDetailInDB(PayrollScenarioDetailBase):
     updated_at: Optional[datetime]
 
     # Serialize Decimal fields as floats (numbers) instead of strings
-    @field_serializer('base_salary', 'monthly_bonus', 'pension_contribution', 'medical_contribution',
+    @field_serializer('base_salary', 'monthly_bonus', 'quarterly_bonus', 'annual_bonus',
+                      'pension_contribution', 'medical_contribution',
                       'social_contribution', 'injury_contribution', 'total_insurance', 'income_tax',
                       'total_employee_cost', 'base_year_salary', 'base_year_insurance', 'cost_increase')
     def serialize_decimal(self, value: Optional[Decimal], _info) -> Optional[float]:

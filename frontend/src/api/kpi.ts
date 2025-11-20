@@ -136,6 +136,34 @@ export interface ApplyTemplateResponse {
   errors: string[]
 }
 
+// ============ Bulk Operations Types ============
+
+export interface BulkAssignGoalsRequest {
+  employee_ids: number[]
+  goal_id: number
+  year: number
+  month: number
+  weight: number
+  target_value?: number
+}
+
+export interface BulkAssignGoalsResponse {
+  success: boolean
+  message: string
+  total_employees: number
+  assigned_count: number
+  skipped_count: number
+  error_count: number
+  details: Array<{
+    employee_id: number
+    employee_name: string
+    assignment_id?: number
+    status: 'assigned' | 'skipped' | 'error'
+    reason?: string
+  }>
+  errors: string[]
+}
+
 export const kpiApi = {
   listGoals: async (params?: {
     skip?: number
@@ -372,6 +400,16 @@ export const kpiApi = {
   ): Promise<ApplyTemplateResponse> => {
     const { data } = await apiClient.post<ApplyTemplateResponse>(
       `kpi/templates/${templateId}/apply`,
+      request
+    )
+    return data
+  },
+
+  // ============ Bulk Operations ============
+
+  bulkAssignGoals: async (request: BulkAssignGoalsRequest): Promise<BulkAssignGoalsResponse> => {
+    const { data } = await apiClient.post<BulkAssignGoalsResponse>(
+      'kpi/employee-kpi-goals/bulk-assign',
       request
     )
     return data

@@ -5,6 +5,7 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { KpiSummaryTab } from '@/components/kpi/KpiSummaryTab'
 import { KpiGoalsTab } from '@/components/kpi/KpiGoalsTab'
+import { KpiGoalTemplatesTab } from '@/components/kpi/KpiGoalTemplatesTab'
 import { EmployeeKpiTab } from '@/components/kpi/EmployeeKpiTab'
 import { KpiAssignmentsTab } from '@/components/kpi/KpiAssignmentsTab'
 import { KpiCalendar } from '@/components/kpi/KpiCalendar'
@@ -33,6 +34,10 @@ const KPIManagementPage = () => {
 
         <Tabs.TabPane tab="Цели KPI" key="goals">
           <KpiGoalsTab departmentId={departmentId} />
+        </Tabs.TabPane>
+
+        <Tabs.TabPane tab="Шаблоны целей" key="templates">
+          <KpiGoalTemplatesTab departmentId={departmentId} />
         </Tabs.TabPane>
 
         <Tabs.TabPane tab="Показатели сотрудников" key="employee-kpi">

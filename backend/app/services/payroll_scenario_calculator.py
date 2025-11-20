@@ -678,23 +678,46 @@ class PayrollScenarioCalculator:
         """
         logger.info(f"Creating scenario details from PLAN for base year {scenario.base_year}")
         
-        # Получить уникальных сотрудников из планов базового года
-        # Группируем по сотрудникам и суммируем total_planned за весь год
+        # ИСПРАВЛЕНО: Получить данные из ПОСЛЕДНЕГО месяца плана + премии из employees
+        # Создаем подзапрос для получения последнего месяца для каждого сотрудника
+        from sqlalchemy import select, func as sqlfunc
+
+        # Подзапрос: последний месяц для каждого сотрудника
+        last_month_subq = self.db.query(
+            PayrollPlan.employee_id,
+            sqlfunc.max(PayrollPlan.month).label('last_month')
+        ).filter(
+            PayrollPlan.department_id == self.department_id,
+            PayrollPlan.year == scenario.base_year
+        ).group_by(PayrollPlan.employee_id).subquery()
+
+        # Основной запрос: данные из последнего месяца + премии из employees
         plan_data = self.db.query(
             PayrollPlan.employee_id,
             Employee.full_name.label('employee_name'),
             Employee.position.label('position'),
-            func.sum(PayrollPlan.total_planned).label('annual_planned'),  # Годовая сумма из плана
-            func.sum(PayrollPlan.base_salary).label('total_base_salary'),  # Для расчета среднего оклада
+            PayrollPlan.base_salary.label('last_month_base_salary'),
+            PayrollPlan.monthly_bonus.label('last_month_monthly_bonus'),
+            Employee.quarterly_bonus_base.label('quarterly_bonus'),
+            Employee.annual_bonus_base.label('annual_bonus'),
+            func.sum(PayrollPlan.total_planned).label('annual_planned'),  # Годовая сумма для расчета взносов
         ).join(
             Employee, PayrollPlan.employee_id == Employee.id
+        ).join(
+            last_month_subq,
+            (PayrollPlan.employee_id == last_month_subq.c.employee_id) &
+            (PayrollPlan.month == last_month_subq.c.last_month)
         ).filter(
             PayrollPlan.department_id == self.department_id,
             PayrollPlan.year == scenario.base_year
         ).group_by(
             PayrollPlan.employee_id,
             Employee.full_name,
-            Employee.position
+            Employee.position,
+            PayrollPlan.base_salary,
+            PayrollPlan.monthly_bonus,
+            Employee.quarterly_bonus_base,
+            Employee.annual_bonus_base
         ).all()
         
         plan_count = len(plan_data)
@@ -712,16 +735,24 @@ class PayrollScenarioCalculator:
         details = []
         
         for plan in plan_data:
-            # Годовая сумма из плана (total_planned за весь год)
-            annual_planned = plan.annual_planned or Decimal('0.00')
-            
-            # Применить процент изменения к общей сумме из плана
-            adjusted_annual = annual_planned * salary_multiplier
-            
-            # Получить средний месячный оклад для расчета (используем для расчета страховых взносов)
-            # Средний месячный оклад = total_base_salary / 12
-            avg_monthly_base = (plan.total_base_salary / 12) if plan.total_base_salary else Decimal('0.00')
-            adjusted_monthly_base = avg_monthly_base * salary_multiplier
+            # ИСПРАВЛЕНО: Используем данные из ПОСЛЕДНЕГО месяца плана
+            base_salary = plan.last_month_base_salary or Decimal('0.00')
+            monthly_bonus = plan.last_month_monthly_bonus or Decimal('0.00')
+            quarterly_bonus = plan.quarterly_bonus or Decimal('0.00')
+            annual_bonus = plan.annual_bonus or Decimal('0.00')
+
+            # Применить процент изменения
+            adjusted_base_salary = base_salary * salary_multiplier
+            adjusted_monthly_bonus = monthly_bonus * salary_multiplier
+            adjusted_quarterly_bonus = quarterly_bonus * salary_multiplier
+            adjusted_annual_bonus = annual_bonus * salary_multiplier
+
+            # Рассчитать годовую сумму: (оклад + месячная премия) * 12 + квартальная * 4 + годовая
+            adjusted_annual = (
+                (adjusted_base_salary + adjusted_monthly_bonus) * 12 +
+                adjusted_quarterly_bonus * 4 +
+                adjusted_annual_bonus
+            )
             
             # Рассчитать страховые взносы от скорректированной годовой суммы
             insurance_calc = self._calculate_insurance_for_employee(
@@ -733,23 +764,29 @@ class PayrollScenarioCalculator:
             income_tax_rate = insurance_rates.get('INCOME_TAX', Decimal('0.13'))
             income_tax = adjusted_annual * income_tax_rate
             
-            # Получить базовый год для сравнения (используем те же планы)
-            base_year_salary = annual_planned
+            # Получить базовый год для сравнения: тоже используем полную годовую сумму
+            base_year_annual = (
+                (base_salary + monthly_bonus) * 12 +
+                quarterly_bonus * 4 +
+                annual_bonus
+            )
             # Рассчитать страховые взносы базового года (для сравнения)
             base_insurance_rates = self._get_insurance_rates(scenario.base_year)
             base_insurance_calc = self._calculate_insurance_for_employee(
-                annual_planned,
+                base_year_annual,
                 base_insurance_rates
             )
             base_year_insurance = base_insurance_calc['total']
-            
+
             detail = PayrollScenarioDetail(
                 scenario_id=scenario.id,
                 employee_id=plan.employee_id,
                 employee_name=plan.employee_name,
                 position=plan.position,
-                base_salary=adjusted_monthly_base,  # Месячный оклад (для отображения)
-                monthly_bonus=Decimal('0.00'),  # Премии уже включены в total_planned
+                base_salary=adjusted_base_salary,  # ИСПРАВЛЕНО: оклад из последнего месяца
+                monthly_bonus=adjusted_monthly_bonus,  # месячная премия
+                quarterly_bonus=adjusted_quarterly_bonus,  # квартальная премия
+                annual_bonus=adjusted_annual_bonus,  # годовая премия
                 # Сохраняем годовые суммы для расчета
                 pension_contribution=insurance_calc['pension'],
                 medical_contribution=insurance_calc['medical'],
@@ -758,7 +795,7 @@ class PayrollScenarioCalculator:
                 total_insurance=insurance_calc['total'],
                 income_tax=income_tax,
                 total_employee_cost=adjusted_annual + insurance_calc['total'],
-                base_year_salary=base_year_salary,
+                base_year_salary=base_year_annual,  # ИСПРАВЛЕНО: полная годовая сумма базового года
                 base_year_insurance=base_year_insurance,
                 department_id=self.department_id,
                 is_new_hire=False,

@@ -82,18 +82,62 @@ async def import_credit_portfolio_task():
         logger.error(f"Error in scheduled credit portfolio import: {e}", exc_info=True)
 
 
+async def create_monthly_employee_kpis_task():
+    """
+    Scheduled task: Auto-create EmployeeKPI records for all active employees
+
+    Runs on the 1st day of each month at 00:01 AM Moscow time
+    Creates EmployeeKPI records with DRAFT status for the current month
+    Copies goals from previous month or creates default goals
+    """
+    logger.info("Starting automatic EmployeeKPI creation for current month")
+
+    try:
+        from datetime import datetime
+        from app.services.employee_kpi_auto_creator import EmployeeKPIAutoCreator
+
+        # Get current year and month
+        now = datetime.now()
+        year = now.year
+        month = now.month
+
+        logger.info(f"Creating EmployeeKPI records for {year}-{month:02d}")
+
+        # Get database session
+        db: Session = SessionLocal()
+
+        try:
+            # Create KPIs for all departments
+            creator = EmployeeKPIAutoCreator(db)
+            result = creator.create_monthly_kpis(year=year, month=month)
+
+            logger.info(
+                f"EmployeeKPI auto-creation completed: "
+                f"{result['created']} created, {result['skipped']} skipped, {result['errors']} errors "
+                f"(total {result['total_employees']} employees)"
+            )
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error in scheduled EmployeeKPI auto-creation: {e}", exc_info=True)
+
+
 def start_scheduler():
     """
     Start background scheduler with all scheduled tasks
 
     Tasks:
     - Credit Portfolio Import: Configurable schedule (default: Daily at 6:00 AM Moscow time)
+    - Employee KPI Auto-Creation: Monthly on 1st day at 00:01 AM Moscow time
 
     Configuration via environment variables:
     - SCHEDULER_ENABLED: Enable/disable scheduler (default: true)
     - CREDIT_PORTFOLIO_IMPORT_ENABLED: Enable credit portfolio auto-import (default: true)
     - CREDIT_PORTFOLIO_IMPORT_HOUR: Hour for import (0-23, default: 6)
     - CREDIT_PORTFOLIO_IMPORT_MINUTE: Minute for import (0-59, default: 0)
+    - EMPLOYEE_KPI_AUTO_CREATE_ENABLED: Enable auto-creation of EmployeeKPI (default: true)
     """
     # Check if scheduler is enabled
     scheduler_enabled = getattr(settings, 'SCHEDULER_ENABLED', True)
@@ -121,6 +165,22 @@ def start_scheduler():
         logger.info(f"Credit portfolio import scheduled: Daily at {import_hour:02d}:{import_minute:02d} Moscow time")
     else:
         logger.info("Credit portfolio auto-import is disabled via CREDIT_PORTFOLIO_IMPORT_ENABLED setting")
+
+    # Employee KPI Auto-Creation - Monthly on 1st day at 00:01 AM
+    kpi_auto_create_enabled = getattr(settings, 'EMPLOYEE_KPI_AUTO_CREATE_ENABLED', True)
+    if kpi_auto_create_enabled:
+        scheduler.add_job(
+            create_monthly_employee_kpis_task,
+            CronTrigger(day=1, hour=0, minute=1, timezone='Europe/Moscow'),
+            id='employee_kpi_auto_create',
+            name='Auto-create Monthly EmployeeKPI Records',
+            replace_existing=True,
+            max_instances=1  # Prevent concurrent runs
+        )
+
+        logger.info("EmployeeKPI auto-creation scheduled: Monthly on 1st day at 00:01 AM Moscow time")
+    else:
+        logger.info("EmployeeKPI auto-creation is disabled via EMPLOYEE_KPI_AUTO_CREATE_ENABLED setting")
 
     logger.info("Scheduled jobs:")
     for job in scheduler.get_jobs():

@@ -46,7 +46,6 @@ import {
 } from '@ant-design/icons';
 import { payrollScenarioAPI, type PayrollScenarioWithDetails } from '@/api/payrollScenarios';
 import { taxRateAPI, type TaxRateListItem, type TaxType } from '@/api/taxRates';
-import { employeeAPI, type Employee } from '@/api/payroll';
 import { PayrollWhatIfAnalysis } from '../components/payroll/PayrollWhatIfAnalysis';
 import PayrollScenarioCharts from '../components/payroll/PayrollScenarioCharts';
 
@@ -112,20 +111,6 @@ export const PayrollScenarioDetailPage: React.FC = () => {
     queryFn: () => payrollScenarioAPI.get(Number(id)),
     enabled: !!id,
   });
-
-  // Получаем данные сотрудников для расчета годовой ЗП с учетом квартальных и годовых премий
-  const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ['employees', scenario?.department_id],
-    queryFn: () => employeeAPI.list({ department_id: scenario?.department_id }),
-    enabled: !!scenario?.department_id,
-  });
-
-  // Создаем Map для быстрого доступа к данным сотрудника по employee_id
-  const employeesMap = useMemo(() => {
-    const map = new Map<number, Employee>();
-    employees.forEach(emp => map.set(emp.id, emp));
-    return map;
-  }, [employees]);
 
   // Получаем страховые взносы для целевого года из справочника tax-rates
   // Используем department_id из сценария, а не из контекста
@@ -469,19 +454,36 @@ export const PayrollScenarioDetailPage: React.FC = () => {
       render: (value: number) => formatCurrency(value),
     },
     {
-      title: 'Годовая ЗП',
-      key: 'annual_salary',
+      title: 'Премия (квартал)',
+      dataIndex: 'quarterly_bonus',
+      key: 'quarterly_bonus',
       width: 130,
       align: 'right' as const,
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Премия (год)',
+      dataIndex: 'annual_bonus',
+      key: 'annual_bonus',
+      width: 120,
+      align: 'right' as const,
+      render: (value: number) => formatCurrency(value || 0),
+    },
+    {
+      title: 'Годовая ЗП',
+      key: 'annual_salary',
+      width: 140,
+      align: 'right' as const,
       render: (_: any, record: any) => {
-        // ИСПРАВЛЕНО: На бэкенде total_employee_cost уже содержит годовую стоимость
-        // Годовая ЗП = total_employee_cost - total_insurance (зарплата без взносов)
-        // Или можно просто (base_salary + monthly_bonus) * 12, если нет уволенных
+        // ИСПРАВЛЕНО: Учитываем все виды премий
         const months_worked = record.is_terminated && record.termination_month
           ? record.termination_month
           : 12;
-        const annual = (record.base_salary + record.monthly_bonus) * months_worked;
-        return <Text strong>{formatCurrency(annual)}</Text>;
+        const monthly_total = (record.base_salary + record.monthly_bonus) * months_worked;
+        const quarterly_total = (record.quarterly_bonus || 0) * 4;
+        const annual_total = record.annual_bonus || 0;
+        const total = monthly_total + quarterly_total + annual_total;
+        return <Text strong>{formatCurrency(total)}</Text>;
       },
     },
     {
@@ -834,19 +836,15 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     showTotal: (total) => `Всего: ${total} записей`,
                   }}
                   summary={(data) => {
-                    // Рассчитываем итоговую годовую ЗП с учетом всех премий
+                    // ИСПРАВЛЕНО: Учитываем все виды премий
                     const totalSalary = data.reduce((sum, record) => {
-                      const monthlyTotal = (record.base_salary + record.monthly_bonus) * 12;
-                      let quarterlyBonus = 0;
-                      let annualBonus = 0;
-                      
-                      if (record.employee_id && employeesMap.has(record.employee_id)) {
-                        const employee = employeesMap.get(record.employee_id)!;
-                        quarterlyBonus = (employee.quarterly_bonus_base || 0) * 4;
-                        annualBonus = employee.annual_bonus_base || 0;
-                      }
-                      
-                      return sum + monthlyTotal + quarterlyBonus + annualBonus;
+                      const months_worked = record.is_terminated && record.termination_month
+                        ? record.termination_month
+                        : 12;
+                      const monthly_total = (record.base_salary + record.monthly_bonus) * months_worked;
+                      const quarterly_total = (record.quarterly_bonus || 0) * 4;
+                      const annual_total = record.annual_bonus || 0;
+                      return sum + monthly_total + quarterly_total + annual_total;
                     }, 0);
                     const totalPension = data.reduce((sum, record) => sum + (record.pension_contribution || 0), 0);
                     const totalMedical = data.reduce((sum, record) => sum + (record.medical_contribution || 0), 0);

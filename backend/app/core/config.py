@@ -162,6 +162,9 @@ class Settings(BaseSettings):
     CREDIT_PORTFOLIO_IMPORT_HOUR: int = 6  # 0-23
     CREDIT_PORTFOLIO_IMPORT_MINUTE: int = 0  # 0-59
 
+    # Employee KPI Auto-Creation
+    EMPLOYEE_KPI_AUTO_CREATE_ENABLED: bool = True  # Auto-create EmployeeKPI records monthly
+
     # ============================================================================
     # RATE LIMITING
     # ============================================================================
