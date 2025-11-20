@@ -271,18 +271,15 @@ app.include_router(admin_settings.router, prefix=f"{settings.API_PREFIX}/admin",
 
 @app.on_event("startup")
 async def startup_event():
-    """Log application startup and start background scheduler"""
+    """Log application startup"""
     log_info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}", "Startup")
     log_info(f"API Documentation: /docs", "Startup")
     log_info(f"API Prefix: {settings.API_PREFIX}", "Startup")
 
-    # Start background scheduler for automated tasks
-    try:
-        from app.services.scheduler import start_scheduler
-        start_scheduler()
-        log_info("Background scheduler started", "Startup")
-    except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
+    # NOTE: Background scheduler is run as a separate process (run_scheduler.py)
+    # to avoid conflicts with uvicorn workers
+    # See: backend/run_scheduler.py and entrypoint.sh
+    log_info("Background scheduler runs as separate process", "Startup")
 
 
 @app.on_event("shutdown")

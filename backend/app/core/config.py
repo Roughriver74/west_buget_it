@@ -165,6 +165,11 @@ class Settings(BaseSettings):
     # Employee KPI Auto-Creation
     EMPLOYEE_KPI_AUTO_CREATE_ENABLED: bool = True  # Auto-create EmployeeKPI records monthly
 
+    # Module Expiry Check
+    MODULE_EXPIRY_CHECK_ENABLED: bool = True  # Check and deactivate expired modules
+    MODULE_EXPIRY_CHECK_HOUR: int = 1  # Hour to run expiry check (0-23)
+    MODULE_EXPIRY_CHECK_MINUTE: int = 0  # Minute to run expiry check (0-59)
+
     # ============================================================================
     # RATE LIMITING
     # ============================================================================
