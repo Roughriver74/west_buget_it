@@ -484,7 +484,7 @@ export default function EmployeeDetailPage() {
                   ) : (
                     <>
                       <Descriptions.Item label="Оклад введен как">
-                        <Tag color="blue">Брутто (до вычета НДФЛ)</Tag>
+                        <Tag color="blue">Gross (до вычета НДФЛ)</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Gross (до вычета налогов, начислено)">
                         <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>

@@ -32,7 +32,7 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
   // Check if user can select department (ADMIN/MANAGER)
   const canSelectDepartment = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
-  // State for salary calculations (Task 1.4: Брутто ↔ Нетто)
+  // State for salary calculations (Task 1.4: Gross ↔ Нетто)
   const [calculatedSalaries, setCalculatedSalaries] = useState<{
     gross: number | null;
     net: number | null;
@@ -221,7 +221,7 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
           <Input placeholder="EMP-001" />
         </Form.Item>
 
-        {/* Task 1.4: Salary Type Toggle (Брутто/Нетто) */}
+        {/* Task 1.4: Salary Type Toggle (Gross/Нетто) */}
         <Form.Item
           name="salary_type"
           label="Тип ввода оклада"
@@ -234,7 +234,7 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
               calculateSalaries(baseSalary, e.target.value, ndflRate);
             }}
           >
-            <Radio.Button value="GROSS">Брутто (до вычета НДФЛ)</Radio.Button>
+            <Radio.Button value="GROSS">Gross (до вычета НДФЛ)</Radio.Button>
             <Radio.Button value="NET">Нетто (на руки)</Radio.Button>
           </Radio.Group>
         </Form.Item>
@@ -315,7 +315,7 @@ export default function EmployeeFormModal({ visible, employee, onCancel }: Emplo
             description={
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Брутто (начисление):</span>
+                  <span>Gross (начисление):</span>
                   <strong>{calculatedSalaries.gross?.toLocaleString('ru-RU')} ₽</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
