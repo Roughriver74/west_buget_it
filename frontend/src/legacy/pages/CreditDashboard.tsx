@@ -585,7 +585,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
         <p className="text-foreground/70">Не удалось загрузить данные дашборда. Попробуйте еще раз.</p>
         <button
           onClick={handleRefresh}
-          className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+          className="px-4 py-2 rounded-lg bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors"
         >
           Обновить
         </button>
@@ -637,7 +637,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
           </button>
           <button
             onClick={handleRefresh}
-            className="px-5 py-2.5 bg-green-500 text-white border-0 rounded-lg cursor-pointer text-sm font-medium hover:bg-green-600"
+            className="px-5 py-2.5 bg-green-500 dark:bg-green-600 text-white border-0 rounded-lg cursor-pointer text-sm font-medium hover:bg-green-600 dark:hover:bg-green-700 transition-colors"
           >
             ⟳ Обновить
           </button>
@@ -879,17 +879,26 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
               </p>
               <ResponsiveContainer width="100%" height={360}>
                 <BarChart data={orgData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                    tick={{ fontSize: 11, fill: textColor }}
                     height={80}
                     angle={-40}
                     textAnchor="end"
                   />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <RechartsTooltip formatter={formatTooltipAmount as any} contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11, fill: textColor }} />
+                  <RechartsTooltip 
+                    formatter={formatTooltipAmount as any} 
+                    contentStyle={{ 
+                      fontSize: 12,
+                      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                      border: `1px solid ${gridColor}`,
+                      borderRadius: '8px',
+                      color: isDark ? '#f8fafc' : '#1f2937'
+                    }} 
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: textColor }} />
                   <Bar dataKey="principal" name="Тело" fill="#10B981" />
                   <Bar dataKey="interest" name="Проценты" fill="#F59E0B" />
                 </BarChart>
