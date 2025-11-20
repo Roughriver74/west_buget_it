@@ -638,9 +638,8 @@ class PayrollScenarioCalculator:
                 else:
                     employee_total_cost = Decimal('0.00')
             
+            # Если нет данных за базовый год, используем fallback
             if employee_total_cost == 0:
-            else:
-                # Если нет данных за базовый год, используем current employee base_salary * 12
                 employee = self.db.query(Employee).get(detail.employee_id)
                 if employee:
                     annual_salary = employee.base_salary * 12

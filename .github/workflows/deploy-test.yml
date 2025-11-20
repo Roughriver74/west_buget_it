@@ -102,6 +102,8 @@ jobs:
             # Stop containers
             echo "🛑 Stopping containers..."
             docker compose -f docker-compose.test.yml down || true
+            echo "🧹 Removing stale containers..."
+            docker rm -f budget_db_test budget_redis_test budget_backend_test budget_frontend_test 2>/dev/null || true
 
             # Rebuild and start containers
             echo "🔨 Building and starting containers..."

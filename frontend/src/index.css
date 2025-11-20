@@ -155,6 +155,25 @@
   border-radius: 6px;
 }
 
+/* Summary rows */
+.ant-table-summary {
+  font-weight: 600;
+}
+
+.ant-table-summary > tr > td {
+  background-color: #fafafa;
+}
+
+[data-theme="dark"] .ant-table-summary > tr > td {
+  background-color: #1f1f1f !important;
+  color: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid #303030;
+}
+
+[data-theme="dark"] .payroll-summary-row .ant-tag {
+  border-color: #303030;
+}
+
 /* Light theme improvements */
 [data-theme="light"] .ant-table-thead > tr > th {
   font-weight: 600;

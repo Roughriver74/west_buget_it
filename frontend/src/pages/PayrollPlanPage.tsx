@@ -452,27 +452,28 @@ export default function PayrollPlanPage() {
           }}
           summary={() => (
             <Table.Summary fixed>
-              <Table.Summary.Row style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
-                <Table.Summary.Cell index={0}>ИТОГО:</Table.Summary.Cell>
-                <Table.Summary.Cell index={1}>
+              <Table.Summary.Row className="payroll-summary-row">
+                <Table.Summary.Cell index={0} />
+                <Table.Summary.Cell index={1}>ИТОГО:</Table.Summary.Cell>
+                <Table.Summary.Cell index={2}>
                   {plans.length}
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={2}>
+                <Table.Summary.Cell index={3}>
                   {formatCurrency(yearTotalPlanned)}
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={3}>
+                <Table.Summary.Cell index={4}>
                   <span style={{ color: yearTotalPaid > 0 ? '#3f8600' : undefined }}>
                     {formatCurrency(yearTotalPaid)}
                   </span>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={4}>
+                <Table.Summary.Cell index={5}>
                   <span style={{
                     color: yearVariance > 0 ? '#cf1322' : yearVariance < 0 ? '#3f8600' : undefined
                   }}>
                     {yearVariance > 0 ? '+' : ''}{formatCurrency(yearVariance)}
                   </span>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={5}>
+                <Table.Summary.Cell index={6}>
                   <Tag color={
                     yearVariance > 0 ? 'red' : yearVariance < 0 ? 'green' : 'default'
                   }>
