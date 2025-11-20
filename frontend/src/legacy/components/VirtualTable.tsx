@@ -73,7 +73,7 @@ export default function VirtualTable<T extends Record<string, any>>({
       </div>
 
       <div
-        className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+        className="scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent"
         style={{ height: actualHeight, overflowY: 'auto' }}
         onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
       >

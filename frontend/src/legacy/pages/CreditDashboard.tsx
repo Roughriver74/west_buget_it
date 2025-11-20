@@ -645,10 +645,10 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
         </div>
       </header>
 
-      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl overflow-hidden">
+      <div className="bg-blue-50 dark:bg-slate-800/60 border border-blue-200 dark:border-slate-700 rounded-2xl overflow-hidden">
         <button
           onClick={() => setHelpExpanded(prev => !prev)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+          className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-100 dark:hover:bg-slate-700/50 transition-colors"
         >
           <div className="flex items-center gap-3">
             <Info size={20} className="text-blue-600 dark:text-blue-400" />
