@@ -28,11 +28,15 @@ def create_test_png():
     )
     return png_data
 
-def test_create_expense_request_with_attachment():
-    """Тест создания заявки на расход с прикреплением файла"""
+def test_create_expense_request_with_attachment(with_vat=True):
+    """Тест создания заявки на расход с прикреплением файла
+
+    Args:
+        with_vat: True - счет с НДС, False - счет без НДС
+    """
 
     logger.info("=" * 80)
-    logger.info("Testing 1C Expense Request Creation with File Attachment")
+    logger.info(f"Testing 1C Expense Request Creation {'WITH VAT' if with_vat else 'WITHOUT VAT'}")
     logger.info("=" * 80)
 
     # 1. Создать OData клиент
@@ -44,6 +48,20 @@ def test_create_expense_request_with_attachment():
         return False
 
     # 2. Тестовые данные для заявки
+    # Расчет сумм с/без НДС
+    if with_vat:
+        total_amount = 2000
+        vat_amount = 333
+        amount_without_vat = 1667
+        vat_treatment = "ОблагаетсяНДС"
+        payment_purpose = f"Тестовый платеж с прикреплением файла (С НДС)\nВ т.ч. НДС (20%) {vat_amount} руб."
+    else:
+        total_amount = 2000
+        vat_amount = 0
+        amount_without_vat = 2000
+        vat_treatment = "ПродажаНеОблагаетсяНДС"
+        payment_purpose = "Тестовый платеж с прикреплением файла (БЕЗ НДС)"
+
     test_data = {
         # Основные поля
         "Date": "2025-11-20T00:00:00",
@@ -53,16 +71,22 @@ def test_create_expense_request_with_attachment():
         "ХозяйственнаяОперация": "ОплатаПоставщику",
 
         # Сумма и валюта
-        "СуммаДокумента": 2000,
+        "СуммаДокумента": total_amount,
         "Валюта_Key": "f04b98ee-b430-11ea-a43c-b42e994e04d3",  # RUB
 
-        # Формы оплаты
-        "ФормаОплатыНаличная": True,
-        "ФормаОплатыБезналичная": False,
+        # Формы оплаты (безналичная для счетов)
+        "ФормаОплатыНаличная": False,
+        "ФормаОплатыБезналичная": True,
         "ФормаОплатыПлатежнаяКарта": False,
 
+        # НДС
+        "НалогообложениеНДС": vat_treatment,
+
+        # Бюджет
+        "вс_ЕстьСвободныйБюджетПоПлану": "Есть",
+
         # Назначение и дата платежа
-        "НазначениеПлатежа": "Тестовый платеж с прикреплением файла\nВ т.ч. НДС (20%) 333 руб.",
+        "НазначениеПлатежа": payment_purpose,
         "ЖелательнаяДатаПлатежа": "2025-11-23T00:00:00",
 
         # Контрагент (из примера)
@@ -96,15 +120,23 @@ def test_create_expense_request_with_attachment():
                 "Номенклатура_Key": "00000000-0000-0000-0000-000000000000",
                 "СтатьяРасходов_Key": "f95baf68-f96c-11ee-ad54-74563c634acb",
                 "СтатьяДвиженияДенежныхСредств_Key": "f95baf68-f96c-11ee-ad54-74563c634acb",
-                "Сумма": 2000,
-                "СуммаБезНДС": 1667,
-                "СуммаНДС": 333,
-                "СтавкаНДС_Key": "ed59436e-f9dc-11ee-ad54-74563c634acb",  # 20%
+                "Сумма": total_amount,
+                "СуммаБезНДС": amount_without_vat,
+                "СуммаНДС": vat_amount,
+                "СтавкаНДС_Key": "ed59436e-f9dc-11ee-ad54-74563c634acb" if with_vat else "00000000-0000-0000-0000-000000000000",
                 "Количество": 1,
-                "Цена": 2000
+                "Цена": total_amount
             }
         ]
     }
+
+    logger.info(f"📋 Test data prepared:")
+    logger.info(f"   Total amount: {total_amount} руб.")
+    logger.info(f"   Has VAT: {'Да' if with_vat else 'Нет'}")
+    logger.info(f"   VAT amount: {vat_amount} руб.")
+    logger.info(f"   Amount without VAT: {amount_without_vat} руб.")
+    logger.info(f"   VAT treatment: {vat_treatment}")
+    logger.info(f"   Payment method: Безналичная")
 
     # 3. Создать заявку
     try:
@@ -161,9 +193,41 @@ def test_create_expense_request_with_attachment():
     logger.info("2. Документ проведен (Posted=true)")
     logger.info("3. Комментарий содержит ФИО пользователя в начале")
     logger.info("4. Файл прикреплен к заявке")
+    logger.info(f"5. НДС: {vat_treatment} ({vat_amount} руб.)")
+    logger.info("6. Форма оплаты: Безналичная")
+    logger.info("7. Бюджет: Есть свободный")
 
     return True
 
 if __name__ == "__main__":
-    success = test_create_expense_request_with_attachment()
+    import sys
+
+    # Проверяем аргументы командной строки
+    test_with_vat = True
+    test_without_vat = False
+
+    if len(sys.argv) > 1:
+        arg = sys.argv[1].lower()
+        if arg == "no-vat" or arg == "without-vat":
+            test_with_vat = False
+            test_without_vat = True
+        elif arg == "both":
+            test_with_vat = True
+            test_without_vat = True
+
+    # Запускаем тесты
+    success = True
+
+    if test_with_vat:
+        logger.info("\n" + "=" * 80)
+        logger.info("🧪 TEST 1: Счет С НДС")
+        logger.info("=" * 80 + "\n")
+        success = test_create_expense_request_with_attachment(with_vat=True) and success
+
+    if test_without_vat:
+        logger.info("\n" + "=" * 80)
+        logger.info("🧪 TEST 2: Счет БЕЗ НДС")
+        logger.info("=" * 80 + "\n")
+        success = test_create_expense_request_with_attachment(with_vat=False) and success
+
     sys.exit(0 if success else 1)

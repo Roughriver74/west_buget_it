@@ -367,13 +367,25 @@ class InvoiceTo1CConverter:
         # ВАЖНО: Суммы должны быть целыми числами (int), как в рабочем примере
         amount_int = int(invoice.total_amount)
 
-        # НДС из invoice или расчет 20% от суммы без НДС
-        vat_amount = int(invoice.vat_amount) if invoice.vat_amount else int(amount_int * 0.2 / 1.2)
-        amount_without_vat = amount_int - vat_amount
+        # Определение наличия НДС
+        # Если vat_amount указан явно и > 0, то счет с НДС
+        # Если vat_amount == 0 или None, то без НДС
+        has_vat = bool(invoice.vat_amount and invoice.vat_amount > 0)
 
-        # Формирование назначения платежа с НДС
+        if has_vat:
+            # Счет с НДС
+            vat_amount = int(invoice.vat_amount)
+            amount_without_vat = amount_int - vat_amount
+            vat_treatment = "ОблагаетсяНДС"  # Или стандартное значение для 1С
+        else:
+            # Счет без НДС
+            vat_amount = 0
+            amount_without_vat = amount_int
+            vat_treatment = "ПродажаНеОблагаетсяНДС"
+
+        # Формирование назначения платежа
         payment_purpose = invoice.payment_purpose or f"Оплата по счету №{invoice.invoice_number} от {invoice.invoice_date.strftime('%d.%m.%Y')}"
-        if vat_amount > 0:
+        if has_vat and vat_amount > 0:
             payment_purpose += f"\nВ т.ч. НДС (20%) {vat_amount} руб."
 
         # Формирование комментария с ФИО пользователя
@@ -383,6 +395,19 @@ class InvoiceTo1CConverter:
 
         base_comment = user_comment or f"Создано автоматически из счета №{invoice.invoice_number}"
         full_comment = f"{user_full_name}: {base_comment}"
+
+        # Логирование информации о НДС
+        logger.info(
+            f"📋 Expense request preparation:\n"
+            f"   Invoice ID: {invoice.id}\n"
+            f"   Total amount: {amount_int} руб.\n"
+            f"   Has VAT: {'Да' if has_vat else 'Нет'}\n"
+            f"   VAT amount: {vat_amount} руб.\n"
+            f"   Amount without VAT: {amount_without_vat} руб.\n"
+            f"   VAT treatment: {vat_treatment}\n"
+            f"   Payment method: Безналичная\n"
+            f"   User: {user_full_name}"
+        )
 
         expense_request_data = {
             # Основные поля
@@ -396,10 +421,16 @@ class InvoiceTo1CConverter:
             "СуммаДокумента": amount_int,
             "Валюта_Key": self.RUB_CURRENCY_GUID,
 
-            # Формы оплаты (безналичная, как в 1С)
-            "ФормаОплатыНаличная": True,
-            "ФормаОплатыБезналичная": False,  # Только одна форма может быть True
+            # Формы оплаты (безналичная оплата по умолчанию для счетов)
+            "ФормаОплатыНаличная": False,
+            "ФормаОплатыБезналичная": True,  # Безналичная оплата (счета от поставщиков)
             "ФормаОплатыПлатежнаяКарта": False,
+
+            # НДС
+            "НалогообложениеНДС": vat_treatment,  # "ОблагаетсяНДС" или "ПродажаНеОблагаетсяНДС"
+
+            # Бюджет
+            "вс_ЕстьСвободныйБюджетПоПлану": "Есть",
 
             # Назначение и дата платежа
             "НазначениеПлатежа": payment_purpose,
