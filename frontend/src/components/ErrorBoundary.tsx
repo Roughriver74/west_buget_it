@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { Result, Button } from 'antd';
+import { Result } from 'antd';
+import { Button } from './ui/Button';
 
 interface Props {
   children: ReactNode;
@@ -22,17 +23,12 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error details to console for debugging
     console.error('ErrorBoundary caught an error:', error);
     console.error('Error info:', errorInfo);
-
-    // You can also log to an error reporting service here
-    // Example: logErrorToService(error, errorInfo);
 
     this.setState({
       error,
@@ -46,48 +42,33 @@ class ErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
     });
-    // Reload the page to reset the application state
     window.location.href = '/';
   };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh',
-            padding: '20px',
-          }}
-        >
+        <div className="flex justify-center items-center min-h-screen p-5">
           <Result
             status="error"
             title="Oops! Something went wrong"
             subTitle="We're sorry for the inconvenience. Please try reloading the page."
             extra={[
-              <Button type="primary" key="home" onClick={this.handleReset}>
+              <Button variant="primary" key="home" onClick={this.handleReset}>
                 Go to Home
               </Button>,
-              <Button key="reload" onClick={() => window.location.reload()}>
+              <Button variant="outline" key="reload" onClick={() => window.location.reload()}>
                 Reload Page
               </Button>,
             ]}
           >
             {import.meta.env.DEV && this.state.error && (
-              <div style={{ textAlign: 'left', marginTop: 20 }}>
-                <details style={{ whiteSpace: 'pre-wrap' }}>
-                  <summary style={{ cursor: 'pointer', marginBottom: 10 }}>
-                    <strong>Error Details (Development Mode)</strong>
+              <div className="text-left mt-5">
+                <details className="whitespace-pre-wrap">
+                  <summary className="cursor-pointer mb-2 font-bold">
+                    Error Details (Development Mode)
                   </summary>
-                  <div style={{
-                    background: '#f5f5f5',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontFamily: 'monospace'
-                  }}>
+                  <div className="bg-gray-100 p-2.5 rounded text-xs font-mono">
                     <p><strong>Error:</strong> {this.state.error.toString()}</p>
                     {this.state.errorInfo && (
                       <p><strong>Component Stack:</strong> {this.state.errorInfo.componentStack}</p>

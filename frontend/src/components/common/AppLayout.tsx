@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import {
 	Layout,
 	Menu,
-	theme,
 	Space,
 	Dropdown,
 	Avatar,
 	Button,
 	Drawer,
+	Tooltip,
 } from 'antd'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -40,12 +40,15 @@ import {
 	UnorderedListOutlined,
 	SafetyOutlined,
 	ClockCircleOutlined,
+	MenuFoldOutlined,
+	MenuUnfoldOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useModules } from '../../contexts/ModulesContext'
 import DepartmentSelector from './DepartmentSelector'
 import ApiTokensDrawer from '../admin/ApiTokensDrawer'
+import { cn } from '@/utils/cn'
 
 const { Header, Content, Sider } = Layout
 
@@ -63,9 +66,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 	const { user, logout } = useAuth()
 	const { mode, toggleTheme } = useTheme()
 	const { hasModule } = useModules()
-	const {
-		token: { colorBgContainer, borderRadiusLG },
-	} = theme.useToken()
 
 	// Check if mobile on mount and resize
 	useEffect(() => {
@@ -543,16 +543,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 	const menuContent = (
 		<>
 			<div
-				style={{
-					height: 32,
-					margin: 16,
-					color: 'white',
-					fontSize: collapsed && !isMobile ? 14 : 18,
-					fontWeight: 'bold',
-					textAlign: 'center',
-				}}
+				className={cn(
+					"h-16 flex items-center justify-center transition-all duration-300",
+					collapsed && !isMobile ? "px-2" : "px-4"
+				)}
 			>
-				{collapsed && !isMobile ? 'ITB' : 'BDR'}
+				<div className={cn(
+					"text-white font-bold tracking-wider transition-all duration-300",
+					collapsed && !isMobile ? "text-xl" : "text-2xl"
+				)}>
+					{collapsed && !isMobile ? 'ITB' : 'BDR'}
+				</div>
 			</div>
 			<Menu
 				theme='dark'
@@ -560,6 +561,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 				mode='inline'
 				items={menuItems}
 				defaultSelectedKeys={[location.pathname]}
+				className="bg-transparent border-none"
+				style={{ background: 'transparent' }}
 			/>
 		</>
 	)
@@ -574,6 +577,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					onCollapse={value => setCollapsed(value)}
 					breakpoint='md'
 					collapsedWidth={80}
+					width={260}
+					className="!bg-[#020617] !border-r !border-white/5 shadow-xl z-20"
+					trigger={null}
 				>
 					{menuContent}
 				</Sider>
@@ -586,84 +592,82 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 					onClose={() => setMobileDrawerOpen(false)}
 					open={mobileDrawerOpen}
 					styles={{ body: { padding: 0, background: '#001529' } }}
-					width={250}
+					width={280}
 				>
 					{menuContent}
 				</Drawer>
 			)}
 
-			<Layout>
+			<Layout className="bg-[#f8fafc] dark:bg-[#0f172a] transition-colors duration-300">
 				<Header
-					style={{
-						padding: isMobile ? '0 12px' : '0 24px',
-						background: colorBgContainer,
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'space-between',
-					}}
+					className={cn(
+						"sticky top-0 z-10 w-full flex items-center justify-between px-6 h-16",
+						"bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5",
+						"transition-all duration-300 shadow-sm"
+					)}
+					style={{ padding: 0 }}
 				>
-					<Space>
-						{/* Mobile menu button */}
-						{isMobile && (
+					<div className="flex items-center px-4">
+						{isMobile ? (
 							<Button
 								type='text'
 								icon={<MenuOutlined />}
 								onClick={() => setMobileDrawerOpen(true)}
-								style={{ fontSize: 20 }}
+								className="text-lg mr-2"
+							/>
+						) : (
+							<Button
+								type="text"
+								icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+								onClick={() => setCollapsed(!collapsed)}
+								className="text-lg mr-4 hover:bg-gray-100 dark:hover:bg-gray-800"
 							/>
 						)}
-						<div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 500 }}>
+						<div className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-gray-800 to-gray-600 dark:from-gray-100 dark:to-gray-300">
 							{isMobile ? 'BDR' : 'Budget Manager'}
 						</div>
-					</Space>
+					</div>
 
-					<Space size={isMobile ? 'small' : 'large'}>
+					<div className="flex items-center gap-2 px-4">
 						<DepartmentSelector />
-						<Button
-							type='text'
-							icon={
-								mode === 'dark' ? (
-									<BulbFilled style={{ color: '#faad14' }} />
-								) : (
-									<BulbOutlined />
-								)
-							}
-							onClick={toggleTheme}
-							title={
-								mode === 'dark'
-									? 'Переключить на светлую тему'
-									: 'Переключить на темную тему'
-							}
-							aria-label={
-								mode === 'dark'
-									? 'Переключить на светлую тему'
-									: 'Переключить на темную тему'
-							}
-						/>
-						<Dropdown menu={{ items: userMenuItems }} placement='bottomRight'>
+						
+						<Tooltip title={mode === 'dark' ? 'Светлая тема' : 'Темная тема'}>
 							<Button
 								type='text'
-								style={{ height: 'auto', padding: '4px 8px' }}
+								icon={
+									mode === 'dark' ? (
+										<BulbFilled className="text-yellow-400 text-lg" />
+									) : (
+										<BulbOutlined className="text-gray-600 text-lg" />
+									)
+								}
+								onClick={toggleTheme}
+								className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+							/>
+						</Tooltip>
+
+						<Dropdown menu={{ items: userMenuItems }} placement='bottomRight' trigger={['click']}>
+							<Button
+								type='text'
+								className="h-10 px-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
 							>
-								<Space size='small'>
-									<Avatar size='small' icon={<UserOutlined />} />
+								<Space>
+									<Avatar 
+										size='small' 
+										icon={<UserOutlined />} 
+										className="bg-primary/10 text-primary"
+									/>
 									{!isMobile && (
-										<span>{user?.full_name || user?.username}</span>
+										<span className="font-medium text-sm">{user?.full_name || user?.username}</span>
 									)}
 								</Space>
 							</Button>
 						</Dropdown>
-					</Space>
+					</div>
 				</Header>
-				<Content style={{ margin: isMobile ? '12px 8px 0' : '24px 16px 0' }}>
-					<div
-						style={{
-							padding: isMobile ? 12 : 24,
-							minHeight: 360,
-							background: colorBgContainer,
-							borderRadius: borderRadiusLG,
-						}}
-					>
+				
+				<Content className="p-4 md:p-6 overflow-auto">
+					<div className="max-w-[1600px] mx-auto w-full animate-fade-in">
 						{children}
 					</div>
 				</Content>

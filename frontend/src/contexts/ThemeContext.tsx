@@ -34,54 +34,74 @@ const lightTheme: ThemeConfig = {
 const darkTheme: ThemeConfig = {
   algorithm: antdTheme.darkAlgorithm,
   token: {
-    colorPrimary: '#1890ff',
-    colorSuccess: '#52c41a',
-    colorWarning: '#faad14',
-    colorError: '#ff4d4f',
-    colorInfo: '#1890ff',
+    colorPrimary: '#3b82f6', // Blue-500 - slightly brighter for dark mode
+    colorSuccess: '#22c55e', // Green-500
+    colorWarning: '#eab308', // Yellow-500
+    colorError: '#ef4444', // Red-500
+    colorInfo: '#3b82f6',
     fontSize: 14,
-    borderRadius: 6,
-    colorBgContainer: '#1f1f1f',
+    borderRadius: 8,
+    colorBgContainer: '#1e293b', // Slate-800 - Lighter than bg for cards
+    colorBgLayout: '#0f172a', // Slate-900 - Main background
+    colorText: '#f8fafc', // Slate-50
+    colorTextSecondary: '#94a3b8', // Slate-400
+    colorBorder: '#334155', // Slate-700
+    colorBorderSecondary: '#334155',
   },
   components: {
     Layout: {
-      bodyBg: '#141414',
-      headerBg: '#1f1f1f',
-      siderBg: '#141414',
+      bodyBg: '#0f172a', // Slate-900
+      headerBg: '#0f172a',
+      siderBg: '#020617', // Slate-950 - Darker sidebar
     },
     Menu: {
-      darkItemBg: '#141414',
-      darkItemSelectedBg: '#1890ff',
-      darkItemHoverBg: '#262626',
+      darkItemBg: '#020617', // Slate-950
+      darkItemSelectedBg: '#1e293b', // Slate-800
+      darkItemHoverBg: '#1e293b',
+      itemColor: '#94a3b8', // Slate-400
+      itemSelectedColor: '#f8fafc', // Slate-50
     },
     Card: {
-      colorBgContainer: '#1f1f1f',
-      colorBorderSecondary: '#303030',
+      colorBgContainer: '#1e293b', // Slate-800
+      colorBorderSecondary: '#334155',
     },
     Table: {
-      colorBgContainer: '#1f1f1f',
-      headerBg: '#262626',
-      headerColor: '#ffffff',
-      rowHoverBg: '#262626',
-      colorBorderSecondary: '#303030',
-      borderColor: '#303030',
-      headerSplitColor: '#303030',
-      bodySortBg: '#262626',
-      rowSelectedBg: '#1a1a2e',
-      rowSelectedHoverBg: '#252540',
+      colorBgContainer: '#1e293b', // Slate-800
+      headerBg: '#0f172a', // Slate-900 - Darker header for contrast
+      headerColor: '#94a3b8', // Slate-400 - Muted header text
+      rowHoverBg: '#334155', // Slate-700
+      colorBorderSecondary: '#334155',
+      borderColor: '#334155',
+      headerSplitColor: '#334155',
+      bodySortBg: '#0f172a',
     },
     Input: {
-      colorBgContainer: '#262626',
-      colorBorder: '#303030',
-      colorTextPlaceholder: '#8c8c8c',
+      colorBgContainer: '#0f172a', // Slate-900 - Input background
+      colorBorder: '#334155',
+      colorTextPlaceholder: '#64748b', // Slate-500
+      activeBorderColor: '#3b82f6',
     },
     Select: {
-      colorBgContainer: '#262626',
-      colorBorder: '#303030',
+      colorBgContainer: '#0f172a',
+      colorBorder: '#334155',
+      optionSelectedBg: '#334155',
     },
     DatePicker: {
-      colorBgContainer: '#262626',
-      colorBorder: '#303030',
+      colorBgContainer: '#0f172a',
+      colorBorder: '#334155',
+    },
+    Modal: {
+      contentBg: '#1e293b',
+      headerBg: '#1e293b',
+    },
+    Drawer: {
+      colorBgElevated: '#1e293b',
+    },
+    Dropdown: {
+      colorBgElevated: '#1e293b',
+    },
+    Popover: {
+      colorBgElevated: '#1e293b',
     },
   },
 }
@@ -123,6 +143,13 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
     // Update document root for additional styling if needed
     document.documentElement.setAttribute('data-theme', mode)
+    
+    // Toggle 'dark' class for Tailwind CSS
+    if (mode === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
   }, [mode])
 
   useEffect(() => {
