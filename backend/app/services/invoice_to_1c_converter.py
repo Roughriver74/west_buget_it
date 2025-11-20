@@ -456,26 +456,32 @@ class InvoiceTo1CConverter:
             logger.debug(f"Expense request created in 1C with Ref_Key: {ref_key}")
 
             # 4. (Опционально) Загрузка файла invoice
-            if upload_attachment and invoice.file_path:
-                try:
-                    # Прочитать файл
-                    with open(invoice.file_path, 'rb') as f:
-                        file_content = f.read()
+            # ВРЕМЕННО ОТКЛЮЧЕНО: Загрузка файлов в 1С через OData не работает
+            # из-за ограничений бизнес-логики 1С (см. docs/1C_FILE_UPLOAD_RESEARCH_SUMMARY.md)
+            # Раскомментировать после настройки прав OData администратором 1С
+            #
+            # if upload_attachment and invoice.file_path:
+            #     try:
+            #         # Прочитать файл
+            #         with open(invoice.file_path, 'rb') as f:
+            #             file_content = f.read()
+            #
+            #         # Загрузить в 1С
+            #         attachment_result = self.odata_client.upload_attachment_base64(
+            #             file_content=file_content,
+            #             filename=invoice.file_name or f"invoice_{invoice.id}.pdf",
+            #             owner_guid=ref_key
+            #         )
+            #
+            #         if attachment_result:
+            #             logger.debug(f"Attachment uploaded successfully to 1C")
+            #         else:
+            #             logger.warning(f"Failed to upload attachment to 1C (non-critical)")
+            #
+            #     except Exception as e:
+            #         logger.warning(f"Failed to upload attachment: {e} (non-critical)", exc_info=True)
 
-                    # Загрузить в 1С
-                    attachment_result = self.odata_client.upload_attachment_base64(
-                        file_content=file_content,
-                        filename=invoice.file_name or f"invoice_{invoice.id}.pdf",
-                        owner_guid=ref_key
-                    )
-
-                    if attachment_result:
-                        logger.debug(f"Attachment uploaded successfully to 1C")
-                    else:
-                        logger.warning(f"Failed to upload attachment to 1C (non-critical)")
-
-                except Exception as e:
-                    logger.warning(f"Failed to upload attachment: {e} (non-critical)", exc_info=True)
+            logger.info(f"File attachment upload to 1C is temporarily disabled (see docs/1C_FILE_UPLOAD_RESEARCH_SUMMARY.md)")
 
             # 5. Обновить invoice
             invoice.external_id_1c = ref_key
