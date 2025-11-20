@@ -32,6 +32,7 @@ import {
   RiseOutlined,
   FallOutlined,
   EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 
 import { useDepartment } from '../contexts/DepartmentContext';
@@ -245,6 +246,28 @@ export default function PayrollScenariosPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => payrollScenarioAPI.delete(id),
+    onSuccess: () => {
+      message.success('Сценарий удален');
+      queryClient.invalidateQueries({ queryKey: ['payroll-scenarios'] });
+    },
+    onError: (error: any) => {
+      message.error(error?.response?.data?.detail || 'Не удалось удалить сценарий');
+    },
+  });
+
+  const handleDelete = (scenario: PayrollScenario) => {
+    Modal.confirm({
+      title: 'Удалить сценарий?',
+      content: `Вы уверены, что хотите удалить сценарий "${scenario.name}"?`,
+      okText: 'Удалить',
+      okType: 'danger',
+      cancelText: 'Отмена',
+      onOk: () => deleteMutation.mutate(scenario.id),
+    });
+  };
+
   const handleModalOpen = () => {
     setModalOpen(true);
     form.resetFields();
@@ -418,7 +441,7 @@ export default function PayrollScenariosPage() {
     {
       title: 'Действия',
       key: 'actions',
-      width: 250,
+      width: 300,
       render: (_: any, record: PayrollScenario) => (
         <Space>
           <Button
@@ -445,6 +468,16 @@ export default function PayrollScenariosPage() {
             loading={calculateMutation.isPending}
           >
             Рассчитать
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+            loading={deleteMutation.isPending}
+          >
+            Удалить
           </Button>
         </Space>
       ),
@@ -602,18 +635,27 @@ export default function PayrollScenariosPage() {
           {impactAnalysis.recommendations && impactAnalysis.recommendations.length > 0 && (
             <>
               <Divider />
-              <h4>Рекомендации по оптимизации:</h4>
-              <ul>
-                {impactAnalysis.recommendations.map((rec, index) => (
-                  <li key={index}>
-                    <strong>{rec.description}</strong>
-                    <br />
-                    <span style={{ color: '#666' }}>
-                      Потенциальная экономия: {formatCurrency(typeof rec.impact === 'number' ? Math.abs(rec.impact) : 0)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <h4>Рекомендации по оптимизации:</h4>
+                <Alert
+                  message="Источник данных"
+                  description={`Рекомендации рассчитаны на основе фактических данных ФОТ за ${baseYear} год (таблица PayrollActual). Расчет учитывает изменения ставок страховых взносов между ${baseYear} и ${targetYear} годами.`}
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                />
+                <ul>
+                  {impactAnalysis.recommendations.map((rec, index) => (
+                    <li key={index}>
+                      <strong>{rec.description}</strong>
+                      <br />
+                      <span style={{ color: '#666' }}>
+                        Потенциальная экономия: {formatCurrency(typeof rec.impact === 'number' ? Math.abs(rec.impact) : 0)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </>
           )}
         </Card>

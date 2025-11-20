@@ -66,11 +66,27 @@ export default function PayrollPlanPage() {
   // Fetch payroll actuals
   const { data: actuals = [], isLoading: actualsLoading } = useQuery<PayrollActualWithEmployee[]>({
     queryKey: ['payroll-actuals', selectedDepartment?.id, selectedYear],
-    queryFn: () =>
-      payrollActualAPI.list({
-        department_id: selectedDepartment?.id,
-        year: selectedYear,
-      }),
+    queryFn: async () => {
+      // Получаем все выплаты за год через несколько запросов, так как лимит API = 1000
+      let allActuals: PayrollActualWithEmployee[] = []
+      let skip = 0
+      const limit = 1000 // Максимальный лимит API
+      let hasMore = true
+
+      while (hasMore) {
+        const actualsBatch = await payrollActualAPI.list({
+          department_id: selectedDepartment?.id,
+          year: selectedYear,
+          skip,
+          limit,
+        })
+        allActuals = [...allActuals, ...actualsBatch]
+        hasMore = actualsBatch.length === limit
+        skip += limit
+      }
+
+      return allActuals
+    },
   });
 
   // Group data by month

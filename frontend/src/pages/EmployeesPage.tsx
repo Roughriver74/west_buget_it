@@ -32,6 +32,8 @@ import {
 	Employee,
 	payrollPlanAPI,
 	PayrollPlanWithEmployee,
+	payrollActualAPI,
+	PayrollActualWithEmployee,
 } from '../api/payroll'
 import { formatCurrency } from '../utils/formatters'
 import EmployeeFormModal from '../components/employees/EmployeeFormModal'
@@ -82,12 +84,54 @@ export default function EmployeesPage() {
 	const currentYear = new Date().getFullYear()
 	const { data: payrollPlans = [] } = useQuery<PayrollPlanWithEmployee[]>({
 		queryKey: ['payroll-plans', selectedDepartment?.id, currentYear],
-		queryFn: () =>
-			payrollPlanAPI.list({
-				department_id: selectedDepartment?.id,
-				year: currentYear,
-				limit: 10000, // Получить все планы за год
-			}),
+		queryFn: async () => {
+			// Получаем все планы за год через несколько запросов, так как лимит API = 1000
+			let allPlans: PayrollPlanWithEmployee[] = []
+			let skip = 0
+			const limit = 1000 // Максимальный лимит API
+			let hasMore = true
+
+			while (hasMore) {
+				const plans = await payrollPlanAPI.list({
+					department_id: selectedDepartment?.id,
+					year: currentYear,
+					skip,
+					limit,
+				})
+				allPlans = [...allPlans, ...plans]
+				hasMore = plans.length === limit
+				skip += limit
+			}
+
+			return allPlans
+		},
+		enabled: !!selectedDepartment?.id,
+	})
+
+	// Fetch payroll actuals (фактические выплаты) for current year
+	const { data: payrollActuals = [] } = useQuery<PayrollActualWithEmployee[]>({
+		queryKey: ['payroll-actuals', selectedDepartment?.id, currentYear],
+		queryFn: async () => {
+			// Получаем все выплаты за год через несколько запросов, так как лимит API = 1000
+			let allActuals: PayrollActualWithEmployee[] = []
+			let skip = 0
+			const limit = 1000 // Максимальный лимит API
+			let hasMore = true
+
+			while (hasMore) {
+				const actuals = await payrollActualAPI.list({
+					department_id: selectedDepartment?.id,
+					year: currentYear,
+					skip,
+					limit,
+				})
+				allActuals = [...allActuals, ...actuals]
+				hasMore = actuals.length === limit
+				skip += limit
+			}
+
+			return allActuals
+		},
 		enabled: !!selectedDepartment?.id,
 	})
 
@@ -248,8 +292,31 @@ export default function EmployeesPage() {
 		totalPayroll = totalSalary * 12 + totalBonuses
 	}
 
-	const avgSalary =
-		activeEmployees.length > 0 ? totalSalary / activeEmployees.length : 0
+	// Рассчитываем сумму фактических выплат за текущий год
+	// Используем ТОЧНО ту же логику, что и на странице планирования
+	// Фильтруем выплаты по департаменту и году
+	const filteredActuals = payrollActuals.filter(
+		actual =>
+			(!selectedDepartment?.id ||
+				actual.department_id === selectedDepartment.id) &&
+			actual.year === currentYear
+	)
+
+	// Группируем по месяцам ТОЧНО так же, как на странице планирования
+	// На странице планирования: MONTHS.map((monthName, index) => { const month = index + 1; ... })
+	const MONTHS_ARRAY = Array.from({ length: 12 }, (_, i) => i + 1) // [1, 2, 3, ..., 12]
+	const monthlyPaidData = MONTHS_ARRAY.map(month => {
+		// Фильтруем выплаты за конкретный месяц - ТОЧНО как на странице планирования
+		const monthActuals = filteredActuals.filter(a => a.month === month)
+		// Суммируем total_paid - ТОЧНО как на странице планирования
+		const totalPaid = monthActuals.reduce(
+			(sum, a) => sum + Number(a.total_paid || 0),
+			0
+		)
+		return totalPaid
+	})
+	// Суммируем все месяцы - ТОЧНО как на странице планирования: yearTotalPaid = monthlyData.reduce((sum, m) => sum + m.totalPaid, 0)
+	const totalPaid = monthlyPaidData.reduce((sum, paid) => sum + paid, 0)
 
 	// Helper function to calculate progressive NDFL for annual income
 	const calculateProgressiveNDFL = (
@@ -336,7 +403,15 @@ export default function EmployeesPage() {
 	const totalGross = totalPayroll // Общая начисленная сумма (gross) - годовая ЗП с премиями
 	const totalSocialTax = Math.round(totalGross * socialTaxRate) // Страховые взносы
 	const totalEmployerCost = totalGross + totalSocialTax // Полная стоимость для работодателя
-	const totalNet = totalGross - totalIncomeTax // Сумма на руки сотрудникам - в этом году запланировано
+
+	// Рассчитываем средний оклад из активных сотрудников
+	const avgSalary =
+		activeEmployees.length > 0
+			? activeEmployees.reduce(
+					(sum, e) => sum + Number(e.base_salary || 0),
+					0
+			  ) / activeEmployees.length
+			: 0
 
 	// Calculate effective tax rate for display
 	const effectiveNDFLRate =
@@ -462,94 +537,100 @@ export default function EmployeesPage() {
 				</h1>
 			</div>
 
-			{/* Statistics Cards */}
-			<Row gutter={16} style={{ marginBottom: '16px' }}>
-				<Col span={6}>
-					<Card>
+			{/* Statistics Cards - Компактное расположение */}
+			<Row gutter={[12, 12]} style={{ marginBottom: '16px' }}>
+				<Col span={4}>
+					<Card size='small'>
 						<Statistic
 							title='Всего сотрудников'
 							value={employees.length}
 							prefix={<UserOutlined />}
+							valueStyle={{ fontSize: '20px' }}
 						/>
 					</Card>
 				</Col>
-				<Col span={6}>
-					<Card>
+				<Col span={4}>
+					<Card size='small'>
 						<Statistic
-							title='Активных сотрудников'
+							title='Активных'
 							value={activeEmployees.length}
-							valueStyle={{ color: mode === 'dark' ? '#73d13d' : '#3f8600' }}
+							valueStyle={{
+								color: mode === 'dark' ? '#73d13d' : '#3f8600',
+								fontSize: '20px',
+							}}
 						/>
 					</Card>
 				</Col>
-				<Col span={6}>
-					<Card>
+				<Col span={4}>
+					<Card size='small'>
 						<Statistic
-							title={`Годовой ФОТ (начислено) - ${currentYear}`}
+							title={`ФОТ (${currentYear})`}
 							value={totalPayroll}
 							precision={0}
 							suffix='₽'
+							valueStyle={{ fontSize: '20px' }}
 						/>
 					</Card>
 				</Col>
-				<Col span={6}>
-					<Card>
+				<Col span={4}>
+					<Card size='small'>
 						<Statistic
 							title='Средний оклад'
 							value={avgSalary}
 							precision={0}
 							suffix='₽'
+							valueStyle={{ fontSize: '20px' }}
+						/>
+					</Card>
+				</Col>
+				<Col span={4}>
+					<Card size='small'>
+						<Statistic
+							title={`Выплачено (${currentYear})`}
+							value={totalPaid}
+							precision={0}
+							suffix='₽'
+							valueStyle={{
+								color: mode === 'dark' ? '#73d13d' : '#3f8600',
+								fontSize: '20px',
+							}}
+						/>
+					</Card>
+				</Col>
+				<Col span={4}>
+					<Card size='small'>
+						<Statistic
+							title={`НДФЛ (${effectiveNDFLRate.toFixed(1)}%)`}
+							value={totalIncomeTax}
+							precision={0}
+							suffix='₽'
+							valueStyle={{
+								color: mode === 'dark' ? '#ff7875' : '#cf1322',
+								fontSize: '20px',
+							}}
 						/>
 					</Card>
 				</Col>
 			</Row>
 
-			{/* Tax Statistics Cards */}
-			<Row gutter={16} style={{ marginBottom: '24px' }}>
+			<Row gutter={[12, 12]} style={{ marginBottom: '16px' }}>
 				<Col span={6}>
-					<Card>
-						<Statistic
-							title={`НДФЛ (${effectiveNDFLRate.toFixed(2)}%)`}
-							value={totalIncomeTax}
-							precision={0}
-							suffix='₽'
-							valueStyle={{ color: mode === 'dark' ? '#ff7875' : '#cf1322' }}
-						/>
-					</Card>
-				</Col>
-				<Col span={6}>
-					<Card>
+					<Card size='small'>
 						<Statistic
 							title='Страховые взносы (30.2%)'
 							value={totalSocialTax}
 							precision={0}
 							suffix='₽'
-							valueStyle={{ color: mode === 'dark' ? '#ffa940' : '#d46b08' }}
-						/>
-					</Card>
-				</Col>
-				<Col span={6}>
-					<Card
-						style={{
-							backgroundColor: mode === 'dark' ? '#162312' : '#f6ffed',
-							border:
-								mode === 'dark' ? '1px solid #389e0d' : '1px solid #b7eb8f',
-						}}
-					>
-						<Statistic
-							title={`На руки сотрудникам в этом году запланировано`}
-							value={totalNet}
-							precision={0}
-							suffix='₽'
 							valueStyle={{
-								color: mode === 'dark' ? '#73d13d' : '#52c41a',
-								fontWeight: 'bold',
+								color: mode === 'dark' ? '#ffa940' : '#d46b08',
+								fontSize: '20px',
 							}}
 						/>
 					</Card>
 				</Col>
 				<Col span={6}>
 					<Card
+						size='small'
 						style={{
 							backgroundColor: mode === 'dark' ? '#2b2111' : '#fff7e6',
 							border:
@@ -557,13 +638,14 @@ export default function EmployeesPage() {
 						}}
 					>
 						<Statistic
-							title={`Стоимость для компании в этом году с учетом запланировано`}
+							title={`Стоимость для компании (${currentYear})`}
 							value={totalEmployerCost}
 							precision={0}
 							suffix='₽'
 							valueStyle={{
 								color: mode === 'dark' ? '#ffa940' : '#fa8c16',
 								fontWeight: 'bold',
+								fontSize: '20px',
 							}}
 						/>
 					</Card>

@@ -1076,16 +1076,21 @@ class InsuranceImpactAnalyzer:
     def _generate_recommendations(
         self, impact: Decimal, current_cost: Decimal, headcount: int
     ) -> List[Dict]:
-        """Генерировать рекомендации по оптимизации"""
+        """Генерировать рекомендации по оптимизации
+        
+        Рекомендации основаны на фактических данных ФОТ за базовый год.
+        """
         recommendations = []
 
-        if impact > 0:
+        if impact > 0 and current_cost > 0:
             # Рекомендация 1: Сокращение штата
+            # Показываем только если сокращение не превышает 50% штата
             if headcount > 0:
                 avg_cost_per_employee = current_cost / headcount
                 headcount_reduction = int(impact / avg_cost_per_employee)
-
-                if headcount_reduction > 0:
+                max_reasonable_reduction = max(1, int(headcount * 0.5))  # Максимум 50% штата
+                
+                if headcount_reduction > 0 and headcount_reduction <= max_reasonable_reduction:
                     recommendations.append({
                         'type': 'headcount_reduction',
                         'description': f'Сократить {headcount_reduction} сотрудников для компенсации роста взносов',
@@ -1097,27 +1102,34 @@ class InsuranceImpactAnalyzer:
                     })
 
             # Рекомендация 2: Снижение зарплат
-            if current_cost > 0:
-                salary_reduction_percent = (impact / current_cost) * 100
-
+            # Ограничиваем максимальное снижение до 50% (реалистичный предел)
+            # Экономия от снижения зарплат на X% = current_cost * X / 100
+            # Нам нужно компенсировать impact, поэтому X = (impact / current_cost) * 100
+            salary_reduction_percent = min((impact / current_cost) * 100, 50.0)
+            
+            if salary_reduction_percent > 0 and salary_reduction_percent <= 50:
+                # Экономия = снижение зарплат на X% от текущего ФОТ
+                savings = current_cost * Decimal(str(salary_reduction_percent / 100))
                 recommendations.append({
                     'type': 'salary_reduction',
                     'description': f'Снизить фонд зарплат на {salary_reduction_percent:.1f}% для компенсации',
-                    'impact': -float(impact),
+                    'impact': -float(savings),
                     'details': {
                         'reduction_percent': float(salary_reduction_percent),
                     }
                 })
 
-            # Рекомендация 3: Оптимизация структуры
-            recommendations.append({
-                'type': 'structure_optimization',
-                'description': 'Пересмотреть структуру премий и бонусов',
-                'impact': -float(impact * Decimal('0.3')),  # Примерная экономия 30%
-                'details': {
-                    'potential_savings_percent': 30,
-                }
-            })
+            # Рекомендация 3: Оптимизация структуры (только если impact не слишком большой)
+            # Показываем только если рост взносов не превышает 30% от текущего ФОТ
+            if (impact / current_cost) * 100 <= 30:
+                recommendations.append({
+                    'type': 'structure_optimization',
+                    'description': 'Пересмотреть структуру премий и бонусов',
+                    'impact': -float(impact * Decimal('0.3')),  # Примерная экономия 30%
+                    'details': {
+                        'potential_savings_percent': 30,
+                    }
+                })
 
         return recommendations
 

@@ -74,6 +74,7 @@
       },
       "type": "decimal",
       "required": false,
+      "default": 0,
       "min": 0,
       "aliases": ["квартальная_премия", "quarterly_bonus", "базовая_квартальная_премия"]
     },
@@ -85,6 +86,7 @@
       },
       "type": "decimal",
       "required": false,
+      "default": 0,
       "min": 0,
       "aliases": ["годовая_премия", "annual_bonus", "базовая_годовая_премия"]
     },
