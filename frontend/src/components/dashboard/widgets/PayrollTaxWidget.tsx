@@ -78,7 +78,7 @@ const PayrollTaxWidget: React.FC<PayrollTaxWidgetProps> = ({
 
     return [
       {
-        type: 'ЗП (нетто)',
+        type: 'ЗП (net)',
         value: totals.net,
       },
       {

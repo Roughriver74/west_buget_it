@@ -18,10 +18,10 @@ class EmployeeBase(BaseModel):
     fire_date: Optional[date] = None
     status: EmployeeStatusEnum = EmployeeStatusEnum.ACTIVE
 
-    # Salary calculation fields (Task 1.4: Gross ↔ Нетто)
+    # Salary calculation fields (Task 1.4: Gross ↔ Net)
     salary_type: SalaryTypeEnum = Field(
         SalaryTypeEnum.GROSS,
-        description="Тип ввода оклада: GROSS (gross, до вычета НДФЛ) или NET (нетто, на руки)"
+        description="Тип ввода оклада: GROSS (gross, до вычета НДФЛ) или NET (net, на руки)"
     )
     base_salary: Decimal = Field(..., ge=0, description="Оклад (значение которое вводит пользователь)")
     ndfl_rate: Decimal = Field(
@@ -59,7 +59,7 @@ class EmployeeUpdate(BaseModel):
     fire_date: Optional[date] = None
     status: Optional[EmployeeStatusEnum] = None
 
-    # Salary calculation fields (Task 1.4: Gross ↔ Нетто)
+    # Salary calculation fields (Task 1.4: Gross ↔ Net)
     salary_type: Optional[SalaryTypeEnum] = None
     base_salary: Optional[Decimal] = Field(None, ge=0)
     ndfl_rate: Optional[Decimal] = Field(None, ge=0, lt=1)
@@ -78,9 +78,9 @@ class EmployeeInDB(EmployeeBase):
     id: int
     department_id: int
 
-    # Calculated salary fields (Task 1.4: Gross ↔ Нетто)
+    # Calculated salary fields (Task 1.4: Gross ↔ Net)
     base_salary_gross: Optional[Decimal] = Field(None, description="Оклад gross (до вычета НДФЛ)")
-    base_salary_net: Optional[Decimal] = Field(None, description="Оклад нетто (на руки после НДФЛ)")
+    base_salary_net: Optional[Decimal] = Field(None, description="Оклад net (на руки после НДФЛ)")
     ndfl_amount: Optional[Decimal] = Field(None, description="Сумма НДФЛ")
 
     created_at: datetime
