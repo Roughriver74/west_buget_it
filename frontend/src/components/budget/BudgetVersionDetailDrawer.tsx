@@ -100,7 +100,7 @@ export const BudgetVersionDetailDrawer: React.FC<BudgetVersionDetailDrawerProps>
       height="100%"
       open={open}
       onClose={onClose}
-      destroyOnClose
+      destroyOnHidden
       title={version ? `Версия бюджета v${version.version_number}` : 'Детали версии'}
       styles={{
         body: {

@@ -63,7 +63,7 @@ class EmployeeKPIBase(BaseModel):
     kpi_percentage: Optional[Decimal] = Field(None, ge=0, le=200, description="КПИ% (0-200)")
 
     # Depremium threshold
-    depremium_threshold: Decimal = Field(10.00, ge=0, le=100, description="Порог депремирования (%)")
+    depremium_threshold: Optional[Decimal] = Field(None, ge=0, le=100, description="Порог депремирования (%)")
     depremium_applied: bool = False
 
     # Bonus types
@@ -89,7 +89,7 @@ class EmployeeKPIBase(BaseModel):
     # Task complexity bonus component (NEW in Task 3.2)
     task_complexity_avg: Optional[Decimal] = Field(None, ge=1, le=10, description="Средняя сложность задач (1-10)")
     task_complexity_multiplier: Optional[Decimal] = Field(None, ge=0.5, le=2.0, description="Множитель премии по сложности")
-    task_complexity_weight: Decimal = Field(20.00, ge=0, le=100, description="Вес компонента сложности в премии (%)")
+    task_complexity_weight: Optional[Decimal] = Field(None, ge=0, le=100, description="Вес компонента сложности в премии (%)")
 
     # Complexity bonus components
     monthly_bonus_complexity: Optional[Decimal] = Field(None, ge=0, description="Компонент месячной премии по сложности")

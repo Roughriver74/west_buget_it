@@ -410,7 +410,7 @@ export default function EmployeesPage() {
 			? activeEmployees.reduce(
 					(sum, e) => sum + Number(e.base_salary || 0),
 					0
-			  ) / activeEmployees.length
+				) / activeEmployees.length
 			: 0
 
 	// Calculate effective tax rate for display
@@ -463,7 +463,7 @@ export default function EmployeesPage() {
 				return total > 0
 					? `${formatCurrency(monthly)} / ${formatCurrency(
 							quarterly
-					  )} / ${formatCurrency(annual)}`
+						)} / ${formatCurrency(annual)}`
 					: '-'
 			},
 		},

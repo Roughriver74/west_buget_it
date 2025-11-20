@@ -60,7 +60,7 @@ export const VALIDATION_RULES = {
 
   // Phone validation (flexible for Russian formats)
   PHONE: {
-    pattern: /^[\d\s\-\+\(\)]+$/,
+    pattern: /^[\d\s+()-]+$/,
     message: 'Введите корректный номер телефона',
   },
 } as const;

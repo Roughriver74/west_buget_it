@@ -11,7 +11,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
-from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions, business_operation_mappings, credit_portfolio, sync_1c, tax_rates, payroll_scenarios, modules, admin_settings  # kpi_tasks temporarily disabled - missing KPITask model
+from app.api.v1 import expenses, categories, contractors, organizations, budget, analytics, analytics_advanced, forecast, attachments, dashboards, auth, departments, audit, reports, employees, payroll, budget_planning, kpi, templates, comprehensive_report, revenue_streams, revenue_categories, revenue_actuals, revenue_plans, revenue_plan_details, customer_metrics, seasonality_coefficients, revenue_analytics, unified_import, api_tokens, external_api, invoice_processing, external_invoice_integration, founder_dashboard, bank_transactions, business_operation_mappings, credit_portfolio, sync_1c, tax_rates, payroll_scenarios, modules, admin_settings, timesheets  # kpi_tasks temporarily disabled - missing KPITask model
 from app.utils.logger import logger, log_error, log_info
 from app.middleware import (
     create_rate_limiter,
@@ -48,9 +48,28 @@ if settings.ENABLE_PROMETHEUS:
     log_info("Prometheus metrics exposed at /metrics", "Startup")
 
 # Configure CORS
+DEFAULT_DEV_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+]
+
+cors_origins = list(dict.fromkeys(settings.CORS_ORIGINS))
+
+if settings.DEBUG:
+    for origin in DEFAULT_DEV_CORS_ORIGINS:
+        if origin not in cors_origins:
+            cors_origins.append(origin)
+
+if not cors_origins:
+    cors_origins = DEFAULT_DEV_CORS_ORIGINS
+
+log_info(f"CORS origins enabled: {cors_origins}", "Startup")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -200,6 +219,7 @@ app.include_router(employees.router, prefix=f"{settings.API_PREFIX}/employees", 
 app.include_router(payroll.router, prefix=f"{settings.API_PREFIX}/payroll", tags=["Payroll"])
 app.include_router(tax_rates.router, prefix=f"{settings.API_PREFIX}/tax-rates", tags=["Tax Rates"])
 app.include_router(payroll_scenarios.router, prefix=f"{settings.API_PREFIX}/payroll-scenarios", tags=["Payroll Scenarios"])
+app.include_router(timesheets.router, prefix=f"{settings.API_PREFIX}/timesheets", tags=["Timesheets (HR Module)"])
 app.include_router(kpi.router, prefix=f"{settings.API_PREFIX}/kpi", tags=["KPI"])
 # app.include_router(kpi_tasks.router, prefix=f"{settings.API_PREFIX}/kpi/tasks", tags=["KPI Tasks"])  # Temporarily disabled - missing KPITask model
 app.include_router(templates.router, prefix=f"{settings.API_PREFIX}/templates", tags=["Templates"])

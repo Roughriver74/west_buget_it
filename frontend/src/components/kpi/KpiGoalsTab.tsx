@@ -313,7 +313,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
         onOk={handleGoalSubmit}
         okText={goalModal.editing ? 'Обновить' : 'Создать'}
         confirmLoading={createGoalMutation.isPending || updateGoalMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={goalForm} layout="vertical">
           <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
@@ -335,7 +335,10 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="weight" label="Вес цели">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} addonAfter="%" />
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={100} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
           <Form.Item name="year" label="Год" rules={[{ required: true }]}>
             <InputNumber min={2020} max={2100} style={{ width: '100%' }} />

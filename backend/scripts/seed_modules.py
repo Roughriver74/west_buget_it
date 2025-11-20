@@ -66,13 +66,22 @@ MODULES = [
         "sort_order": 5,
     },
     {
+        "code": "HR_DEPARTMENT",
+        "name": "HR Department (Timesheet)",
+        "description": "Табель учета рабочего времени, управление рабочими часами сотрудников, интеграция с расчетом ЗП",
+        "version": "1.0.0",
+        "dependencies": ["BUDGET_CORE"],
+        "icon": "ClockCircleOutlined",
+        "sort_order": 6,
+    },
+    {
         "code": "INTEGRATIONS_1C",
         "name": "1C Integration",
         "description": "Интеграция с 1С через OData, синхронизация справочников, фоновые задачи",
         "version": "1.0.0",
         "dependencies": ["BUDGET_CORE"],
         "icon": "ApiOutlined",
-        "sort_order": 6,
+        "sort_order": 7,
     },
     {
         "code": "FOUNDER_DASHBOARD",
@@ -81,7 +90,7 @@ MODULES = [
         "version": "1.0.0",
         "dependencies": ["BUDGET_CORE"],
         "icon": "DashboardOutlined",
-        "sort_order": 7,
+        "sort_order": 8,
     },
     {
         "code": "ADVANCED_ANALYTICS",
@@ -90,7 +99,7 @@ MODULES = [
         "version": "1.0.0",
         "dependencies": ["BUDGET_CORE"],
         "icon": "BarChartOutlined",
-        "sort_order": 8,
+        "sort_order": 9,
     },
     {
         "code": "MULTI_DEPARTMENT",
@@ -99,7 +108,7 @@ MODULES = [
         "version": "1.0.0",
         "dependencies": ["BUDGET_CORE"],
         "icon": "ClusterOutlined",
-        "sort_order": 9,
+        "sort_order": 10,
     },
 ]
 

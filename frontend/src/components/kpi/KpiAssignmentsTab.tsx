@@ -367,7 +367,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
         onCancel={() => setAssignmentModal({ open: false })}
         onOk={handleAssignmentSubmit}
         confirmLoading={upsertAssignmentMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
         width={600}
       >
         <Form form={assignmentForm} layout="vertical">

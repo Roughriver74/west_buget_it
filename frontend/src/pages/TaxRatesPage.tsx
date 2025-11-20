@@ -373,7 +373,7 @@ export default function TaxRatesPage() {
         onCancel={handleModalClose}
         onOk={handleSubmit}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" form={form}>
           <Form.Item

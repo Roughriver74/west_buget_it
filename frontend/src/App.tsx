@@ -71,6 +71,9 @@ const KPIAnalyticsPage = lazy(() => import('./pages/KPIAnalyticsPage'))
 const NDFLCalculatorPage = lazy(() => import('./pages/NDFLCalculatorPage'))
 const SalaryCalculatorPage = lazy(() => import('./pages/SalaryCalculatorPage'))
 
+// HR Department module (Timesheet)
+const TimesheetsGridPage = lazy(() => import('./pages/TimesheetsGridPage'))
+
 // Revenue module
 const RevenueDashboardPage = lazy(() => import('./pages/RevenueDashboardPage'))
 const RevenueStreamsPage = lazy(() => import('./pages/RevenueStreamsPage'))
@@ -398,6 +401,16 @@ function App() {
                           element={
                             <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER']}>
                               <KPIAnalyticsPage />
+                            </ProtectedRoute>
+                          }
+                        />
+
+                        {/* HR Department - Timesheets */}
+                        <Route
+                          path="/timesheets"
+                          element={
+                            <ProtectedRoute requiredRoles={['ADMIN', 'MANAGER', 'USER', 'HR']}>
+                              <TimesheetsGridPage />
                             </ProtectedRoute>
                           }
                         />

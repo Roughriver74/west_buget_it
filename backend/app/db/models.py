@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+import uuid
 from sqlalchemy import (
     Boolean,
     Column,
@@ -16,7 +17,10 @@ from sqlalchemy import (
     JSON,
     func,
     TypeDecorator,
+    CheckConstraint,
+    UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
 
@@ -815,6 +819,7 @@ class Employee(Base):
     payroll_plans = relationship("PayrollPlan", back_populates="employee")
     payroll_actuals = relationship("PayrollActual", back_populates="employee")
     salary_history = relationship("SalaryHistory", back_populates="employee", order_by="SalaryHistory.effective_date.desc()")
+    timesheets = relationship("WorkTimesheet", back_populates="employee")
 
     def __repr__(self):
         return f"<Employee {self.full_name} ({self.position})>"
@@ -1772,6 +1777,23 @@ class InvoiceProcessingStatusEnum(str, enum.Enum):
     ERROR = "ERROR"  # Ошибка обработки
     MANUAL_REVIEW = "MANUAL_REVIEW"  # Требует ручной проверки
     EXPENSE_CREATED = "EXPENSE_CREATED"  # Расход создан
+
+
+class TimesheetStatusEnum(str, enum.Enum):
+    """Enum for timesheet statuses (Статусы табеля учета рабочего времени)"""
+    DRAFT = "DRAFT"  # Черновик (можно редактировать)
+    APPROVED = "APPROVED"  # Утвержден (редактирование запрещено)
+    PAID = "PAID"  # Оплачен (финальный статус)
+
+
+class DayTypeEnum(str, enum.Enum):
+    """Enum for day types (Типы дней в табеле)"""
+    WORK = "WORK"  # Рабочий день (оплачиваемый)
+    UNPAID_LEAVE = "UNPAID_LEAVE"  # День за свой счет (неоплачиваемый отпуск)
+    SICK_LEAVE = "SICK_LEAVE"  # Больничный
+    VACATION = "VACATION"  # Оплачиваемый отпуск
+    WEEKEND = "WEEKEND"  # Выходной
+    HOLIDAY = "HOLIDAY"  # Праздник
 
 
 class RevenueForecast(Base):
@@ -2892,3 +2914,141 @@ class AdminSettings(Base):
 
     def __repr__(self):
         return f"<AdminSettings id={self.id}>"
+
+
+# ==================== TIMESHEET MODELS (HR_DEPARTMENT) ====================
+
+class WorkTimesheet(Base):
+    """
+    Табель учета рабочего времени (HR_DEPARTMENT module)
+    Один табель на сотрудника за месяц
+    """
+    __tablename__ = "work_timesheets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Сотрудник
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Период
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)
+
+    # Итоги
+    total_days_worked = Column(Integer, default=0, nullable=False)
+    total_hours_worked = Column(Numeric(6, 2), default=0, nullable=False)
+
+    # Статус
+    status = Column(Enum(TimesheetStatusEnum), default=TimesheetStatusEnum.DRAFT, nullable=False, index=True)
+
+    # Утверждение
+    approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at = Column(Date)
+
+    # Примечания
+    notes = Column(Text)
+
+    # Кэш для быстрого доступа (JSON)
+    daily_summary = Column(JSON)
+
+    # Multi-tenancy (ОБЯЗАТЕЛЬНО)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    employee = relationship("Employee", back_populates="timesheets")
+    approved_by = relationship("User", foreign_keys=[approved_by_id])
+    daily_records = relationship("DailyWorkRecord", back_populates="timesheet", cascade="all, delete-orphan")
+    department_rel = relationship("Department")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('employee_id', 'department_id', 'year', 'month', name='uq_timesheet_employee_period'),
+        CheckConstraint('year >= 2020 AND year <= 2100', name='ck_timesheet_year'),
+        CheckConstraint('month >= 1 AND month <= 12', name='ck_timesheet_month'),
+        CheckConstraint('total_days_worked >= 0 AND total_days_worked <= 31', name='ck_timesheet_days'),
+        CheckConstraint('total_hours_worked >= 0', name='ck_timesheet_hours'),
+        Index('ix_timesheet_employee_period', 'employee_id', 'year', 'month'),
+        Index('ix_timesheet_period', 'year', 'month'),
+        Index('ix_timesheet_department_period', 'department_id', 'year', 'month'),
+    )
+
+    @property
+    def can_edit(self) -> bool:
+        """Можно ли редактировать табель"""
+        return self.status == TimesheetStatusEnum.DRAFT
+
+    @property
+    def period_display(self) -> str:
+        """Отображение периода на русском"""
+        months_ru = [
+            "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+            "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+        ]
+        return f"{months_ru[self.month - 1]} {self.year}"
+
+    def __repr__(self):
+        return f"<WorkTimesheet employee={self.employee_id} period={self.year}-{self.month:02d} status={self.status}>"
+
+
+class DailyWorkRecord(Base):
+    """
+    Подневные записи табеля
+    Одна запись на день для каждого табеля
+    """
+    __tablename__ = "daily_work_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Связь с табелем
+    timesheet_id = Column(UUID(as_uuid=True), ForeignKey("work_timesheets.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Дата
+    work_date = Column(Date, nullable=False, index=True)
+
+    # Работа
+    is_working_day = Column(Boolean, default=False, nullable=False)
+    hours_worked = Column(Numeric(4, 2), default=0, nullable=False)
+
+    # Тип дня (NEW)
+    day_type = Column(Enum(DayTypeEnum), default=DayTypeEnum.WORK, nullable=False)
+
+    # Дополнительные часы
+    break_hours = Column(Numeric(3, 2), default=0)
+    overtime_hours = Column(Numeric(3, 2), default=0)
+
+    # Примечания
+    notes = Column(Text)
+
+    # Multi-tenancy (ОБЯЗАТЕЛЬНО)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    timesheet = relationship("WorkTimesheet", back_populates="daily_records")
+    department_rel = relationship("Department")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('timesheet_id', 'work_date', name='uq_daily_record_timesheet_date'),
+        CheckConstraint('hours_worked >= 0 AND hours_worked <= 24', name='ck_daily_hours'),
+        CheckConstraint('break_hours >= 0', name='ck_break_hours'),
+        CheckConstraint('overtime_hours >= 0', name='ck_overtime_hours'),
+        Index('ix_daily_record_timesheet_date', 'timesheet_id', 'work_date'),
+        Index('ix_daily_record_date', 'work_date'),
+        Index('ix_daily_record_department', 'department_id'),
+    )
+
+    @property
+    def net_hours_worked(self) -> float:
+        """Чистое время работы (без перерывов)"""
+        return float(self.hours_worked) - float(self.break_hours or 0)
+
+    def __repr__(self):
+        return f"<DailyWorkRecord date={self.work_date} hours={self.hours_worked}>"

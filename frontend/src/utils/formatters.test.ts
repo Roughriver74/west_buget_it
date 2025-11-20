@@ -19,7 +19,7 @@ describe('formatters', () => {
   it('formats currency in Russian locale', () => {
     const formatted = formatCurrency(1234.56)
     // Locale string can vary slightly, but must contain the value and currency sign/code
-    expect(formatted).toMatch(/1[\s ]?234/) // regular or non-breaking space
+    expect(formatted).toMatch(/1[\s\u00A0]?234/) // regular or non-breaking space
     expect(formatted).toMatch(/₽|RUB/)
   })
 })

@@ -16,8 +16,23 @@ export type EmployeeKPI = components['schemas']['EmployeeKPIWithGoals'] & {
   annual_bonus_complexity?: number | null
 }
 
+// Temporary extension to support legacy/front-end-only fields used in the KPI wizard
+type EmployeeKpiWizardFields = {
+  status?: string
+  bonus_base?: number | string
+  bonus_type?: string
+  monthly_bonus_multiplier?: number
+  quarterly_bonus_multiplier?: number
+  annual_bonus_multiplier?: number
+  depremium_threshold?: number
+  comment?: string
+}
+
+export type EmployeeKPIExtended = EmployeeKPI & EmployeeKpiWizardFields
 export type EmployeeKPICreate = components['schemas']['EmployeeKPICreate']
 export type EmployeeKPIUpdate = components['schemas']['EmployeeKPIUpdate']
+export type EmployeeKPICreateExtended = EmployeeKPICreate & EmployeeKpiWizardFields
+export type EmployeeKPIUpdateExtended = EmployeeKPIUpdate & EmployeeKpiWizardFields
 
 export type EmployeeKPIGoal = components['schemas']['EmployeeKPIGoalWithDetails']
 export type EmployeeKPIGoalCreate = components['schemas']['EmployeeKPIGoalCreate']
@@ -162,6 +177,42 @@ export interface BulkAssignGoalsResponse {
     reason?: string
   }>
   errors: string[]
+}
+
+// ============ KPI Dashboard Types ============
+
+export interface KPIDashboardData {
+  overview: {
+    total_kpis: number
+    avg_kpi_percentage: number
+    total_bonuses: number
+    unique_employees: number
+    total_goals: number
+    active_goals: number
+  }
+  status_distribution: Array<{
+    status: string
+    count: number
+    percentage: number
+  }>
+  monthly_trends: Array<{
+    month: number
+    month_name: string
+    avg_kpi: number
+    employee_count: number
+    total_bonus: number
+  }>
+  top_employees: Array<{
+    employee_id: number
+    employee_name: string
+    avg_kpi: number
+    total_bonus: number
+    kpi_count: number
+  }>
+  filters: {
+    year: number
+    department_id: number | null
+  }
 }
 
 export const kpiApi = {
@@ -412,6 +463,16 @@ export const kpiApi = {
       'kpi/employee-kpi-goals/bulk-assign',
       request
     )
+    return data
+  },
+
+  // ============ KPI Dashboard ============
+
+  getDashboardData: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<KPIDashboardData> => {
+    const { data } = await apiClient.get<KPIDashboardData>('kpi/analytics/dashboard', { params })
     return data
   },
 }

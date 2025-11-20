@@ -179,7 +179,7 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
         </Button>,
       ]}
       width={1000}
-      destroyOnClose
+      destroyOnHidden
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Employee and Period Info */}

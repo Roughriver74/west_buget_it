@@ -744,41 +744,6 @@ class ExcelExporter:
                 cell_weekday.fill = gray_fill
                 cell_date.fill = gray_fill
 
-        # Группируем прогнозы по уникальной комбинации
-        grouped_forecasts = {}
-        for forecast in forecasts:
-            category = forecast.get('category') or {}
-            contractor = forecast.get('contractor') or {}
-            organization = forecast.get('organization') or {}
-
-            category_name = category.get('name', 'Без категории')
-            contractor_name = contractor.get('name', '')
-            org_name = organization.get('name', '')
-            comment = forecast.get('comment', '')
-
-            key = (category_name, org_name, contractor_name)
-
-            if key not in grouped_forecasts:
-                grouped_forecasts[key] = {
-                    'category': category_name,
-                    'organization': org_name,
-                    'contractor': contractor_name,
-                    'comment': comment,
-                    'amounts_by_day': {}
-                }
-
-            # Добавляем сумму к конкретному дню
-            forecast_date = forecast.get('date')
-            if forecast_date:
-                if isinstance(forecast_date, str):
-                    forecast_date = datetime.fromisoformat(forecast_date.replace('Z', '+00:00')).date()
-                amount = float(forecast.get('amount', 0))
-                day = forecast_date.day
-
-                if day not in grouped_forecasts[key]['amounts_by_day']:
-                    grouped_forecasts[key]['amounts_by_day'][day] = 0
-                grouped_forecasts[key]['amounts_by_day'][day] += amount
-
         # Структура шаблона:
         # Строка 3: дни недели (пн, вт, ср...)
         # Строка 4: даты (01/10/25, 02/10/25...)
@@ -797,39 +762,65 @@ class ExcelExporter:
             for col in range(8, 8 + num_days):
                 ws.cell(row=row, column=col).value = None
 
+        # Формируем список прогнозов в порядке, близком к UI (по дате, затем по категории/контрагенту)
+        def _to_date(value):
+            if value is None:
+                return None
+            if isinstance(value, str):
+                return datetime.fromisoformat(value.replace('Z', '+00:00')).date()
+            return value
+
+        sorted_forecasts = sorted(
+            forecasts,
+            key=lambda f: (
+                _to_date(f.get('date')) or date.min,
+                (f.get('category') or {}).get('name') or '',
+                (f.get('organization') or {}).get('name') or '',
+                (f.get('contractor') or {}).get('name') or '',
+                f.get('id', 0),
+            )
+        )
+
         # Заполняем данные прогноза
         current_row = data_start_row
         row_number = 1
 
-        for key, data in sorted(grouped_forecasts.items()):
+        for forecast in sorted_forecasts:
+            category = forecast.get('category') or {}
+            contractor = forecast.get('contractor') or {}
+            organization = forecast.get('organization') or {}
+            comment = forecast.get('comment', '')
+            forecast_date = _to_date(forecast.get('date'))
+            amount = float(forecast.get('amount', 0) or 0)
+
             # Номер п/п (колонка B)
             ws.cell(row=current_row, column=2, value=row_number)
 
             # Статья ДДС (колонка C)
-            ws.cell(row=current_row, column=3, value=data['category'])
+            ws.cell(row=current_row, column=3, value=category.get('name', 'Без категории'))
 
             # ЮЛ (колонка D)
-            ws.cell(row=current_row, column=4, value=data['organization'])
+            ws.cell(row=current_row, column=4, value=organization.get('name', ''))
 
             # Контрагент (колонка E)
-            ws.cell(row=current_row, column=5, value=data['contractor'])
+            ws.cell(row=current_row, column=5, value=contractor.get('name', ''))
 
             # Договор (колонка F) - оставляем пустым
             ws.cell(row=current_row, column=6, value='')
 
             # Комментарии (колонка G)
-            ws.cell(row=current_row, column=7, value=data['comment'])
+            ws.cell(row=current_row, column=7, value=comment)
 
-            # Заполняем суммы по дням (начиная с колонки H = 8)
+            # Очищаем все ячейки дней на случай остатков от предыдущих выгрузок
             for day in range(1, num_days + 1):
-                col = 7 + day  # H=8, I=9, J=10, ...
-                amount = data['amounts_by_day'].get(day, 0)
+                ws.cell(row=current_row, column=7 + day, value=None)
 
-                if amount > 0:
-                    ws.cell(row=current_row, column=col, value=amount)
+            if forecast_date:
+                day = min(max(forecast_date.day, 1), num_days)
+                col = 7 + day
+                ws.cell(row=current_row, column=col, value=amount if amount != 0 else None)
+                if amount:
                     ws.cell(row=current_row, column=col).number_format = '#,##0.00'
-                else:
-                    ws.cell(row=current_row, column=col, value=None)
 
             current_row += 1
             row_number += 1

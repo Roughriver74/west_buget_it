@@ -329,15 +329,24 @@ async def update_employee(
         salary_type = update_data.get('salary_type', employee.salary_type)
         ndfl_rate = update_data.get('ndfl_rate', employee.ndfl_rate)
 
-        # Recalculate
-        salary_calc_result = SalaryCalculator.calculate_salaries(
-            base_salary=base_salary,
-            salary_type=salary_type,
-            ndfl_rate=ndfl_rate
-        )
-        update_data['base_salary_gross'] = salary_calc_result['base_salary_gross']
-        update_data['base_salary_net'] = salary_calc_result['base_salary_net']
-        update_data['ndfl_amount'] = salary_calc_result['ndfl_amount']
+        # Skip salary calculation if base_salary is 0 or employee is fired
+        # SalaryCalculator requires positive salary values
+        is_fired = update_data.get('status') == EmployeeStatusEnum.FIRED or employee.status == EmployeeStatusEnum.FIRED
+        if base_salary > 0 and not is_fired:
+            # Recalculate
+            salary_calc_result = SalaryCalculator.calculate_salaries(
+                base_salary=base_salary,
+                salary_type=salary_type,
+                ndfl_rate=ndfl_rate
+            )
+            update_data['base_salary_gross'] = salary_calc_result['base_salary_gross']
+            update_data['base_salary_net'] = salary_calc_result['base_salary_net']
+            update_data['ndfl_amount'] = salary_calc_result['ndfl_amount']
+        else:
+            # For fired employees or zero salary, set all to zero
+            update_data['base_salary_gross'] = 0
+            update_data['base_salary_net'] = 0
+            update_data['ndfl_amount'] = 0
 
     for field, value in update_data.items():
         setattr(employee, field, value)

@@ -226,7 +226,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
       onClose={onClose}
       open={open}
       width={900}
-      destroyOnClose
+      destroyOnHidden
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Employee Info */}

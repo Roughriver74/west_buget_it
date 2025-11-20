@@ -134,7 +134,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
       onCancel={onClose}
       width={1200}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       {!shouldFetch ? (
         <Alert message="Выберите две версии для сравнения" type="info" showIcon />

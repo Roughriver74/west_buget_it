@@ -13,9 +13,18 @@ import {
   Divider,
   Typography,
   Popconfirm,
+  Tooltip,
+  Alert,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { UploadOutlined, CalculatorOutlined, SyncOutlined } from '@ant-design/icons'
+import {
+  UploadOutlined,
+  CalculatorOutlined,
+  SyncOutlined,
+  QuestionCircleOutlined,
+  FileTextOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
@@ -31,6 +40,8 @@ import { employeeAPI } from '@/api/payroll'
 import type { Employee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
 import ImportKPIModal from './ImportKPIModal'
+import { EmployeeKpiWizard } from './EmployeeKpiWizard'
+import { KpiWorkflowDiagram } from './KpiWorkflowDiagram'
 
 const { Option } = Select
 const { Text } = Typography
@@ -69,6 +80,9 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
   })
 
   const [importModalVisible, setImportModalVisible] = useState(false)
+  const [workflowModalVisible, setWorkflowModalVisible] = useState(false)
+  const [wizardModalVisible, setWizardModalVisible] = useState(false)
+  const [wizardEditingKpi, setWizardEditingKpi] = useState<EmployeeKPI | undefined>(undefined)
 
   const [employeeKpiForm] = Form.useForm<EmployeeKPICreate | EmployeeKPIUpdate>()
 
@@ -263,6 +277,18 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
     recalculateKPIMutation.mutate()
   }
 
+  const handleOpenWizard = (record?: EmployeeKPI) => {
+    setWizardEditingKpi(record)
+    setWizardModalVisible(true)
+  }
+
+  const handleWizardClose = () => {
+    setWizardModalVisible(false)
+    setWizardEditingKpi(undefined)
+    queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
+    queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
+  }
+
   const employeeColumns: ColumnsType<EmployeeKPI> = [
     {
       title: 'Сотрудник',
@@ -365,13 +391,25 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
       <Card
         title="Показатели"
         extra={
-          <Space>
-            <Button
-              icon={<UploadOutlined />}
-              onClick={handleImportClick}
-            >
-              Импорт из Excel
-            </Button>
+          <Space wrap>
+            <Tooltip title="Показать жизненный цикл KPI и доступные статусы">
+              <Button
+                icon={<FileTextOutlined />}
+                onClick={() => setWorkflowModalVisible(true)}
+              >
+                Workflow
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Загрузить KPI из Excel файла">
+              <Button
+                icon={<UploadOutlined />}
+                onClick={handleImportClick}
+              >
+                Импорт из Excel
+              </Button>
+            </Tooltip>
+
             <Popconfirm
               title="Пересчитать KPI%?"
               description={`Пересчитать KPI% для всех сотрудников отдела за ${currentYear} год на основе взвешенных достижений по целям?`}
@@ -379,16 +417,31 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
               okText="Да"
               cancelText="Отмена"
             >
-              <Button
-                icon={<CalculatorOutlined />}
-                loading={recalculateKPIMutation.isPending}
-              >
-                Пересчитать KPI
-              </Button>
+              <Tooltip title="Автоматически пересчитать KPI% на основе назначенных целей">
+                <Button
+                  icon={<CalculatorOutlined />}
+                  loading={recalculateKPIMutation.isPending}
+                >
+                  Пересчитать KPI
+                </Button>
+              </Tooltip>
             </Popconfirm>
-            <Button type="primary" onClick={() => onEditEmployeeKpi()}>
-              Добавить KPI
-            </Button>
+
+            <Tooltip title="Создать KPI через пошаговый мастер (рекомендуется)">
+              <Button
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                onClick={() => handleOpenWizard()}
+              >
+                Мастер создания
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Быстрое добавление KPI (для опытных пользователей)">
+              <Button onClick={() => onEditEmployeeKpi()}>
+                Добавить KPI
+              </Button>
+            </Tooltip>
           </Space>
         }
       >
@@ -408,9 +461,17 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
         onCancel={() => setKpiModal({ open: false })}
         onOk={handleEmployeeKpiSubmit}
         confirmLoading={upsertEmployeeKpiMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
         width={600}
       >
+        <Alert
+          message="Быстрый режим"
+          description="Для пошагового создания с проверками используйте кнопку 'Мастер создания'"
+          type="info"
+          showIcon
+          icon={<QuestionCircleOutlined />}
+          style={{ marginBottom: 16 }}
+        />
         <Form form={employeeKpiForm} layout="vertical">
           <Form.Item name="employee_id" label="Сотрудник" rules={[{ required: true }]}>
             <Select
@@ -445,16 +506,47 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="kpi_percentage" label="КПИ %">
-            <InputNumber min={0} max={200} style={{ width: '100%' }} addonAfter="%" />
+          <Form.Item
+            name="kpi_percentage"
+            label={
+              <Space>
+                КПИ %
+                <Tooltip title="Процент выполнения KPI (0-200%). Можно оставить пустым и пересчитать автоматически на основе целей.">
+                  <QuestionCircleOutlined style={{ color: '#1890ff' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={200} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
           <Divider />
-          <Form.Item name="monthly_bonus_base" label="База (месяц)" initialValue={0}>
+          <Form.Item
+            name="monthly_bonus_base"
+            label={
+              <Space>
+                База (месяц)
+                <Tooltip title="Базовая сумма месячного бонуса в рублях">
+                  <QuestionCircleOutlined style={{ color: '#1890ff' }} />
+                </Tooltip>
+              </Space>
+            }
+            initialValue={0}
+          >
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item
             name="monthly_bonus_type"
-            label="Тип бонуса (месяц)"
+            label={
+              <Space>
+                Тип бонуса (месяц)
+                <Tooltip title="PERFORMANCE_BASED: зависит от KPI%. FIXED: фиксированная сумма. MIXED: комбинация обоих.">
+                  <QuestionCircleOutlined style={{ color: '#1890ff' }} />
+                </Tooltip>
+              </Space>
+            }
             initialValue={BONUS_TYPE_OPTIONS[0]}
           >
             <Select>
@@ -465,8 +557,21 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="monthly_bonus_fixed_part" label="Фиксированная часть (месяц)">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} addonAfter="%" />
+          <Form.Item
+            name="monthly_bonus_fixed_part"
+            label={
+              <Space>
+                Фиксированная часть (месяц)
+                <Tooltip title="Для типа MIXED: процент от базы, который выплачивается независимо от KPI% (0-100%)">
+                  <QuestionCircleOutlined style={{ color: '#1890ff' }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={100} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
           <Divider />
           <Form.Item name="quarterly_bonus_base" label="База (квартал)" initialValue={0}>
@@ -486,7 +591,10 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
             </Select>
           </Form.Item>
           <Form.Item name="quarterly_bonus_fixed_part" label="Фиксированная часть (квартал)">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} addonAfter="%" />
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={100} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
           <Divider />
           <Form.Item name="annual_bonus_base" label="База (год)" initialValue={0}>
@@ -506,7 +614,10 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
             </Select>
           </Form.Item>
           <Form.Item name="annual_bonus_fixed_part" label="Фиксированная часть (год)">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} addonAfter="%" />
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={100} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
         </Form>
       </Modal>
@@ -518,6 +629,27 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
           onCancel={() => setImportModalVisible(false)}
         />
       )}
+
+      {/* Workflow Diagram Modal */}
+      <Modal
+        title="Workflow: Процесс работы с KPI"
+        open={workflowModalVisible}
+        onCancel={() => setWorkflowModalVisible(false)}
+        footer={null}
+        width={900}
+        destroyOnHidden
+      >
+        <KpiWorkflowDiagram compact={false} />
+      </Modal>
+
+      {/* KPI Wizard Modal */}
+      <EmployeeKpiWizard
+        open={wizardModalVisible}
+        onClose={handleWizardClose}
+        editingKpi={wizardEditingKpi}
+        departmentId={departmentId}
+        defaultYear={currentYear}
+      />
     </>
   )
 }

@@ -3077,3 +3077,196 @@ def apply_template_to_employees(
     )
 
 
+# ============ Dashboard Analytics ============
+
+@router.get("/analytics/dashboard")
+async def get_kpi_dashboard(
+    year: int = Query(..., description="Год для анализа"),
+    department_id: Optional[int] = Query(None, description="ID отдела (опционально для ADMIN)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Комплексный endpoint для KPI Dashboard.
+
+    Возвращает агрегированные данные для визуализации:
+    - Общая статистика (средний КПИ%, количество сотрудников, бонусы)
+    - Распределение по статусам (DRAFT, UNDER_REVIEW, APPROVED, REJECTED)
+    - Динамика КПИ по месяцам (для графика тренда)
+    - Топ-10 сотрудников по КПИ%
+    - Статистика по целям
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Определяем department_id для фильтрации
+    target_department_id = department_id
+    if current_user.role == UserRoleEnum.USER:
+        # USER видит только свой отдел
+        if not current_user.department_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no assigned department"
+            )
+        target_department_id = current_user.department_id
+    elif current_user.role == UserRoleEnum.MANAGER:
+        # MANAGER видит только свой отдел
+        target_department_id = current_user.department_id
+
+    # Base query для EmployeeKPI
+    kpi_query = db.query(EmployeeKPI).filter(EmployeeKPI.year == year)
+    if target_department_id:
+        kpi_query = kpi_query.filter(EmployeeKPI.department_id == target_department_id)
+
+    # 1. Общая статистика
+    total_kpis = kpi_query.count()
+
+    avg_kpi = db.query(func.avg(EmployeeKPI.kpi_percentage)).filter(
+        EmployeeKPI.year == year,
+        EmployeeKPI.kpi_percentage.isnot(None)
+    )
+    if target_department_id:
+        avg_kpi = avg_kpi.filter(EmployeeKPI.department_id == target_department_id)
+    avg_kpi_value = avg_kpi.scalar() or 0
+
+    total_bonuses = db.query(
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        )
+    ).filter(EmployeeKPI.year == year)
+    if target_department_id:
+        total_bonuses = total_bonuses.filter(EmployeeKPI.department_id == target_department_id)
+    total_bonuses_value = total_bonuses.scalar() or 0
+
+    unique_employees = db.query(func.count(func.distinct(EmployeeKPI.employee_id))).filter(
+        EmployeeKPI.year == year
+    )
+    if target_department_id:
+        unique_employees = unique_employees.filter(EmployeeKPI.department_id == target_department_id)
+    unique_employees_count = unique_employees.scalar() or 0
+
+    # 2. Распределение по статусам
+    status_distribution = db.query(
+        EmployeeKPI.status,
+        func.count(EmployeeKPI.id).label('count')
+    ).filter(EmployeeKPI.year == year)
+    if target_department_id:
+        status_distribution = status_distribution.filter(EmployeeKPI.department_id == target_department_id)
+    status_distribution = status_distribution.group_by(EmployeeKPI.status).all()
+
+    status_stats = {
+        'DRAFT': 0,
+        'UNDER_REVIEW': 0,
+        'APPROVED': 0,
+        'REJECTED': 0
+    }
+    for status_item in status_distribution:
+        status_stats[status_item.status] = status_item.count
+
+    # 3. Динамика КПИ по месяцам (для линейного графика)
+    monthly_trends = db.query(
+        EmployeeKPI.month,
+        func.avg(EmployeeKPI.kpi_percentage).label('avg_kpi'),
+        func.count(func.distinct(EmployeeKPI.employee_id)).label('employee_count'),
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        ).label('total_bonus')
+    ).filter(
+        EmployeeKPI.year == year,
+        EmployeeKPI.kpi_percentage.isnot(None)
+    )
+    if target_department_id:
+        monthly_trends = monthly_trends.filter(EmployeeKPI.department_id == target_department_id)
+    monthly_trends = monthly_trends.group_by(EmployeeKPI.month).order_by(EmployeeKPI.month).all()
+
+    trends_data = [
+        {
+            'month': trend.month,
+            'month_name': ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн',
+                          'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'][trend.month - 1],
+            'avg_kpi': float(trend.avg_kpi or 0),
+            'employee_count': trend.employee_count,
+            'total_bonus': float(trend.total_bonus or 0)
+        }
+        for trend in monthly_trends
+    ]
+
+    # 4. Топ-10 сотрудников по среднему КПИ%
+    top_employees_query = db.query(
+        Employee.id,
+        Employee.full_name,
+        func.avg(EmployeeKPI.kpi_percentage).label('avg_kpi'),
+        func.count(EmployeeKPI.id).label('kpi_count'),
+        func.sum(
+            EmployeeKPI.monthly_bonus_calculated +
+            EmployeeKPI.quarterly_bonus_calculated +
+            EmployeeKPI.annual_bonus_calculated
+        ).label('total_bonus')
+    ).join(
+        EmployeeKPI, Employee.id == EmployeeKPI.employee_id
+    ).filter(
+        EmployeeKPI.year == year,
+        EmployeeKPI.kpi_percentage.isnot(None),
+        EmployeeKPI.status == EmployeeKPIStatusEnum.APPROVED
+    )
+    if target_department_id:
+        top_employees_query = top_employees_query.filter(Employee.department_id == target_department_id)
+
+    top_employees = top_employees_query.group_by(
+        Employee.id, Employee.full_name
+    ).order_by(
+        func.avg(EmployeeKPI.kpi_percentage).desc()
+    ).limit(10).all()
+
+    top_employees_data = [
+        {
+            'employee_id': emp.id,
+            'employee_name': emp.full_name,
+            'avg_kpi': float(emp.avg_kpi or 0),
+            'kpi_count': emp.kpi_count,
+            'total_bonus': float(emp.total_bonus or 0)
+        }
+        for emp in top_employees
+    ]
+
+    # 5. Статистика по целям
+    total_goals_query = db.query(func.count(func.distinct(KPIGoal.id)))
+    if target_department_id:
+        total_goals_query = total_goals_query.filter(KPIGoal.department_id == target_department_id)
+    total_goals = total_goals_query.scalar() or 0
+
+    active_goals_query = db.query(func.count(func.distinct(KPIGoal.id))).filter(
+        KPIGoal.is_active == True
+    )
+    if target_department_id:
+        active_goals_query = active_goals_query.filter(KPIGoal.department_id == target_department_id)
+    active_goals = active_goals_query.scalar() or 0
+
+    # Формируем response
+    dashboard_data = {
+        'overview': {
+            'total_kpis': total_kpis,
+            'avg_kpi_percentage': round(float(avg_kpi_value), 2),
+            'total_bonuses': round(float(total_bonuses_value), 2),
+            'unique_employees': unique_employees_count,
+            'total_goals': total_goals,
+            'active_goals': active_goals
+        },
+        'status_distribution': status_stats,
+        'monthly_trends': trends_data,
+        'top_employees': top_employees_data,
+        'filters': {
+            'year': year,
+            'department_id': target_department_id
+        }
+    }
+
+    logger.info(f"Dashboard data generated for year {year}, department {target_department_id}")
+
+    return dashboard_data
+
+
