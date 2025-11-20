@@ -331,7 +331,8 @@ class InvoiceTo1CConverter:
         self,
         invoice: ProcessedInvoice,
         upload_attachment: bool = True,
-        user_comment: Optional[str] = None
+        user_comment: Optional[str] = None,
+        current_user = None
     ) -> str:
         """
         Создать заявку на расход в 1С из invoice
@@ -340,6 +341,7 @@ class InvoiceTo1CConverter:
             invoice: Обработанный invoice
             upload_attachment: Загружать ли прикрепленный PDF файл (если есть)
             user_comment: Комментарий пользователя для заявки
+            current_user: Текущий пользователь (для добавления ФИО в комментарий)
 
         Returns:
             GUID созданной заявки в 1С (Ref_Key)
@@ -374,10 +376,18 @@ class InvoiceTo1CConverter:
         if vat_amount > 0:
             payment_purpose += f"\nВ т.ч. НДС (20%) {vat_amount} руб."
 
+        # Формирование комментария с ФИО пользователя
+        user_full_name = "Система"
+        if current_user:
+            user_full_name = current_user.full_name or current_user.email or "Система"
+
+        base_comment = user_comment or f"Создано автоматически из счета №{invoice.invoice_number}"
+        full_comment = f"{user_full_name}: {base_comment}"
+
         expense_request_data = {
             # Основные поля
             "Date": invoice.invoice_date.isoformat() + "T00:00:00",
-            "Posted": False,
+            "Posted": True,  # Провести документ автоматически
             "Организация_Key": validation_result.organization_guid,
             "Статус": "НеСогласована",
             "ХозяйственнаяОперация": "ОплатаПоставщику",
@@ -415,8 +425,8 @@ class InvoiceTo1CConverter:
             "СтатьяАктивовПассивов_Key": self.EMPTY_GUID,
             "ВариантОплаты": "ПредоплатаДоПоступления",
 
-            # Комментарий
-            "Комментарий": user_comment or f"Создано автоматически из счета №{invoice.invoice_number}",
+            # Комментарий (с ФИО пользователя в начале)
+            "Комментарий": full_comment,
             "ФормаОплатыЗаявки": "",
 
             # Табличная часть РасшифровкаПлатежа
@@ -455,33 +465,49 @@ class InvoiceTo1CConverter:
 
             logger.debug(f"Expense request created in 1C with Ref_Key: {ref_key}")
 
-            # 4. (Опционально) Загрузка файла invoice
-            # ВРЕМЕННО ОТКЛЮЧЕНО: Загрузка файлов в 1С через OData не работает
-            # из-за ограничений бизнес-логики 1С (см. docs/1C_FILE_UPLOAD_RESEARCH_SUMMARY.md)
-            # Раскомментировать после настройки прав OData администратором 1С
-            #
-            # if upload_attachment and invoice.file_path:
-            #     try:
-            #         # Прочитать файл
-            #         with open(invoice.file_path, 'rb') as f:
-            #             file_content = f.read()
-            #
-            #         # Загрузить в 1С
-            #         attachment_result = self.odata_client.upload_attachment_base64(
-            #             file_content=file_content,
-            #             filename=invoice.file_name or f"invoice_{invoice.id}.pdf",
-            #             owner_guid=ref_key
-            #         )
-            #
-            #         if attachment_result:
-            #             logger.debug(f"Attachment uploaded successfully to 1C")
-            #         else:
-            #             logger.warning(f"Failed to upload attachment to 1C (non-critical)")
-            #
-            #     except Exception as e:
-            #         logger.warning(f"Failed to upload attachment: {e} (non-critical)", exc_info=True)
+            # 4. Загрузка файла invoice как прикрепленного файла
+            if upload_attachment and invoice.file_path:
+                try:
+                    import os
+                    from pathlib import Path
 
-            logger.info(f"File attachment upload to 1C is temporarily disabled (see docs/1C_FILE_UPLOAD_RESEARCH_SUMMARY.md)")
+                    # Проверка существования файла
+                    file_path = Path(invoice.file_path)
+                    if not file_path.exists():
+                        logger.warning(f"Invoice file not found: {invoice.file_path}, skipping attachment upload")
+                    else:
+                        # Прочитать файл
+                        with open(file_path, 'rb') as f:
+                            file_content = f.read()
+
+                        # Определить имя файла и расширение
+                        original_filename = invoice.original_filename or file_path.name
+                        file_extension = file_path.suffix.lstrip('.')  # .pdf -> pdf
+
+                        logger.info(f"Uploading attachment to 1C: {original_filename} ({len(file_content)} bytes)")
+
+                        # Загрузить в 1С используя правильный endpoint
+                        attachment_result = self.odata_client.upload_attachment_to_expense_request(
+                            file_content=file_content,
+                            filename=original_filename,
+                            owner_guid=ref_key,
+                            file_extension=file_extension
+                        )
+
+                        if attachment_result:
+                            logger.info(f"✅ Attachment uploaded successfully to 1C expense request")
+                        else:
+                            logger.warning(f"⚠️ Failed to upload attachment to 1C (non-critical)")
+
+                except FileNotFoundError:
+                    logger.warning(f"Invoice file not found: {invoice.file_path}, skipping attachment upload")
+                except Exception as e:
+                    logger.warning(f"Failed to upload attachment: {e} (non-critical, continuing)", exc_info=True)
+            else:
+                if not upload_attachment:
+                    logger.debug("Attachment upload disabled by parameter")
+                elif not invoice.file_path:
+                    logger.debug("No file path in invoice, skipping attachment upload")
 
             # 5. Обновить invoice
             invoice.external_id_1c = ref_key

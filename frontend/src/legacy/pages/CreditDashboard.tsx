@@ -93,7 +93,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
     [debouncedFilters]
   )
 
-  // Backend API limits increased to 50000 for all endpoints
+  // Backend API limits set to 50000 for comprehensive financial data
   const limitBase = 50000
 
   const receiptParams = useMemo<ReceiptQueryParams>(() => {
@@ -132,7 +132,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
 
   const expenseDetailsQuery = useQuery({
     queryKey: ['legacy-dashboard', 'expense-details', departmentId],
-    queryFn: () => expenseDetailsAPI.getAll({ limit: 50000, department_id: departmentId }),
+    queryFn: () => expenseDetailsAPI.getAll({ limit: limitBase, department_id: departmentId }),
     placeholderData: keepPreviousData,
     staleTime: 10 * 60 * 1000,
     enabled: Boolean(departmentId),
