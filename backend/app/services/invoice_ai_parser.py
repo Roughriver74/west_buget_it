@@ -8,23 +8,42 @@ from typing import Optional, Dict, Any
 from loguru import logger
 from datetime import datetime
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.schemas.invoice_processing import ParsedInvoiceData, SupplierData, BuyerData, InvoiceItem
+from app.services.admin_settings_service import AdminSettingsService
 
 
 class InvoiceAIParser:
     """Сервис извлечения структурированных данных из текста счета через AI"""
 
-    def __init__(self):
-        if not settings.VSEGPT_API_KEY:
-            raise ValueError("VSEGPT_API_KEY не указан в настройках. Проверьте .env файл.")
+    def __init__(self, db: Optional[Session] = None):
+        """
+        Initialize AI Parser with VseGPT configuration
+
+        Args:
+            db: Database session (optional) - if provided, reads config from DB, otherwise uses .env
+        """
+        # Get config from DB or fallback to .env
+        if db:
+            config = AdminSettingsService.get_vsegpt_config(db)
+            api_key = config["api_key"]
+            base_url = config["base_url"]
+            model = config["model"]
+        else:
+            api_key = settings.VSEGPT_API_KEY
+            base_url = settings.VSEGPT_BASE_URL
+            model = settings.VSEGPT_MODEL
+
+        if not api_key:
+            raise ValueError("VSEGPT_API_KEY не указан. Добавьте токен в настройках администратора или в .env файл.")
 
         self.client = OpenAI(
-            api_key=settings.VSEGPT_API_KEY,
-            base_url=settings.VSEGPT_BASE_URL
+            api_key=api_key,
+            base_url=base_url
         )
-        self.model = settings.VSEGPT_MODEL
+        self.model = model
 
     def parse_invoice(self, ocr_text: str, filename: str = "") -> ParsedInvoiceData:
         """

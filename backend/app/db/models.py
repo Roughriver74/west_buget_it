@@ -2874,3 +2874,53 @@ class ModuleEvent(Base):
 
     def __repr__(self):
         return f"<ModuleEvent {self.event_type} org={self.organization_id} module={self.module_id}>"
+
+
+# ==================== Admin Settings (Singleton) ====================
+
+class AdminSettings(Base):
+    """
+    Глобальные настройки администратора (singleton)
+    Хранятся в БД и не теряются после перезапуска
+    """
+    __tablename__ = "admin_settings"
+
+    id = Column(Integer, primary_key=True)  # Всегда = 1 (singleton)
+
+    # Основные настройки
+    app_name = Column(String(255), nullable=True)
+
+    # 1C OData
+    odata_url = Column(String(500), nullable=True)
+    odata_username = Column(String(255), nullable=True)
+    odata_password = Column(String(255), nullable=True)
+    odata_custom_auth_token = Column(Text, nullable=True)
+
+    # VseGPT (AI для обработки счетов)
+    vsegpt_api_key = Column(String(500), nullable=True)
+    vsegpt_base_url = Column(String(500), nullable=True)
+    vsegpt_model = Column(String(255), nullable=True)
+
+    # Credit Portfolio FTP
+    credit_portfolio_ftp_host = Column(String(255), nullable=True)
+    credit_portfolio_ftp_user = Column(String(255), nullable=True)
+    credit_portfolio_ftp_password = Column(String(255), nullable=True)
+    credit_portfolio_ftp_remote_dir = Column(String(500), nullable=True)
+    credit_portfolio_ftp_local_dir = Column(String(500), nullable=True)
+
+    # Scheduler настройки
+    scheduler_enabled = Column(Boolean, default=True, nullable=False)
+    credit_portfolio_import_enabled = Column(Boolean, default=False, nullable=False)
+    credit_portfolio_import_hour = Column(Integer, default=2, nullable=False)
+    credit_portfolio_import_minute = Column(Integer, default=0, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    updated_by_rel = relationship("User")
+
+    def __repr__(self):
+        return f"<AdminSettings id={self.id}>"

@@ -35,7 +35,7 @@ class InvoiceProcessorService:
     def __init__(self, db: Session):
         self.db = db
         self.ocr_service = InvoiceOCRService()
-        self.ai_parser = InvoiceAIParser()
+        self.ai_parser = InvoiceAIParser(db=db)  # Pass db to read VseGPT config from admin_settings
 
     async def create_invoice_record(
         self,
