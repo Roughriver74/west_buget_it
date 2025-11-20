@@ -53,13 +53,11 @@ def test_create_expense_request_with_attachment(with_vat=True):
         total_amount = 2000
         vat_amount = 333
         amount_without_vat = 1667
-        vat_treatment = "ОблагаетсяНДС"
         payment_purpose = f"Тестовый платеж с прикреплением файла (С НДС)\nВ т.ч. НДС (20%) {vat_amount} руб."
     else:
         total_amount = 2000
         vat_amount = 0
         amount_without_vat = 2000
-        vat_treatment = "ПродажаНеОблагаетсяНДС"
         payment_purpose = "Тестовый платеж с прикреплением файла (БЕЗ НДС)"
 
     test_data = {
@@ -74,16 +72,16 @@ def test_create_expense_request_with_attachment(with_vat=True):
         "СуммаДокумента": total_amount,
         "Валюта_Key": "f04b98ee-b430-11ea-a43c-b42e994e04d3",  # RUB
 
-        # Формы оплаты (безналичная для счетов)
-        "ФормаОплатыНаличная": False,
+        # Формы оплаты (ОБЕ формы true, как в рабочих заявках 1С)
+        "ФормаОплатыНаличная": True,
         "ФормаОплатыБезналичная": True,
         "ФормаОплатыПлатежнаяКарта": False,
 
-        # НДС
-        "НалогообложениеНДС": vat_treatment,
+        # НДС (пустая строка, как в 1С)
+        "НалогообложениеНДС": "",
 
-        # Бюджет
-        "вс_ЕстьСвободныйБюджетПоПлану": "Есть",
+        # Бюджет (пустая строка, как в 1С)
+        "вс_ЕстьСвободныйБюджетПоПлану": "",
 
         # Назначение и дата платежа
         "НазначениеПлатежа": payment_purpose,
@@ -135,8 +133,7 @@ def test_create_expense_request_with_attachment(with_vat=True):
     logger.info(f"   Has VAT: {'Да' if with_vat else 'Нет'}")
     logger.info(f"   VAT amount: {vat_amount} руб.")
     logger.info(f"   Amount without VAT: {amount_without_vat} руб.")
-    logger.info(f"   VAT treatment: {vat_treatment}")
-    logger.info(f"   Payment method: Безналичная")
+    logger.info(f"   Payment method: Наличная + Безналичная (оба)")
 
     # 3. Создать заявку
     try:
@@ -193,9 +190,8 @@ def test_create_expense_request_with_attachment(with_vat=True):
     logger.info("2. Документ проведен (Posted=true)")
     logger.info("3. Комментарий содержит ФИО пользователя в начале")
     logger.info("4. Файл прикреплен к заявке")
-    logger.info(f"5. НДС: {vat_treatment} ({vat_amount} руб.)")
-    logger.info("6. Форма оплаты: Безналичная")
-    logger.info("7. Бюджет: Есть свободный")
+    logger.info(f"5. НДС: СуммаНДС={vat_amount} руб., СуммаБезНДС={amount_without_vat} руб.")
+    logger.info("6. Форма оплаты: Наличная + Безналичная (обе)")
 
     return True
 

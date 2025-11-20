@@ -376,12 +376,10 @@ class InvoiceTo1CConverter:
             # Счет с НДС
             vat_amount = int(invoice.vat_amount)
             amount_without_vat = amount_int - vat_amount
-            vat_treatment = "ОблагаетсяНДС"  # Или стандартное значение для 1С
         else:
             # Счет без НДС
             vat_amount = 0
             amount_without_vat = amount_int
-            vat_treatment = "ПродажаНеОблагаетсяНДС"
 
         # Формирование назначения платежа
         payment_purpose = invoice.payment_purpose or f"Оплата по счету №{invoice.invoice_number} от {invoice.invoice_date.strftime('%d.%m.%Y')}"
@@ -404,8 +402,7 @@ class InvoiceTo1CConverter:
             f"   Has VAT: {'Да' if has_vat else 'Нет'}\n"
             f"   VAT amount: {vat_amount} руб.\n"
             f"   Amount without VAT: {amount_without_vat} руб.\n"
-            f"   VAT treatment: {vat_treatment}\n"
-            f"   Payment method: Безналичная\n"
+            f"   Payment method: Наличная + Безналичная (оба)\n"
             f"   User: {user_full_name}"
         )
 
@@ -421,16 +418,16 @@ class InvoiceTo1CConverter:
             "СуммаДокумента": amount_int,
             "Валюта_Key": self.RUB_CURRENCY_GUID,
 
-            # Формы оплаты (безналичная оплата по умолчанию для счетов)
-            "ФормаОплатыНаличная": False,
-            "ФормаОплатыБезналичная": True,  # Безналичная оплата (счета от поставщиков)
+            # Формы оплаты (ОБЕ формы true, как в рабочих заявках 1С)
+            "ФормаОплатыНаличная": True,
+            "ФормаОплатыБезналичная": True,
             "ФормаОплатыПлатежнаяКарта": False,
 
-            # НДС
-            "НалогообложениеНДС": vat_treatment,  # "ОблагаетсяНДС" или "ПродажаНеОблагаетсяНДС"
+            # НДС (пустая строка, как в 1С)
+            "НалогообложениеНДС": "",
 
-            # Бюджет
-            "вс_ЕстьСвободныйБюджетПоПлану": "Есть",
+            # Бюджет (пустая строка, как в 1С)
+            "вс_ЕстьСвободныйБюджетПоПлану": "",
 
             # Назначение и дата платежа
             "НазначениеПлатежа": payment_purpose,
