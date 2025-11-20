@@ -884,7 +884,8 @@ class OData1CClient:
         file_content: bytes,
         filename: str,
         owner_guid: str,
-        file_extension: Optional[str] = None
+        file_extension: Optional[str] = None,
+        endpoint: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Загрузить файл в 1С через Base64 encoding
@@ -894,6 +895,7 @@ class OData1CClient:
             filename: Имя файла
             owner_guid: GUID владельца (документа)
             file_extension: Расширение файла (без точки), например "pdf"
+            endpoint: Кастомный endpoint (по умолчанию из настроек)
 
         Returns:
             Созданное вложение или None при ошибке
@@ -905,15 +907,23 @@ class OData1CClient:
             logger.warning("File content is empty, skipping upload")
             return None
 
-        # Проверка размера (макс 6MB в байтах)
-        max_size = 6 * 1024 * 1024
+        # Получаем настройки из config
+        from app.core.config import settings
+        max_size = settings.ODATA_1C_MAX_FILE_SIZE
+        upload_endpoint = endpoint or settings.ODATA_1C_ATTACHMENT_ENDPOINT
+
+        # Проверка размера
         if len(file_content) > max_size:
-            logger.warning(f"File too large ({len(file_content)} bytes), max {max_size} bytes. Skipping upload.")
+            logger.warning(
+                f"File too large ({len(file_content)} bytes = {len(file_content) / 1024 / 1024:.2f}MB), "
+                f"max {max_size} bytes = {max_size / 1024 / 1024}MB. Skipping upload."
+            )
             return None
 
         try:
             # Кодирование в Base64
             base64_content = base64.b64encode(file_content).decode('utf-8')
+            base64_size = len(base64_content)
 
             # Определить расширение если не указано
             if not file_extension and '.' in filename:
@@ -921,7 +931,6 @@ class OData1CClient:
 
             # Данные для создания вложения
             # ВАЖНО: Структура может отличаться в зависимости от конфигурации 1С
-            # Обычно используется InformationRegister_ПрисоединенныеФайлы
             attachment_data = {
                 "Наименование": filename,
                 "ДвоичныеДанные": base64_content,
@@ -929,24 +938,32 @@ class OData1CClient:
                 "Расширение": file_extension or "pdf"
             }
 
-            logger.debug(f"Uploading attachment: {filename} ({len(file_content)} bytes) to owner {owner_guid}")
+            logger.info(
+                f"📎 Uploading attachment to 1C:\n"
+                f"   Filename: {filename}\n"
+                f"   Extension: {file_extension or 'pdf'}\n"
+                f"   Original size: {len(file_content)} bytes ({len(file_content) / 1024:.1f} KB)\n"
+                f"   Base64 size: {base64_size} bytes ({base64_size / 1024:.1f} KB)\n"
+                f"   Owner GUID: {owner_guid}\n"
+                f"   Endpoint: {upload_endpoint}"
+            )
 
             # ПРИМЕЧАНИЕ: Endpoint может отличаться в зависимости от конфигурации 1С
             # Возможные варианты:
-            # - InformationRegister_ПрисоединенныеФайлы
+            # - InformationRegister_ПрисоединенныеФайлы (по умолчанию)
             # - Catalog_ПрисоединенныеФайлы
             # - Catalog_ХранилищеФайлов
             response = self._make_request(
                 method='POST',
-                endpoint='InformationRegister_ПрисоединенныеФайлы',
+                endpoint=upload_endpoint,
                 data=attachment_data
             )
 
-            logger.debug(f"Attachment uploaded successfully")
+            logger.info(f"✅ Attachment uploaded successfully: {response}")
             return response
 
         except Exception as e:
-            logger.error(f"Failed to upload attachment: {e}")
+            logger.error(f"❌ Failed to upload attachment: {e}", exc_info=True)
             # Не прерываем процесс если не удалось загрузить файл
             return None
 

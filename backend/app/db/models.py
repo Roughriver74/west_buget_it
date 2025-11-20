@@ -215,20 +215,7 @@ class EmployeeKPIStatusEnum(str, enum.Enum):
     REJECTED = "REJECTED"  # Отклонено - требуется пересмотр/корректировка
 
 
-class KPITaskStatusEnum(str, enum.Enum):
-    """Enum for KPI task statuses"""
-    TODO = "TODO"  # К выполнению
-    IN_PROGRESS = "IN_PROGRESS"  # В работе
-    DONE = "DONE"  # Выполнено
-    CANCELLED = "CANCELLED"  # Отменено
-
-
-class KPITaskPriorityEnum(str, enum.Enum):
-    """Enum for KPI task priorities"""
-    LOW = "LOW"  # Низкий
-    MEDIUM = "MEDIUM"  # Средний
-    HIGH = "HIGH"  # Высокий
-    CRITICAL = "CRITICAL"  # Критический
+# KPITaskStatusEnum and KPITaskPriorityEnum removed - Tasks feature deprecated
 
 
 class RevenueStreamTypeEnum(str, enum.Enum):
@@ -1296,15 +1283,7 @@ class EmployeeKPI(Base):
     quarterly_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
     annual_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
 
-    # Task complexity bonus component (NEW in Task 3.2)
-    task_complexity_avg = Column(Numeric(5, 2), nullable=True)  # Средняя сложность выполненных задач (1-10)
-    task_complexity_multiplier = Column(Numeric(5, 4), nullable=True)  # Множитель премии по сложности (0.5-2.0)
-    task_complexity_weight = Column(Numeric(5, 2), nullable=True, default=20.00)  # Вес компонента сложности в премии (0-100%, default 20%)
-
-    # Complexity bonus components (calculated)
-    monthly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент месячной премии по сложности
-    quarterly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент квартальной премии по сложности
-    annual_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент годовой премии по сложности
+    # Task complexity bonus removed - Tasks feature deprecated
 
     # Workflow status
     status = Column(
@@ -1385,93 +1364,7 @@ class EmployeeKPIGoal(Base):
         return f"<EmployeeKPIGoal Employee#{self.employee_id} Goal#{self.goal_id} {self.achievement_percentage}%>"
 
 
-class KPITask(Base):
-    """KPI Task - задачи, привязанные к целям KPI для декомпозиции на выполнимые элементы"""
-    __tablename__ = "kpi_tasks"
-    __table_args__ = (
-        Index('idx_kpi_task_employee', 'employee_id'),
-        Index('idx_kpi_task_goal', 'employee_kpi_goal_id'),
-        Index('idx_kpi_task_status', 'status'),
-        Index('idx_kpi_task_priority', 'priority'),
-        Index('idx_kpi_task_due_date', 'due_date'),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    # Relations
-    employee_kpi_goal_id = Column(
-        Integer,
-        ForeignKey("employee_kpi_goals.id"),
-        nullable=False,
-        index=True
-    )
-    employee_id = Column(
-        Integer,
-        ForeignKey("employees.id"),
-        nullable=False,
-        index=True
-    )
-    assigned_by_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=True,
-        index=True
-    )
-    department_id = Column(
-        Integer,
-        ForeignKey("departments.id"),
-        nullable=False,
-        index=True
-    )
-
-    # Task details
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    status = Column(
-        Enum(KPITaskStatusEnum),
-        nullable=False,
-        default=KPITaskStatusEnum.TODO,
-        index=True
-    )
-    priority = Column(
-        Enum(KPITaskPriorityEnum),
-        nullable=False,
-        default=KPITaskPriorityEnum.MEDIUM,
-        index=True
-    )
-
-    # Complexity and estimation
-    complexity = Column(Integer, nullable=True)  # 1-10 scale (1=простая, 10=очень сложная)
-    estimated_hours = Column(Numeric(5, 2), nullable=True)  # Оценка времени в часах
-    actual_hours = Column(Numeric(5, 2), nullable=True)  # Фактическое время
-
-    # Progress tracking
-    completion_percentage = Column(
-        Numeric(5, 2),
-        nullable=True,
-        default=0
-    )  # Процент выполнения 0-100%
-
-    # Dates
-    due_date = Column(DateTime, nullable=True, index=True)  # Срок выполнения
-    start_date = Column(DateTime, nullable=True)  # Дата начала
-    completed_at = Column(DateTime, nullable=True)  # Дата завершения
-
-    # Additional information
-    notes = Column(Text, nullable=True)  # Комментарии и заметки
-
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationships
-    employee_kpi_goal = relationship("EmployeeKPIGoal", backref="tasks")
-    employee = relationship("Employee")
-    assigned_by = relationship("User", foreign_keys=[assigned_by_id])
-    department_rel = relationship("Department")
-
-    def __repr__(self):
-        return f"<KPITask #{self.id} '{self.title}' {self.status.value} {self.priority.value}>"
+# KPITask model removed - Tasks feature deprecated in favor of simplified KPI Goals workflow
 
 
 # ============================================================================

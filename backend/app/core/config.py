@@ -140,6 +140,15 @@ class Settings(BaseSettings):
     ODATA_1C_PASSWORD: str = "ak228Hu2hbs28"
     ODATA_1C_CUSTOM_AUTH_TOKEN: str = "Basic 0KjQuNC60YPQvdC+0LLQlTohUUFaMndzeA=="
 
+    # 1C OData File Upload Configuration
+    ODATA_1C_ATTACHMENT_ENDPOINT: str = "InformationRegister_ПрисоединенныеФайлы"
+    ODATA_1C_MAX_FILE_SIZE_MB: int = 6  # Максимальный размер файла в МБ
+
+    @property
+    def ODATA_1C_MAX_FILE_SIZE(self) -> int:
+        """Максимальный размер файла в байтах"""
+        return self.ODATA_1C_MAX_FILE_SIZE_MB * 1024 * 1024
+
     # Credit Portfolio FTP (для автоматического импорта из 1С)
     CREDIT_PORTFOLIO_FTP_HOST: str = "floppisw.beget.tech"
     CREDIT_PORTFOLIO_FTP_USER: str = "floppisw_fin"
