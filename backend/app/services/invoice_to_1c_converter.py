@@ -394,7 +394,26 @@ class InvoiceTo1CConverter:
         base_comment = user_comment or f"Создано автоматически из счета №{invoice.invoice_number}"
         full_comment = f"{user_full_name}: {base_comment}"
 
-        # Логирование информации о НДС
+        # Поиск банковского счета контрагента
+        bank_account_guid = self.EMPTY_GUID
+        if invoice.supplier_account:
+            logger.info(f"🏦 Attempting to find bank account: {invoice.supplier_account}")
+            try:
+                bank_account_data = self.odata_client.get_bank_account_by_number_and_owner(
+                    account_number=invoice.supplier_account,
+                    owner_guid=validation_result.counterparty_guid
+                )
+                if bank_account_data:
+                    bank_account_guid = bank_account_data.get('Ref_Key')
+                    logger.info(f"✅ Found bank account in 1C: {bank_account_data.get('Description')} (Ref_Key: {bank_account_guid})")
+                else:
+                    logger.warning(f"⚠️ Bank account {invoice.supplier_account} not found in 1C, using EMPTY_GUID")
+            except Exception as e:
+                logger.error(f"❌ Error looking up bank account: {e}")
+                # Fallback to EMPTY_GUID on error
+                bank_account_guid = self.EMPTY_GUID
+
+        # Логирование информации о НДС и банковском счете
         logger.info(
             f"📋 Expense request preparation:\n"
             f"   Invoice ID: {invoice.id}\n"
@@ -403,6 +422,8 @@ class InvoiceTo1CConverter:
             f"   VAT amount: {vat_amount} руб.\n"
             f"   Amount without VAT: {amount_without_vat} руб.\n"
             f"   Payment method: Наличная + Безналичная (оба)\n"
+            f"   Bank account: {invoice.supplier_account or 'не указан'}\n"
+            f"   Bank account GUID: {bank_account_guid}\n"
             f"   User: {user_full_name}"
         )
 
@@ -436,7 +457,7 @@ class InvoiceTo1CConverter:
             # Контрагент
             "Контрагент_Key": validation_result.counterparty_guid,
             "Партнер_Key": validation_result.counterparty_guid,
-            "БанковскийСчетКонтрагента_Key": self.EMPTY_GUID,  # Пустой - не знаем конкретный счет
+            "БанковскийСчетКонтрагента_Key": bank_account_guid,  # Найденный счет или EMPTY_GUID
 
             # Данные счета поставщика
             "вс_НомерПоДаннымПоставщика": invoice.invoice_number or "",

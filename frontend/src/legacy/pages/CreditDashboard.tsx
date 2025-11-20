@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import { useTheme } from '@/contexts/ThemeContext'
 import {
   receiptsAPI,
   expensesAPI,
@@ -87,6 +88,13 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
   const [currentPage, setCurrentPage] = useState<'overview' | 'details'>('overview')
   const [helpExpanded, setHelpExpanded] = useState(false)
   const queryClient = useQueryClient()
+  const { mode } = useTheme()
+  
+  // Colors for charts based on theme
+  const isDark = mode === 'dark'
+  const gridColor = isDark ? '#334155' : '#E5E7EB'
+  const textColor = isDark ? '#94a3b8' : '#6B7280'
+  const textColorDark = isDark ? '#cbd5e1' : '#374151'
 
   const filterPayload = useMemo(
     () => buildFilterPayload(debouncedFilters, { includeDefaultDateTo: true }),
@@ -460,7 +468,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       label: 'Банк',
       flex: 2,
       render: (value: string) => (
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           {value?.length > 30 ? `${value.substring(0, 27)}...` : value || '-'}
         </span>
       ),
@@ -475,13 +483,13 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       key: 'principalPaid',
       label: 'Погашено тела',
       align: 'right',
-      render: (value: number) => <span className="font-mono text-green-600">{formatAmount(value)}</span>,
+      render: (value: number) => <span className="font-mono text-green-600 dark:text-green-400">{formatAmount(value)}</span>,
     },
     {
       key: 'balance',
       label: 'Остаток',
       align: 'right',
-      render: (value: number) => <span className="font-mono text-red-600">{formatAmount(value)}</span>,
+      render: (value: number) => <span className="font-mono text-red-600 dark:text-red-400">{formatAmount(value)}</span>,
     },
     {
       key: 'interestPaid',
@@ -517,7 +525,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       key: 'bankAccount',
       label: 'Банк',
       flex: 2,
-      render: (value: string) => <span className="text-xs text-gray-500">{value?.substring(0, 25)}...</span>,
+      render: (value: string) => <span className="text-xs text-muted-foreground">{value?.substring(0, 25)}...</span>,
     },
     {
       key: 'operations',
@@ -622,7 +630,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
               currentPage === 'details'
                 ? 'bg-blue-500 text-white border border-blue-500'
-                : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+                : 'bg-card text-muted-foreground border border-border hover:bg-muted'
             }`}
           >
             Детали
@@ -637,21 +645,21 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
         </div>
       </header>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl overflow-hidden">
+      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl overflow-hidden">
         <button
           onClick={() => setHelpExpanded(prev => !prev)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-100 transition-colors"
+          className="w-full px-6 py-4 flex items-center justify-between hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <Info size={20} className="text-blue-600" />
-            <span className="font-semibold text-blue-900">
+            <Info size={20} className="text-blue-600 dark:text-blue-400" />
+            <span className="font-semibold text-blue-900 dark:text-blue-300">
               Как рассчитываются показатели?
             </span>
           </div>
           {helpExpanded ? (
-            <ChevronUp size={20} className="text-blue-600" />
+            <ChevronUp size={20} className="text-blue-600 dark:text-blue-400" />
           ) : (
-            <ChevronDown size={20} className="text-blue-600" />
+            <ChevronDown size={20} className="text-blue-600 dark:text-blue-400" />
           )}
         </button>
         {helpExpanded && (
@@ -698,31 +706,31 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
-        <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-blue-500 to-blue-600">
-          <div className="text-sm opacity-80">Получено кредитов</div>
+        <div className="p-6 rounded-2xl shadow-lg text-white bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 dark:shadow-blue-500/20">
+          <div className="text-sm opacity-90 dark:opacity-80">Получено кредитов</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.totalReceived)}</div>
-          <div className="text-xs opacity-80">
+          <div className="text-xs opacity-90 dark:opacity-75">
             {filteredReceipts.length} операций поступления
           </div>
         </div>
-        <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-green-500 to-green-600">
-          <div className="text-sm opacity-80">Погашено тела</div>
+        <div className="p-6 rounded-2xl shadow-lg text-white bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 dark:shadow-green-500/20">
+          <div className="text-sm opacity-90 dark:opacity-80">Погашено тела</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.principalPaid)}</div>
-          <div className="text-xs opacity-80">
+          <div className="text-xs opacity-90 dark:opacity-75">
             {filteredDetails.filter(d => d.payment_type === 'Погашение долга').length} платежей
           </div>
         </div>
-        <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-orange-500 to-orange-600">
-          <div className="text-sm opacity-80">Уплачено процентов</div>
+        <div className="p-6 rounded-2xl shadow-lg text-white bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 dark:shadow-orange-500/20">
+          <div className="text-sm opacity-90 dark:opacity-80">Уплачено процентов</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.interestPaid)}</div>
-          <div className="text-xs opacity-80">
+          <div className="text-xs opacity-90 dark:opacity-75">
             {filteredDetails.filter(d => d.payment_type === 'Уплата процентов').length} платежей
           </div>
         </div>
-        <div className="p-6 rounded-2xl shadow-sm text-white bg-gradient-to-br from-red-500 to-red-600">
-          <div className="text-sm opacity-80">Остаток задолженности</div>
+        <div className="p-6 rounded-2xl shadow-lg text-white bg-gradient-to-br from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 dark:shadow-red-500/20">
+          <div className="text-sm opacity-90 dark:opacity-80">Остаток задолженности</div>
           <div className="text-3xl font-bold my-2">{formatAmount(kpis.debtBalance)}</div>
-          <div className="text-xs opacity-80">
+          <div className="text-xs opacity-90 dark:opacity-75">
             {(kpis.totalReceived > 0
               ? ((kpis.debtBalance / kpis.totalReceived) * 100).toFixed(1)
               : '0')}{' '}
@@ -731,7 +739,7 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
         </div>
       </div>
 
-      <div className="p-6 bg-white rounded-2xl shadow-sm border border-red-100">
+      <div className="p-6 bg-card dark:bg-slate-800/50 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
             🔴 Активные кредиты
@@ -766,26 +774,32 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             </p>
             <ResponsiveContainer width="100%" height={360}>
               <ComposedChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                 <XAxis
                   dataKey="month"
                   tickFormatter={dateTickFormatter}
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
+                  tick={{ fontSize: 11, fill: textColor }}
                   angle={-45}
                   textAnchor="end"
                   height={70}
                 />
-                <YAxis tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                <YAxis tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: textColor }} />
                 <RechartsTooltip
                   formatter={formatTooltipAmount as any}
                   labelFormatter={dateTickFormatter}
-                  contentStyle={{ fontSize: 12 }}
+                  contentStyle={{ 
+                    fontSize: 12,
+                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                    border: `1px solid ${gridColor}`,
+                    borderRadius: '8px',
+                    color: isDark ? '#f8fafc' : '#1f2937'
+                  }}
                 />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: textColor }} />
                 <Bar dataKey="received" name="Получено" fill="#3B82F6" />
                 <Bar dataKey="principal" name="Погашено тела" fill="#10B981" />
                 <Bar dataKey="interest" name="Уплачено %" fill="#F59E0B" />
-                <Line dataKey="received" name="Линия получено" stroke="#1E3A8A" strokeWidth={2} dot={false} />
+                <Line dataKey="received" name="Линия получено" stroke={isDark ? '#60a5fa' : '#1E3A8A'} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -799,19 +813,28 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
             </p>
             <ResponsiveContainer width="100%" height={480}>
               <BarChart data={contractData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis type="number" tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                <XAxis type="number" tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: textColor }} />
                 <YAxis
                   dataKey="name"
                   type="category"
                   width={240}
-                  tick={{ fontSize: 11, fill: '#374151' }}
+                  tick={{ fontSize: 11, fill: textColorDark }}
                   tickFormatter={value =>
                     value.length > 38 ? `${value.substring(0, 35)}...` : value
                   }
                 />
-                <RechartsTooltip formatter={formatTooltipAmount as any} contentStyle={{ fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <RechartsTooltip 
+                  formatter={formatTooltipAmount as any} 
+                  contentStyle={{ 
+                    fontSize: 12,
+                    backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                    border: `1px solid ${gridColor}`,
+                    borderRadius: '8px',
+                    color: isDark ? '#f8fafc' : '#1f2937'
+                  }} 
+                />
+                <Legend wrapperStyle={{ fontSize: 12, color: textColor }} />
                 <Bar dataKey="principal" name="Тело" fill="#10B981" stackId="a" />
                 <Bar dataKey="interest" name="Проценты" fill="#F59E0B" stackId="a" />
               </BarChart>
@@ -826,15 +849,24 @@ const CreditDashboard = ({ departmentId }: CreditDashboardProps) => {
               </p>
               <ResponsiveContainer width="100%" height={360}>
                 <BarChart data={bankData} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis type="number" tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                  <XAxis type="number" tickFormatter={formatAxisAmount} tick={{ fontSize: 11, fill: textColor }} />
                   <YAxis
                     dataKey="name"
                     type="category"
                     width={200}
-                    tick={{ fontSize: 11, fill: '#374151' }}
+                    tick={{ fontSize: 11, fill: textColorDark }}
                   />
-                  <RechartsTooltip formatter={formatTooltipAmount as any} contentStyle={{ fontSize: 12 }} />
+                  <RechartsTooltip 
+                    formatter={formatTooltipAmount as any} 
+                    contentStyle={{ 
+                      fontSize: 12,
+                      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                      border: `1px solid ${gridColor}`,
+                      borderRadius: '8px',
+                      color: isDark ? '#f8fafc' : '#1f2937'
+                    }} 
+                  />
                   <Bar dataKey="amount" name="Сумма" fill="#8B5CF6" />
                 </BarChart>
               </ResponsiveContainer>

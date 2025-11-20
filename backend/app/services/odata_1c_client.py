@@ -788,6 +788,74 @@ class OData1CClient:
             logger.error(f"Failed to search counterparty by INN {inn}: {e}")
             return None
 
+    def get_bank_account_by_number_and_owner(
+        self,
+        account_number: str,
+        owner_guid: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить банковский счет контрагента по номеру счета и владельцу
+
+        Args:
+            account_number: Номер банковского счета (20 цифр)
+            owner_guid: GUID владельца счета (контрагента)
+
+        Returns:
+            Данные банковского счета или None если не найден
+        """
+        if not account_number or not owner_guid:
+            return None
+
+        try:
+            # Очистить номер счета от пробелов
+            clean_account = account_number.strip().replace(' ', '')
+
+            # OData $filter по номеру счета
+            # Сначала ищем по номеру счета
+            filter_str = f"НомерСчета eq '{clean_account}'"
+            endpoint_with_params = f"Catalog_БанковскиеСчетаКонтрагентов?$top=10&$format=json&$filter={filter_str}"
+
+            logger.debug(f"Searching bank account by number: {clean_account} for owner: {owner_guid}")
+            logger.debug(f"Request URL: {self.base_url}/{endpoint_with_params}")
+
+            response = self._make_request(
+                method='GET',
+                endpoint=endpoint_with_params,
+                params=None
+            )
+
+            logger.debug(f"Bank account search response: {response}")
+
+            results = response.get('value', [])
+
+            # Фильтруем результаты по владельцу (на клиенте, т.к. фильтр по Owner может не работать)
+            matching_accounts = []
+            for account in results:
+                # Owner может быть строкой или словарем
+                owner_ref = account.get('Owner_Key')
+                if not owner_ref:
+                    owner = account.get('Owner', '')
+                    if isinstance(owner, dict):
+                        owner_ref = owner.get('Ref_Key', '')
+                    else:
+                        owner_ref = owner  # Строка
+
+                if owner_ref == owner_guid:
+                    matching_accounts.append(account)
+
+            if matching_accounts:
+                # Возвращаем первый найденный счет
+                account = matching_accounts[0]
+                logger.info(f"Found bank account: {account.get('Description')} (Ref_Key: {account.get('Ref_Key')})")
+                return account
+            else:
+                logger.warning(f"Bank account {clean_account} not found for owner {owner_guid}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to search bank account {account_number} for owner {owner_guid}: {e}")
+            return None
+
     def get_organization_by_inn(self, inn: str) -> Optional[Dict[str, Any]]:
         """
         Получить организацию по ИНН
