@@ -63,6 +63,20 @@ if not hasattr(models_module, "KPITaskPriorityEnum"):
         HIGH = "HIGH"
     models_module.KPITaskPriorityEnum = KPITaskPriorityEnum
 
+# Stub removed task complexity calculator module to satisfy imports in deprecated endpoints
+if "app.services.task_complexity_bonus" not in sys.modules:
+    task_complexity_module = types.ModuleType("app.services.task_complexity_bonus")
+
+    class TaskComplexityBonusCalculator:
+        def __init__(self, *args, **kwargs):
+            ...
+
+        def calculate_complexity_bonus(self, *args, **kwargs):
+            return {"complexity_bonus": 0}
+
+    task_complexity_module.TaskComplexityBonusCalculator = TaskComplexityBonusCalculator
+    sys.modules["app.services.task_complexity_bonus"] = task_complexity_module
+
 from app.main import app
 from app.db.models import Base
 from app.db.session import get_db

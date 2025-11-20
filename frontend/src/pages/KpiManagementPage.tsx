@@ -8,7 +8,7 @@ import { KpiGoalsTab } from '@/components/kpi/KpiGoalsTab'
 import { EmployeeKpiTab } from '@/components/kpi/EmployeeKpiTab'
 import { KpiAssignmentsTab } from '@/components/kpi/KpiAssignmentsTab'
 import { KpiCalendar } from '@/components/kpi/KpiCalendar'
-import KpiAllTasksTab from '@/components/kpi/KpiAllTasksTab'
+// KpiAllTasksTab removed - Tasks feature deprecated
 
 const { Title } = Typography
 
@@ -43,9 +43,7 @@ const KPIManagementPage = () => {
           <KpiAssignmentsTab departmentId={departmentId} year={currentYear} />
         </Tabs.TabPane>
 
-        <Tabs.TabPane tab="Задачи KPI" key="tasks">
-          <KpiAllTasksTab departmentId={departmentId} />
-        </Tabs.TabPane>
+        {/* Tasks tab removed - Tasks feature deprecated */}
 
         <Tabs.TabPane tab="Календарь бонусов" key="calendar">
           <KpiCalendar departmentId={departmentId} />

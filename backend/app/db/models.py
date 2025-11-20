@@ -207,12 +207,11 @@ class KPIGoalStatusEnum(str, enum.Enum):
 
 
 class EmployeeKPIStatusEnum(str, enum.Enum):
-    """Enum for EmployeeKPI workflow statuses"""
-    DRAFT = "DRAFT"  # Черновик - цели установлены, факт не введен
-    IN_PROGRESS = "IN_PROGRESS"  # В работе - период активен, сотрудник работает над целями
-    UNDER_REVIEW = "UNDER_REVIEW"  # На проверке - факт введен, ждет оценки руководителя
-    APPROVED = "APPROVED"  # Утверждено - руководитель утвердил оценку
-    REJECTED = "REJECTED"  # Отклонено - требуется пересмотр/корректировка
+    """Enum for EmployeeKPI workflow statuses (simplified workflow)"""
+    DRAFT = "DRAFT"  # Черновик - цели установлены, сотрудник работает над ними
+    UNDER_REVIEW = "UNDER_REVIEW"  # На проверке - результаты введены, ждет оценки руководителя
+    APPROVED = "APPROVED"  # Утверждено - руководитель утвердил, премии рассчитаны
+    REJECTED = "REJECTED"  # Отклонено - требуется доработка
 
 
 # KPITaskStatusEnum and KPITaskPriorityEnum removed - Tasks feature deprecated

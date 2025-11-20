@@ -907,10 +907,15 @@ class OData1CClient:
             logger.warning("File content is empty, skipping upload")
             return None
 
-        # Получаем настройки из config
-        from app.core.config import settings
-        max_size = settings.ODATA_1C_MAX_FILE_SIZE
-        upload_endpoint = endpoint or settings.ODATA_1C_ATTACHMENT_ENDPOINT
+        # Получаем настройки из config (с fallback на дефолтные значения)
+        try:
+            from app.core.config import settings
+            max_size = settings.ODATA_1C_MAX_FILE_SIZE
+            upload_endpoint = endpoint or settings.ODATA_1C_ATTACHMENT_ENDPOINT
+        except Exception:
+            # Fallback если config не доступен
+            max_size = 6 * 1024 * 1024  # 6MB
+            upload_endpoint = endpoint or "InformationRegister_ПрисоединенныеФайлы"
 
         # Проверка размера
         if len(file_content) > max_size:
