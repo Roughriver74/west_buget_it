@@ -84,6 +84,58 @@ export interface BonusDistributionData {
   employee_count: number
 }
 
+// ============ KPI Goal Template Types ============
+// TEMPORARILY DISABLED: KPI Task types missing due to kpi_tasks endpoint being disabled
+
+// export type KPIGoalTemplate = components['schemas']['KPIGoalTemplateWithGoals']
+// export type KPIGoalTemplateCreate = components['schemas']['KPIGoalTemplateCreate']
+// export type KPIGoalTemplateUpdate = components['schemas']['KPIGoalTemplateUpdate']
+// export type KPIGoalTemplateItem = components['schemas']['KPIGoalTemplateItemWithGoal']
+
+// Temporary placeholder types until KPITask model is implemented
+export interface KPIGoalTemplate {
+  id: number
+  name: string
+  description?: string
+  department_id: number
+  is_active: boolean
+  template_items?: KPIGoalTemplateItem[]
+  template_goals?: any[] // For backward compatibility
+}
+
+export interface KPIGoalTemplateCreate {
+  name: string
+  description?: string
+  department_id?: number
+  is_active?: boolean
+}
+
+export interface KPIGoalTemplateUpdate {
+  name?: string
+  description?: string
+  is_active?: boolean
+}
+
+export interface KPIGoalTemplateItem {
+  id: number
+  template_id: number
+  kpi_goal?: any
+}
+
+export interface ApplyTemplateRequest {
+  employee_ids: number[]
+  year: number
+  month: number
+}
+
+export interface ApplyTemplateResponse {
+  success: boolean
+  message: string
+  employees_updated: number
+  goals_created: number
+  errors: string[]
+}
+
 export const kpiApi = {
   listGoals: async (params?: {
     skip?: number
@@ -279,6 +331,49 @@ export const kpiApi = {
     }
   }> => {
     const { data } = await apiClient.post('kpi/recalculate-department', null, { params })
+    return data
+  },
+
+  // ============ KPI Goal Templates ============
+
+  listTemplates: async (params?: {
+    department_id?: number
+    is_active?: boolean
+  }): Promise<KPIGoalTemplate[]> => {
+    const { data } = await apiClient.get<KPIGoalTemplate[]>('kpi/templates', { params })
+    return data
+  },
+
+  getTemplate: async (templateId: number): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.get<KPIGoalTemplate>(`kpi/templates/${templateId}`)
+    return data
+  },
+
+  createTemplate: async (templateData: KPIGoalTemplateCreate): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.post<KPIGoalTemplate>('kpi/templates', templateData)
+    return data
+  },
+
+  updateTemplate: async (
+    templateId: number,
+    templateData: KPIGoalTemplateUpdate
+  ): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.put<KPIGoalTemplate>(`kpi/templates/${templateId}`, templateData)
+    return data
+  },
+
+  deleteTemplate: async (templateId: number): Promise<void> => {
+    await apiClient.delete(`kpi/templates/${templateId}`)
+  },
+
+  applyTemplate: async (
+    templateId: number,
+    request: ApplyTemplateRequest
+  ): Promise<ApplyTemplateResponse> => {
+    const { data } = await apiClient.post<ApplyTemplateResponse>(
+      `kpi/templates/${templateId}/apply`,
+      request
+    )
     return data
   },
 }
