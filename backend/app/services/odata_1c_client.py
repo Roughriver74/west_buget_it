@@ -89,7 +89,8 @@ class OData1CClient:
             encoded_endpoint = quote(endpoint, safe='/:?=.$&_')
             # Формируем полный путь: base_path + endpoint + query params
             # Например: /trade/odata/standard.odata/Document_ЗаявкаНаРасходованиеДенежныхСредств?$format=json
-            full_endpoint = f"{parsed.path}/{encoded_endpoint}?$format=json"
+            # FIX: Не дублируем parsed.path если он уже есть в base_url
+            full_endpoint = f"{parsed.path.rstrip('/')}/{encoded_endpoint.lstrip('/')}?$format=json"
 
             # Создаем connection
             conn = http.client.HTTPConnection(parsed.netloc, timeout=timeout)
@@ -130,7 +131,8 @@ class OData1CClient:
                 if http_response.status >= 400:
                     error_text = response_data.decode('utf-8')
                     logger.error(f"HTTP error: {http_response.status} {http_response.reason}")
-                    logger.error(f"URL: {self.base_url}/{full_endpoint}")
+                    # FIX: Правильно формируем URL для логирования
+                    logger.error(f"URL: {parsed.scheme}://{parsed.netloc}{full_endpoint}")
                     logger.error(f"Response: {error_text}")
                     raise requests.exceptions.HTTPError(
                         f"{http_response.status} {http_response.reason}",
