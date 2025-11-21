@@ -450,15 +450,15 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
         bordered
         size="small"
         summary={() => (
-          <ResponsiveTable.Summary fixed mobileLayout="card">
-            <ResponsiveTable.Summary.Row style={{ backgroundColor: '#f0f0f0' }} mobileLayout="card">
+          <ResponsiveTable.Summary fixed>
+            <ResponsiveTable.Summary.Row style={{ backgroundColor: '#f0f0f0' }}>
               {columns.map((col, index) => (
-                <ResponsiveTable.Summary.Cell key={index} index={index} align={col.align as any} mobileLayout="card">
+                <ResponsiveTable.Summary.Cell key={index} index={index} align={col.align as any}>
                   {summaryRow[col.key as string]}
-                </Table.Summary.Cell>
+                </ResponsiveTable.Summary.Cell>
               ))}
-            </Table.Summary.Row>
-          </Table.Summary>
+            </ResponsiveTable.Summary.Row>
+          </ResponsiveTable.Summary>
         )}
       />
     </div>

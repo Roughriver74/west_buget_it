@@ -121,7 +121,8 @@ export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) =>
         </Space>
       }
     >
-      <ResponsiveTable<KPIEmployeeSummary mobileLayout="card">
+      <ResponsiveTable<KPIEmployeeSummary>
+        mobileLayout="card"
         rowKey={(record) => `${record.employee_id}-${record.year}-${record.month ?? 'all'}`}
         columns={summaryColumns}
         dataSource={summary}

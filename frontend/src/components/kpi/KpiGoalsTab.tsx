@@ -302,7 +302,8 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
           </Space>
         }
       >
-        <ResponsiveTable<KPIGoal mobileLayout="card">
+        <ResponsiveTable<KPIGoal>
+          mobileLayout="card"
           rowKey="id"
           columns={goalColumns}
           dataSource={goals}

@@ -409,7 +409,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="Загрузка деталей сценария..."  mobileLayout="card" />
+        <Spin size="large" tip="Загрузка деталей сценария..."  />
       </div>
     );
   }
@@ -421,7 +421,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         description="Запрашиваемый сценарий не существует или был удален."
         type="error"
         showIcon
-       mobileLayout="card" />
+       />
     );
   }
 
@@ -629,7 +629,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
           </Descriptions.Item>
         </Descriptions>
 
-        <Divider  mobileLayout="card" />
+        <Divider  />
 
         {/* Параметры сценария */}
         <Descriptions title="Параметры сценария" column={2} bordered size="small" style={{ marginBottom: 16 }}>
@@ -650,14 +650,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         {/* Страховые взносы */}
         {insuranceRates.length > 0 && (
           <>
-            <Divider  mobileLayout="card" />
+            <Divider  />
             <Alert
               message="Ставки страховых взносов берутся из справочника"
               description={`Ставки для ${scenario.target_year} года загружаются из справочника страховых взносов. Для изменения ставок используйте раздел управления ставками.`}
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-             mobileLayout="card" />
+             />
             <Descriptions title={`Ставки страховых взносов (${scenario.target_year} год)`} column={2} bordered size="small" style={{ marginBottom: 16 }}>
               {(() => {
                 // Фильтруем дубликаты - оставляем только одну ставку для каждого типа
@@ -698,7 +698,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                           <>
                             <Tag>{baseRatePercent}%</Tag>
                             <Text>→</Text>
-                          < mobileLayout="card" />
+</>
                         )}
                         <Tag color={change > 0 ? 'volcano' : change < 0 ? 'green' : 'default'}>
                           {ratePercent}%
@@ -714,22 +714,22 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 });
               })()}
             </Descriptions>
-          < mobileLayout="card" />
+</>
         )}
         {insuranceRates.length === 0 && scenario.target_year && (
           <>
-            <Divider  mobileLayout="card" />
+            <Divider  />
             <Alert
               message="Ставки страховых взносов не найдены"
               description={`Ставки для ${scenario.target_year} года отсутствуют в справочнике. Будут использованы значения по умолчанию (ПФР: 22%, ФОМС: 5.1%, ФСС: 2.9%, Травматизм: 0.2%).`}
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
-             mobileLayout="card" />
-          < mobileLayout="card" />
+             />
+</>
         )}
 
-        <Divider  mobileLayout="card" />
+        <Divider  />
 
         {/* Key Statistics */}
         <Row gutter={[16, 16]}>
@@ -740,7 +740,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_headcount}
                 prefix={<UserOutlined />}
                 suffix="чел."
-               mobileLayout="card" />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -750,7 +750,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_base_salary}
                 prefix={<DollarOutlined />}
                 formatter={(value) => formatCurrency(Number(value))}
-               mobileLayout="card" />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -760,7 +760,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_insurance_cost}
                 formatter={(value) => formatCurrency(Number(value))}
                 valueStyle={{ color: '#1890ff' }}
-               mobileLayout="card" />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -770,7 +770,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_payroll_cost}
                 formatter={(value) => formatCurrency(Number(value))}
                 valueStyle={{ color: '#52c41a' }}
-               mobileLayout="card" />
+               />
             </Card>
           </Col>
         </Row>
@@ -778,7 +778,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         {/* Comparison with Base Year */}
         {scenario.base_year_total_cost && (
           <>
-            <Divider  mobileLayout="card" />
+            <Divider  />
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={12}>
                 <Card>
@@ -786,7 +786,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     title={`Базовый год (${scenario.base_year})`}
                     value={scenario.base_year_total_cost}
                     formatter={(value) => formatCurrency(Number(value))}
-                   mobileLayout="card" />
+                   />
                 </Card>
               </Col>
               <Col xs={24} sm={12}>
@@ -797,14 +797,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     formatter={(value) => formatCurrency(Number(value))}
                     valueStyle={{ color: (scenario.cost_difference || 0) >= 0 ? '#52c41a' : '#f5222d' }}
                     prefix={(scenario.cost_difference || 0) >= 0 ? <RiseOutlined /> : <FallOutlined />}
-                   mobileLayout="card" />
+                   />
                   <div style={{ marginTop: 8 }}>
                     {formatPercent(scenario.cost_difference_percent)}
                   </div>
                 </Card>
               </Col>
             </Row>
-          < mobileLayout="card" />
+</>
         )}
       </Card>
 
@@ -816,7 +816,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             key: 'employees',
             label: (
               <span>
-                <TableOutlined  mobileLayout="card" />
+                <TableOutlined  />
                 Детализация по сотрудникам
               </span>
             ),
@@ -888,7 +888,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                       </Table.Summary>
                     );
                   }}
-                 mobileLayout="card" />
+                 />
               </Card>
             ),
           },
@@ -896,7 +896,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             key: 'what-if',
             label: (
               <span>
-                <ExperimentOutlined  mobileLayout="card" />
+                <ExperimentOutlined  />
                 What-If Анализ
               </span>
             ),
@@ -973,7 +973,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                       salary_change_percent: overallSalaryChangePercent,
                     });
                   }}
-               mobileLayout="card" />
+               />
               );
             })(),
           },
@@ -981,14 +981,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             key: 'charts',
             label: (
               <span>
-                <BarChartOutlined  mobileLayout="card" />
+                <BarChartOutlined  />
                 Графики и аналитика
               </span>
             ),
             children: <PayrollScenarioCharts scenario={scenario} />,
           },
         ]}
-       mobileLayout="card" />
+       />
 
       {/* Модальное окно редактирования параметров */}
       <Modal
@@ -1020,7 +1020,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
               style={{ width: '100%' }}
               formatter={(value) => `${value}%`}
               parser={(value) => Number(value?.replace('%', '') || 0) as any}
-             mobileLayout="card" />
+             />
           </Form.Item>
 
           <Form.Item
@@ -1039,7 +1039,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
               style={{ width: '100%' }}
               formatter={(value) => `${value}%`}
               parser={(value) => Number(value?.replace('%', '') || 0) as any}
-             mobileLayout="card" />
+             />
           </Form.Item>
 
           <Alert
@@ -1047,7 +1047,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             type="info"
             showIcon
             style={{ marginTop: 16 }}
-           mobileLayout="card" />
+           />
         </Form>
       </Modal>
     </div>

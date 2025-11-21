@@ -357,7 +357,8 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
           </Button>
         }
       >
-        <ResponsiveTable<EmployeeKPIGoal mobileLayout="card">
+        <ResponsiveTable<EmployeeKPIGoal>
+          mobileLayout="card"
           rowKey="id"
           columns={assignmentColumns}
           dataSource={filteredAssignments}

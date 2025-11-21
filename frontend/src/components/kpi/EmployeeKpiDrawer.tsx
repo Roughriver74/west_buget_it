@@ -287,7 +287,8 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
           <Text strong style={{ fontSize: 16, marginBottom: 16, display: 'block' }}>
             История KPI
           </Text>
-          <ResponsiveTable<EmployeeKPI mobileLayout="card">
+          <ResponsiveTable<EmployeeKPI>
+            mobileLayout="card"
             rowKey="id"
             columns={historyColumns}
             dataSource={employeeRecords}

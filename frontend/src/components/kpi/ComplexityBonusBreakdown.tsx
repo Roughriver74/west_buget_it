@@ -251,7 +251,8 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
         {breakdown.completed_tasks_count > 0 ? (
           <div>
             <Title level={5}>Завершенные задачи</Title>
-            <ResponsiveTable<ComplexityBreakdownType['completed_tasks'][0] mobileLayout="card">
+            <ResponsiveTable<ComplexityBreakdownType['completed_tasks'][0]>
+              mobileLayout="card"
               rowKey="id"
               columns={taskColumns}
               dataSource={breakdown.completed_tasks}

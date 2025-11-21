@@ -731,21 +731,21 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   ]
 
   const summaryRow = (
-    <ResponsiveTable.Summary fixed mobileLayout="card">
-      <ResponsiveTable.Summary.Row style={{ backgroundColor: mode === 'dark' ? '#262626' : '#fafafa' }} mobileLayout="card">
-        <ResponsiveTable.Summary.Cell index={0} mobileLayout="card">
+    <ResponsiveTable.Summary fixed>
+      <ResponsiveTable.Summary.Row style={{ backgroundColor: mode === 'dark' ? '#262626' : '#fafafa' }}>
+        <ResponsiveTable.Summary.Cell index={0}>
           <Text strong>Итого по месяцам</Text>
-        </Table.Summary.Cell>
+        </ResponsiveTable.Summary.Cell>
         {MONTHS.map((month, index) => (
-          <ResponsiveTable.Summary.Cell key={month.key} index={index + 1} align="right" mobileLayout="card">
+          <ResponsiveTable.Summary.Cell key={month.key} index={index + 1} align="right">
             <Text strong>{formatCurrency(columnTotals.get(month.key) || 0)}</Text>
-          </Table.Summary.Cell>
+          </ResponsiveTable.Summary.Cell>
         ))}
-        <ResponsiveTable.Summary.Cell index={13} align="right" mobileLayout="card">
+        <ResponsiveTable.Summary.Cell index={13} align="right">
           <Text strong style={{ fontSize: 16 }}>{formatCurrency(grandTotal)}</Text>
-        </Table.Summary.Cell>
-      </Table.Summary.Row>
-    </Table.Summary>
+        </ResponsiveTable.Summary.Cell>
+      </ResponsiveTable.Summary.Row>
+    </ResponsiveTable.Summary>
   )
 
   const tableScrollX =

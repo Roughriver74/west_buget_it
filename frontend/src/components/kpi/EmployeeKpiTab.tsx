@@ -451,7 +451,8 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
           </Space>
         }
       >
-        <ResponsiveTable<EmployeeKPI mobileLayout="card">
+        <ResponsiveTable<EmployeeKPI>
+          mobileLayout="card"
           rowKey="id"
           columns={employeeColumns}
           dataSource={employeeKpis}
