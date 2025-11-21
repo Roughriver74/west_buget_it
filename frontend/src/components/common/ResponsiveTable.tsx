@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
-import { Table, Card, Space, Typography, Row, Col, TableProps } from 'antd'
+import { Table, Card, Space, Typography, Row, Col, TableProps, Skeleton, Empty } from 'antd'
 import type { ColumnsType, ColumnType } from 'antd/es/table'
 import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { getResponsiveCardStyle, getResponsivePagination } from '@/utils/responsive'
 
 const { Text } = Typography
 
@@ -24,6 +25,12 @@ export interface ResponsiveTableProps<T = any> extends TableProps<T> {
    * Custom card renderer for mobile
    */
   renderMobileCard?: (record: T, index: number) => React.ReactNode
+
+  /**
+   * Number of skeleton cards/rows to show while loading (mobile only)
+   * Default: 3
+   */
+  skeletonCount?: number
 }
 
 /**
@@ -51,16 +58,48 @@ export function ResponsiveTable<T extends Record<string, any>>({
   dataSource = [],
   scroll,
   sticky,
+  skeletonCount = 3,
+  loading,
   ...restProps
 }: ResponsiveTableProps<T>) {
   const isMobile = useIsMobile()
   const isSmallScreen = useIsSmallScreen()
+
+  // Skeleton loading for mobile card layout
+  const skeletonCards = useMemo(() => {
+    if (!isMobile || mobileLayout !== 'card' || !loading) return null
+
+    const cardStyle = getResponsiveCardStyle(isMobile, isSmallScreen)
+
+    return (
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        {Array.from({ length: skeletonCount }).map((_, index) => (
+          <Card
+            key={`skeleton-${index}`}
+            size="small"
+            style={{
+              width: '100%',
+              marginBottom: cardStyle.marginBottom,
+            }}
+            bodyStyle={{ padding: cardStyle.padding }}
+          >
+            <Skeleton active paragraph={{ rows: 3 }} />
+          </Card>
+        ))}
+      </Space>
+    )
+  }, [isMobile, isSmallScreen, mobileLayout, loading, skeletonCount])
 
   // Card Layout for Mobile
   const cardLayout = useMemo(() => {
     if (!isMobile || mobileLayout !== 'card') return null
 
     const renderCard = renderMobileCard || defaultCardRenderer
+    const cardStyle = getResponsiveCardStyle(isMobile, isSmallScreen)
+
+    if (dataSource.length === 0) {
+      return <Empty description="Нет данных" />
+    }
 
     return (
       <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -69,14 +108,18 @@ export function ResponsiveTable<T extends Record<string, any>>({
             key={record.key || record.id || index}
             size="small"
             hoverable
-            style={{ width: '100%' }}
+            style={{
+              width: '100%',
+              marginBottom: cardStyle.marginBottom,
+            }}
+            bodyStyle={{ padding: cardStyle.padding }}
           >
             {renderCard(record, index)}
           </Card>
         ))}
       </Space>
     )
-  }, [isMobile, mobileLayout, dataSource, renderMobileCard])
+  }, [isMobile, isSmallScreen, mobileLayout, dataSource, renderMobileCard])
 
   // Default card renderer
   const defaultCardRenderer = (record: T, _index: number) => {
@@ -156,31 +199,38 @@ export function ResponsiveTable<T extends Record<string, any>>({
 
   // Render card layout on mobile
   if (isMobile && mobileLayout === 'card') {
+    if (loading && skeletonCards) {
+      return <>{skeletonCards}</>
+    }
     return <>{cardLayout}</>
   }
 
   // Render compact or scroll table
+  const responsivePaginationConfig = useMemo(() => {
+    if (restProps.pagination === false) return false
+
+    const defaultPagination = getResponsivePagination(isMobile, isSmallScreen)
+
+    return {
+      ...defaultPagination,
+      ...restProps.pagination,
+      pageSize: (restProps.pagination as any)?.pageSize || defaultPagination.pageSize,
+    }
+  }, [isMobile, isSmallScreen, restProps.pagination])
+
   return (
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <Table<T>
         {...restProps}
+        loading={loading}
         columns={mobileLayout === 'compact' ? compactTableColumns : columns}
         dataSource={dataSource}
         scroll={responsiveScroll}
         sticky={responsiveSticky}
-        pagination={
-          restProps.pagination === false
-            ? false
-            : {
-                ...restProps.pagination,
-                // Reduce page size on mobile
-                pageSize: isMobile ? 10 : (restProps.pagination as any)?.pageSize || 20,
-                showSizeChanger: !isMobile,
-                showQuickJumper: !isMobile,
-                // Simple pagination on mobile
-                simple: isMobile,
-              }
-        }
+        pagination={responsivePaginationConfig}
+        locale={{
+          emptyText: <Empty description="Нет данных" />,
+        }}
       />
     </div>
   )

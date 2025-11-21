@@ -34,6 +34,11 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import BusinessOperationMappingFormModal from '@/components/businessOperationMappings/BusinessOperationMappingFormModal'
+import {
+  getResponsiveSpacing,
+  getResponsiveGutter,
+  getResponsiveButtonSize,
+} from '@/utils/responsive'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -281,9 +286,13 @@ const BusinessOperationMappingsPage = () => {
   const activeCount = mappings?.items?.filter((m) => m.is_active).length || 0
   const inactiveCount = mappings?.items?.filter((m) => !m.is_active).length || 0
 
+  const spacing = getResponsiveSpacing(isMobile, isSmallScreen)
+  const gutter = getResponsiveGutter(isMobile, isSmallScreen)
+  const buttonSize = getResponsiveButtonSize(isMobile, isSmallScreen)
+
   return (
-    <div style={{ padding: '24px' }}>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <div style={{ padding: spacing.page }}>
+      <Space direction="vertical" size={spacing.section} style={{ width: '100%' }}>
         {/* Header */}
         <div>
           <Title level={2}>
@@ -296,8 +305,8 @@ const BusinessOperationMappingsPage = () => {
         </div>
 
         {/* Statistics */}
-        <Row gutter={16}>
-          <Col span={6}>
+        <Row gutter={gutter}>
+          <Col xs={12} sm={12} md={6} lg={6}>
             <Card>
               <Statistic
                 title="Всего маппингов"
@@ -306,7 +315,7 @@ const BusinessOperationMappingsPage = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} sm={12} md={6} lg={6}>
             <Card>
               <Statistic
                 title="Активных"
@@ -316,7 +325,7 @@ const BusinessOperationMappingsPage = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} sm={12} md={6} lg={6}>
             <Card>
               <Statistic
                 title="Неактивных"
@@ -325,7 +334,7 @@ const BusinessOperationMappingsPage = () => {
               />
             </Card>
           </Col>
-          <Col span={6}>
+          <Col xs={12} sm={12} md={6} lg={6}>
             <Card>
               <Statistic
                 title="Выбрано"
@@ -339,79 +348,82 @@ const BusinessOperationMappingsPage = () => {
         {/* Filters and Actions */}
         <Card>
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <Row gutter={16}>
-              <Col flex="auto">
+            <Row gutter={gutter}>
+              <Col xs={24} sm={24} md={12} lg={12} xl={12}>
                 <Input
                   placeholder="Поиск по названию операции..."
                   prefix={<SearchOutlined />}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   allowClear
+                  size={buttonSize}
                 />
               </Col>
-              <Col>
+              <Col xs={12} sm={12} md={6} lg={6} xl={6}>
                 <Select
                   placeholder="Все статусы"
-                  style={{ width: 150 }}
+                  style={{ width: '100%' }}
                   value={activeFilter}
                   onChange={setActiveFilter}
                   allowClear
+                  size={buttonSize}
                 >
                   <Option value={true}>Активные</Option>
                   <Option value={false}>Неактивные</Option>
                 </Select>
               </Col>
-              <Col>
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  Создать маппинг
+              <Col xs={12} sm={12} md={6} lg={6} xl={6}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleCreate}
+                  size={buttonSize}
+                  block={isMobile}
+                >
+                  {isMobile ? 'Создать' : 'Создать маппинг'}
                 </Button>
               </Col>
             </Row>
 
             {selectedRowKeys.length > 0 && (
-              <Row gutter={8}>
-                <Col>
-                  <Text>Выбрано: {selectedRowKeys.length}</Text>
-                </Col>
-                <Col>
+              <Space direction={isMobile ? 'vertical' : 'horizontal'} size="small" wrap style={{ width: isMobile ? '100%' : 'auto' }}>
+                <Text strong>Выбрано: {selectedRowKeys.length}</Text>
+                <Button
+                  size={buttonSize}
+                  icon={<CheckOutlined />}
+                  onClick={handleBulkActivate}
+                  loading={bulkLoading}
+                  block={isMobile}
+                >
+                  Активировать
+                </Button>
+                <Button
+                  size={buttonSize}
+                  icon={<CloseOutlined />}
+                  onClick={handleBulkDeactivate}
+                  loading={bulkLoading}
+                  block={isMobile}
+                >
+                  Деактивировать
+                </Button>
+                <Popconfirm
+                  title="Удалить выбранные маппинги?"
+                  description="Это действие нельзя отменить"
+                  onConfirm={handleBulkDelete}
+                  okText="Да"
+                  cancelText="Нет"
+                >
                   <Button
-                    size="small"
-                    icon={<CheckOutlined />}
-                    onClick={handleBulkActivate}
+                    size={buttonSize}
+                    danger
+                    icon={<DeleteOutlined />}
                     loading={bulkLoading}
+                    block={isMobile}
                   >
-                    Активировать
+                    Удалить
                   </Button>
-                </Col>
-                <Col>
-                  <Button
-                    size="small"
-                    icon={<CloseOutlined />}
-                    onClick={handleBulkDeactivate}
-                    loading={bulkLoading}
-                  >
-                    Деактивировать
-                  </Button>
-                </Col>
-                <Col>
-                  <Popconfirm
-                    title="Удалить выбранные маппинги?"
-                    description="Это действие нельзя отменить"
-                    onConfirm={handleBulkDelete}
-                    okText="Да"
-                    cancelText="Нет"
-                  >
-                    <Button
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      loading={bulkLoading}
-                    >
-                      Удалить
-                    </Button>
-                  </Popconfirm>
-                </Col>
-              </Row>
+                </Popconfirm>
+              </Space>
             )}
           </Space>
         </Card>
