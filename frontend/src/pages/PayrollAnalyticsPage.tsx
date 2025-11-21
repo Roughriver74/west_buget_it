@@ -33,6 +33,8 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import {
@@ -62,6 +64,8 @@ const MONTH_NAMES = [
 
 export default function PayrollAnalyticsPage() {
   const currentYear = dayjs().year();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [activeTab, setActiveTab] = useState('summary');
   const { selectedDepartment } = useDepartment();
@@ -982,7 +986,7 @@ export default function PayrollAnalyticsPage() {
                     dataSource={taxByEmployee}
                     columns={taxEmployeeColumns}
                     rowKey="employee_id"
-                    pagination={{ pageSize: 10 }}
+                    pagination={{ pageSize: 10 }} mobileLayout="card"
                     scroll={{ x: 1200 }}
                   />
                 </Card>

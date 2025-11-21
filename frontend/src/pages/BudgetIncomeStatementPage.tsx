@@ -27,6 +27,8 @@ import {
 } from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import {
   DollarOutlined,
@@ -103,6 +105,8 @@ interface MonthlyChartData {
 
 const BudgetIncomeStatementPage = () => {
   const currentYear = dayjs().year()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [year, setYear] = useState(currentYear)
   const { selectedDepartment } = useDepartment()
 
@@ -565,7 +569,7 @@ const BudgetIncomeStatementPage = () => {
             label: 'Помесячная детализация',
             children: (
               <Card>
-                <Table
+                <ResponsiveTable
                   dataSource={data.by_month}
                   columns={monthlyColumns}
                   rowKey="month"
@@ -600,7 +604,7 @@ const BudgetIncomeStatementPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация доходов">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.revenue_by_category}
                       columns={categoryColumns}
                       rowKey="category_id"
@@ -641,7 +645,7 @@ const BudgetIncomeStatementPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация расходов">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.expenses_by_category}
                       columns={categoryColumns}
                       rowKey="category_id"
