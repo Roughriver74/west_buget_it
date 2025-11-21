@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { Table, Card, Space, Typography, Row, Col, TableProps, Skeleton, Empty } from 'antd'
 import type { ColumnsType, ColumnType } from 'antd/es/table'
 import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
@@ -90,39 +90,9 @@ export function ResponsiveTable<T extends Record<string, any>>({
     )
   }, [isMobile, isSmallScreen, mobileLayout, loading, skeletonCount])
 
-  // Card Layout for Mobile
-  const cardLayout = useMemo(() => {
-    if (!isMobile || mobileLayout !== 'card') return null
-
-    const renderCard = renderMobileCard || defaultCardRenderer
-    const cardStyle = getResponsiveCardStyle(isMobile, isSmallScreen)
-
-    if (dataSource.length === 0) {
-      return <Empty description="Нет данных" />
-    }
-
-    return (
-      <Space direction="vertical" style={{ width: '100%' }} size="middle">
-        {dataSource.map((record, index) => (
-          <Card
-            key={record.key || record.id || index}
-            size="small"
-            hoverable
-            style={{
-              width: '100%',
-              marginBottom: cardStyle.marginBottom,
-            }}
-            bodyStyle={{ padding: cardStyle.padding }}
-          >
-            {renderCard(record, index)}
-          </Card>
-        ))}
-      </Space>
-    )
-  }, [isMobile, isSmallScreen, mobileLayout, dataSource, renderMobileCard])
-
-  // Default card renderer
-  const defaultCardRenderer = (record: T, _index: number) => {
+  // Default card renderer - MUST be declared before cardLayout useMemo
+  // useCallback to avoid unnecessary re-renders
+  const defaultCardRenderer = useCallback((record: T, _index: number) => {
     return (
       <Space direction="vertical" style={{ width: '100%' }} size="small">
         {(columns as ColumnsType<T>).map((col: ColumnType<T>) => {
@@ -152,7 +122,38 @@ export function ResponsiveTable<T extends Record<string, any>>({
         })}
       </Space>
     )
-  }
+  }, [columns])
+
+  // Card Layout for Mobile
+  const cardLayout = useMemo(() => {
+    if (!isMobile || mobileLayout !== 'card') return null
+
+    const renderCard = renderMobileCard || defaultCardRenderer
+    const cardStyle = getResponsiveCardStyle(isMobile, isSmallScreen)
+
+    if (dataSource.length === 0) {
+      return <Empty description="Нет данных" />
+    }
+
+    return (
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        {dataSource.map((record, index) => (
+          <Card
+            key={record.key || record.id || index}
+            size="small"
+            hoverable
+            style={{
+              width: '100%',
+              marginBottom: cardStyle.marginBottom,
+            }}
+            bodyStyle={{ padding: cardStyle.padding }}
+          >
+            {renderCard(record, index)}
+          </Card>
+        ))}
+      </Space>
+    )
+  }, [isMobile, isSmallScreen, mobileLayout, dataSource, renderMobileCard, defaultCardRenderer])
 
   // Compact Layout (show only important columns)
   const compactTableColumns = useMemo(() => {
