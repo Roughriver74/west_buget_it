@@ -19,12 +19,16 @@ import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   KPIGoal,
   KPIGoalStatus,
   KPIGoalCreate,
   KPIGoalUpdate,
 } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import ImportKPIModal from './ImportKPIModal'
 
 const { Option } = Select
@@ -44,6 +48,8 @@ interface KpiGoalsTabProps {
 
 export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const [goalFilters, setGoalFilters] = useState<{ year: number; status?: KPIGoalStatus }>(() => ({
     year: dayjs().year(),
@@ -296,7 +302,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
           </Space>
         }
       >
-        <Table<KPIGoal>
+        <ResponsiveTable<KPIGoal mobileLayout="card">
           rowKey="id"
           columns={goalColumns}
           dataSource={goals}

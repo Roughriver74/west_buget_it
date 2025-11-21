@@ -19,6 +19,8 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   EmployeeKPIGoal,
   EmployeeKPIGoalCreate,
@@ -26,6 +28,8 @@ import type {
   KPIGoal,
   KPIGoalStatus,
 } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { employeeAPI } from '@/api/payroll'
 import type { Employee } from '@/api/payroll'
 
@@ -51,6 +55,8 @@ interface KpiAssignmentsTabProps {
 
 export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ departmentId, year }) => {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const currentYear = year || dayjs().year()
 
   const [assignmentModal, setAssignmentModal] = useState<{
@@ -351,7 +357,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
           </Button>
         }
       >
-        <Table<EmployeeKPIGoal>
+        <ResponsiveTable<EmployeeKPIGoal mobileLayout="card">
           rowKey="id"
           columns={assignmentColumns}
           dataSource={filteredAssignments}
