@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Row, Col, Statistic, Select, Spin, Tabs, Table, Tag, Progress } from 'antd'
+import { Card, Row, Col, Statistic, Select, Spin, Tabs, Tag, Progress } from 'antd'
 import {
   BarChart,
   Bar,
@@ -14,8 +14,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-} from 'recharts'
+  ResponsiveContainer} from 'recharts'
 import {
   RiseOutlined,
   FallOutlined,
@@ -23,10 +22,8 @@ import {
   BarChartOutlined,
   PieChartOutlined,
   LineChartOutlined,
-  TrophyOutlined,
-} from '@ant-design/icons'
+  TrophyOutlined} from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 
@@ -36,8 +33,6 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const RevenueAnalyticsPage = () => {
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   // Fetch regional breakdown
@@ -46,10 +41,8 @@ const RevenueAnalyticsPage = () => {
     queryFn: () =>
       revenueApi.analytics.getRegionalBreakdown({
         year: selectedYear,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Fetch product mix
   const { data: productMixData, isLoading: isLoadingProductMix } = useQuery({
@@ -57,10 +50,8 @@ const RevenueAnalyticsPage = () => {
     queryFn: () =>
       revenueApi.analytics.getProductMix({
         year: selectedYear,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Fetch monthly trends
   const { data: trendsData, isLoading: isLoadingTrends } = useQuery({
@@ -68,10 +59,8 @@ const RevenueAnalyticsPage = () => {
     queryFn: () =>
       revenueApi.analytics.getMonthlyTrends({
         year: selectedYear,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Fetch top performers
   const { data: topPerformersData, isLoading: isLoadingTopPerformers } = useQuery({
@@ -80,10 +69,8 @@ const RevenueAnalyticsPage = () => {
       revenueApi.analytics.getTopPerformers({
         year: selectedYear,
         limit: 5,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Calculate summary metrics
   const summary = useMemo(() => {
@@ -98,8 +85,7 @@ const RevenueAnalyticsPage = () => {
       totalPlanned,
       totalActual,
       variance,
-      variancePercent,
-    }
+      variancePercent}
   }, [regionalData])
 
   // Format currency
@@ -108,8 +94,7 @@ const RevenueAnalyticsPage = () => {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 0}).format(value)
   }
 
   // Regional breakdown table columns
@@ -119,31 +104,27 @@ const RevenueAnalyticsPage = () => {
       dataIndex: 'stream_name',
       key: 'stream_name',
       fixed: 'left' as const,
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Тип',
       dataIndex: 'stream_type',
       key: 'stream_type',
       width: 120,
-      render: (type: string) => <Tag>{type}</Tag>,
-    },
+      render: (type: string) => <Tag>{type}</Tag>},
     {
       title: 'План',
       dataIndex: 'planned_revenue',
       key: 'planned_revenue',
       width: 150,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Факт',
       dataIndex: 'actual_revenue',
       key: 'actual_revenue',
       width: 150,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Отклонение',
       dataIndex: 'variance',
@@ -155,8 +136,7 @@ const RevenueAnalyticsPage = () => {
           {value >= 0 ? '+' : ''}
           {formatCurrency(value)}
         </span>
-      ),
-    },
+      )},
     {
       title: 'Отклонение, %',
       dataIndex: 'variance_percent',
@@ -168,8 +148,7 @@ const RevenueAnalyticsPage = () => {
           {value >= 0 ? '+' : ''}
           {value.toFixed(1)}%
         </Tag>
-      ),
-    },
+      )},
   ]
 
   // Product mix table columns
@@ -179,23 +158,20 @@ const RevenueAnalyticsPage = () => {
       dataIndex: 'category_name',
       key: 'category_name',
       fixed: 'left' as const,
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Тип',
       dataIndex: 'category_type',
       key: 'category_type',
       width: 120,
-      render: (type: string) => <Tag>{type}</Tag>,
-    },
+      render: (type: string) => <Tag>{type}</Tag>},
     {
       title: 'План',
       dataIndex: 'planned_revenue',
       key: 'planned_revenue',
       width: 150,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Доля плана, %',
       dataIndex: 'planned_share',
@@ -208,16 +184,14 @@ const RevenueAnalyticsPage = () => {
           size="small"
           format={(percent) => `${percent?.toFixed(1)}%`}
         />
-      ),
-    },
+      )},
     {
       title: 'Факт',
       dataIndex: 'actual_revenue',
       key: 'actual_revenue',
       width: 150,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Доля факта, %',
       dataIndex: 'actual_share',
@@ -230,8 +204,7 @@ const RevenueAnalyticsPage = () => {
           size="small"
           format={(percent) => `${percent?.toFixed(1)}%`}
         />
-      ),
-    },
+      )},
   ]
 
   if (!selectedDepartment) {
@@ -381,8 +354,7 @@ const RevenueAnalyticsPage = () => {
                     </div>
                   )}
                 </div>
-              ),
-            },
+              )},
             {
               key: 'regional',
               label: (
@@ -433,8 +405,7 @@ const RevenueAnalyticsPage = () => {
                     </div>
                   )}
                 </div>
-              ),
-            },
+              )},
             {
               key: 'product-mix',
               label: (
@@ -515,8 +486,7 @@ const RevenueAnalyticsPage = () => {
                     </div>
                   )}
                 </div>
-              ),
-            },
+              )},
             {
               key: 'top-performers',
               label: (
@@ -546,8 +516,7 @@ const RevenueAnalyticsPage = () => {
                                   borderBottom:
                                     index < topPerformersData.top_regions.length - 1
                                       ? '1px solid #f0f0f0'
-                                      : 'none',
-                                }}
+                                      : 'none'}}
                               >
                                 <Row justify="space-between" align="middle">
                                   <Col>
@@ -582,8 +551,7 @@ const RevenueAnalyticsPage = () => {
                                   borderBottom:
                                     index < topPerformersData.top_categories.length - 1
                                       ? '1px solid #f0f0f0'
-                                      : 'none',
-                                }}
+                                      : 'none'}}
                               >
                                 <Row justify="space-between" align="middle">
                                   <Col>
@@ -614,8 +582,7 @@ const RevenueAnalyticsPage = () => {
                     </div>
                   )}
                 </div>
-              ),
-            },
+              )},
           ]}
         />
       </Card>

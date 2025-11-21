@@ -10,7 +10,6 @@ import {
   Typography,
   Spin,
   Alert,
-  Table,
   Tag,
 } from 'antd'
 import {
@@ -28,6 +27,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi } from '@/api'
 import type { ForecastMethod } from '@/types'
 import { formatCurrency } from '@/utils/formatters'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
@@ -40,8 +40,6 @@ interface PaymentForecastChartProps {
 const PaymentForecastChart: React.FC<PaymentForecastChartProps> = ({
   defaultMethod = 'simple_average',
 }) => {
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().add(1, 'day'),
     dayjs().add(30, 'days'),

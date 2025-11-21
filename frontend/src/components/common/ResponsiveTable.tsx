@@ -197,15 +197,7 @@ export function ResponsiveTable<T extends Record<string, any>>({
     return sticky
   }, [isMobile, sticky])
 
-  // Render card layout on mobile
-  if (isMobile && mobileLayout === 'card') {
-    if (loading && skeletonCards) {
-      return <>{skeletonCards}</>
-    }
-    return <>{cardLayout}</>
-  }
-
-  // Render compact or scroll table
+  // Calculate pagination config BEFORE any conditional returns (React Hooks rule)
   const responsivePaginationConfig = useMemo(() => {
     if (restProps.pagination === false) return false
 
@@ -217,6 +209,16 @@ export function ResponsiveTable<T extends Record<string, any>>({
       pageSize: (restProps.pagination as any)?.pageSize || defaultPagination.pageSize,
     }
   }, [isMobile, isSmallScreen, restProps.pagination])
+
+  // Render card layout on mobile
+  if (isMobile && mobileLayout === 'card') {
+    if (loading && skeletonCards) {
+      return <>{skeletonCards}</>
+    }
+    return <>{cardLayout}</>
+  }
+
+  // Render compact or scroll table
 
   return (
     <div style={{ width: '100%', overflowX: 'auto' }}>

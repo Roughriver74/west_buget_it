@@ -5,7 +5,6 @@ import {
   Card,
   Space,
   Button,
-  Table,
   Modal,
   Form,
   Input,
@@ -15,19 +14,16 @@ import {
   Popconfirm,
   Tooltip,
   Row,
-  Col,
-} from 'antd'
+  Col} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   ArrowUpOutlined,
-  ArrowDownOutlined,
-} from '@ant-design/icons'
+  ArrowDownOutlined} from '@ant-design/icons'
 import { revenueActualsApi, revenueStreamsApi, revenueCategoriesApi } from '@/api'
 import type { RevenueActual, RevenueActualCreate, RevenueActualUpdate } from '@/types/revenue'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
@@ -38,8 +34,6 @@ const { Title } = Typography
 const RevenueActualsPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -49,22 +43,19 @@ const RevenueActualsPage = () => {
   // Fetch revenue actuals
   const { data: actuals, isLoading, error } = useQuery({
     queryKey: ['revenue-actuals', year, selectedDepartment?.id],
-    queryFn: () => revenueActualsApi.getAll({ year, department_id: selectedDepartment?.id }),
-  })
+    queryFn: () => revenueActualsApi.getAll({ year, department_id: selectedDepartment?.id })})
 
   // Fetch streams for select
   const { data: streams } = useQuery({
     queryKey: ['revenue-streams', selectedDepartment?.id],
     queryFn: () =>
-      revenueStreamsApi.getAll({ is_active: true, department_id: selectedDepartment?.id }),
-  })
+      revenueStreamsApi.getAll({ is_active: true, department_id: selectedDepartment?.id })})
 
   // Fetch categories for select
   const { data: categories } = useQuery({
     queryKey: ['revenue-categories', selectedDepartment?.id],
     queryFn: () =>
-      revenueCategoriesApi.getAll({ is_active: true, department_id: selectedDepartment?.id }),
-  })
+      revenueCategoriesApi.getAll({ is_active: true, department_id: selectedDepartment?.id })})
 
   // Create mutation
   const createMutation = useMutation({
@@ -77,8 +68,7 @@ const RevenueActualsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при добавлении дохода')
-    },
-  })
+    }})
 
   // Update mutation
   const updateMutation = useMutation({
@@ -93,8 +83,7 @@ const RevenueActualsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при обновлении дохода')
-    },
-  })
+    }})
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -105,8 +94,7 @@ const RevenueActualsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при удалении дохода')
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setEditingActual(null)
@@ -132,8 +120,7 @@ const RevenueActualsPage = () => {
       // Add selected department_id to ensure multi-tenancy
       const dataWithDepartment = {
         ...values,
-        department_id: selectedDepartment?.id,
-      }
+        department_id: selectedDepartment?.id}
 
       if (editingActual) {
         updateMutation.mutate({ id: editingActual.id, data: dataWithDepartment })
@@ -150,8 +137,7 @@ const RevenueActualsPage = () => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(value)
+      minimumFractionDigits: 0}).format(value)
   }
 
   const getMonthName = (month: number) => {
@@ -177,15 +163,13 @@ const RevenueActualsPage = () => {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 80,
-    },
+      width: 80},
     {
       title: 'Месяц',
       dataIndex: 'month',
       key: 'month',
       width: 120,
-      render: (month: number) => getMonthName(month),
-    },
+      render: (month: number) => getMonthName(month)},
     {
       title: 'Поток доходов',
       dataIndex: 'revenue_stream_id',
@@ -194,8 +178,7 @@ const RevenueActualsPage = () => {
         if (!streamId) return '-'
         const stream = streams?.find((s) => s.id === streamId)
         return stream?.name || '-'
-      },
-    },
+      }},
     {
       title: 'Категория',
       dataIndex: 'revenue_category_id',
@@ -204,22 +187,19 @@ const RevenueActualsPage = () => {
         if (!categoryId) return '-'
         const category = categories?.find((c) => c.id === categoryId)
         return category?.name || '-'
-      },
-    },
+      }},
     {
       title: 'Факт',
       dataIndex: 'actual_amount',
       key: 'actual_amount',
       width: 150,
-      render: (amount: number) => formatCurrency(amount),
-    },
+      render: (amount: number) => formatCurrency(amount)},
     {
       title: 'План',
       dataIndex: 'planned_amount',
       key: 'planned_amount',
       width: 150,
-      render: (amount: number) => formatCurrency(amount),
-    },
+      render: (amount: number) => formatCurrency(amount)},
     {
       title: 'Отклонение',
       dataIndex: 'variance',
@@ -240,8 +220,7 @@ const RevenueActualsPage = () => {
             </span>
           </Space>
         )
-      },
-    },
+      }},
     {
       title: 'Действия',
       key: 'actions',
@@ -263,8 +242,7 @@ const RevenueActualsPage = () => {
             </Popconfirm>
           </Tooltip>
         </Space>
-      ),
-    },
+      )},
   ]
 
   if (isLoading) {
@@ -319,8 +297,7 @@ const RevenueActualsPage = () => {
               style={{
                 fontSize: 18,
                 fontWeight: 600,
-                color: totalVariance >= 0 ? '#52c41a' : '#f5222d',
-              }}
+                color: totalVariance >= 0 ? '#52c41a' : '#f5222d'}}
             >
               {formatCurrency(totalVariance)}
             </div>
@@ -343,8 +320,7 @@ const RevenueActualsPage = () => {
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
-            showTotal: (total) => `Всего: ${total}`,
-          }}
+            showTotal: (total) => `Всего: ${total}`}}
         />
       </Card>
 
@@ -386,8 +362,7 @@ const RevenueActualsPage = () => {
                 <Select
                   options={Array.from({ length: 12 }, (_, i) => ({
                     value: i + 1,
-                    label: getMonthName(i + 1),
-                  }))}
+                    label: getMonthName(i + 1)}))}
                 />
               </Form.Item>
             </Col>

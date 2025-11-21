@@ -3,8 +3,7 @@
  * Displays side-by-side comparison of two budget versions
  */
 import React, { useMemo } from 'react'
-import { Modal, Table, Card, Row, Col, Statistic, Descriptions, Space, Tag, Spin, Alert } from 'antd'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { Modal, Card, Row, Col, Statistic, Descriptions, Space, Tag, Spin, Alert } from 'antd'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -21,33 +20,26 @@ interface BudgetVersionComparisonModalProps {
 const currencyFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
-  maximumFractionDigits: 0,
-})
+  maximumFractionDigits: 0})
 
 const percentFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'percent',
   minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-})
+  maximumFractionDigits: 1})
 
 export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModalProps> = ({
   open,
   version1Id,
   version2Id,
-  onClose,
-}) => {
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
+  onClose}) => {
   const shouldFetch = open && !!version1Id && !!version2Id
 
   const {
     data: comparison,
     isLoading,
     isError,
-    error,
-  } = useVersionComparison(version1Id ?? 0, version2Id ?? 0, {
-    enabled: shouldFetch,
-  })
+    error} = useVersionComparison(version1Id ?? 0, version2Id ?? 0, {
+    enabled: shouldFetch})
 
   const totalDifferencePercent = useMemo(() => {
     if (!comparison) return 0
@@ -69,24 +61,21 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
       dataIndex: 'category_name',
       key: 'category_name',
       width: 250,
-      fixed: 'left',
-    },
+      fixed: 'left'},
     {
       title: comparison?.version1.version_name || `Версия ${comparison?.version1.version_number}`,
       dataIndex: 'version1_amount',
       key: 'version1_amount',
       align: 'right',
       width: 180,
-      render: (value: number) => currencyFormatter.format(Number(value || 0)),
-    },
+      render: (value: number) => currencyFormatter.format(Number(value || 0))},
     {
       title: comparison?.version2.version_name || `Версия ${comparison?.version2.version_number}`,
       dataIndex: 'version2_amount',
       key: 'version2_amount',
       align: 'right',
       width: 180,
-      render: (value: number) => currencyFormatter.format(Number(value || 0)),
-    },
+      render: (value: number) => currencyFormatter.format(Number(value || 0))},
     {
       title: 'Разница, ₽',
       dataIndex: 'difference_amount',
@@ -102,8 +91,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
             {currencyFormatter.format(diff)}
           </span>
         )
-      },
-    },
+      }},
     {
       title: 'Изменение, %',
       dataIndex: 'difference_percent',
@@ -127,8 +115,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
             {percentFormatter.format(percent)}
           </Tag>
         )
-      },
-    },
+      }},
   ]
 
   return (
@@ -200,8 +187,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
                   value={Number(comparison.total_difference_amount || 0)}
                   precision={0}
                   valueStyle={{
-                    color: Number(comparison.total_difference_amount || 0) > 0 ? '#cf1322' : '#3f8600',
-                  }}
+                    color: Number(comparison.total_difference_amount || 0) > 0 ? '#cf1322' : '#3f8600'}}
                   prefix={Number(comparison.total_difference_amount || 0) > 0 ? '+' : ''}
                   suffix="₽"
                 />
@@ -212,8 +198,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
                   value={Math.abs(totalDifferencePercent * 100)}
                   precision={1}
                   valueStyle={{
-                    color: totalDifferencePercent > 0 ? '#cf1322' : '#3f8600',
-                  }}
+                    color: totalDifferencePercent > 0 ? '#cf1322' : '#3f8600'}}
                   prefix={
                     totalDifferencePercent > 0 ? (
                       <ArrowUpOutlined />

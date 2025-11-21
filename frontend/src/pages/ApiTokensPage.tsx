@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Card,
-  Table,
   Button,
   Space,
   Tag,
@@ -22,7 +21,6 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/ru';
 
 import AppLayout from '../components/common/AppLayout';
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
 import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import CreateTokenModal from '../components/apiTokens/CreateTokenModal';
 import ShowTokenModal from '../components/apiTokens/ShowTokenModal';
@@ -37,8 +35,6 @@ const { confirm } = Modal;
 
 const ApiTokensPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
-  const isSmallScreen = useIsSmallScreen();
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState<{

@@ -11,7 +11,7 @@
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Typography, Card, Row, Col, Select, Statistic, Table, Tabs, Space, Tag } from 'antd'
+import { Typography, Card, Row, Col, Select, Statistic, Tabs, Space, Tag } from 'antd'
 import {
   LineChart,
   Line,
@@ -25,11 +25,9 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Area,
-  AreaChart,
-} from 'recharts'
+  AreaChart} from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import {
@@ -38,8 +36,7 @@ import {
   PercentageOutlined,
   DollarOutlined,
   RiseOutlined,
-  FallOutlined,
-} from '@ant-design/icons'
+  FallOutlined} from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import ExportButton from '@/components/common/ExportButton'
@@ -98,23 +95,18 @@ const CustomerMetricsAnalyticsPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
 
   // Fetch customer metrics analytics
   const {
     data,
     isLoading,
     error,
-    refetch,
-  } = useQuery<CustomerMetricsAnalytics>({
+    refetch} = useQuery<CustomerMetricsAnalytics>({
     queryKey: ['customer-metrics-analytics', year, selectedDepartment?.id],
     queryFn: () =>
       analyticsApi.getCustomerMetricsAnalytics({
         year,
-        department_id: selectedDepartment?.id,
-      }),
-  })
+        department_id: selectedDepartment?.id})})
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('ru-RU').format(value)
@@ -125,8 +117,7 @@ const CustomerMetricsAnalyticsPage = () => {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 0}).format(value)
   }
 
   const formatPercent = (value: number) => {
@@ -164,8 +155,7 @@ const CustomerMetricsAnalyticsPage = () => {
     'ОКБ': item.total_customer_base,
     'АКБ': item.active_customer_base,
     'Покрытие %': item.coverage_rate,
-    'Средний чек': item.avg_order_value,
-  }))
+    'Средний чек': item.avg_order_value}))
 
   // Monthly table columns
   const monthlyColumns = [
@@ -174,57 +164,49 @@ const CustomerMetricsAnalyticsPage = () => {
       dataIndex: 'month_name',
       key: 'month_name',
       width: 120,
-      fixed: 'left' as const,
-    },
+      fixed: 'left' as const},
     {
       title: 'ОКБ',
       dataIndex: 'total_customer_base',
       key: 'total_customer_base',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'АКБ',
       dataIndex: 'active_customer_base',
       key: 'active_customer_base',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Покрытие',
       dataIndex: 'coverage_rate',
       key: 'coverage_rate',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
     {
       title: 'Средний чек',
       dataIndex: 'avg_order_value',
       key: 'avg_order_value',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Чек (Обычные)',
       dataIndex: 'avg_order_value_regular',
       key: 'avg_order_value_regular',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Чек (Сети)',
       dataIndex: 'avg_order_value_network',
       key: 'avg_order_value_network',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Чек (Новые)',
       dataIndex: 'avg_order_value_new',
       key: 'avg_order_value_new',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
   ]
 
   // Stream columns
@@ -233,57 +215,49 @@ const CustomerMetricsAnalyticsPage = () => {
       title: 'Поток доходов',
       dataIndex: 'revenue_stream_name',
       key: 'revenue_stream_name',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'ОКБ',
       dataIndex: 'total_customer_base',
       key: 'total_customer_base',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'АКБ',
       dataIndex: 'active_customer_base',
       key: 'active_customer_base',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Покрытие',
       dataIndex: 'coverage_rate',
       key: 'coverage_rate',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
     {
       title: 'Средний чек',
       dataIndex: 'avg_order_value',
       key: 'avg_order_value',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Обычные',
       dataIndex: 'regular_clinics',
       key: 'regular_clinics',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Сети',
       dataIndex: 'network_clinics',
       key: 'network_clinics',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Новые',
       dataIndex: 'new_clinics',
       key: 'new_clinics',
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
   ]
 
   return (
@@ -525,8 +499,7 @@ const CustomerMetricsAnalyticsPage = () => {
                   </Card>
                 </Col>
               </Row>
-            ),
-          },
+            )},
           {
             key: 'monthly',
             label: 'Помесячная детализация',
@@ -540,8 +513,7 @@ const CustomerMetricsAnalyticsPage = () => {
                   scroll={{ x: 1200 }}
                 />
               </Card>
-            ),
-          },
+            )},
           {
             key: 'streams',
             label: 'По потокам доходов',
@@ -578,8 +550,7 @@ const CustomerMetricsAnalyticsPage = () => {
               <Card>
                 <Text type="secondary">Нет данных по потокам доходов</Text>
               </Card>
-            ),
-          },
+            )},
         ]}
       />
     </div>

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Typography, Card, Select, Space, Table, Tag, Spin, Alert } from 'antd'
+import { Table,  Typography, Card, Select, Space, Tag, Spin, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
@@ -31,8 +30,6 @@ interface BalanceData {
 
 const BalanceAnalyticsPage: React.FC = () => {
   const currentYear = new Date().getFullYear()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)

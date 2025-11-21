@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Card, Row, Col, Statistic, Table, Empty, Spin, Tag } from 'antd'
+import { Card, Row, Col, Statistic, Empty, Spin, Tag } from 'antd'
 import {
   TrophyOutlined,
   PercentageOutlined,
   RiseOutlined,
-  BankOutlined,
-} from '@ant-design/icons'
+  BankOutlined} from '@ant-design/icons'
 import {
   Bar,
   Line,
@@ -15,22 +14,17 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
-} from 'recharts'
+  ComposedChart} from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import ExportButton from '@/legacy/components/ExportButton'
 import CreditPortfolioFilters, {
-  type CreditPortfolioFilterValues,
-} from '@/components/bank/CreditPortfolioFilters'
+  type CreditPortfolioFilterValues} from '@/components/bank/CreditPortfolioFilters'
 
 export default function CreditPortfolioAnalyticsPage() {
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
   // Fetch summary for KPI metrics
@@ -40,10 +34,8 @@ export default function CreditPortfolioAnalyticsPage() {
       creditPortfolioApi.getSummary({
         department_id: selectedDepartment?.id,
         date_from: filters.dateFrom,
-        date_to: filters.dateTo,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        date_to: filters.dateTo}),
+    enabled: !!selectedDepartment})
 
   // Fetch monthly efficiency
   const { data: monthlyEfficiency, isLoading: monthlyLoading } = useQuery({
@@ -54,10 +46,8 @@ export default function CreditPortfolioAnalyticsPage() {
         date_from: filters.dateFrom,
         date_to: filters.dateTo,
         organization_id: filters.organizationIds?.[0],
-        bank_account_id: filters.bankAccountIds?.[0],
-      }),
-    enabled: !!selectedDepartment,
-  })
+        bank_account_id: filters.bankAccountIds?.[0]}),
+    enabled: !!selectedDepartment})
 
   // Fetch organization efficiency
   const { data: orgEfficiency, isLoading: orgLoading } = useQuery({
@@ -67,10 +57,8 @@ export default function CreditPortfolioAnalyticsPage() {
         department_id: selectedDepartment?.id,
         date_from: filters.dateFrom,
         date_to: filters.dateTo,
-        organization_id: filters.organizationIds?.[0],
-      }),
-    enabled: !!selectedDepartment,
-  })
+        organization_id: filters.organizationIds?.[0]}),
+    enabled: !!selectedDepartment})
 
   const isLoading = summaryLoading || monthlyLoading || orgLoading
 
@@ -82,11 +70,10 @@ export default function CreditPortfolioAnalyticsPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: '400px',
-        }}
+          minHeight: '400px'}}
       >
         <Spin size='large' tip='Загрузка аналитики...'>
-          <div style={{ minHeight: 200 }}  mobileLayout="card" />
+          <div style={{ minHeight: 200 }} />
         </Spin>
       </div>
     )
@@ -98,7 +85,7 @@ export default function CreditPortfolioAnalyticsPage() {
         <h1 style={{ marginBottom: 24 }}>
           Кредитный портфель - Расширенная аналитика
         </h1>
-        <Empty description='Нет данных'  mobileLayout="card" />
+        <Empty description='Нет данных'  />
       </div>
     )
   }
@@ -132,8 +119,7 @@ export default function CreditPortfolioAnalyticsPage() {
           ? ((item.principal / (item.principal + item.interest)) * 100).toFixed(
               1
             )
-          : 0,
-    })) || []
+          : 0})) || []
 
   // Organization efficiency table columns
   const orgColumns = [
@@ -141,8 +127,7 @@ export default function CreditPortfolioAnalyticsPage() {
       title: 'Организация',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string) => <strong>{text}</strong>,
-    },
+      render: (text: string) => <strong>{text}</strong>},
     {
       title: 'Получено',
       dataIndex: 'received',
@@ -152,22 +137,19 @@ export default function CreditPortfolioAnalyticsPage() {
           {value.toLocaleString('ru-RU')} ₽
         </span>
       ),
-      sorter: (a: any, b: any) => a.received - b.received,
-    },
+      sorter: (a: any, b: any) => a.received - b.received},
     {
       title: 'Погашено тела',
       dataIndex: 'principal',
       key: 'principal',
       render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-      sorter: (a: any, b: any) => a.principal - b.principal,
-    },
+      sorter: (a: any, b: any) => a.principal - b.principal},
     {
       title: 'Уплачено %',
       dataIndex: 'interest',
       key: 'interest',
       render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-      sorter: (a: any, b: any) => a.interest - b.interest,
-    },
+      sorter: (a: any, b: any) => a.interest - b.interest},
     {
       title: 'Всего выплачено',
       key: 'total',
@@ -176,8 +158,7 @@ export default function CreditPortfolioAnalyticsPage() {
         return `${total.toLocaleString('ru-RU')} ₽`
       },
       sorter: (a: any, b: any) =>
-        a.principal + a.interest - (b.principal + b.interest),
-    },
+        a.principal + a.interest - (b.principal + b.interest)},
     {
       title: 'Эффективность',
       key: 'efficiency',
@@ -203,8 +184,7 @@ export default function CreditPortfolioAnalyticsPage() {
             ? (b.principal / (b.principal + b.interest)) * 100
             : 0
         return aEff - bEff
-      },
-    },
+      }},
   ]
 
   const dateTickFormatter = (value: string) => {
@@ -234,8 +214,7 @@ export default function CreditPortfolioAnalyticsPage() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 24,
-        }}
+          marginBottom: 24}}
       >
         <h1 style={{ margin: 0 }}>
           Кредитный портфель - Расширенная аналитика
@@ -244,14 +223,14 @@ export default function CreditPortfolioAnalyticsPage() {
           targetId='analytics-content'
           fileName='credit-analytics'
           data={orgEfficiency || []}
-         mobileLayout="card" />
+         />
       </div>
 
       {/* Filters */}
       <CreditPortfolioFilters
         onFilterChange={setFilters}
         initialValues={filters}
-       mobileLayout="card" />
+       />
 
       <div id='analytics-content'>
 
@@ -266,7 +245,7 @@ export default function CreditPortfolioAnalyticsPage() {
               suffix='%'
               prefix={<PercentageOutlined />}
               valueStyle={{ color: '#1890ff' }}
-             mobileLayout="card" />
+             />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Отношение процентов к общей сумме выплат
             </p>
@@ -282,7 +261,7 @@ export default function CreditPortfolioAnalyticsPage() {
               suffix='%'
               prefix={<RiseOutlined />}
               valueStyle={{ color: '#52c41a' }}
-             mobileLayout="card" />
+             />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Отношение списаний к поступлениям
             </p>
@@ -295,7 +274,7 @@ export default function CreditPortfolioAnalyticsPage() {
               title='Активных договоров'
               value={activeContracts}
               prefix={<TrophyOutlined />}
-             mobileLayout="card" />
+             />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Количество действующих кредитных договоров
             </p>
@@ -311,9 +290,8 @@ export default function CreditPortfolioAnalyticsPage() {
               suffix='%'
               prefix={<BankOutlined />}
               valueStyle={{
-                color: parseFloat(debtRatio) > 100 ? '#cf1322' : '#3f8600',
-              }}
-             mobileLayout="card" />
+                color: parseFloat(debtRatio) > 100 ? '#cf1322' : '#3f8600'}}
+             />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Списания относительно поступлений
             </p>
@@ -331,17 +309,17 @@ export default function CreditPortfolioAnalyticsPage() {
         </p>
         <ResponsiveContainer width='100%' height={400}>
           <ComposedChart data={monthlyChartData}>
-            <CartesianGrid strokeDasharray='3 3'  mobileLayout="card" />
-            <XAxis dataKey='month' tickFormatter={dateTickFormatter}  mobileLayout="card" />
+            <CartesianGrid strokeDasharray='3 3'  />
+            <XAxis dataKey='month' tickFormatter={dateTickFormatter}  />
             <YAxis
               yAxisId='left'
               tickFormatter={value => `${(value / 1000000).toFixed(1)}M`}
-             mobileLayout="card" />
+             />
             <YAxis
               yAxisId='right'
               orientation='right'
               tickFormatter={value => `${value}%`}
-             mobileLayout="card" />
+             />
             <Tooltip
               formatter={(value: any, name: string) => {
                 if (name === 'Эффективность') {
@@ -349,20 +327,20 @@ export default function CreditPortfolioAnalyticsPage() {
                 }
                 return `${Number(value).toLocaleString('ru-RU')} ₽`
               }}
-             mobileLayout="card" />
-            <Legend  mobileLayout="card" />
+             />
+            <Legend  />
             <Bar
               yAxisId='left'
               dataKey='principal'
               name='Погашено тела'
               fill='#10B981'
-             mobileLayout="card" />
+             />
             <Bar
               yAxisId='left'
               dataKey='interest'
               name='Уплачено %'
               fill='#F59E0B'
-             mobileLayout="card" />
+             />
             <Line
               yAxisId='right'
               type='monotone'
@@ -370,7 +348,7 @@ export default function CreditPortfolioAnalyticsPage() {
               name='Эффективность'
               stroke='#3B82F6'
               strokeWidth={2}
-             mobileLayout="card" />
+             />
           </ComposedChart>
         </ResponsiveContainer>
       </Card>
@@ -381,7 +359,7 @@ export default function CreditPortfolioAnalyticsPage() {
           Детализация платежей и эффективности погашения по организациям
         </p>
         {!orgEfficiency || orgEfficiency.length === 0 ? (
-          <Empty description='Нет данных по организациям'  mobileLayout="card" />
+          <Empty description='Нет данных по организациям'  />
         ) : (
           <ResponsiveTable
             columns={orgColumns}
@@ -390,7 +368,7 @@ export default function CreditPortfolioAnalyticsPage() {
               record.organization || record.name || index
             }
             pagination={{ pageSize: 10 }}
-           mobileLayout="card" />
+           />
         )}
       </Card>
 

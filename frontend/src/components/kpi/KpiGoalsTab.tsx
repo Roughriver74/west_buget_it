@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Card,
   Button,
-  Table,
   Tag,
   Space,
   Modal,
@@ -12,23 +11,18 @@ import {
   Select,
   message,
   Radio,
-  Typography,
-} from 'antd'
+  Typography} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   KPIGoal,
   KPIGoalStatus,
   KPIGoalCreate,
-  KPIGoalUpdate,
-} from '@/api/kpi'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
-import { ResponsiveTable } from '@/components/common/ResponsiveTable'
+  KPIGoalUpdate} from '@/api/kpi'
 import ImportKPIModal from './ImportKPIModal'
 
 const { Option } = Select
@@ -39,8 +33,7 @@ const statusColor: Record<KPIGoalStatus, string> = {
   ACTIVE: 'processing',
   ACHIEVED: 'success',
   NOT_ACHIEVED: 'error',
-  CANCELLED: 'warning',
-}
+  CANCELLED: 'warning'}
 
 interface KpiGoalsTabProps {
   departmentId?: number
@@ -48,16 +41,12 @@ interface KpiGoalsTabProps {
 
 export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
 
   const [goalFilters, setGoalFilters] = useState<{ year: number; status?: KPIGoalStatus }>(() => ({
-    year: dayjs().year(),
-  }))
+    year: dayjs().year()}))
 
   const [goalModal, setGoalModal] = useState<{ open: boolean; editing?: KPIGoal }>({
-    open: false,
-  })
+    open: false})
 
   const [importModalVisible, setImportModalVisible] = useState(false)
 
@@ -70,10 +59,8 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       kpiApi.listGoals({
         year: goalFilters.year,
         status: goalFilters.status,
-        department_id: departmentId,
-      }),
-    enabled: !!departmentId,
-  })
+        department_id: departmentId}),
+    enabled: !!departmentId})
 
   // Mutations
   const createGoalMutation = useMutation({
@@ -81,8 +68,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
     onSuccess: () => {
       message.success('Цель KPI создана')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const updateGoalMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: KPIGoalUpdate }) =>
@@ -90,16 +76,14 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
     onSuccess: () => {
       message.success('Цель KPI обновлена')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const deleteGoalMutation = useMutation({
     mutationFn: (id: number) => kpiApi.deleteGoal(id),
     onSuccess: () => {
       message.success('Цель KPI удалена')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const goals = goalsQuery.data || []
 
@@ -120,8 +104,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       year: goal.year,
       is_annual: goal.is_annual,
       status: goal.status,
-      department_id: goal.department_id,
-    })
+      department_id: goal.department_id})
   }
 
   const onCreateGoal = () => {
@@ -132,8 +115,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       department_id: departmentId,
       is_annual: true,
       weight: 100,
-      status: 'ACTIVE',
-    })
+      status: 'ACTIVE'})
   }
 
   const handleGoalSubmit = async () => {
@@ -148,14 +130,12 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       target_value: values.target_value ?? null,
       weight: values.weight ?? 100,
       department_id: departmentId,
-      is_annual: Boolean(values.is_annual),
-    } as KPIGoalCreate
+      is_annual: Boolean(values.is_annual)} as KPIGoalCreate
 
     if (goalModal.editing) {
       await updateGoalMutation.mutateAsync({
         id: goalModal.editing.id,
-        payload,
-      })
+        payload})
     } else {
       await createGoalMutation.mutateAsync(payload)
     }
@@ -182,23 +162,20 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             </Text>
           )}
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Категория',
       dataIndex: 'category',
       key: 'category',
       width: 140,
-      render: (value) => value || '—',
-    },
+      render: (value) => value || '—'},
     {
       title: 'Метрика',
       dataIndex: 'metric_name',
       key: 'metric_name',
       width: 160,
       render: (_, record) =>
-        record.metric_name ? `${record.metric_name} (${record.metric_unit || ''})` : '—',
-    },
+        record.metric_name ? `${record.metric_name} (${record.metric_unit || ''})` : '—'},
     {
       title: 'Цель',
       dataIndex: 'target_value',
@@ -207,36 +184,31 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       render: (value) =>
         value !== null && value !== undefined
           ? Number(value).toLocaleString('ru-RU')
-          : '—',
-    },
+          : '—'},
     {
       title: 'Вес',
       dataIndex: 'weight',
       key: 'weight',
       width: 80,
       render: (value) =>
-        value !== null && value !== undefined ? `${Number(value)} %` : '—',
-    },
+        value !== null && value !== undefined ? `${Number(value)} %` : '—'},
     {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 80,
-    },
+      width: 80},
     {
       title: 'Тип',
       dataIndex: 'is_annual',
       key: 'is_annual',
       width: 120,
-      render: (value) => (value ? 'Годовая' : 'Месячная'),
-    },
+      render: (value) => (value ? 'Годовая' : 'Месячная')},
     {
       title: 'Статус',
       dataIndex: 'status',
       key: 'status',
       width: 140,
-      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>,
-    },
+      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>},
     {
       title: 'Действия',
       key: 'actions',
@@ -252,15 +224,13 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             onClick={async () => {
               Modal.confirm({
                 title: 'Удалить KPI цель?',
-                onOk: () => deleteGoalMutation.mutate(record.id),
-              })
+                onOk: () => deleteGoalMutation.mutate(record.id)})
             }}
           >
             Удалить
           </Button>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (

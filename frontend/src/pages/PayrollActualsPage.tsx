@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Table, Button, Space, Select, message, Popconfirm, Card, Statistic, Row, Col } from 'antd'
+import { Button, Space, Select, message, Popconfirm, Card, Statistic, Row, Col } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import { payrollActualAPI, employeeAPI, PayrollActualWithEmployee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
 import PayrollActualFormModal from '@/components/payroll/PayrollActualFormModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 
@@ -30,8 +29,6 @@ const MONTHS = [
 const PayrollActualsPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const currentYear = new Date().getFullYear()
 
   const [selectedYear, setSelectedYear] = useState(currentYear)
@@ -54,15 +51,12 @@ const PayrollActualsPage = () => {
         department_id: selectedDepartment?.id,
         year: selectedYear,
         month: selectedMonth,
-        employee_id: selectedEmployeeId,
-      }),
-  })
+        employee_id: selectedEmployeeId})})
 
   // Fetch employees for filter
   const { data: employees = [] } = useQuery({
     queryKey: ['employees', selectedDepartment?.id],
-    queryFn: () => employeeAPI.list({ department_id: selectedDepartment?.id }),
-  })
+    queryFn: () => employeeAPI.list({ department_id: selectedDepartment?.id })})
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -73,8 +67,7 @@ const PayrollActualsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при удалении выплаты')
-    },
-  })
+    }})
 
   // Calculate statistics
   const totalPaid = actuals.reduce((sum, a) => sum + Number(a.total_paid), 0)
@@ -100,8 +93,7 @@ const PayrollActualsPage = () => {
       await payrollActualAPI.exportToExcel({
         year: selectedYear,
         month: selectedMonth,
-        department_id: selectedDepartment?.id,
-      })
+        department_id: selectedDepartment?.id})
       message.success('Экспорт выполнен успешно')
     } catch (error) {
       message.error('Ошибка при экспорте')
@@ -114,91 +106,79 @@ const PayrollActualsPage = () => {
       dataIndex: ['employee', 'full_name'],
       key: 'employee',
       width: 200,
-      fixed: 'left' as const,
-    },
+      fixed: 'left' as const},
     {
       title: 'Должность',
       dataIndex: ['employee', 'position'],
       key: 'position',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
       width: 80,
-      align: 'center' as const,
-    },
+      align: 'center' as const},
     {
       title: 'Месяц',
       dataIndex: 'month',
       key: 'month',
       width: 120,
-      render: (month: number) => MONTHS.find(m => m.value === month)?.label || month,
-    },
+      render: (month: number) => MONTHS.find(m => m.value === month)?.label || month},
     {
       title: 'Дата выплаты',
       dataIndex: 'payment_date',
       key: 'payment_date',
       width: 120,
-      render: (date: string) => date ? dayjs(date).format('DD.MM.YYYY') : '-',
-    },
+      render: (date: string) => date ? dayjs(date).format('DD.MM.YYYY') : '-'},
     {
       title: 'Оклад',
       dataIndex: 'base_salary_paid',
       key: 'base_salary_paid',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Мес. премия',
       dataIndex: 'monthly_bonus_paid',
       key: 'monthly_bonus_paid',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Квар. премия',
       dataIndex: 'quarterly_bonus_paid',
       key: 'quarterly_bonus_paid',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Год. премия',
       dataIndex: 'annual_bonus_paid',
       key: 'annual_bonus_paid',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Прочее',
       dataIndex: 'other_payments_paid',
       key: 'other_payments_paid',
       width: 100,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'НДФЛ',
       dataIndex: 'income_tax_amount',
       key: 'income_tax_amount',
       width: 100,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Страховые',
       dataIndex: 'social_tax_amount',
       key: 'social_tax_amount',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Всего выплачено',
       dataIndex: 'total_paid',
@@ -209,8 +189,7 @@ const PayrollActualsPage = () => {
         <span style={{ fontWeight: 'bold', color: '#52c41a' }}>
           {formatCurrency(value)}
         </span>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -243,8 +222,7 @@ const PayrollActualsPage = () => {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -348,8 +326,7 @@ const PayrollActualsPage = () => {
         pagination={{
           pageSize: 50,
           showSizeChanger: true,
-          showTotal: (total) => `Всего: ${total}`,
-        }}
+          showTotal: (total) => `Всего: ${total}`}}
       />
 
       <PayrollActualFormModal
@@ -360,8 +337,7 @@ const PayrollActualsPage = () => {
             ? {
                 year: editingActual.year,
                 month: editingActual.month,
-                employee_id: editingActual.employee_id,
-              }
+                employee_id: editingActual.employee_id}
             : undefined
         }
         onCancel={() => {

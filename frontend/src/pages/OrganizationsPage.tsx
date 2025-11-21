@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Typography, Card, Table, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
+import { Typography, Card, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckOutlined, CloudSyncOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -8,7 +8,6 @@ import type { Organization } from '@/types'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import OrganizationFormModal from '@/components/organizations/OrganizationFormModal'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
@@ -30,8 +29,6 @@ const OrganizationsPage = () => {
   const [syncLoading, setSyncLoading] = useState(false)
 
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
 
   // Organizations are SHARED across all departments - no department filtering
   const { data: organizations, isLoading } = useQuery({
@@ -41,9 +38,7 @@ const OrganizationsPage = () => {
         skip: (page - 1) * pageSize,
         limit: pageSize,
         search: search || undefined,
-        is_active: activeFilter,
-      }),
-  })
+        is_active: activeFilter})})
 
   const deleteMutation = useMutation({
     mutationFn: organizationsApi.delete,
@@ -53,8 +48,7 @@ const OrganizationsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка при удалении: ${error.message}`)
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setModalMode('create')
@@ -135,15 +129,13 @@ const OrganizationsPage = () => {
                 ))}
               </div>
             ),
-            width: 600,
-          })
+            width: 600})
         }
         queryClient.invalidateQueries({ queryKey: ['organizations'] })
       } else if (info.file.status === 'error') {
         message.error(`${info.file.name} загрузка не удалась`)
       }
-    },
-  }
+    }}
 
   const handleBulkActivate = async () => {
     if (selectedRowKeys.length === 0) {
@@ -155,8 +147,7 @@ const OrganizationsPage = () => {
     try {
       await axios.post(`${API_BASE}/organizations/bulk/update`, {
         ids: selectedRowKeys,
-        is_active: true,
-      })
+        is_active: true})
       message.success(`Активировано ${selectedRowKeys.length} организаций`)
       setSelectedRowKeys([])
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
@@ -177,8 +168,7 @@ const OrganizationsPage = () => {
     try {
       await axios.post(`${API_BASE}/organizations/bulk/update`, {
         ids: selectedRowKeys,
-        is_active: false,
-      })
+        is_active: false})
       message.success(`Деактивировано ${selectedRowKeys.length} организаций`)
       setSelectedRowKeys([])
       queryClient.invalidateQueries({ queryKey: ['organizations'] })
@@ -202,8 +192,7 @@ const OrganizationsPage = () => {
         setBulkLoading(true)
         try {
           await axios.post(`${API_BASE}/organizations/bulk/delete`, {
-            ids: selectedRowKeys,
-          })
+            ids: selectedRowKeys})
           message.success(`Удалено ${selectedRowKeys.length} организаций`)
           setSelectedRowKeys([])
           queryClient.invalidateQueries({ queryKey: ['organizations'] })
@@ -212,8 +201,7 @@ const OrganizationsPage = () => {
         } finally {
           setBulkLoading(false)
         }
-      },
-    })
+      }})
   }
 
   const handleSyncFrom1C = async () => {
@@ -252,8 +240,7 @@ const OrganizationsPage = () => {
                   ))}
                 </div>
               ),
-              width: 600,
-            })
+              width: 600})
           }
 
           queryClient.invalidateQueries({ queryKey: ['organizations'] })
@@ -265,8 +252,7 @@ const OrganizationsPage = () => {
         } finally {
           setSyncLoading(false)
         }
-      },
-    })
+      }})
   }
 
   const columns = [
@@ -280,30 +266,26 @@ const OrganizationsPage = () => {
         <Link to={`/organizations/${record.id}`} style={{ color: '#1890ff', fontWeight: 500 }}>
           {name}
         </Link>
-      ),
-    },
+      )},
     {
       title: 'ИНН',
       dataIndex: 'inn',
       key: 'inn',
       width: 130,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'КПП',
       dataIndex: 'kpp',
       key: 'kpp',
       width: 110,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Адрес',
       dataIndex: 'address',
       key: 'address',
       width: 200,
       ellipsis: true,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -314,8 +296,7 @@ const OrganizationsPage = () => {
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Да' : 'Нет'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -349,8 +330,7 @@ const OrganizationsPage = () => {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   // Calculate statistics
@@ -494,13 +474,11 @@ const OrganizationsPage = () => {
             },
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total} организаций`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-          }}
+            pageSizeOptions: ['10', '20', '50', '100']}}
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
-            preserveSelectedRowKeys: true,
-          }}
+            preserveSelectedRowKeys: true}}
         />
 
         <OrganizationFormModal

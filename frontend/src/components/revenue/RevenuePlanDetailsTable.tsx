@@ -3,8 +3,7 @@
  * Editable table for monthly revenue planning by stream/category
  */
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { Table, InputNumber, Button, Space, message, Typography, Spin, Tag } from 'antd'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { InputNumber, Button, Space, message, Typography, Spin, Tag, Table } from 'antd'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { SaveOutlined, UndoOutlined, PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -28,8 +27,7 @@ const TOTAL_COLUMN_WIDTH = 150
 const currencyFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
-  maximumFractionDigits: 0,
-})
+  maximumFractionDigits: 0})
 
 const formatCurrency = (value: number) =>
   currencyFormatter.format(Number.isFinite(value) ? value : 0)
@@ -69,18 +67,14 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
   streams,
   categories,
   isEditable,
-  onAfterSave,
-}) => {
+  onAfterSave}) => {
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
 
   // Fetch plan details
   const { data: planDetails = [], isLoading } = useQuery({
     queryKey: ['revenue-plan-details', versionId],
     queryFn: () => revenueApi.planDetails.getAll({ version_id: versionId }),
-    enabled: !!versionId,
-  })
+    enabled: !!versionId})
 
   const [data, setData] = useState<DetailRow[]>([])
   const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
@@ -92,8 +86,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       message.success('Строка добавлена')
       queryClient.invalidateQueries({ queryKey: ['revenue-plan-details'] })
       if (onAfterSave) onAfterSave()
-    },
-  })
+    }})
 
   // Update mutation
   const updateMutation = useMutation({
@@ -103,8 +96,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       message.success('Изменения сохранены')
       queryClient.invalidateQueries({ queryKey: ['revenue-plan-details'] })
       if (onAfterSave) onAfterSave()
-    },
-  })
+    }})
 
   // Create stream/category lookup maps
   const streamMap = useMemo(() => {
@@ -125,8 +117,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       ...detail,
       key: `${detail.id}`,
       streamName: detail.revenue_stream_id ? streamMap.get(detail.revenue_stream_id)?.name : '—',
-      categoryName: detail.revenue_category_id ? categoryMap.get(detail.revenue_category_id)?.name : '—',
-    }))
+      categoryName: detail.revenue_category_id ? categoryMap.get(detail.revenue_category_id)?.name : '—'}))
     setData(rows)
     setChangedCells(new Set())
   }, [planDetails, streamMap, categoryMap])
@@ -210,8 +201,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
             month_09: Number(row.month_09) || 0,
             month_10: Number(row.month_10) || 0,
             month_11: Number(row.month_11) || 0,
-            month_12: Number(row.month_12) || 0,
-          })
+            month_12: Number(row.month_12) || 0})
         } else {
           // Update existing detail
           await updateMutation.mutateAsync({
@@ -228,9 +218,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
               month_09: Number(row.month_09) || undefined,
               month_10: Number(row.month_10) || undefined,
               month_11: Number(row.month_11) || undefined,
-              month_12: Number(row.month_12) || undefined,
-            },
-          })
+              month_12: Number(row.month_12) || undefined}})
         }
       }
 
@@ -247,8 +235,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       ...detail,
       key: `${detail.id}`,
       streamName: detail.revenue_stream_id ? streamMap.get(detail.revenue_stream_id)?.name : '—',
-      categoryName: detail.revenue_category_id ? categoryMap.get(detail.revenue_category_id)?.name : '—',
-    }))
+      categoryName: detail.revenue_category_id ? categoryMap.get(detail.revenue_category_id)?.name : '—'}))
     setData(rows)
     setChangedCells(new Set())
     message.info('Изменения отменены')
@@ -279,8 +266,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       key: `new_${Date.now()}`,
       isNew: true,
       streamName: '—',
-      categoryName: '—',
-    }
+      categoryName: '—'}
     setData((prev) => [...prev, newRow])
     message.info('Добавлена новая строка. Заполните данные и нажмите "Сохранить"')
   }, [versionId])
@@ -296,15 +282,13 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
         fixed: 'left',
         render: (text: string, record: DetailRow) => (
           <Text strong={!record.revenue_category_id}>{text}</Text>
-        ),
-      },
+        )},
       {
         title: 'Категория',
         dataIndex: 'categoryName',
         key: 'categoryName',
         width: CATEGORY_COLUMN_WIDTH,
-        fixed: 'left',
-      },
+        fixed: 'left'},
     ]
 
     // Add month columns
@@ -331,16 +315,14 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
               style={{
                 width: '100%',
                 backgroundColor: hasChanges ? '#fff7e6' : 'transparent',
-                borderColor: hasChanges ? '#ffa940' : undefined,
-              }}
+                borderColor: hasChanges ? '#ffa940' : undefined}}
               formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
               parser={(val) => Number(val?.replace(/\s/g, '') || 0)}
               min={0}
               precision={0}
             />
           )
-        },
-      })
+        }})
     })
 
     // Add total column
@@ -355,8 +337,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
         <Text strong style={{ color: '#1890ff' }}>
           {formatCurrency(value || 0)}
         </Text>
-      ),
-    })
+      )})
 
     return cols
   }, [isEditable, changedCells, handleCellChange])
@@ -365,8 +346,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
   const summaryRow = useMemo(() => {
     const row: any = {
       streamName: <Text strong>ИТОГО</Text>,
-      categoryName: '',
-    }
+      categoryName: ''}
 
     MONTHS.forEach((month) => {
       const monthKey = `month_${String(month.key).padStart(2, '0')}`
@@ -408,8 +388,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
             borderRadius: 8,
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
+            alignItems: 'center'}}
         >
           <Space>
             {changedCells.size > 0 && (
@@ -450,15 +429,15 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
         bordered
         size="small"
         summary={() => (
-          <ResponsiveTable.Summary fixed>
-            <ResponsiveTable.Summary.Row style={{ backgroundColor: '#f0f0f0' }}>
+          <Table.Summary fixed>
+            <Table.Summary.Row style={{ backgroundColor: '#f0f0f0' }}>
               {columns.map((col, index) => (
-                <ResponsiveTable.Summary.Cell key={index} index={index} align={col.align as any}>
+                <Table.Summary.Cell key={index} index={index} align={col.align as any}>
                   {summaryRow[col.key as string]}
-                </ResponsiveTable.Summary.Cell>
+                </Table.Summary.Cell>
               ))}
-            </ResponsiveTable.Summary.Row>
-          </ResponsiveTable.Summary>
+            </Table.Summary.Row>
+          </Table.Summary>
         )}
       />
     </div>

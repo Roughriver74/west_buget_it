@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Drawer, Descriptions, Table, Space, Tag, Typography, Divider, Statistic, Row, Col, Button, Tooltip } from 'antd'
+import { Drawer, Descriptions, Space, Tag, Typography, Divider, Statistic, Row, Col, Button, Tooltip } from 'antd'
 import { CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import type { EmployeeKPI, KPIGoalStatus } from '@/api/kpi'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { Employee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
@@ -17,8 +16,7 @@ const statusColor: Record<KPIGoalStatus, string> = {
   ACTIVE: 'processing',
   ACHIEVED: 'success',
   NOT_ACHIEVED: 'error',
-  CANCELLED: 'warning',
-}
+  CANCELLED: 'warning'}
 
 const monthLabel = (month: number | null | undefined) =>
   typeof month === 'number' ? dayjs().month(month - 1).format('MMMM') : 'Годовая'
@@ -34,10 +32,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
   open,
   onClose,
   employee,
-  employeeKpis,
-}) => {
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
+  employeeKpis}) => {
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false)
   const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null)
 
@@ -91,8 +86,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
       title: 'Период',
       key: 'period',
       width: 140,
-      render: (_, record) => `${monthLabel(record.month)} ${record.year}`,
-    },
+      render: (_, record) => `${monthLabel(record.month)} ${record.year}`},
     {
       title: 'КПИ %',
       dataIndex: 'kpi_percentage',
@@ -103,29 +97,25 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
           <Text strong>{Number(value).toFixed(1)} %</Text>
         ) : (
           <Text type="secondary">—</Text>
-        ),
-    },
+        )},
     {
       title: 'Бонус (месяц)',
       dataIndex: 'monthly_bonus_calculated',
       key: 'monthly_bonus',
       width: 130,
-      render: (value) => formatCurrency(Number(value || 0)),
-    },
+      render: (value) => formatCurrency(Number(value || 0))},
     {
       title: 'Бонус (квартал)',
       dataIndex: 'quarterly_bonus_calculated',
       key: 'quarterly_bonus',
       width: 130,
-      render: (value) => formatCurrency(Number(value || 0)),
-    },
+      render: (value) => formatCurrency(Number(value || 0))},
     {
       title: 'Бонус (год)',
       dataIndex: 'annual_bonus_calculated',
       key: 'annual_bonus',
       width: 130,
-      render: (value) => formatCurrency(Number(value || 0)),
-    },
+      render: (value) => formatCurrency(Number(value || 0))},
     {
       title: (
         <Tooltip title="Средняя сложность завершенных задач">
@@ -154,8 +144,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
             {complexity.toFixed(1)} / 10
           </Tag>
         )
-      },
-    },
+      }},
     {
       title: (
         <Tooltip title="Множитель премии по сложности (0.70-1.30)">
@@ -181,8 +170,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
             {multiplier.toFixed(2)}×
           </Text>
         )
-      },
-    },
+      }},
     {
       title: 'Действия',
       key: 'actions',
@@ -197,8 +185,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
         >
           Детали
         </Button>
-      ),
-    },
+      )},
     {
       title: 'Цели',
       key: 'goals',
@@ -219,8 +206,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
           <Text type="secondary" style={{ fontSize: 12 }}>
             Нет целей
           </Text>
-        ),
-    },
+        )},
   ]
 
   return (
@@ -273,8 +259,7 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
                 title="Выполнено целей"
                 value={`${achievedGoalsCount} / ${totalGoalsCount}`}
                 valueStyle={{
-                  color: achievedGoalsCount === totalGoalsCount && totalGoalsCount > 0 ? '#3f8600' : undefined,
-                }}
+                  color: achievedGoalsCount === totalGoalsCount && totalGoalsCount > 0 ? '#3f8600' : undefined}}
               />
             </Col>
           </Row>

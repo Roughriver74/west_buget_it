@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Radio, Empty, Spin, Table, Tag } from 'antd'
+import { Card, Radio, Empty, Spin, Tag } from 'antd'
 import {
   BarChart,
   Bar,
@@ -11,17 +11,14 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
-} from 'recharts'
+  Cell} from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import CreditPortfolioFilters, {
-  type CreditPortfolioFilterValues,
-} from '@/components/bank/CreditPortfolioFilters'
+  type CreditPortfolioFilterValues} from '@/components/bank/CreditPortfolioFilters'
 
 type PeriodType = 'yearly' | 'quarterly'
 
@@ -49,8 +46,6 @@ interface YoYGrowth {
 
 export default function CreditPortfolioComparePage() {
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [comparisonPeriod, setComparisonPeriod] = useState<PeriodType>('yearly')
   const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
@@ -61,10 +56,8 @@ export default function CreditPortfolioComparePage() {
       creditPortfolioApi.getYearlyComparison({
         department_id: selectedDepartment?.id,
         date_from: filters.dateFrom,
-        date_to: filters.dateTo,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        date_to: filters.dateTo}),
+    enabled: !!selectedDepartment})
 
   // Fetch monthly efficiency for quarterly breakdown
   const { data: monthlyData, isLoading: monthlyLoading } = useQuery({
@@ -75,10 +68,8 @@ export default function CreditPortfolioComparePage() {
         date_from: filters.dateFrom,
         date_to: filters.dateTo,
         organization_id: filters.organizationIds?.[0],
-        bank_account_id: filters.bankAccountIds?.[0],
-      }),
-    enabled: !!selectedDepartment,
-  })
+        bank_account_id: filters.bankAccountIds?.[0]}),
+    enabled: !!selectedDepartment})
 
   const isLoading = yearlyLoading || monthlyLoading
 
@@ -108,8 +99,7 @@ export default function CreditPortfolioComparePage() {
     principal: y.principal || 0,
     interest: y.interest || 0,
     paid: y.paid || 0,
-    totalPaid: (y.paid || 0),
-  }))
+    totalPaid: (y.paid || 0)}))
 
   // Get quarterly comparison from monthly data
   const getQuarterlyComparison = (): QuarterlyData[] => {
@@ -162,8 +152,7 @@ export default function CreditPortfolioComparePage() {
         year: current.year,
         receivedGrowth,
         principalGrowth,
-        interestGrowth,
-      })
+        interestGrowth})
     }
 
     return growth
@@ -180,8 +169,7 @@ export default function CreditPortfolioComparePage() {
         previousPaid: 0,
         paidChange: 0,
         currentYear: '',
-        previousYear: '',
-      }
+        previousYear: ''}
     }
 
     const current = yearlyComparison[yearlyComparison.length - 1]
@@ -203,8 +191,7 @@ export default function CreditPortfolioComparePage() {
             100
           : 0,
       currentYear: current.year,
-      previousYear: previous.year,
-    }
+      previousYear: previous.year}
   }
 
   const quarterlyData = getQuarterlyComparison()
@@ -217,32 +204,27 @@ export default function CreditPortfolioComparePage() {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      render: (text: string) => <strong>{text}</strong>,
-    },
+      render: (text: string) => <strong>{text}</strong>},
     {
       title: 'Получено',
       dataIndex: 'received',
       key: 'received',
-      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-    },
+      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`},
     {
       title: 'Погашено тела',
       dataIndex: 'principal',
       key: 'principal',
-      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-    },
+      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`},
     {
       title: 'Уплачено %',
       dataIndex: 'interest',
       key: 'interest',
-      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-    },
+      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`},
     {
       title: 'Всего выплачено',
       dataIndex: 'totalPaid',
       key: 'totalPaid',
-      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`,
-    },
+      render: (value: number) => `${value.toLocaleString('ru-RU')} ₽`},
     {
       title: 'Эффективность',
       key: 'efficiency',
@@ -261,8 +243,7 @@ export default function CreditPortfolioComparePage() {
             {efficiency.toFixed(1)}%
           </Tag>
         )
-      },
-    },
+      }},
   ]
 
   return (

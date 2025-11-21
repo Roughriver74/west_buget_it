@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm, Modal, Form, Row, Col } from 'antd'
+import { Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm, Modal, Form, Row, Col } from 'antd'
 import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi, departmentsApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
@@ -11,11 +11,11 @@ import FTPImportModal from '@/components/expenses/FTPImportModal'
 import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPaymentModal'
 import InvoiceProcessingDrawer from '@/components/expenses/InvoiceProcessingDrawer'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { MobileFilterDrawer } from '@/components/common/MobileFilterDrawer'
 import dayjs from 'dayjs'
 import { getApiBaseUrl } from '@/config/api'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 
 const { RangePicker } = DatePicker
 
@@ -36,10 +36,10 @@ const ExpensesPage = () => {
   const [transferModalVisible, setTransferModalVisible] = useState(false)
   const [targetDepartmentId, setTargetDepartmentId] = useState<number | undefined>()
 
-  const queryClient = useQueryClient()
-  const { selectedDepartment } = useDepartment()
   const isMobile = useIsMobile()
   const isSmallScreen = useIsSmallScreen()
+  const queryClient = useQueryClient()
+  const { selectedDepartment } = useDepartment()
 
   // Count active filters
   const activeFiltersCount = useMemo(() => {
@@ -67,19 +67,15 @@ const ExpensesPage = () => {
         category_id: categoryId,
         department_id: selectedDepartment?.id,
         date_from: dateRange?.[0]?.toISOString(),
-        date_to: dateRange?.[1]?.toISOString(),
-      }),
-  })
+        date_to: dateRange?.[1]?.toISOString()})})
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoriesApi.getAll({ is_active: true }),
-  })
+    queryFn: () => categoriesApi.getAll({ is_active: true })})
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
-    queryFn: () => departmentsApi.getAll({ is_active: true }),
-  })
+    queryFn: () => departmentsApi.getAll({ is_active: true })})
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
@@ -92,8 +88,7 @@ const ExpensesPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при удалении: ${errorMessage}`)
-    },
-  })
+    }})
 
   // Bulk transfer department mutation
   const bulkTransferMutation = useMutation({
@@ -109,8 +104,7 @@ const ExpensesPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при переносе: ${errorMessage}`)
-    },
-  })
+    }})
 
   const handleBulkDelete = () => {
     if (selectedRowKeys.length === 0) {
@@ -135,8 +129,7 @@ const ExpensesPage = () => {
     }
     bulkTransferMutation.mutate({
       expenseIds: selectedRowKeys,
-      targetDepartmentId,
-    })
+      targetDepartmentId})
   }
 
   const handleExport = async () => {
@@ -218,21 +211,18 @@ const ExpensesPage = () => {
           )}
           <span>{number}</span>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Дата заявки',
       dataIndex: 'request_date',
       key: 'request_date',
       width: 120,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY'),
-    },
+      render: (date: string) => dayjs(date).format('DD.MM.YYYY')},
     {
       title: 'Категория',
       dataIndex: ['category', 'name'],
       key: 'category',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -243,9 +233,7 @@ const ExpensesPage = () => {
         new Intl.NumberFormat('ru-RU', {
           style: 'currency',
           currency: 'RUB',
-          minimumFractionDigits: 0,
-        }).format(amount),
-    },
+          minimumFractionDigits: 0}).format(amount)},
     {
       title: 'Статус',
       dataIndex: 'status',
@@ -255,8 +243,7 @@ const ExpensesPage = () => {
         <Tag color={getExpenseStatusColor(status)}>
           {getExpenseStatusLabel(status)}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Контрагент',
       dataIndex: ['contractor', 'name'],
@@ -273,8 +260,7 @@ const ExpensesPage = () => {
           </Link>
         ) : (
           '-'
-        ),
-    },
+        )},
     {
       title: 'Организация',
       dataIndex: ['organization', 'name'],
@@ -290,14 +276,12 @@ const ExpensesPage = () => {
           </Link>
         ) : (
           '-'
-        ),
-    },
+        )},
     {
       title: 'Заявитель',
       dataIndex: 'requester',
       key: 'requester',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Действия',
       key: 'actions',
@@ -334,8 +318,7 @@ const ExpensesPage = () => {
             </Tooltip>
           )}
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -496,8 +479,7 @@ const ExpensesPage = () => {
         mobileLayout="card"
         rowSelection={{
           selectedRowKeys,
-          onChange: (selectedKeys) => setSelectedRowKeys(selectedKeys as number[]),
-        }}
+          onChange: (selectedKeys) => setSelectedRowKeys(selectedKeys as number[])}}
         pagination={{
           current: page,
           pageSize: pageSize,
@@ -507,8 +489,7 @@ const ExpensesPage = () => {
           onChange: (newPage, newPageSize) => {
             setPage(newPage)
             setPageSize(newPageSize)
-          },
-        }}
+          }}}
       />
 
       <ExpenseFormModal
@@ -556,8 +537,7 @@ const ExpensesPage = () => {
           onChange={setTargetDepartmentId}
           options={departments?.map((dept) => ({
             label: dept.name,
-            value: dept.id,
-          }))}
+            value: dept.id}))}
         />
       </Modal>
     </div>

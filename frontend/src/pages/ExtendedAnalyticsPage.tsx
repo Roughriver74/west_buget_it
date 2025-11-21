@@ -6,7 +6,6 @@ import {
   DatePicker,
   Tabs,
   Statistic,
-  Table,
   Space,
   Typography,
   Tag,
@@ -28,13 +27,12 @@ import { useDepartment } from '../contexts/DepartmentContext';
 import { analyticsApi } from '../api';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
+import { ResponsiveTable } from '../components/common/ResponsiveTable';
 
 const { Title, Text } = Typography;
 
 const ExtendedAnalyticsPage: React.FC = () => {
   const { selectedDepartment } = useDepartment();
-  const isMobile = useIsMobile();
-  const isSmallScreen = useIsSmallScreen();
   const [activeTab, setActiveTab] = useState('execution');
   const [year, setYear] = useState(dayjs().year());
 
@@ -80,8 +78,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(value)
+      minimumFractionDigits: 0}).format(value)
   }
 
   // Budget Execution Tab
@@ -212,8 +209,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
         title: 'Категория',
         dataIndex: 'category_name',
         key: 'category_name',
-        width: 200,
-      },
+        width: 200},
       {
         title: 'Тип',
         dataIndex: 'category_type',
@@ -384,8 +380,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
             smooth
             point={{
               size: 5,
-              shape: 'circle',
-            }}
+              shape: 'circle'}}
             label={{
               formatter: (datum: any) => `${(datum.amount / 1000).toFixed(0)}K ₽`
             }}

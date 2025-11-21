@@ -9,7 +9,6 @@ import { useState } from 'react'
 import {
   Modal,
   Descriptions,
-  Table,
   Space,
   Tag,
   Typography,
@@ -36,6 +35,7 @@ import type { ColumnsType } from 'antd/es/table'
 import * as complexityBonusApi from '@/api/complexityBonus'
 import type { ComplexityBonusBreakdown as ComplexityBreakdownType } from '@/api/complexityBonus'
 import { formatCurrency } from '@/utils/formatters'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Text, Title } = Typography
 
@@ -79,8 +79,6 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
   employeeKpiId,
 }) => {
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [recalculating, setRecalculating] = useState(false)
 
   // Fetch breakdown data

@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Card,
-  Table,
   Button,
   Space,
   Modal,
@@ -18,8 +17,7 @@ import {
   Statistic,
   Alert,
   Tag,
-  Spin,
-} from 'antd'
+  Spin} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -27,10 +25,8 @@ import {
   BarChartOutlined,
   CalculatorOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
-} from '@ant-design/icons'
+  WarningOutlined} from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { SeasonalityCoefficient, SeasonalityCoefficientCreate } from '@/types/revenue'
@@ -55,8 +51,6 @@ const MONTH_NAMES = [
 const SeasonalityPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [form] = Form.useForm()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [editingCoefficient, setEditingCoefficient] = useState<SeasonalityCoefficient | null>(null)
@@ -70,10 +64,8 @@ const SeasonalityPage = () => {
       revenueApi.seasonality.getAll({
         year: selectedYear,
         category: selectedCategory,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Create coefficient mutation
   const createCoefficientMutation = useMutation({
@@ -86,8 +78,7 @@ const SeasonalityPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка создания коэффициентов: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Update coefficient mutation
   const updateCoefficientMutation = useMutation({
@@ -101,8 +92,7 @@ const SeasonalityPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления коэффициентов: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Delete coefficient mutation
   const deleteCoefficientMutation = useMutation({
@@ -113,8 +103,7 @@ const SeasonalityPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка удаления коэффициентов: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Calculate average coefficient and validation
   const calculateAverage = useCallback((values: any) => {
@@ -161,8 +150,7 @@ const SeasonalityPage = () => {
           coef_10: coefficient.coef_10,
           coef_11: coefficient.coef_11,
           coef_12: coefficient.coef_12,
-          notes: coefficient.description,
-        })
+          notes: coefficient.description})
       } else {
         setEditingCoefficient(null)
         // Set default values (all 1.0)
@@ -179,8 +167,7 @@ const SeasonalityPage = () => {
           coef_09: 1.0,
           coef_10: 1.0,
           coef_11: 1.0,
-          coef_12: 1.0,
-        })
+          coef_12: 1.0})
       }
       setIsModalVisible(true)
     },
@@ -212,8 +199,7 @@ const SeasonalityPage = () => {
       return {
         month: name,
         coefficient: value,
-        impact: ((value - 1) * 100).toFixed(1),
-      }
+        impact: ((value - 1) * 100).toFixed(1)}
     })
 
     const columns = [
@@ -224,8 +210,7 @@ const SeasonalityPage = () => {
         key: 'coefficient',
         render: (value: number) => (
           <Tag color={value > 1 ? 'green' : value < 1 ? 'red' : 'default'}>{value.toFixed(3)}</Tag>
-        ),
-      },
+        )},
       {
         title: 'Влияние',
         dataIndex: 'impact',
@@ -238,8 +223,7 @@ const SeasonalityPage = () => {
               {value}%
             </span>
           )
-        },
-      },
+        }},
     ]
 
     return <ResponsiveTable columns={columns} dataSource={monthlyData} pagination={false} rowKey="month" size="small" mobileLayout="card" />
@@ -250,14 +234,12 @@ const SeasonalityPage = () => {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 100,
-    },
+      width: 100},
     {
       title: 'Категория',
       dataIndex: 'category',
       key: 'category',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Средний коэффициент',
       key: 'avg_coefficient',
@@ -293,14 +275,12 @@ const SeasonalityPage = () => {
             )}
           </Space>
         )
-      },
-    },
+      }},
     {
       title: 'Примечания',
       dataIndex: 'notes',
       key: 'notes',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Действия',
       key: 'actions',
@@ -327,8 +307,7 @@ const SeasonalityPage = () => {
             <Button type="link" danger size="small" icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   // Watch form values for real-time average calculation
@@ -439,13 +418,11 @@ const SeasonalityPage = () => {
           loading={isLoading}
           expandable={{
             expandedRowRender,
-            expandRowByClick: true,
-          }}
+            expandRowByClick: true}}
           pagination={{
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total}`,
-            defaultPageSize: 20,
-          }}
+            defaultPageSize: 20}}
           scroll={{ x: 1000 }}
           mobileLayout="card"
         />

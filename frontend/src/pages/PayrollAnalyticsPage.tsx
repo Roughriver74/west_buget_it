@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
+import { Table, 
   Card,
   Row,
   Col,
@@ -12,9 +12,7 @@ import {
   Space,
   Divider,
   Tag,
-  Tabs,
-  Table,
-} from 'antd';
+  Tabs} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   LineChart,
@@ -31,10 +29,7 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-} from 'recharts';
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
-import { ResponsiveTable } from '@/components/common/ResponsiveTable'
+  Cell} from 'recharts';
 import ReactApexChart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import {
@@ -44,8 +39,7 @@ import {
   TeamOutlined,
   DollarOutlined,
   FundOutlined,
-  PercentageOutlined,
-} from '@ant-design/icons';
+  PercentageOutlined} from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
 import { payrollAnalyticsAPI, payrollTaxAnalyticsAPI } from '../api/payroll';
 import type { TaxByEmployee } from '../api/payroll';
@@ -64,8 +58,6 @@ const MONTH_NAMES = [
 
 export default function PayrollAnalyticsPage() {
   const currentYear = dayjs().year();
-  const isMobile = useIsMobile();
-  const isSmallScreen = useIsSmallScreen();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [activeTab, setActiveTab] = useState('summary');
   const { selectedDepartment } = useDepartment();
@@ -73,20 +65,17 @@ export default function PayrollAnalyticsPage() {
   // Fetch salary statistics
   const { data: salaryStats, isLoading: statsLoading } = useQuery({
     queryKey: ['payroll-salary-stats', selectedDepartment?.id],
-    queryFn: () => payrollAnalyticsAPI.getSalaryStats(selectedDepartment?.id),
-  });
+    queryFn: () => payrollAnalyticsAPI.getSalaryStats(selectedDepartment?.id)});
 
   // Fetch payroll structure
   const { data: structure, isLoading: structureLoading } = useQuery({
     queryKey: ['payroll-structure', selectedYear, selectedDepartment?.id],
-    queryFn: () => payrollAnalyticsAPI.getStructure(selectedYear, selectedDepartment?.id),
-  });
+    queryFn: () => payrollAnalyticsAPI.getStructure(selectedYear, selectedDepartment?.id)});
 
   // Fetch payroll dynamics
   const { data: dynamics, isLoading: dynamicsLoading } = useQuery({
     queryKey: ['payroll-dynamics', selectedYear, selectedDepartment?.id],
-    queryFn: () => payrollAnalyticsAPI.getDynamics(selectedYear, selectedDepartment?.id),
-  });
+    queryFn: () => payrollAnalyticsAPI.getDynamics(selectedYear, selectedDepartment?.id)});
 
   // Fetch payroll forecast
   const { data: forecast, isLoading: forecastLoading } = useQuery({
@@ -94,9 +83,7 @@ export default function PayrollAnalyticsPage() {
     queryFn: () => payrollAnalyticsAPI.getForecast({
       months_ahead: 6,
       historical_months: 6,
-      department_id: selectedDepartment?.id,
-    }),
-  });
+      department_id: selectedDepartment?.id})});
 
   // Fetch salary distribution
   const { data: salaryDistribution, isLoading: distributionLoading } = useQuery({
@@ -104,45 +91,36 @@ export default function PayrollAnalyticsPage() {
     queryFn: () => payrollAnalyticsAPI.getSalaryDistribution({
       department_id: selectedDepartment?.id,
       bucket_size: 50000, // 50k per bucket
-    }),
-  });
+    })});
 
   // Fetch tax analytics
   const { data: taxBurden, isLoading: taxBurdenLoading } = useQuery({
     queryKey: ['payroll-tax-burden', selectedYear, selectedDepartment?.id],
     queryFn: () => payrollTaxAnalyticsAPI.getTaxBurden({
       year: selectedYear,
-      department_id: selectedDepartment?.id,
-    }),
-    enabled: activeTab === 'taxes',
-  });
+      department_id: selectedDepartment?.id}),
+    enabled: activeTab === 'taxes'});
 
   const { data: taxBreakdownByMonth, isLoading: taxBreakdownLoading } = useQuery({
     queryKey: ['payroll-tax-breakdown', selectedYear, selectedDepartment?.id],
     queryFn: () => payrollTaxAnalyticsAPI.getTaxBreakdownByMonth({
       year: selectedYear,
-      department_id: selectedDepartment?.id,
-    }),
-    enabled: activeTab === 'taxes',
-  });
+      department_id: selectedDepartment?.id}),
+    enabled: activeTab === 'taxes'});
 
   const { data: taxByEmployee, isLoading: taxByEmployeeLoading } = useQuery({
     queryKey: ['payroll-tax-by-employee', selectedYear, selectedDepartment?.id],
     queryFn: () => payrollTaxAnalyticsAPI.getTaxByEmployee({
       year: selectedYear,
-      department_id: selectedDepartment?.id,
-    }),
-    enabled: activeTab === 'taxes',
-  });
+      department_id: selectedDepartment?.id}),
+    enabled: activeTab === 'taxes'});
 
   const { data: costWaterfall, isLoading: costWaterfallLoading } = useQuery({
     queryKey: ['payroll-cost-waterfall', selectedYear, selectedDepartment?.id],
     queryFn: () => payrollTaxAnalyticsAPI.getCostWaterfall({
       year: selectedYear,
-      department_id: selectedDepartment?.id,
-    }),
-    enabled: activeTab === 'taxes',
-  });
+      department_id: selectedDepartment?.id}),
+    enabled: activeTab === 'taxes'});
 
   const isLoading = statsLoading || structureLoading || dynamicsLoading || forecastLoading || distributionLoading;
   const isTaxLoading = taxBurdenLoading || taxBreakdownLoading || taxByEmployeeLoading || costWaterfallLoading;
@@ -160,8 +138,7 @@ export default function PayrollAnalyticsPage() {
     month: MONTH_NAMES[item.month - 1],
     'План': Number(item.planned_total),
     'Факт': Number(item.actual_total),
-    'Сотрудников': item.employee_count,
-  })) || [];
+    'Сотрудников': item.employee_count})) || [];
 
   const structureChartData = structure?.map((item) => ({
     month: MONTH_NAMES[item.month - 1],
@@ -169,8 +146,7 @@ export default function PayrollAnalyticsPage() {
     'Премия мес.': Number(item.total_monthly_bonus),
     'Премия квар.': Number(item.total_quarterly_bonus),
     'Премия год.': Number(item.total_annual_bonus),
-    'Прочие': Number(item.total_other_payments),
-  })) || [];
+    'Прочие': Number(item.total_other_payments)})) || [];
 
   // Calculate average structure for pie chart
   const totalBaseSalary = structure?.reduce((sum, item) => sum + Number(item.total_base_salary), 0) || 0;
@@ -219,8 +195,7 @@ export default function PayrollAnalyticsPage() {
     foms: Number(item.foms),
     fss: Number(item.fss),
     effective_ndfl: item.gross_payroll > 0 ? (Number(item.ndfl) / Number(item.gross_payroll) * 100) : 0,
-    effective_total: item.gross_payroll > 0 ? (Number(item.total_taxes) / Number(item.gross_payroll) * 100) : 0,
-  })) || [];
+    effective_total: item.gross_payroll > 0 ? (Number(item.total_taxes) / Number(item.gross_payroll) * 100) : 0})) || [];
 
   // Waterfall chart data
   const waterfallSeries = costWaterfall ? [{
@@ -228,98 +203,76 @@ export default function PayrollAnalyticsPage() {
     data: [
       {
         x: 'Оклад',
-        y: [0, Number(costWaterfall.base_salary)],
-      },
+        y: [0, Number(costWaterfall.base_salary)]},
       {
         x: 'Премия мес.',
-        y: [Number(costWaterfall.base_salary), Number(costWaterfall.base_salary) + Number(costWaterfall.monthly_bonus)],
-      },
+        y: [Number(costWaterfall.base_salary), Number(costWaterfall.base_salary) + Number(costWaterfall.monthly_bonus)]},
       {
         x: 'Премия квар.',
         y: [
           Number(costWaterfall.base_salary) + Number(costWaterfall.monthly_bonus),
           Number(costWaterfall.base_salary) + Number(costWaterfall.monthly_bonus) + Number(costWaterfall.quarterly_bonus)
-        ],
-      },
+        ]},
       {
         x: 'Премия год.',
         y: [
           Number(costWaterfall.base_salary) + Number(costWaterfall.monthly_bonus) + Number(costWaterfall.quarterly_bonus),
           Number(costWaterfall.gross_total)
-        ],
-      },
+        ]},
       {
         x: 'Gross Total',
-        y: [0, Number(costWaterfall.gross_total)],
-      },
+        y: [0, Number(costWaterfall.gross_total)]},
       {
         x: 'НДФЛ',
-        y: [Number(costWaterfall.gross_total), Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl)],
-      },
+        y: [Number(costWaterfall.gross_total), Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl)]},
       {
         x: 'ПФР',
         y: [
           Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl),
           Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl) - Number(costWaterfall.pfr)
-        ],
-      },
+        ]},
       {
         x: 'ФОМС',
         y: [
           Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl) - Number(costWaterfall.pfr),
           Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl) - Number(costWaterfall.pfr) - Number(costWaterfall.foms)
-        ],
-      },
+        ]},
       {
         x: 'ФСС',
         y: [
           Number(costWaterfall.gross_total) - Number(costWaterfall.ndfl) - Number(costWaterfall.pfr) - Number(costWaterfall.foms),
           Number(costWaterfall.net_payroll)
-        ],
-      },
+        ]},
       {
         x: 'Net Payroll',
-        y: [0, Number(costWaterfall.net_payroll)],
-      },
-    ],
-  }] : [];
+        y: [0, Number(costWaterfall.net_payroll)]},
+    ]}] : [];
 
   const waterfallOptions: ApexOptions = {
     chart: {
       type: 'rangeBar',
-      toolbar: { show: true },
-    },
+      toolbar: { show: true }},
     plotOptions: {
       bar: {
         horizontal: false,
-        columnWidth: '50%',
-      },
-    },
+        columnWidth: '50%'}},
     dataLabels: {
       enabled: true,
       formatter: (val: any) => {
         const value = Array.isArray(val) ? val[1] - val[0] : val;
         return formatCurrency(value);
-      },
-    },
+      }},
     xaxis: {
       type: 'category',
       labels: {
-        rotate: -45,
-      },
-    },
+        rotate: -45}},
     yaxis: {
       labels: {
-        formatter: (val: number) => formatCurrency(val),
-      },
-    },
+        formatter: (val: number) => formatCurrency(val)}},
     colors: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#1890ff', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#52c41a'],
     tooltip: {
       y: {
-        formatter: (val: number) => formatCurrency(val),
-      },
-    },
-  };
+        formatter: (val: number) => formatCurrency(val)}}};
 
   // Tax by employee table columns
   const taxEmployeeColumns: ColumnsType<TaxByEmployee> = [
@@ -334,40 +287,35 @@ export default function PayrollAnalyticsPage() {
           <div style={{ fontWeight: 500 }}>{text}</div>
           <div style={{ fontSize: 12, color: '#888' }}>{record.position}</div>
         </div>
-      ),
-    },
+      )},
     {
       title: 'Gross доход',
       dataIndex: 'gross_income',
       key: 'gross_income',
       width: 150,
       align: 'right',
-      render: (value) => formatCurrency(Number(value)),
-    },
+      render: (value) => formatCurrency(Number(value))},
     {
       title: 'НДФЛ',
       dataIndex: 'ndfl',
       key: 'ndfl',
       width: 120,
       align: 'right',
-      render: (value) => formatCurrency(Number(value)),
-    },
+      render: (value) => formatCurrency(Number(value))},
     {
       title: 'Взносы',
       dataIndex: 'social_contributions',
       key: 'social_contributions',
       width: 120,
       align: 'right',
-      render: (value) => formatCurrency(Number(value)),
-    },
+      render: (value) => formatCurrency(Number(value))},
     {
       title: 'Net доход',
       dataIndex: 'net_income',
       key: 'net_income',
       width: 150,
       align: 'right',
-      render: (value) => formatCurrency(Number(value)),
-    },
+      render: (value) => formatCurrency(Number(value))},
     {
       title: 'Всего налогов',
       dataIndex: 'total_taxes',
@@ -378,24 +326,21 @@ export default function PayrollAnalyticsPage() {
         <span style={{ color: '#cf1322', fontWeight: 500 }}>
           {formatCurrency(Number(value))}
         </span>
-      ),
-    },
+      )},
     {
       title: 'НДФЛ %',
       dataIndex: 'effective_tax_rate',
       key: 'effective_tax_rate',
       width: 100,
       align: 'right',
-      render: (value) => `${Number(value).toFixed(1)}%`,
-    },
+      render: (value) => `${Number(value).toFixed(1)}%`},
     {
       title: 'Нагрузка %',
       dataIndex: 'effective_burden_rate',
       key: 'effective_burden_rate',
       width: 110,
       align: 'right',
-      render: (value) => `${Number(value).toFixed(1)}%`,
-    },
+      render: (value) => `${Number(value).toFixed(1)}%`},
   ];
 
   return (
@@ -723,8 +668,7 @@ export default function PayrollAnalyticsPage() {
                         width: 12,
                         height: 12,
                         backgroundColor: COLORS[index],
-                        borderRadius: 2,
-                      }}
+                        borderRadius: 2}}
                     />
                     <span>{item.name}:</span>
                   </Space>
@@ -856,8 +800,7 @@ export default function PayrollAnalyticsPage() {
                                 width: 12,
                                 height: 12,
                                 backgroundColor: item.color,
-                                borderRadius: 2,
-                              }}
+                                borderRadius: 2}}
                             />
                             <span>{item.name}:</span>
                           </Space>
@@ -986,7 +929,7 @@ export default function PayrollAnalyticsPage() {
                     dataSource={taxByEmployee}
                     columns={taxEmployeeColumns}
                     rowKey="employee_id"
-                    pagination={{ pageSize: 10 }} mobileLayout="card"
+                    pagination={{ pageSize: 10 }}
                     scroll={{ x: 1200 }}
                   />
                 </Card>
@@ -1019,8 +962,7 @@ export default function PayrollAnalyticsPage() {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={forecast.map(item => ({
               month: `${MONTH_NAMES[item.month - 1]} ${item.year}`,
-              'Прогноз': Number(item.forecasted_total),
-            }))}>
+              'Прогноз': Number(item.forecasted_total)}))}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />

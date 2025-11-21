@@ -5,7 +5,6 @@ import {
   Card,
   Space,
   Button,
-  Table,
   Tag,
   Modal,
   Form,
@@ -13,24 +12,20 @@ import {
   Select,
   message,
   Popconfirm,
-  Tooltip,
-} from 'antd'
+  Tooltip} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   CheckOutlined,
-  CloseOutlined,
-} from '@ant-design/icons'
+  CloseOutlined} from '@ant-design/icons'
 import { revenueStreamsApi } from '@/api'
 import type {
   RevenueStream,
   RevenueStreamCreate,
   RevenueStreamUpdate,
-  RevenueStreamType,
-} from '@/types/revenue'
+  RevenueStreamType} from '@/types/revenue'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
@@ -40,8 +35,6 @@ const { Title } = Typography
 const RevenueStreamsPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingStream, setEditingStream] = useState<RevenueStream | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
@@ -50,8 +43,7 @@ const RevenueStreamsPage = () => {
   // Fetch revenue streams
   const { data: streams, isLoading, error } = useQuery({
     queryKey: ['revenue-streams', selectedDepartment?.id],
-    queryFn: () => revenueStreamsApi.getAll({ department_id: selectedDepartment?.id }),
-  })
+    queryFn: () => revenueStreamsApi.getAll({ department_id: selectedDepartment?.id })})
 
   // Create mutation
   const createMutation = useMutation({
@@ -64,8 +56,7 @@ const RevenueStreamsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при создании потока доходов')
-    },
-  })
+    }})
 
   // Update mutation
   const updateMutation = useMutation({
@@ -80,8 +71,7 @@ const RevenueStreamsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при обновлении потока доходов')
-    },
-  })
+    }})
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -92,8 +82,7 @@ const RevenueStreamsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при удалении потока доходов')
-    },
-  })
+    }})
 
   // Bulk update mutation
   const bulkUpdateMutation = useMutation({
@@ -106,8 +95,7 @@ const RevenueStreamsPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при обновлении потоков доходов')
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setEditingStream(null)
@@ -132,8 +120,7 @@ const RevenueStreamsPage = () => {
       // Add selected department_id to ensure multi-tenancy
       const dataWithDepartment = {
         ...values,
-        department_id: selectedDepartment?.id,
-      }
+        department_id: selectedDepartment?.id}
 
       if (editingStream) {
         updateMutation.mutate({ id: editingStream.id, data: dataWithDepartment })
@@ -165,8 +152,7 @@ const RevenueStreamsPage = () => {
     const labels = {
       REGIONAL: 'Региональный',
       CHANNEL: 'Канал продаж',
-      PRODUCT: 'Продуктовый',
-    }
+      PRODUCT: 'Продуктовый'}
     return labels[type]
   }
 
@@ -174,8 +160,7 @@ const RevenueStreamsPage = () => {
     const colors = {
       REGIONAL: 'blue',
       CHANNEL: 'green',
-      PRODUCT: 'orange',
-    }
+      PRODUCT: 'orange'}
     return colors[type]
   }
 
@@ -184,13 +169,11 @@ const RevenueStreamsPage = () => {
       title: 'Код',
       dataIndex: 'code',
       key: 'code',
-      width: 100,
-    },
+      width: 100},
     {
       title: 'Название',
       dataIndex: 'name',
-      key: 'name',
-    },
+      key: 'name'},
     {
       title: 'Тип',
       dataIndex: 'stream_type',
@@ -198,14 +181,12 @@ const RevenueStreamsPage = () => {
       width: 150,
       render: (type: RevenueStreamType) => (
         <Tag color={getStreamTypeColor(type)}>{getStreamTypeLabel(type)}</Tag>
-      ),
-    },
+      )},
     {
       title: 'Описание',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -215,8 +196,7 @@ const RevenueStreamsPage = () => {
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Активен' : 'Неактивен'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -242,8 +222,7 @@ const RevenueStreamsPage = () => {
             </Popconfirm>
           </Tooltip>
         </Space>
-      ),
-    },
+      )},
   ]
 
   if (isLoading) {
@@ -284,8 +263,7 @@ const RevenueStreamsPage = () => {
         <ResponsiveTable
           rowSelection={{
             selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
+            onChange: setSelectedRowKeys}}
           columns={columns}
           dataSource={streams}
           rowKey="id"
@@ -293,8 +271,7 @@ const RevenueStreamsPage = () => {
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
-            showTotal: (total) => `Всего: ${total}`,
-          }}
+            showTotal: (total) => `Всего: ${total}`}}
         />
       </Card>
 

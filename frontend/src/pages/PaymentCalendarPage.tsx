@@ -9,15 +9,13 @@ import {
   Col,
   Statistic,
   Modal,
-  Table,
   Typography,
   Space,
   Spin,
   Button,
   Tabs,
   Tooltip,
-  Tag,
-} from 'antd'
+  Tag} from 'antd'
 import { CalendarOutlined, DollarOutlined, LineChartOutlined, DownloadOutlined, RiseOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi, forecastApi } from '@/api'
@@ -26,7 +24,6 @@ import { formatCurrency } from '@/utils/formatters'
 import PaymentForecastChart from '@/components/forecast/PaymentForecastChart'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
@@ -36,8 +33,6 @@ const { Option } = Select
 const PaymentCalendarPage = () => {
   const { selectedDepartment } = useDepartment()
   const { mode } = useTheme()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
   const [categoryId, setCategoryId] = useState<number | undefined>()
   const [modalVisible, setModalVisible] = useState(false)
@@ -54,8 +49,7 @@ const PaymentCalendarPage = () => {
       const response = await fetch(
         `${getApiBaseUrl()}/forecast/export/${currentYear}/${currentMonth}${departmentParam}`,
         {
-          method: 'GET',
-        }
+          method: 'GET'}
       )
 
       if (!response.ok) {
@@ -84,22 +78,18 @@ const PaymentCalendarPage = () => {
         year: currentYear,
         month: currentMonth,
         department_id: selectedDepartment?.id,
-        category_id: categoryId,
-      }),
-  })
+        category_id: categoryId})})
 
   // Fetch forecast data
   const { data: forecastData, isLoading: forecastLoading } = useQuery({
     queryKey: ['forecast-calendar', currentYear, currentMonth, selectedDepartment?.id],
     queryFn: () => forecastApi.getAll(currentYear, currentMonth, selectedDepartment?.id ?? 0),
-    enabled: !!selectedDepartment?.id,
-  })
+    enabled: !!selectedDepartment?.id})
 
   // Fetch categories for filter
   const { data: categories } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoriesApi.getAll({ is_active: true }),
-  })
+    queryFn: () => categoriesApi.getAll({ is_active: true })})
 
   // Create a map of dates to payment data for quick lookup
   const paymentMap = new Map<string, PaymentCalendarDay>()
@@ -115,8 +105,7 @@ const PaymentCalendarPage = () => {
     forecastMap.set(dateStr, {
       count: existing.count + 1,
       total: existing.total + Number(forecast.amount),
-      items: [...existing.items, forecast],
-    })
+      items: [...existing.items, forecast]})
   })
 
   // Calculate month statistics
@@ -125,8 +114,7 @@ const PaymentCalendarPage = () => {
     totalPayments: calendarData?.days.reduce((sum, day) => sum + day.payment_count, 0) || 0,
     totalPlanned: calendarData?.days.reduce((sum, day) => sum + (day.planned_amount || 0), 0) || 0,
     totalPlannedCount: calendarData?.days.reduce((sum, day) => sum + (day.planned_count || 0), 0) || 0,
-    daysWithPayments: calendarData?.days.length || 0,
-  }
+    daysWithPayments: calendarData?.days.length || 0}
 
   // Handle date cell rendering
   const dateCellRender = (value: Dayjs) => {
@@ -225,8 +213,7 @@ const PaymentCalendarPage = () => {
           const result = await analyticsApi.getPaymentsByDay({
             date: dateStr,
             department_id: selectedDepartment?.id,
-            category_id: categoryId,
-          })
+            category_id: categoryId})
           dayData = result.payments
         }
 
@@ -273,8 +260,7 @@ const PaymentCalendarPage = () => {
             {number}
           </span>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -288,32 +274,28 @@ const PaymentCalendarPage = () => {
         }}>
           {formatCurrency(amount)}
         </span>
-      ),
-    },
+      )},
     {
       title: 'Категория',
       dataIndex: 'category_name',
       key: 'category_name',
       render: (text: string, record: any) => (
         <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
-      ),
-    },
+      )},
     {
       title: 'Контрагент',
       dataIndex: 'contractor_name',
       key: 'contractor_name',
       render: (text: string, record: any) => (
         <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
-      ),
-    },
+      )},
     {
       title: 'Организация',
       dataIndex: 'organization_name',
       key: 'organization_name',
       render: (text: string, record: any) => (
         <span style={{ color: record.is_forecast ? '#595959' : 'inherit' }}>{text}</span>
-      ),
-    },
+      )},
     {
       title: 'Комментарий',
       dataIndex: 'comment',
@@ -321,8 +303,7 @@ const PaymentCalendarPage = () => {
       ellipsis: true,
       render: (text: string, record: any) => (
         <span style={{ color: record.is_forecast ? '#595959' : 'inherit', fontStyle: record.is_forecast ? 'italic' : 'normal' }}>{text}</span>
-      ),
-    },
+      )},
   ]
 
   const tabItems = [
@@ -473,8 +454,7 @@ const PaymentCalendarPage = () => {
             </Spin>
           </Card>
         </>
-      ),
-    },
+      )},
     {
       key: 'forecast',
       label: (
@@ -483,8 +463,7 @@ const PaymentCalendarPage = () => {
           Прогноз
         </span>
       ),
-      children: <PaymentForecastChart />,
-    },
+      children: <PaymentForecastChart />},
   ]
 
   return (

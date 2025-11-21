@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Table, Button, Space, Tag, Popconfirm, message, Select, Radio } from 'antd'
+import { Button, Space, Tag, Popconfirm, message, Select, Radio } from 'antd'
 import { EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { categoriesApi } from '@/api'
@@ -7,7 +7,6 @@ import type { BudgetCategory, ExpenseType } from '@/types'
 import CategoryCreateModal from './CategoryCreateModal'
 import CategoryEditModal from './CategoryEditModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Option } = Select
@@ -19,24 +18,20 @@ interface CategoryTableProps {
 
 const CategoryTable: React.FC<CategoryTableProps> = ({
   selectedRowKeys = [],
-  onSelectionChange,
-}) => {
+  onSelectionChange}) => {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null)
   const [typeFilter, setTypeFilter] = useState<ExpenseType | 'ALL'>('ALL')
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined)
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
 
   const queryClient = useQueryClient()
 
   // Загрузка категорий
   const { data: categories, isLoading } = useQuery({
     queryKey: ['categories', { is_active: activeFilter, department_id: selectedDepartment?.id }],
-    queryFn: () => categoriesApi.getAll({ is_active: activeFilter, department_id: selectedDepartment?.id }),
-  })
+    queryFn: () => categoriesApi.getAll({ is_active: activeFilter, department_id: selectedDepartment?.id })})
 
   // Удаление категории
   const deleteMutation = useMutation({
@@ -48,8 +43,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message || 'Произошла ошибка'
       message.error(`Ошибка при удалении: ${errorMessage}`)
-    },
-  })
+    }})
 
   const handleEdit = (category: BudgetCategory) => {
     setSelectedCategory(category)
@@ -118,8 +112,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
       dataIndex: 'name',
       key: 'name',
       width: 300,
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Тип',
       dataIndex: 'type',
@@ -128,16 +121,14 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
       align: 'center' as const,
       render: (type: ExpenseType) => (
         <Tag color={type === 'OPEX' ? 'blue' : 'green'}>{type}</Tag>
-      ),
-    },
+      )},
     {
       title: 'Описание',
       dataIndex: 'description',
       key: 'description',
       width: 300,
       ellipsis: true,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -148,8 +139,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Да' : 'Нет'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -183,8 +173,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -231,18 +220,15 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
           pageSize: 20,
           showSizeChanger: true,
           showTotal: (total) => `Всего: ${total} статей`,
-          pageSizeOptions: ['10', '20', '50', '100'],
-        }}
+          pageSizeOptions: ['10', '20', '50', '100']}}
         expandable={{
-          defaultExpandAllRows: false,
-        }}
+          defaultExpandAllRows: false}}
         rowSelection={
           onSelectionChange
             ? {
                 selectedRowKeys,
                 onChange: onSelectionChange,
-                preserveSelectedRowKeys: true,
-              }
+                preserveSelectedRowKeys: true}
             : undefined
         }
       />

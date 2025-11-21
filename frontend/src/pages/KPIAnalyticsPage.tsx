@@ -1,16 +1,15 @@
 import React, { useState } from 'react'
-import { Card, Row, Col, Statistic, DatePicker, Spin, Alert, Table, Progress, Tag } from 'antd'
+import { Card, Row, Col, Statistic, DatePicker, Spin, Alert, Progress, Tag } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { Area, Pie, Column } from '@ant-design/plots'
 import { TrophyOutlined, TeamOutlined, RiseOutlined, DollarOutlined, AimOutlined } from '@ant-design/icons'
 import dayjs, { Dayjs } from 'dayjs'
 import { kpiApi } from '@/api/kpi'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const KPIAnalyticsPage: React.FC = () => {
   const { selectedDepartment } = useDepartment()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [selectedYear, setSelectedYear] = useState<Dayjs>(dayjs())
   const year = selectedYear.year()
 
@@ -20,8 +19,7 @@ const KPIAnalyticsPage: React.FC = () => {
       year,
       department_id: selectedDepartment?.id
     }),
-    enabled: !!year,
-  })
+    enabled: !!year})
 
   const { data: goalProgress, isLoading: loadingGoals } = useQuery({
     queryKey: ['kpi-goal-progress', year, selectedDepartment?.id],
@@ -29,8 +27,7 @@ const KPIAnalyticsPage: React.FC = () => {
       year,
       department_id: selectedDepartment?.id
     }),
-    enabled: !!year,
-  })
+    enabled: !!year})
 
   const { data: kpiTrends, isLoading: loadingTrends } = useQuery({
     queryKey: ['kpi-trends', year, selectedDepartment?.id],
@@ -38,14 +35,12 @@ const KPIAnalyticsPage: React.FC = () => {
       year,
       department_id: selectedDepartment?.id
     }),
-    enabled: !!year,
-  })
+    enabled: !!year})
 
   const { data: bonusDistribution, isLoading: loadingBonus } = useQuery({
     queryKey: ['bonus-distribution', year],
     queryFn: () => kpiApi.getBonusDistribution({ year }),
-    enabled: !!year,
-  })
+    enabled: !!year})
 
   const isLoading = loadingEmployees || loadingGoals || loadingTrends || loadingBonus
 
@@ -65,8 +60,7 @@ const KPIAnalyticsPage: React.FC = () => {
     .sort((a, b) => Number(b.kpi_percentage || 0) - Number(a.kpi_percentage || 0))
     .map((emp, index) => ({
       ...emp,
-      rank: index + 1,
-    })) || []
+      rank: index + 1})) || []
 
   // Employee ranking columns
   const rankingColumns = [
@@ -79,18 +73,15 @@ const KPIAnalyticsPage: React.FC = () => {
         <Tag color={rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? '#cd7f32' : 'default'}>
           #{rank}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Сотрудник',
       dataIndex: 'employee_name',
-      key: 'employee_name',
-    },
+      key: 'employee_name'},
     {
       title: 'Должность',
       dataIndex: 'position',
-      key: 'position',
-    },
+      key: 'position'},
     {
       title: 'КПИ %',
       dataIndex: 'kpi_percentage',
@@ -99,14 +90,12 @@ const KPIAnalyticsPage: React.FC = () => {
         <span style={{ fontWeight: 'bold', color: val && val >= 100 ? '#52c41a' : '#ff4d4f' }}>
           {val?.toFixed(1)}%
         </span>
-      ),
-    },
+      )},
     {
       title: 'Премии',
       dataIndex: 'total_bonus_calculated',
       key: 'total_bonus_calculated',
-      render: (val: number) => `${Number(val).toLocaleString('ru-RU')} ₽`,
-    },
+      render: (val: number) => `${Number(val).toLocaleString('ru-RU')} ₽`},
     {
       title: 'Цели',
       key: 'goals',
@@ -116,8 +105,7 @@ const KPIAnalyticsPage: React.FC = () => {
           size="small"
           format={() => `${record.goals_achieved}/${record.goals_count}`}
         />
-      ),
-    },
+      )},
   ]
 
   // Goal progress columns
@@ -125,24 +113,20 @@ const KPIAnalyticsPage: React.FC = () => {
     {
       title: 'Цель',
       dataIndex: 'goal_name',
-      key: 'goal_name',
-    },
+      key: 'goal_name'},
     {
       title: 'Категория',
       dataIndex: 'category',
       key: 'category',
-      render: (val: string | null) => val || '-',
-    },
+      render: (val: string | null) => val || '-'},
     {
       title: 'Назначено сотрудников',
       dataIndex: 'employees_assigned',
-      key: 'employees_assigned',
-    },
+      key: 'employees_assigned'},
     {
       title: 'Достигли цели',
       dataIndex: 'employees_achieved',
-      key: 'employees_achieved',
-    },
+      key: 'employees_achieved'},
     {
       title: 'Прогресс',
       key: 'progress',
@@ -151,14 +135,12 @@ const KPIAnalyticsPage: React.FC = () => {
           percent={record.employees_assigned > 0 ? (record.employees_achieved / record.employees_assigned) * 100 : 0}
           size="small"
         />
-      ),
-    },
+      )},
     {
       title: 'Ср. выполнение',
       dataIndex: 'avg_achievement_percentage',
       key: 'avg_achievement_percentage',
-      render: (val: number) => `${Number(val).toFixed(1)}%`,
-    },
+      render: (val: number) => `${Number(val).toFixed(1)}%`},
   ]
 
   // KPI Trends Chart
@@ -171,26 +153,18 @@ const KPIAnalyticsPage: React.FC = () => {
         formatter: (v: string) => {
           const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
           return months[parseInt(v) - 1] || v
-        },
-      },
-    },
+        }}},
     yAxis: {
       label: {
-        formatter: (v: string) => `${v}%`,
-      },
-    },
+        formatter: (v: string) => `${v}%`}},
     line: {
-      color: '#1890ff',
-    },
+      color: '#1890ff'},
     areaStyle: {
-      fillOpacity: 0.3,
-    },
+      fillOpacity: 0.3},
     smooth: true,
     point: {
       size: 5,
-      shape: 'circle',
-    },
-  }
+      shape: 'circle'}}
 
   // Bonus Distribution by Department
   const bonusChartConfig = {
@@ -202,22 +176,15 @@ const KPIAnalyticsPage: React.FC = () => {
       position: 'middle' as const,
       style: {
         fill: '#FFFFFF',
-        opacity: 0.6,
-      },
-      formatter: (datum: any) => `${Number(datum.total_bonus).toLocaleString('ru-RU')} ₽`,
-    },
+        opacity: 0.6},
+      formatter: (datum: any) => `${Number(datum.total_bonus).toLocaleString('ru-RU')} ₽`},
     xAxis: {
       label: {
         autoHide: true,
-        autoRotate: false,
-      },
-    },
+        autoRotate: false}},
     yAxis: {
       label: {
-        formatter: (v: string) => `${Number(v).toLocaleString('ru-RU')} ₽`,
-      },
-    },
-  }
+        formatter: (v: string) => `${Number(v).toLocaleString('ru-RU')} ₽`}}}
 
   // Bonus Distribution by Type (Pie Chart)
   const bonusTypeData = bonusDistribution?.flatMap(dept => [
@@ -233,17 +200,13 @@ const KPIAnalyticsPage: React.FC = () => {
     radius: 0.8,
     label: {
       type: 'outer' as const,
-      content: '{name} {percentage}',
-    },
+      content: '{name} {percentage}'},
     interactions: [
       {
-        type: 'pie-legend-active',
-      },
+        type: 'pie-legend-active'},
       {
-        type: 'element-active',
-      },
-    ],
-  }
+        type: 'element-active'},
+    ]}
 
   if (isLoading) {
     return (

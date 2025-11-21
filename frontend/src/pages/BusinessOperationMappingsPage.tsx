@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Typography,
   Card,
-  Table,
   Button,
   Space,
   Tag,
@@ -14,8 +13,7 @@ import {
   Col,
   Statistic,
   Tooltip,
-  Progress,
-} from 'antd'
+  Progress} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -25,20 +23,18 @@ import {
   CloseOutlined,
   CheckOutlined,
   SettingOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons'
+  InfoCircleOutlined} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as businessOperationMappingsApi from '@/api/businessOperationMappings'
 import type { BusinessOperationMapping } from '@/types/businessOperationMapping'
 import { useDepartment } from '@/contexts/DepartmentContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import BusinessOperationMappingFormModal from '@/components/businessOperationMappings/BusinessOperationMappingFormModal'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import {
   getResponsiveSpacing,
   getResponsiveGutter,
-  getResponsiveButtonSize,
-} from '@/utils/responsive'
+  getResponsiveButtonSize} from '@/utils/responsive'
 
 const { Title, Paragraph, Text } = Typography
 const { Option } = Select
@@ -67,9 +63,7 @@ const BusinessOperationMappingsPage = () => {
         limit: pageSize,
         business_operation: search || undefined,
         is_active: activeFilter,
-        department_id: selectedDepartment?.id,
-      }),
-  })
+        department_id: selectedDepartment?.id})})
 
   const deleteMutation = useMutation({
     mutationFn: businessOperationMappingsApi.deleteMapping,
@@ -79,8 +73,7 @@ const BusinessOperationMappingsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка при удалении: ${error.message}`)
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setModalMode('create')
@@ -161,8 +154,7 @@ const BusinessOperationMappingsPage = () => {
       dataIndex: 'business_operation',
       key: 'business_operation',
       width: 250,
-      render: (text: string) => <Text strong>{text}</Text>,
-    },
+      render: (text: string) => <Text strong>{text}</Text>},
     {
       title: 'Категория бюджета',
       dataIndex: 'category_name',
@@ -177,8 +169,7 @@ const BusinessOperationMappingsPage = () => {
             </Tag>
           )}
         </Space>
-      ),
-    },
+      )},
     {
       title: (
         <Space>
@@ -192,8 +183,7 @@ const BusinessOperationMappingsPage = () => {
       key: 'priority',
       width: 120,
       sorter: (a: BusinessOperationMapping, b: BusinessOperationMapping) => a.priority - b.priority,
-      render: (value: number) => <Tag color="purple">{value}</Tag>,
-    },
+      render: (value: number) => <Tag color="purple">{value}</Tag>},
     {
       title: (
         <Space>
@@ -211,22 +201,19 @@ const BusinessOperationMappingsPage = () => {
         const percent = Math.round(value * 100)
         const color = percent >= 90 ? 'success' : percent >= 70 ? 'warning' : 'exception'
         return <Progress percent={percent} size="small" status={color as any} />
-      },
-    },
+      }},
     {
       title: 'Отдел',
       dataIndex: 'department_name',
       key: 'department_name',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Примечания',
       dataIndex: 'notes',
       key: 'notes',
       width: 200,
       ellipsis: true,
-      render: (text: string) => text || <Text type="secondary">—</Text>,
-    },
+      render: (text: string) => text || <Text type="secondary">—</Text>},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -243,8 +230,7 @@ const BusinessOperationMappingsPage = () => {
           </Tag>
         ) : (
           <Tag color="default">Неактивный</Tag>
-        ),
-    },
+        )},
     {
       title: 'Действия',
       key: 'actions',
@@ -272,16 +258,14 @@ const BusinessOperationMappingsPage = () => {
             </Tooltip>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   const rowSelection = {
     selectedRowKeys,
     onChange: (newSelectedRowKeys: React.Key[]) => {
       setSelectedRowKeys(newSelectedRowKeys)
-    },
-  }
+    }}
 
   const activeCount = mappings?.items?.filter((m) => m.is_active).length || 0
   const inactiveCount = mappings?.items?.filter((m) => !m.is_active).length || 0
@@ -445,8 +429,7 @@ const BusinessOperationMappingsPage = () => {
               onChange: (newPage, newPageSize) => {
                 setPage(newPage)
                 setPageSize(newPageSize)
-              },
-            }}
+              }}}
             scroll={{ x: 1400 }}
             mobileLayout="card"
           />

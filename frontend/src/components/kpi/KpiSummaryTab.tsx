@@ -1,14 +1,11 @@
 import { useState } from 'react'
-import { Card, Select, Space, Table, Typography } from 'antd'
+import { Card, Select, Space, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { KPIEmployeeSummary } from '@/api/kpi'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
-import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { formatCurrency } from '@/utils/formatters'
 
 const { Option } = Select
@@ -24,11 +21,8 @@ interface KpiSummaryTabProps {
 }
 
 export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) => {
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const [summaryFilters, setSummaryFilters] = useState<{ year: number; month?: number }>({
-    year: dayjs().year(),
-  })
+    year: dayjs().year()})
 
   const summaryQuery = useQuery({
     queryKey: ['kpi-employee-summary', summaryFilters, departmentId],
@@ -36,10 +30,8 @@ export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) =>
       kpiApi.getEmployeeSummary({
         year: summaryFilters.year,
         month: summaryFilters.month,
-        department_id: departmentId,
-      }),
-    enabled: !!departmentId,
-  })
+        department_id: departmentId}),
+    enabled: !!departmentId})
 
   const summary = summaryQuery.data || []
 
@@ -55,38 +47,33 @@ export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) =>
             {record.position || '—'}
           </Text>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Период',
       dataIndex: 'month',
       key: 'period',
       width: 120,
       render: (_, record) =>
-        record.month ? `${monthLabel(record.month)} ${record.year}` : `${record.year}`,
-    },
+        record.month ? `${monthLabel(record.month)} ${record.year}` : `${record.year}`},
     {
       title: 'КПИ %',
       dataIndex: 'kpi_percentage',
       key: 'kpi_percentage',
       width: 100,
       render: (value) =>
-        value !== null && value !== undefined ? `${Number(value).toFixed(1)} %` : '—',
-    },
+        value !== null && value !== undefined ? `${Number(value).toFixed(1)} %` : '—'},
     {
       title: 'Бонус (всего)',
       dataIndex: 'total_bonus_calculated',
       key: 'total_bonus_calculated',
       width: 140,
-      render: (value) => formatCurrency(Number(value || 0)),
-    },
+      render: (value) => formatCurrency(Number(value || 0))},
     {
       title: 'Целей выполнено',
       dataIndex: 'goals_achieved',
       key: 'goals_achieved',
       width: 160,
-      render: (_, record) => `${record.goals_achieved}/${record.goals_count}`,
-    },
+      render: (_, record) => `${record.goals_achieved}/${record.goals_count}`},
   ]
 
   return (

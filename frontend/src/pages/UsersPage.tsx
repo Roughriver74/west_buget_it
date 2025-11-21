@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Typography,
   Card,
-  Table,
   Button,
   Space,
   Tag,
@@ -12,8 +11,7 @@ import {
   Select,
   Row,
   Col,
-  Statistic,
-} from 'antd'
+  Statistic} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -21,14 +19,12 @@ import {
   SearchOutlined,
   UserOutlined,
   CheckCircleOutlined,
-  CloseCircleOutlined,
-} from '@ant-design/icons'
+  CloseCircleOutlined} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usersApi } from '@/api'
 import type { UserListItem } from '@/api/users'
 import UserFormModal from '@/components/users/UserFormModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { PAGINATION_CONFIG } from '@/config/pagination'
 
@@ -41,8 +37,7 @@ const getRoleLabel = (role: string) => {
     MANAGER: { label: 'Руководитель', color: 'purple' },
     ACCOUNTANT: { label: 'Бухгалтер', color: 'blue' },
     REQUESTER: { label: 'Заявитель', color: 'green' },
-    USER: { label: 'Пользователь', color: 'default' },
-  }
+    USER: { label: 'Пользователь', color: 'default' }}
   return roleLabels[role] || { label: role, color: 'default' }
 }
 
@@ -58,8 +53,6 @@ const UsersPage = () => {
 
   const queryClient = useQueryClient()
   const { user: currentUser } = useAuth()
-  const isMobile = useIsMobile()
-  const isSmallScreen = useIsSmallScreen()
   const isAdmin = currentUser?.role === 'ADMIN'
 
   const { data: users, isLoading } = useQuery({
@@ -67,9 +60,7 @@ const UsersPage = () => {
     queryFn: () =>
       usersApi.getAll({
         skip: (page - 1) * pageSize,
-        limit: pageSize,
-      }),
-  })
+        limit: pageSize})})
 
   const deleteMutation = useMutation({
     mutationFn: usersApi.delete,
@@ -80,8 +71,7 @@ const UsersPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при удалении: ${errorMessage}`)
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setModalMode('create')
@@ -142,21 +132,18 @@ const UsersPage = () => {
           <UserOutlined />
           <strong>{text}</strong>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Полное имя',
       dataIndex: 'full_name',
       key: 'full_name',
       width: 200,
-      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>,
-    },
+      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>},
     {
       title: 'Роль',
       dataIndex: 'role',
@@ -165,16 +152,14 @@ const UsersPage = () => {
       render: (role: string) => {
         const { label, color } = getRoleLabel(role)
         return <Tag color={color}>{label}</Tag>
-      },
-    },
+      }},
     {
       title: 'Отдел',
       dataIndex: 'department_id',
       key: 'department_id',
       width: 100,
       render: (dept: number | null) =>
-        dept ? `Отдел #${dept}` : <span style={{ color: '#999' }}>—</span>,
-    },
+        dept ? `Отдел #${dept}` : <span style={{ color: '#999' }}>—</span>},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -190,8 +175,7 @@ const UsersPage = () => {
           <Tag color="default" icon={<CloseCircleOutlined />}>
             Неактивен
           </Tag>
-        ),
-    },
+        )},
     {
       title: 'Действия',
       key: 'actions',
@@ -225,8 +209,7 @@ const UsersPage = () => {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -346,8 +329,7 @@ const UsersPage = () => {
                 },
                 showSizeChanger: true,
                 showTotal: (total) => `Всего ${total} пользователей`,
-                pageSizeOptions: [...PAGINATION_CONFIG.OPTIONS_STRINGS],
-              }}
+                pageSizeOptions: [...PAGINATION_CONFIG.OPTIONS_STRINGS]}}
               scroll={{ x: 1200 }}
               mobileLayout="card"
             />
