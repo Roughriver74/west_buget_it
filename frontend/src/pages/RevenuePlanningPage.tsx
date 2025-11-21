@@ -32,6 +32,8 @@ import {
   FolderOutlined,
 } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { RevenuePlan, RevenuePlanCreate, RevenuePlanStatus } from '@/types/revenue'
 import CopyRevenuePlanModal from '@/components/revenue/CopyRevenuePlanModal'
@@ -43,6 +45,8 @@ const RevenuePlanningPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [form] = Form.useForm()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isCopyModalVisible, setIsCopyModalVisible] = useState(false)
@@ -419,7 +423,7 @@ const RevenuePlanningPage = () => {
 
       {/* Plans Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={plans}
           rowKey="id"
@@ -430,6 +434,7 @@ const RevenuePlanningPage = () => {
             defaultPageSize: 20,
           }}
           scroll={{ x: 1200 }}
+          mobileLayout="card"
         />
       </Card>
 
