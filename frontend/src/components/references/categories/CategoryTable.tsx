@@ -7,6 +7,8 @@ import type { BudgetCategory, ExpenseType } from '@/types'
 import CategoryCreateModal from './CategoryCreateModal'
 import CategoryEditModal from './CategoryEditModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Option } = Select
 
@@ -25,6 +27,8 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
   const [typeFilter, setTypeFilter] = useState<ExpenseType | 'ALL'>('ALL')
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(undefined)
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const queryClient = useQueryClient()
 
@@ -215,13 +219,14 @@ const CategoryTable: React.FC<CategoryTableProps> = ({
         </Button>
       </div>
 
-      <Table
+      <ResponsiveTable
         columns={columns}
         dataSource={treeData}
         loading={isLoading}
         rowKey="id"
         size="middle"
         scroll={{ x: 900 }}
+        mobileLayout="card"
         pagination={{
           pageSize: 20,
           showSizeChanger: true,

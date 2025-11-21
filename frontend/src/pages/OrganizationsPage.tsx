@@ -8,6 +8,8 @@ import type { Organization } from '@/types'
 import type { UploadProps } from 'antd'
 import axios from 'axios'
 import OrganizationFormModal from '@/components/organizations/OrganizationFormModal'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
@@ -28,6 +30,8 @@ const OrganizationsPage = () => {
   const [syncLoading, setSyncLoading] = useState(false)
 
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   // Organizations are SHARED across all departments - no department filtering
   const { data: organizations, isLoading } = useQuery({
@@ -472,13 +476,14 @@ const OrganizationsPage = () => {
           </Button>
         </div>
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={organizations || []}
           loading={isLoading}
           rowKey="id"
           size="middle"
           scroll={{ x: 800 }}
+          mobileLayout="card"
           pagination={{
             current: page,
             pageSize: pageSize,
