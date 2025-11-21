@@ -43,7 +43,9 @@ Frontend UI Hiding   ────┘
 | `CREDIT_PORTFOLIO` | Кредитный портфель | Финансовый портфель + FTP import |
 | `REVENUE_BUDGET` | Бюджет доходов | Планирование доходов + LTV метрики |
 | `PAYROLL_KPI` | KPI и бонусы | Система KPI для сотрудников |
+| `HR_DEPARTMENT` | Табель рабочего времени | Учет рабочих часов сотрудников |
 | `INTEGRATIONS_1C` | Интеграция с 1С | OData синхронизация |
+| `INVOICE_PROCESSING` | AI обработка счетов | OCR + GPT-4o для счетов |
 | `FOUNDER_DASHBOARD` | Дашборд учредителя | Executive dashboard |
 | `ADVANCED_ANALYTICS` | Расширенная аналитика | Продвинутые отчеты |
 | `MULTI_DEPARTMENT` | Мультиотдельность | Управление отделами |
@@ -113,13 +115,28 @@ GET /api/v1/modules/enabled/my
 cd backend
 python scripts/seed_modules.py
 
-# 2. Включить модуль для организации (через SQL)
+# 2. Включить модули через Web UI (рекомендуется)
+# Войдите как ADMIN → Перейдите в меню "Модули" (/module-settings)
+# Выберите организацию и включите нужные модули через UI
+
+# ИЛИ через SQL напрямую:
 INSERT INTO organization_modules (organization_id, module_id, is_active)
 SELECT 1, id, true FROM modules WHERE code = 'AI_FORECAST';
 
 # 3. Frontend автоматически скроет/покажет элементы
 # 4. Backend автоматически защитит API endpoints
 ```
+
+**⚠️ ВАЖНО**: Система модулей сейчас временно отключена для обратной совместимости. Все модули доступны всем пользователям. Настройки модулей будут применены после активации системы (раскомментировать код в `module_service.py` и `ModulesContext.tsx`).
+
+**Web UI для управления модулями**:
+- **Путь**: `/module-settings` (только ADMIN)
+- **Меню**: Администрирование → Модули
+- **Функции**:
+  - Просмотр всех доступных модулей
+  - Включение/выключение модулей для организаций
+  - Просмотр зависимостей и описаний
+  - По умолчанию включены: BUDGET_CORE (обязательный) и PAYROLL_KPI
 
 **Полная документация**: [docs/MODULES.md](docs/MODULES.md)
 

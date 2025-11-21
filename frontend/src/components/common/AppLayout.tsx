@@ -42,6 +42,7 @@ import {
 	ClockCircleOutlined,
 	MenuFoldOutlined,
 	MenuUnfoldOutlined,
+	AppstoreOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -535,6 +536,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 						icon: <KeyOutlined />,
 						label: 'API Токены',
 						onClick: () => setApiTokensDrawerOpen(true),
+					},
+					{
+						key: '/module-settings',
+						icon: <AppstoreOutlined />,
+						label: <Link to='/module-settings'>Модули</Link>,
 					},
 			]
 			: baseMenuItems

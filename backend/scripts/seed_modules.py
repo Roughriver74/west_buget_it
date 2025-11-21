@@ -110,6 +110,15 @@ MODULES = [
         "icon": "ClusterOutlined",
         "sort_order": 10,
     },
+    {
+        "code": "INVOICE_PROCESSING",
+        "name": "Invoice Processing (AI OCR)",
+        "description": "Автоматическое распознавание счетов через OCR и GPT-4o, создание заявок на расход в 1С",
+        "version": "1.0.0",
+        "dependencies": ["BUDGET_CORE", "INTEGRATIONS_1C"],
+        "icon": "FileTextOutlined",
+        "sort_order": 11,
+    },
 ]
 
 
