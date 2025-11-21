@@ -26,6 +26,8 @@ import { formatCurrency } from '@/utils/formatters'
 import PaymentForecastChart from '@/components/forecast/PaymentForecastChart'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Text } = Typography
@@ -34,6 +36,8 @@ const { Option } = Select
 const PaymentCalendarPage = () => {
   const { selectedDepartment } = useDepartment()
   const { mode } = useTheme()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs())
   const [categoryId, setCategoryId] = useState<number | undefined>()
   const [modalVisible, setModalVisible] = useState(false)
@@ -566,13 +570,14 @@ const PaymentCalendarPage = () => {
                       <CheckCircleOutlined /> Фактически оплачено ({actualPayments.length})
                     </Text>
                   </div>
-                  <Table
+                  <ResponsiveTable
                     dataSource={actualPayments}
                     columns={columns}
                     rowKey="id"
                     pagination={false}
                     size="small"
                     style={{ marginBottom: 24 }}
+                    mobileLayout="card"
                   />
                 </>
               )}
@@ -585,7 +590,7 @@ const PaymentCalendarPage = () => {
                       <CalendarOutlined /> Запланировано к оплате ({plannedPayments.length})
                     </Text>
                   </div>
-                  <Table
+                  <ResponsiveTable
                     dataSource={plannedPayments}
                     columns={columns}
                     rowKey="id"
@@ -593,6 +598,7 @@ const PaymentCalendarPage = () => {
                     size="small"
                     style={{ marginBottom: 24 }}
                     rowClassName={() => 'planned-row'}
+                    mobileLayout="card"
                   />
                 </>
               )}
@@ -605,13 +611,14 @@ const PaymentCalendarPage = () => {
                       <RiseOutlined /> Прогнозные расходы ({forecastPayments.length})
                     </Text>
                   </div>
-                  <Table
+                  <ResponsiveTable
                     dataSource={forecastPayments}
                     columns={columns}
                     rowKey="id"
                     pagination={false}
                     size="small"
                     rowClassName={() => 'forecast-row'}
+                    mobileLayout="card"
                   />
                 </>
               )}

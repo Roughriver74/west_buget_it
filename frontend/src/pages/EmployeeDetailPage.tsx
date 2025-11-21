@@ -26,6 +26,8 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { employeeAPI, payrollPlanAPI, payrollActualAPI, employeeTaxAPI } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
@@ -54,6 +56,8 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const [modalVisible, setModalVisible] = useState(false);
   const [planModalVisible, setPlanModalVisible] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
@@ -571,11 +575,12 @@ export default function EmployeeDetailPage() {
                       Добавить план
                     </Button>
                   </div>
-                  <Table
+                  <ResponsiveTable
                     columns={plansColumns}
                     dataSource={sortedPlans}
                     rowKey="id"
                     pagination={{ pageSize: 12 }}
+                    mobileLayout="card"
                   />
                 </>
               ),
@@ -588,11 +593,12 @@ export default function EmployeeDetailPage() {
                 </span>
               ),
               children: (
-                <Table
+                <ResponsiveTable
                   columns={actualsColumns}
                   dataSource={sortedActuals}
                   rowKey="id"
                   pagination={{ pageSize: 12 }}
+                  mobileLayout="card"
                 />
               ),
             },
@@ -604,11 +610,12 @@ export default function EmployeeDetailPage() {
                 </span>
               ),
               children: sortedSalaryHistory.length > 0 ? (
-                <Table
+                <ResponsiveTable
                   columns={salaryHistoryColumns}
                   dataSource={sortedSalaryHistory}
                   rowKey="id"
                   pagination={false}
+                  mobileLayout="card"
                 />
               ) : (
                 <div style={{ textAlign: 'center', padding: '40px' }}>

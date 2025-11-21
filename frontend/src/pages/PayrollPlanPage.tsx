@@ -25,6 +25,8 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
@@ -43,6 +45,8 @@ const MONTHS = [
 export default function PayrollPlanPage() {
   const { selectedDepartment } = useDepartment();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [planModalVisible, setPlanModalVisible] = useState(false);
@@ -368,12 +372,13 @@ export default function PayrollPlanPage() {
 
       {/* Monthly Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={monthlyData}
           rowKey="month"
           loading={plansLoading || actualsLoading}
           pagination={false}
+          mobileLayout="card"
           expandable={{
             expandedRowRender: (record) => {
               const monthPlans = plans.filter((p) => p.month === record.month);
@@ -455,12 +460,13 @@ export default function PayrollPlanPage() {
               ];
 
               return (
-                <Table
+                <ResponsiveTable
                   columns={detailColumns}
                   dataSource={monthPlans}
                   rowKey="id"
                   pagination={false}
                   size="small"
+                  mobileLayout="card"
                 />
               );
             },

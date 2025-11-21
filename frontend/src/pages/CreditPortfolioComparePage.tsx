@@ -15,6 +15,8 @@ import {
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import CreditPortfolioFilters, {
@@ -47,6 +49,8 @@ interface YoYGrowth {
 
 export default function CreditPortfolioComparePage() {
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [comparisonPeriod, setComparisonPeriod] = useState<PeriodType>('yearly')
   const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
@@ -82,7 +86,7 @@ export default function CreditPortfolioComparePage() {
     return (
       <div style={{ padding: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
         <Spin size="large" tip="Загрузка данных...">
-          <div style={{ minHeight: 200 }} />
+          <div style={{ minHeight: 200 }}  />
         </Spin>
       </div>
     )
@@ -92,7 +96,7 @@ export default function CreditPortfolioComparePage() {
     return (
       <div style={{ padding: 24 }}>
         <h1 style={{ marginBottom: 24 }}>Кредитный портфель - Сравнительный анализ</h1>
-        <Empty description="Нет данных для сравнения" />
+        <Empty description="Нет данных для сравнения"  />
       </div>
     )
   }
@@ -284,7 +288,7 @@ export default function CreditPortfolioComparePage() {
       <CreditPortfolioFilters
         onFilterChange={setFilters}
         initialValues={filters}
-      />
+       />
 
       {/* Comparison Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16, marginBottom: 24 }}>
@@ -351,25 +355,25 @@ export default function CreditPortfolioComparePage() {
             </p>
             <ResponsiveContainer width="100%" height={400}>
               <ComposedChart data={yearlyComparison}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
+                <CartesianGrid strokeDasharray="3 3"  />
+                <XAxis dataKey="year"  />
                 <YAxis
                   tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                />
+                 />
                 <Tooltip
                   formatter={(value: number) => `${value.toLocaleString('ru-RU')} ₽`}
-                />
-                <Legend />
-                <Bar dataKey="received" name="Получено" fill="#3B82F6" />
-                <Bar dataKey="principal" name="Погашено тела" fill="#10B981" />
-                <Bar dataKey="interest" name="Уплачено %" fill="#F59E0B" />
+                 />
+                <Legend  />
+                <Bar dataKey="received" name="Получено" fill="#3B82F6"  />
+                <Bar dataKey="principal" name="Погашено тела" fill="#10B981"  />
+                <Bar dataKey="interest" name="Уплачено %" fill="#F59E0B"  />
                 <Line
                   type="monotone"
                   dataKey="totalPaid"
                   name="Всего выплачено"
                   stroke="#EF4444"
                   strokeWidth={2}
-                />
+                 />
               </ComposedChart>
             </ResponsiveContainer>
           </Card>
@@ -381,17 +385,17 @@ export default function CreditPortfolioComparePage() {
             </p>
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={yoyGrowth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`} />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3"  />
+                <XAxis dataKey="year"  />
+                <YAxis  />
+                <Tooltip formatter={(value: number) => `${value.toFixed(1)}%`}  />
+                <Legend  />
                 <Bar dataKey="receivedGrowth" name="Рост получений">
                   {yoyGrowth.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.receivedGrowth >= 0 ? '#10B981' : '#EF4444'}
-                    />
+                     />
                   ))}
                 </Bar>
                 <Bar dataKey="principalGrowth" name="Рост погашений">
@@ -399,7 +403,7 @@ export default function CreditPortfolioComparePage() {
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.principalGrowth >= 0 ? '#3B82F6' : '#F59E0B'}
-                    />
+                     />
                   ))}
                 </Bar>
               </BarChart>
@@ -416,17 +420,17 @@ export default function CreditPortfolioComparePage() {
           </p>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={quarterlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="quarter" angle={-45} textAnchor="end" height={80} />
+              <CartesianGrid strokeDasharray="3 3"  />
+              <XAxis dataKey="quarter" angle={-45} textAnchor="end" height={80}  />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-              />
+               />
               <Tooltip
                 formatter={(value: number) => `${value.toLocaleString('ru-RU')} ₽`}
-              />
-              <Legend />
-              <Bar dataKey="principal" name="Погашено тела" fill="#10B981" />
-              <Bar dataKey="interest" name="Уплачено %" fill="#F59E0B" />
+               />
+              <Legend  />
+              <Bar dataKey="principal" name="Погашено тела" fill="#10B981"  />
+              <Bar dataKey="interest" name="Уплачено %" fill="#F59E0B"  />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -434,12 +438,12 @@ export default function CreditPortfolioComparePage() {
 
       {/* Summary Table */}
       <Card title="Детальное сравнение по годам">
-        <Table
+        <ResponsiveTable
           columns={tableColumns}
           dataSource={yearlyComparison}
           rowKey="year"
           pagination={false}
-        />
+         />
       </Card>
     </div>
   )

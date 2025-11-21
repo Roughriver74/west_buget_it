@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react'
 import { Card, Col, Empty, Row, Statistic, Table, Tag } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { CalendarOutlined, FieldTimeOutlined, FundOutlined } from '@ant-design/icons'
 import {
   Bar,
@@ -19,6 +21,8 @@ interface RegularPaymentsInsightsProps {
 }
 
 const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data = [], loading }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('ru-RU', {
       style: 'currency',
@@ -204,7 +208,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
 
             <Col xs={24} lg={14}>
               <h4 style={{ marginBottom: 12 }}>Детализация по контрагентам</h4>
-              <Table
+              <ResponsiveTable
                 columns={columns}
                 dataSource={data}
                 rowKey={(record) => `${record.counterparty_name}-${record.category_name}`}

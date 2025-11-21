@@ -79,6 +79,8 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
   employeeKpiId,
 }) => {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [recalculating, setRecalculating] = useState(false)
 
   // Fetch breakdown data
@@ -249,7 +251,8 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
         {breakdown.completed_tasks_count > 0 ? (
           <div>
             <Title level={5}>Завершенные задачи</Title>
-            <Table<ComplexityBreakdownType['completed_tasks'][0]>
+            <ResponsiveTable<ComplexityBreakdownType['completed_tasks'][0]>
+              mobileLayout="card"
               rowKey="id"
               columns={taskColumns}
               dataSource={breakdown.completed_tasks}

@@ -47,6 +47,8 @@ import { BankTransactionStatus, BankTransactionType } from '@/types/bankTransact
 import type { BankTransaction, BankTransactionList } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import ColumnMappingModal from '@/components/bank/ColumnMappingModal'
@@ -82,6 +84,8 @@ const BankTransactionsPage = () => {
   const { user } = useAuth()
   const { modal } = App.useApp()
   const { message } = App.useApp()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   // Filters
   const [transactionType, setTransactionType] = useState<BankTransactionType | undefined>()
@@ -1667,14 +1671,15 @@ const BankTransactionsPage = () => {
         )}
 
         <Form form={editForm} component={false}>
-          <Table
+          <ResponsiveTable
             className="bank-transactions-table"
             columns={columns}
             dataSource={data?.items || []}
             rowKey="id"
             size="middle"
             scroll={{ x: 1700 }}
-            sticky={{ offsetHeader: 64 }}
+            sticky={{ offsetHeader: isMobile ? 48 : 64 }}
+            mobileLayout="card"
             title={() => (
               <div className="bank-transactions-table__title">
                 <Space size="large" wrap>

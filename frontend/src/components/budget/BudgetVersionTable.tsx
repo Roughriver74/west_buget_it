@@ -4,6 +4,8 @@
  */
 import React, { Key } from 'react'
 import { Table, Tag, Button, Space, Popconfirm, Tooltip } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { ColumnsType } from 'antd/es/table'
 import {
   EditOutlined,
@@ -71,6 +73,8 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   onSelectionChange,
 }) => {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const canApprove = user?.role === 'ADMIN' || user?.role === 'MANAGER'
   const columns: ColumnsType<BudgetVersion> = [
     {
@@ -274,7 +278,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
     : undefined
 
   return (
-    <Table
+    <ResponsiveTable
       columns={columns}
       dataSource={versions}
       rowKey="id"

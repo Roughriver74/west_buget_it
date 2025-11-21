@@ -44,6 +44,8 @@ const FounderDashboardPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [month, setMonth] = useState<number | undefined>(undefined)
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['founderDashboard', year, month],
@@ -315,7 +317,7 @@ const FounderDashboardPage = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={24}>
           <Card title="Показатели по отделам">
-            <Table
+            <ResponsiveTable
               columns={departmentColumns}
               dataSource={data.departments}
               rowKey="department_id"

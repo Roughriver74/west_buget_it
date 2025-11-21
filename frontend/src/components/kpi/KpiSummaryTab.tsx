@@ -4,7 +4,11 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { KPIEmployeeSummary } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { formatCurrency } from '@/utils/formatters'
 
 const { Option } = Select
@@ -20,6 +24,8 @@ interface KpiSummaryTabProps {
 }
 
 export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [summaryFilters, setSummaryFilters] = useState<{ year: number; month?: number }>({
     year: dayjs().year(),
   })
@@ -115,7 +121,8 @@ export const KpiSummaryTab: React.FC<KpiSummaryTabProps> = ({ departmentId }) =>
         </Space>
       }
     >
-      <Table<KPIEmployeeSummary>
+      <ResponsiveTable<KPIEmployeeSummary>
+        mobileLayout="card"
         rowKey={(record) => `${record.employee_id}-${record.year}-${record.month ?? 'all'}`}
         columns={summaryColumns}
         dataSource={summary}

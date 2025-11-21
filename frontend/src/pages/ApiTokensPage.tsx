@@ -22,6 +22,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/ru';
 
 import AppLayout from '../components/common/AppLayout';
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import CreateTokenModal from '../components/apiTokens/CreateTokenModal';
 import ShowTokenModal from '../components/apiTokens/ShowTokenModal';
 import * as apiTokensApi from '../api/apiTokens';
@@ -35,6 +37,8 @@ const { confirm } = Modal;
 
 const ApiTokensPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState<{
@@ -269,7 +273,7 @@ const ApiTokensPage: React.FC = () => {
         </div>
 
         <Card>
-          <Table
+          <ResponsiveTable
             columns={columns}
             dataSource={tokens}
             rowKey="id"
@@ -279,6 +283,7 @@ const ApiTokensPage: React.FC = () => {
               showSizeChanger: true,
               showTotal: (total) => `Всего токенов: ${total}`
             }}
+            mobileLayout="card"
           />
         </Card>
 

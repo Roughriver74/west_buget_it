@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Table, Tag, Spin, message, Button, Space, Alert, Segmented, theme } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { CopyOutlined, PlusOutlined, DownloadOutlined, WarningOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
@@ -32,6 +34,8 @@ const BudgetPlanTable = React.forwardRef<
   const [activeMonth, setActiveMonth] = useState<number>(year === currentYear ? currentMonth : 1)
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollTargetRef = useRef<HTMLDivElement | null>(null)
   const { mode } = useTheme()
@@ -668,7 +672,7 @@ const BudgetPlanTable = React.forwardRef<
         ref={scrollContainerRef}
         style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
       >
-        <Table
+        <ResponsiveTable
           sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
           columns={columns}
           dataSource={dataWithTotals}

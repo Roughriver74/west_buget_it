@@ -28,6 +28,8 @@ import {
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   EmployeeKPI,
   EmployeeKPICreate,
@@ -36,6 +38,8 @@ import type {
   KPIGoal,
   KPIGoalStatus,
 } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { employeeAPI } from '@/api/payroll'
 import type { Employee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
@@ -73,6 +77,8 @@ interface EmployeeKpiTabProps {
 
 export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, year }) => {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const currentYear = year || dayjs().year()
 
   const [kpiModal, setKpiModal] = useState<{ open: boolean; editing?: EmployeeKPI }>({
@@ -445,7 +451,8 @@ export const EmployeeKpiTab: React.FC<EmployeeKpiTabProps> = ({ departmentId, ye
           </Space>
         }
       >
-        <Table<EmployeeKPI>
+        <ResponsiveTable<EmployeeKPI>
+          mobileLayout="card"
           rowKey="id"
           columns={employeeColumns}
           dataSource={employeeKpis}

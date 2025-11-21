@@ -9,6 +9,8 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 
 const KPIAnalyticsPage: React.FC = () => {
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [selectedYear, setSelectedYear] = useState<Dayjs>(dayjs())
   const year = selectedYear.year()
 
@@ -343,11 +345,11 @@ const KPIAnalyticsPage: React.FC = () => {
               </span>
             }
           >
-            <Table
+            <ResponsiveTable
               dataSource={rankedEmployees}
               columns={rankingColumns}
               rowKey="employee_id"
-              pagination={{ pageSize: 10 }}
+              pagination={{ pageSize: 10 }} mobileLayout="card"
             />
           </Card>
         </Col>
@@ -358,11 +360,11 @@ const KPIAnalyticsPage: React.FC = () => {
         <Col span={24}>
           <Card title="Анализ выполнения целей">
             {goalProgress && goalProgress.length > 0 ? (
-              <Table
+              <ResponsiveTable
                 dataSource={goalProgress}
                 columns={goalColumns}
                 rowKey="goal_id"
-                pagination={{ pageSize: 10 }}
+                pagination={{ pageSize: 10 }} mobileLayout="card"
               />
             ) : (
               <Alert message="Нет данных о целях" type="info" />

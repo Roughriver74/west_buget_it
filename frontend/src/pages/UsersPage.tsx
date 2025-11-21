@@ -28,6 +28,8 @@ import { usersApi } from '@/api'
 import type { UserListItem } from '@/api/users'
 import UserFormModal from '@/components/users/UserFormModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { PAGINATION_CONFIG } from '@/config/pagination'
 
 const { Title, Paragraph } = Typography
@@ -56,6 +58,8 @@ const UsersPage = () => {
 
   const queryClient = useQueryClient()
   const { user: currentUser } = useAuth()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const isAdmin = currentUser?.role === 'ADMIN'
 
   const { data: users, isLoading } = useQuery({
@@ -327,7 +331,7 @@ const UsersPage = () => {
             </Row>
 
             {/* Table */}
-            <Table
+            <ResponsiveTable
               columns={columns}
               dataSource={filteredUsers}
               rowKey="id"
@@ -345,6 +349,7 @@ const UsersPage = () => {
                 pageSizeOptions: [...PAGINATION_CONFIG.OPTIONS_STRINGS],
               }}
               scroll={{ x: 1200 }}
+              mobileLayout="card"
             />
           </Space>
         </Card>

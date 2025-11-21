@@ -27,6 +27,8 @@ import { departmentsApi } from '@/api'
 import type { Department } from '@/contexts/DepartmentContext'
 import DepartmentFormModal from '@/components/departments/DepartmentFormModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -43,6 +45,8 @@ const DepartmentsPage = () => {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const { data: departments, isLoading } = useQuery({
     queryKey: ['departments', page, pageSize, search, activeFilter],
@@ -313,7 +317,7 @@ const DepartmentsPage = () => {
             </Row>
 
             {/* Table */}
-            <Table
+            <ResponsiveTable
               columns={columns}
               dataSource={filteredDepartments}
               rowKey="id"
@@ -331,6 +335,7 @@ const DepartmentsPage = () => {
                 pageSizeOptions: ['10', '20', '50', '100'],
               }}
               scroll={{ x: 1200 }}
+              mobileLayout="card"
             />
           </Space>
         </Card>

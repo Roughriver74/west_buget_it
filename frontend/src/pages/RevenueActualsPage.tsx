@@ -27,6 +27,8 @@ import {
 import { revenueActualsApi, revenueStreamsApi, revenueCategoriesApi } from '@/api'
 import type { RevenueActual, RevenueActualCreate, RevenueActualUpdate } from '@/types/revenue'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import dayjs from 'dayjs'
@@ -36,6 +38,8 @@ const { Title } = Typography
 const RevenueActualsPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -331,10 +335,11 @@ const RevenueActualsPage = () => {
           </Button>
         </Space>
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={actuals}
           rowKey="id"
+          mobileLayout="card"
           pagination={{
             pageSize: 20,
             showSizeChanger: true,

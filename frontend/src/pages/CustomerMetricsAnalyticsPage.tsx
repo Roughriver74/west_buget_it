@@ -29,6 +29,8 @@ import {
 } from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import {
   TeamOutlined,
@@ -96,6 +98,8 @@ const CustomerMetricsAnalyticsPage = () => {
   const currentYear = dayjs().year()
   const [year, setYear] = useState(currentYear)
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   // Fetch customer metrics analytics
   const {
@@ -528,7 +532,7 @@ const CustomerMetricsAnalyticsPage = () => {
             label: 'Помесячная детализация',
             children: (
               <Card>
-                <Table
+                <ResponsiveTable
                   dataSource={data.by_month}
                   columns={monthlyColumns}
                   rowKey="month"
@@ -560,7 +564,7 @@ const CustomerMetricsAnalyticsPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация по потокам">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.by_stream}
                       columns={streamColumns}
                       rowKey="revenue_stream_id"

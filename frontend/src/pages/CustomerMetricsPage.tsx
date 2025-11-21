@@ -28,6 +28,8 @@ import {
   DollarOutlined,
 } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { CustomerMetrics, CustomerMetricsCreate } from '@/types/revenue'
 
@@ -36,6 +38,8 @@ const { Option } = Select
 const CustomerMetricsPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [form] = Form.useForm()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [editingMetrics, setEditingMetrics] = useState<CustomerMetrics | null>(null)
@@ -409,7 +413,7 @@ const CustomerMetricsPage = () => {
 
       {/* Metrics Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={metrics}
           rowKey="id"
@@ -420,6 +424,7 @@ const CustomerMetricsPage = () => {
             defaultPageSize: 20,
           }}
           scroll={{ x: 1600 }}
+          mobileLayout="card"
         />
       </Card>
 

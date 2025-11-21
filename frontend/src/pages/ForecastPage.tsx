@@ -28,6 +28,8 @@ import type { AIForecastResponse } from '@/api/forecast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
@@ -41,6 +43,8 @@ const ForecastPage = () => {
   const { user } = useAuth()
   const { selectedDepartment } = useDepartment()
   const { mode } = useTheme()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const [selectedYear, setSelectedYear] = useState(nextMonth.year())
   const [selectedMonth, setSelectedMonth] = useState(nextMonth.month() + 1)
@@ -668,7 +672,7 @@ const ForecastPage = () => {
               </div>
             }
           >
-            <Table
+            <ResponsiveTable
               columns={columns}
               dataSource={forecasts}
               rowKey="id"
@@ -676,6 +680,7 @@ const ForecastPage = () => {
               scroll={{ x: 1200 }}
               size="small"
               rowClassName={(record) => record.is_regular ? 'regular-row' : ''}
+              mobileLayout="card"
             />
           </Card>
 

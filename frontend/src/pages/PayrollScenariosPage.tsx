@@ -36,6 +36,8 @@ import {
 } from '@ant-design/icons';
 
 import { useDepartment } from '../contexts/DepartmentContext';
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import {
   payrollAnalysisAPI,
   payrollScenarioAPI,
@@ -75,6 +77,8 @@ const DATA_SOURCE_COLORS: Record<string, string> = {
 export default function PayrollScenariosPage() {
   const { selectedDepartment } = useDepartment();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<PayrollScenario | null>(null);
@@ -680,12 +684,13 @@ export default function PayrollScenariosPage() {
         }
         style={{ marginBottom: '24px' }}
       >
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={scenarios}
           rowKey="id"
           loading={scenariosLoading}
           pagination={{ pageSize: 10 }}
+          mobileLayout="card"
         />
       </Card>
 

@@ -30,6 +30,8 @@ import type {
   RevenueCategoryType,
 } from '@/types/revenue'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 
@@ -38,6 +40,8 @@ const { Title } = Typography
 const RevenueCategoriesPage = () => {
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<RevenueCategory | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
@@ -279,7 +283,7 @@ const RevenueCategoriesPage = () => {
           </Button>
         </Space>
 
-        <Table
+        <ResponsiveTable
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
@@ -287,6 +291,7 @@ const RevenueCategoriesPage = () => {
           columns={columns}
           dataSource={categories}
           rowKey="id"
+          mobileLayout="card"
           pagination={{
             pageSize: 20,
             showSizeChanger: true,

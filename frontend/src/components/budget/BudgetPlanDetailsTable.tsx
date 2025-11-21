@@ -4,6 +4,8 @@
  */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag, theme } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined, PlusOutlined } from '@ant-design/icons'
 import { LoadBaselineModal } from './LoadBaselineModal'
 import { ManageCategoriesModal } from './ManageCategoriesModal'
@@ -110,6 +112,8 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   const { data: planDetails = [], isLoading } = usePlanDetails(versionId)
   const createMutation = useCreatePlanDetail()
   const updateMutation = useUpdatePlanDetail()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const [data, setData] = useState<CategoryRow[]>([])
   const [changedCells, setChangedCells] = useState<Set<string>>(new Set())
@@ -727,21 +731,21 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   ]
 
   const summaryRow = (
-    <Table.Summary fixed>
-      <Table.Summary.Row style={{ backgroundColor: mode === 'dark' ? '#262626' : '#fafafa' }}>
-        <Table.Summary.Cell index={0}>
+    <ResponsiveTable.Summary fixed>
+      <ResponsiveTable.Summary.Row style={{ backgroundColor: mode === 'dark' ? '#262626' : '#fafafa' }}>
+        <ResponsiveTable.Summary.Cell index={0}>
           <Text strong>Итого по месяцам</Text>
-        </Table.Summary.Cell>
+        </ResponsiveTable.Summary.Cell>
         {MONTHS.map((month, index) => (
-          <Table.Summary.Cell key={month.key} index={index + 1} align="right">
+          <ResponsiveTable.Summary.Cell key={month.key} index={index + 1} align="right">
             <Text strong>{formatCurrency(columnTotals.get(month.key) || 0)}</Text>
-          </Table.Summary.Cell>
+          </ResponsiveTable.Summary.Cell>
         ))}
-        <Table.Summary.Cell index={13} align="right">
+        <ResponsiveTable.Summary.Cell index={13} align="right">
           <Text strong style={{ fontSize: 16 }}>{formatCurrency(grandTotal)}</Text>
-        </Table.Summary.Cell>
-      </Table.Summary.Row>
-    </Table.Summary>
+        </ResponsiveTable.Summary.Cell>
+      </ResponsiveTable.Summary.Row>
+    </ResponsiveTable.Summary>
   )
 
   const tableScrollX =
@@ -876,7 +880,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         ref={scrollContainerRef}
         style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
       >
-        <Table
+        <ResponsiveTable
           sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
           columns={columns}
           dataSource={visibleData}

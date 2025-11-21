@@ -4,6 +4,8 @@ import { CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import type { EmployeeKPI, KPIGoalStatus } from '@/api/kpi'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { Employee } from '@/api/payroll'
 import { formatCurrency } from '@/utils/formatters'
 import { ComplexityBonusBreakdown } from './ComplexityBonusBreakdown'
@@ -34,6 +36,8 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
   employee,
   employeeKpis,
 }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [breakdownModalOpen, setBreakdownModalOpen] = useState(false)
   const [selectedKpiId, setSelectedKpiId] = useState<number | null>(null)
 
@@ -283,7 +287,8 @@ export const EmployeeKpiDrawer: React.FC<EmployeeKpiDrawerProps> = ({
           <Text strong style={{ fontSize: 16, marginBottom: 16, display: 'block' }}>
             История KPI
           </Text>
-          <Table<EmployeeKPI>
+          <ResponsiveTable<EmployeeKPI>
+            mobileLayout="card"
             rowKey="id"
             columns={historyColumns}
             dataSource={employeeRecords}

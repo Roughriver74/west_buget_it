@@ -27,6 +27,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { taxRateAPI, TaxRateListItem, TaxType } from '../api/taxRates';
 
 const TAX_TYPE_LABELS: Record<TaxType, string> = {
@@ -49,6 +51,8 @@ const rateToPercent = (value?: number | null) =>
   value !== undefined && value !== null ? `${(value * 100).toFixed(2)}%` : '—';
 
 export default function TaxRatesPage() {
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const [filters, setFilters] = useState<{
     taxType?: TaxType;
     isActive?: boolean;
@@ -358,12 +362,13 @@ export default function TaxRatesPage() {
       </Card>
 
       <Card>
-        <Table
+        <ResponsiveTable
           loading={isLoading || isFetching}
           dataSource={taxRates}
           columns={columns}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          mobileLayout="card"
         />
       </Card>
 
