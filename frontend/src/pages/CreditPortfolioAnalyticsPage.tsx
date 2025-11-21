@@ -19,6 +19,8 @@ import {
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { creditPortfolioApi } from '@/api/creditPortfolio'
 import ExportButton from '@/legacy/components/ExportButton'
 import CreditPortfolioFilters, {
@@ -27,6 +29,8 @@ import CreditPortfolioFilters, {
 
 export default function CreditPortfolioAnalyticsPage() {
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
 
   // Fetch summary for KPI metrics
@@ -82,7 +86,7 @@ export default function CreditPortfolioAnalyticsPage() {
         }}
       >
         <Spin size='large' tip='Загрузка аналитики...'>
-          <div style={{ minHeight: 200 }} />
+          <div style={{ minHeight: 200 }}  mobileLayout="card" />
         </Spin>
       </div>
     )
@@ -94,7 +98,7 @@ export default function CreditPortfolioAnalyticsPage() {
         <h1 style={{ marginBottom: 24 }}>
           Кредитный портфель - Расширенная аналитика
         </h1>
-        <Empty description='Нет данных' />
+        <Empty description='Нет данных'  mobileLayout="card" />
       </div>
     )
   }
@@ -240,14 +244,14 @@ export default function CreditPortfolioAnalyticsPage() {
           targetId='analytics-content'
           fileName='credit-analytics'
           data={orgEfficiency || []}
-        />
+         mobileLayout="card" />
       </div>
 
       {/* Filters */}
       <CreditPortfolioFilters
         onFilterChange={setFilters}
         initialValues={filters}
-      />
+       mobileLayout="card" />
 
       <div id='analytics-content'>
 
@@ -262,7 +266,7 @@ export default function CreditPortfolioAnalyticsPage() {
               suffix='%'
               prefix={<PercentageOutlined />}
               valueStyle={{ color: '#1890ff' }}
-            />
+             mobileLayout="card" />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Отношение процентов к общей сумме выплат
             </p>
@@ -278,7 +282,7 @@ export default function CreditPortfolioAnalyticsPage() {
               suffix='%'
               prefix={<RiseOutlined />}
               valueStyle={{ color: '#52c41a' }}
-            />
+             mobileLayout="card" />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Отношение списаний к поступлениям
             </p>
@@ -291,7 +295,7 @@ export default function CreditPortfolioAnalyticsPage() {
               title='Активных договоров'
               value={activeContracts}
               prefix={<TrophyOutlined />}
-            />
+             mobileLayout="card" />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Количество действующих кредитных договоров
             </p>
@@ -309,7 +313,7 @@ export default function CreditPortfolioAnalyticsPage() {
               valueStyle={{
                 color: parseFloat(debtRatio) > 100 ? '#cf1322' : '#3f8600',
               }}
-            />
+             mobileLayout="card" />
             <p style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
               Списания относительно поступлений
             </p>
@@ -327,17 +331,17 @@ export default function CreditPortfolioAnalyticsPage() {
         </p>
         <ResponsiveContainer width='100%' height={400}>
           <ComposedChart data={monthlyChartData}>
-            <CartesianGrid strokeDasharray='3 3' />
-            <XAxis dataKey='month' tickFormatter={dateTickFormatter} />
+            <CartesianGrid strokeDasharray='3 3'  mobileLayout="card" />
+            <XAxis dataKey='month' tickFormatter={dateTickFormatter}  mobileLayout="card" />
             <YAxis
               yAxisId='left'
               tickFormatter={value => `${(value / 1000000).toFixed(1)}M`}
-            />
+             mobileLayout="card" />
             <YAxis
               yAxisId='right'
               orientation='right'
               tickFormatter={value => `${value}%`}
-            />
+             mobileLayout="card" />
             <Tooltip
               formatter={(value: any, name: string) => {
                 if (name === 'Эффективность') {
@@ -345,20 +349,20 @@ export default function CreditPortfolioAnalyticsPage() {
                 }
                 return `${Number(value).toLocaleString('ru-RU')} ₽`
               }}
-            />
-            <Legend />
+             mobileLayout="card" />
+            <Legend  mobileLayout="card" />
             <Bar
               yAxisId='left'
               dataKey='principal'
               name='Погашено тела'
               fill='#10B981'
-            />
+             mobileLayout="card" />
             <Bar
               yAxisId='left'
               dataKey='interest'
               name='Уплачено %'
               fill='#F59E0B'
-            />
+             mobileLayout="card" />
             <Line
               yAxisId='right'
               type='monotone'
@@ -366,7 +370,7 @@ export default function CreditPortfolioAnalyticsPage() {
               name='Эффективность'
               stroke='#3B82F6'
               strokeWidth={2}
-            />
+             mobileLayout="card" />
           </ComposedChart>
         </ResponsiveContainer>
       </Card>
@@ -377,16 +381,16 @@ export default function CreditPortfolioAnalyticsPage() {
           Детализация платежей и эффективности погашения по организациям
         </p>
         {!orgEfficiency || orgEfficiency.length === 0 ? (
-          <Empty description='Нет данных по организациям' />
+          <Empty description='Нет данных по организациям'  mobileLayout="card" />
         ) : (
-          <Table
+          <ResponsiveTable
             columns={orgColumns}
             dataSource={orgEfficiency}
             rowKey={(record: any, index) =>
               record.organization || record.name || index
             }
             pagination={{ pageSize: 10 }}
-          />
+           mobileLayout="card" />
         )}
       </Card>
 

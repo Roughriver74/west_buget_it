@@ -26,6 +26,8 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 
 const { Option } = Select
@@ -34,6 +36,8 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const RevenueAnalyticsPage = () => {
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
   // Fetch regional breakdown
@@ -413,12 +417,13 @@ const RevenueAnalyticsPage = () => {
                       </ResponsiveContainer>
 
                       <div style={{ marginTop: 24 }}>
-                        <Table
+                        <ResponsiveTable
                           columns={regionalColumns}
                           dataSource={regionalData.regions}
                           rowKey="stream_id"
                           pagination={false}
                           scroll={{ x: 1000 }}
+                          mobileLayout="card"
                         />
                       </div>
                     </>
@@ -494,12 +499,13 @@ const RevenueAnalyticsPage = () => {
                       </Row>
 
                       <div style={{ marginTop: 24 }}>
-                        <Table
+                        <ResponsiveTable
                           columns={productMixColumns}
                           dataSource={productMixData.categories}
                           rowKey="category_id"
                           pagination={false}
                           scroll={{ x: 1000 }}
+                          mobileLayout="card"
                         />
                       </div>
                     </>
