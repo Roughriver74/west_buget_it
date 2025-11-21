@@ -134,7 +134,7 @@ export function ResponsiveTable<T extends Record<string, any>>({
 
           let value: React.ReactNode
           if (col.render) {
-            value = col.render(record[key], record, _index)
+            value = col.render(record[key], record, _index) as React.ReactNode
           } else {
             value = record[key]
           }
@@ -160,7 +160,7 @@ export function ResponsiveTable<T extends Record<string, any>>({
 
     if (compactColumns && compactColumns.length > 0) {
       return (columns as ColumnsType<T>).filter((col) => {
-        const key = col.key || col.dataIndex
+        const key = col.key || ('dataIndex' in col ? col.dataIndex : undefined)
         return compactColumns.includes(String(key))
       })
     }
@@ -188,10 +188,13 @@ export function ResponsiveTable<T extends Record<string, any>>({
     if (!sticky) return undefined
 
     if (isMobile) {
-      return {
-        ...sticky,
-        offsetHeader: typeof sticky === 'object' ? 48 : sticky, // Mobile header height
+      if (typeof sticky === 'object') {
+        return {
+          ...sticky,
+          offsetHeader: 48, // Mobile header height
+        }
       }
+      return sticky
     }
 
     return sticky
