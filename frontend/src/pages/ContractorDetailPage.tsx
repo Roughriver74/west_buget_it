@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Card, Descriptions, Table, Tag, Spin, Statistic, Row, Col, Button, Space, Typography, Divider } from 'antd'
 import { ArrowLeftOutlined, DollarOutlined, FileTextOutlined, EditOutlined, TeamOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { contractorsApi, expensesApi } from '@/api'
 import { ExpenseStatus } from '@/types'
 import type { Expense } from '@/types'
@@ -13,6 +15,8 @@ import dayjs from 'dayjs'
 const ContractorDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const contractorId = parseInt(id || '0')
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
 
@@ -249,12 +253,13 @@ const ContractorDetailPage = () => {
       </Row>
 
       <Card title="Заявки">
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={expenses?.items}
           rowKey="id"
           pagination={{ pageSize: 20, showSizeChanger: true }}
           scroll={{ x: 1000 }}
+          mobileLayout="card"
         />
       </Card>
 
