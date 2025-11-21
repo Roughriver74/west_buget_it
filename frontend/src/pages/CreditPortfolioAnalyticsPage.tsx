@@ -23,6 +23,14 @@ import ExportButton from '@/legacy/components/ExportButton'
 import CreditPortfolioFilters, {
   type CreditPortfolioFilterValues} from '@/components/bank/CreditPortfolioFilters'
 
+interface MonthlyEfficiencyData {
+  month: string
+  principal: number
+  interest: number
+  total?: number
+  efficiency?: number
+}
+
 export default function CreditPortfolioAnalyticsPage() {
   const { selectedDepartment } = useDepartment()
   const [filters, setFilters] = useState<CreditPortfolioFilterValues>({})
@@ -153,16 +161,16 @@ export default function CreditPortfolioAnalyticsPage() {
     {
       title: 'Всего выплачено',
       key: 'total',
-      render: (_: any, record: any) => {
+      render: (_: any, record: MonthlyEfficiencyData) => {
         const total = (record.principal || 0) + (record.interest || 0)
         return `${total.toLocaleString('ru-RU')} ₽`
       },
-      sorter: (a: any, b: any) =>
+      sorter: (a: MonthlyEfficiencyData, b: MonthlyEfficiencyData) =>
         a.principal + a.interest - (b.principal + b.interest)},
     {
       title: 'Эффективность',
       key: 'efficiency',
-      render: (_: any, record: any) => {
+      render: (_: any, record: MonthlyEfficiencyData) => {
         const total = (record.principal || 0) + (record.interest || 0)
         const efficiency =
           total > 0 ? ((record.principal / total) * 100).toFixed(1) : '0.0'
@@ -174,7 +182,7 @@ export default function CreditPortfolioAnalyticsPage() {
           </Tag>
         )
       },
-      sorter: (a: any, b: any) => {
+      sorter: (a: MonthlyEfficiencyData, b: MonthlyEfficiencyData) => {
         const aEff =
           a.principal + a.interest > 0
             ? (a.principal / (a.principal + a.interest)) * 100

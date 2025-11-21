@@ -783,7 +783,7 @@ const BankTransactionsPage = () => {
       key: 'transaction_date',
       width: 170,
       sorter: (a, b) => dayjs(a.transaction_date).unix() - dayjs(b.transaction_date).unix(),
-      render: (date: string, record) => (
+      render: (date: string, record: BankTransaction) => (
         <div className="transaction-date-cell">
           <Text strong className="transaction-date-main">
             {dayjs(date).format('DD MMM YYYY')}
@@ -809,7 +809,7 @@ const BankTransactionsPage = () => {
       width: 150,
       align: 'right',
       sorter: (a, b) => a.amount - b.amount,
-      render: (amount: number, record) => {
+      render: (amount: number, record: BankTransaction) => {
         const isCredit = record.transaction_type === BankTransactionType.CREDIT
         return (
             <div className="transaction-amount-cell">
@@ -833,7 +833,7 @@ const BankTransactionsPage = () => {
       title: 'Форма оплаты',
       key: 'payment_source',
       width: 260,
-      render: (_, record) => {
+      render: (_: any, record: BankTransaction) => {
         const sourceMeta = record.payment_source ? paymentSourceMeta[record.payment_source] : undefined
         return (
           <div className="payment-form-cell">
@@ -886,7 +886,7 @@ const BankTransactionsPage = () => {
       dataIndex: 'counterparty_name',
       key: 'counterparty_name',
       width: 280,
-      render: (name: string, record) => (
+      render: (name: string, record: BankTransaction) => (
         <div className="counterparty-cell">
           <Text strong>{name || 'Не указан'}</Text>
           {(record.counterparty_inn || record.counterparty_kpp || record.counterparty_bank) && (
@@ -928,7 +928,7 @@ const BankTransactionsPage = () => {
       key: 'processing',
       width: 360,
       fixed: 'right',
-      render: (_, record) => {
+      render: (_: any, record: BankTransaction) => {
         const editable = isEditing(record)
         if (editable) {
           return (

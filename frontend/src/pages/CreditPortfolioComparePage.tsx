@@ -228,7 +228,7 @@ export default function CreditPortfolioComparePage() {
     {
       title: 'Эффективность',
       key: 'efficiency',
-      render: (_: any, record: YearlyData) => {
+      render: (_: number | string | undefined, record: YearlyData) => {
         const efficiency =
           record.principal + record.interest > 0
             ? (record.principal / (record.principal + record.interest)) * 100
