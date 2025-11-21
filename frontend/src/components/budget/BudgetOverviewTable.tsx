@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { Table, Tag, Button, Spin, Space, message } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { PlusOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
@@ -17,6 +19,8 @@ interface BudgetOverviewTableProps {
 const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }) => {
   const [expenseModalOpen, setExpenseModalOpen] = useState(false)
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const { mode } = useTheme()
 
   // Загрузка данных обзора
@@ -274,7 +278,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         </Space>
       </div>
 
-      <Table
+      <ResponsiveTable
         columns={columns}
         dataSource={dataWithTotals}
         pagination={false}

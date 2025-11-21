@@ -4,6 +4,8 @@
  */
 import React, { useMemo } from 'react'
 import { Modal, Table, Card, Row, Col, Statistic, Descriptions, Space, Tag, Spin, Alert } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useVersionComparison } from '@/hooks/useBudgetPlanning'
@@ -34,6 +36,8 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
   version2Id,
   onClose,
 }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const shouldFetch = open && !!version1Id && !!version2Id
 
   const {
@@ -224,7 +228,7 @@ export const BudgetVersionComparisonModal: React.FC<BudgetVersionComparisonModal
           </Card>
 
           {/* Comparison Table */}
-          <Table
+          <ResponsiveTable
             columns={columns}
             dataSource={sortedCategories}
             rowKey="category_id"

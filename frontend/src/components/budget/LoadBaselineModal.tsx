@@ -4,6 +4,8 @@
  */
 import React, { useState, useMemo, useCallback } from 'react'
 import { Modal, Checkbox, Table, message, Button, Space, Typography, Alert, Spin } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { DownloadOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { calculatorApi, planDetailsApi } from '@/api/budgetPlanning'
@@ -48,6 +50,8 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<number>>(new Set())
   const [categoriesData, setCategoriesData] = useState<Map<number, CategoryWithBaseline>>(new Map())
   const [loadingBaseline, setLoadingBaseline] = useState(false)
@@ -305,7 +309,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
           showIcon
         />
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={leafCategories}
           rowKey="id"

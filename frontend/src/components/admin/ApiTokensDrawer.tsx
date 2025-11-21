@@ -37,6 +37,8 @@ interface ApiTokensDrawerProps {
 }
 
 const ApiTokensDrawer: React.FC<ApiTokensDrawerProps> = ({ visible, onClose }) => {
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [form] = Form.useForm()
   const [editingToken, setEditingToken] = useState<APIToken | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
@@ -278,7 +280,7 @@ const ApiTokensDrawer: React.FC<ApiTokensDrawerProps> = ({ visible, onClose }) =
             showIcon
           />
 
-          <Table
+          <ResponsiveTable
             columns={columns}
             dataSource={tokens}
             loading={isLoading}

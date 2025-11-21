@@ -4,6 +4,8 @@
  */
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Table, InputNumber, Button, Space, message, Typography, Spin, Tag } from 'antd'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { SaveOutlined, UndoOutlined, PlusOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ColumnsType } from 'antd/es/table'
@@ -70,6 +72,8 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
   onAfterSave,
 }) => {
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   // Fetch plan details
   const { data: planDetails = [], isLoading } = useQuery({
@@ -437,7 +441,7 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
       )}
 
       {/* Table */}
-      <Table
+      <ResponsiveTable
         columns={columns}
         dataSource={data}
         rowKey="key"
@@ -446,10 +450,10 @@ export const RevenuePlanDetailsTable: React.FC<RevenuePlanDetailsTableProps> = (
         bordered
         size="small"
         summary={() => (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ backgroundColor: '#f0f0f0' }}>
+          <ResponsiveTable.Summary fixed mobileLayout="card">
+            <ResponsiveTable.Summary.Row style={{ backgroundColor: '#f0f0f0' }} mobileLayout="card">
               {columns.map((col, index) => (
-                <Table.Summary.Cell key={index} index={index} align={col.align as any}>
+                <ResponsiveTable.Summary.Cell key={index} index={index} align={col.align as any} mobileLayout="card">
                   {summaryRow[col.key as string]}
                 </Table.Summary.Cell>
               ))}
