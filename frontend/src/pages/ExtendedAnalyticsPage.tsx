@@ -33,6 +33,8 @@ const { Title, Text } = Typography;
 
 const ExtendedAnalyticsPage: React.FC = () => {
   const { selectedDepartment } = useDepartment();
+  const isMobile = useIsMobile();
+  const isSmallScreen = useIsSmallScreen();
   const [activeTab, setActiveTab] = useState('execution');
   const [year, setYear] = useState(dayjs().year());
 
@@ -341,7 +343,7 @@ const ExtendedAnalyticsPage: React.FC = () => {
         </Card>
 
         <Card title="Детализация по категориям">
-          <Table
+          <ResponsiveTable
             columns={columns}
             dataSource={categoryData.categories}
             rowKey="category_id"
