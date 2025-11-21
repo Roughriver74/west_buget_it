@@ -9,6 +9,8 @@ import type { UploadProps } from 'antd'
 import axios from 'axios'
 import ContractorFormModal from '@/components/contractors/ContractorFormModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
@@ -27,6 +29,8 @@ const ContractorsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const queryClient = useQueryClient()
 
@@ -413,13 +417,14 @@ const ContractorsPage = () => {
           </Button>
         </div>
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={contractors || []}
           loading={isLoading}
           rowKey="id"
           size="middle"
           scroll={{ x: 900 }}
+          mobileLayout="card"
           pagination={{
             current: page,
             pageSize: pageSize,

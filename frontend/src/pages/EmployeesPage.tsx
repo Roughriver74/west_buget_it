@@ -27,6 +27,8 @@ import {
 } from '@ant-design/icons'
 import { useDepartment } from '../contexts/DepartmentContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import {
 	employeeAPI,
 	Employee,
@@ -61,6 +63,8 @@ export default function EmployeesPage() {
 	const queryClient = useQueryClient()
 	const { selectedDepartment } = useDepartment()
 	const { mode } = useTheme()
+	const isMobile = useIsMobile()
+	const isSmallScreen = useIsSmallScreen()
 	const [searchText, setSearchText] = useState('')
 	const [statusFilter, setStatusFilter] = useState<string | undefined>()
 	const [modalVisible, setModalVisible] = useState(false)
@@ -700,7 +704,7 @@ export default function EmployeesPage() {
 				</Space>
 
 				{/* Employees Table */}
-				<Table
+				<ResponsiveTable
 					columns={columns}
 					dataSource={employees}
 					rowKey='id'
@@ -711,6 +715,7 @@ export default function EmployeesPage() {
 						showTotal: total => `Всего сотрудников: ${total}`,
 					}}
 					scroll={{ x: 1200 }}
+					mobileLayout="card"
 				/>
 			</Card>
 
