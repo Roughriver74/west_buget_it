@@ -6,6 +6,8 @@ import { payrollActualAPI, employeeAPI, PayrollActualWithEmployee } from '@/api/
 import { formatCurrency } from '@/utils/formatters'
 import PayrollActualFormModal from '@/components/payroll/PayrollActualFormModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 
 const { Option } = Select
@@ -28,6 +30,8 @@ const MONTHS = [
 const PayrollActualsPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const currentYear = new Date().getFullYear()
 
   const [selectedYear, setSelectedYear] = useState(currentYear)
@@ -334,12 +338,13 @@ const PayrollActualsPage = () => {
         </Button>
       </div>
 
-      <Table
+      <ResponsiveTable
         columns={columns}
         dataSource={actuals}
         rowKey="id"
         loading={isLoading}
         scroll={{ x: 1800 }}
+        mobileLayout="card"
         pagination={{
           pageSize: 50,
           showSizeChanger: true,

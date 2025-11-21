@@ -31,6 +31,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as businessOperationMappingsApi from '@/api/businessOperationMappings'
 import type { BusinessOperationMapping } from '@/types/businessOperationMapping'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import BusinessOperationMappingFormModal from '@/components/businessOperationMappings/BusinessOperationMappingFormModal'
 
 const { Title, Paragraph, Text } = Typography
@@ -47,6 +49,8 @@ const BusinessOperationMappingsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [bulkLoading, setBulkLoading] = useState(false)
   const { selectedDepartment } = useDepartment()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
 
   const queryClient = useQueryClient()
 
@@ -414,7 +418,7 @@ const BusinessOperationMappingsPage = () => {
 
         {/* Table */}
         <Card>
-          <Table
+          <ResponsiveTable
             rowKey="id"
             columns={columns}
             dataSource={mappings?.items || []}
@@ -432,6 +436,7 @@ const BusinessOperationMappingsPage = () => {
               },
             }}
             scroll={{ x: 1400 }}
+            mobileLayout="card"
           />
         </Card>
       </Space>

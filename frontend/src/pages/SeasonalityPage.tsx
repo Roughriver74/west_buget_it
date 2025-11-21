@@ -30,6 +30,8 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { SeasonalityCoefficient, SeasonalityCoefficientCreate } from '@/types/revenue'
 
@@ -53,6 +55,8 @@ const MONTH_NAMES = [
 const SeasonalityPage = () => {
   const { selectedDepartment } = useDepartment()
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const [form] = Form.useForm()
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [editingCoefficient, setEditingCoefficient] = useState<SeasonalityCoefficient | null>(null)
@@ -238,7 +242,7 @@ const SeasonalityPage = () => {
       },
     ]
 
-    return <Table columns={columns} dataSource={monthlyData} pagination={false} rowKey="month" size="small" />
+    return <ResponsiveTable columns={columns} dataSource={monthlyData} pagination={false} rowKey="month" size="small" mobileLayout="card" />
   }
 
   const columns = [
@@ -428,7 +432,7 @@ const SeasonalityPage = () => {
 
       {/* Coefficients Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={coefficients}
           rowKey="id"
@@ -443,6 +447,7 @@ const SeasonalityPage = () => {
             defaultPageSize: 20,
           }}
           scroll={{ x: 1000 }}
+          mobileLayout="card"
         />
       </Card>
 
