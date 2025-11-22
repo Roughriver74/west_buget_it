@@ -531,6 +531,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 						label: <Link to='/users'>Пользователи</Link>,
 					},
 					{
+						key: '/settings/modules',
+						icon: <SettingOutlined />,
+						label: <Link to='/settings/modules'>Модули</Link>,
+					},
+					{
 						key: 'api-tokens',
 						icon: <KeyOutlined />,
 						label: 'API Токены',
