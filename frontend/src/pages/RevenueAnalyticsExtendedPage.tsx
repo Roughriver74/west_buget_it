@@ -9,7 +9,7 @@
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Typography, Card, Row, Col, Select, Statistic, Table, Tabs, Space, Tag, Progress } from 'antd'
+import { Typography, Card, Row, Col, Select, Statistic, Tabs, Space, Tag, Progress } from 'antd'
 import {
   LineChart,
   Line,
@@ -21,17 +21,16 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-} from 'recharts'
+  ResponsiveContainer} from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import {
   DollarOutlined,
   RiseOutlined,
   FallOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons'
+  CheckCircleOutlined} from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import ExportButton from '@/components/common/ExportButton'
@@ -53,17 +52,14 @@ const RevenueAnalyticsExtendedPage = () => {
     queryFn: () =>
       analyticsApi.getRevenueAnalytics({
         year,
-        department_id: selectedDepartment?.id,
-      }),
-  })
+        department_id: selectedDepartment?.id})})
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 0}).format(value)
   }
 
   const formatNumber = (value: number) => {
@@ -104,20 +100,17 @@ const RevenueAnalyticsExtendedPage = () => {
     month: item.month_name,
     'План': item.planned,
     'Факт': item.actual,
-    'Отклонение': item.variance,
-  }))
+    'Отклонение': item.variance}))
 
   // Pie chart data for regional breakdown
   const regionalPieData = data.by_stream?.map((item: any) => ({
     name: item.revenue_stream_name,
-    value: item.actual,
-  })) || []
+    value: item.actual})) || []
 
   // Pie chart data for product mix
   const productPieData = data.by_category?.map((item: any) => ({
     name: item.revenue_category_name,
-    value: item.actual,
-  })) || []
+    value: item.actual})) || []
 
   // Table columns for streams
   const streamColumns = [
@@ -125,29 +118,25 @@ const RevenueAnalyticsExtendedPage = () => {
       title: 'Поток доходов',
       dataIndex: 'revenue_stream_name',
       key: 'revenue_stream_name',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Тип',
       dataIndex: 'stream_type',
       key: 'stream_type',
       width: 120,
-      render: (type: string) => <Tag>{type}</Tag>,
-    },
+      render: (type: string) => <Tag>{type}</Tag>},
     {
       title: 'План',
       dataIndex: 'planned',
       key: 'planned',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Факт',
       dataIndex: 'actual',
       key: 'actual',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Отклонение',
       dataIndex: 'variance',
@@ -157,8 +146,7 @@ const RevenueAnalyticsExtendedPage = () => {
         <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Исполнение',
       dataIndex: 'execution_percent',
@@ -171,15 +159,13 @@ const RevenueAnalyticsExtendedPage = () => {
           format={(percent) => `${percent?.toFixed(1)}%`}
           status={value >= 100 ? 'success' : value >= 80 ? 'normal' : 'exception'}
         />
-      ),
-    },
+      )},
     {
       title: 'Доля',
       dataIndex: 'share_of_total',
       key: 'share_of_total',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
   ]
 
   // Table columns for categories
@@ -188,29 +174,25 @@ const RevenueAnalyticsExtendedPage = () => {
       title: 'Категория',
       dataIndex: 'revenue_category_name',
       key: 'revenue_category_name',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Тип',
       dataIndex: 'category_type',
       key: 'category_type',
       width: 120,
-      render: (type: string) => <Tag color="blue">{type}</Tag>,
-    },
+      render: (type: string) => <Tag color="blue">{type}</Tag>},
     {
       title: 'План',
       dataIndex: 'planned',
       key: 'planned',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Факт',
       dataIndex: 'actual',
       key: 'actual',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Отклонение',
       dataIndex: 'variance',
@@ -220,8 +202,7 @@ const RevenueAnalyticsExtendedPage = () => {
         <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Исполнение',
       dataIndex: 'execution_percent',
@@ -234,15 +215,13 @@ const RevenueAnalyticsExtendedPage = () => {
           format={(percent) => `${percent?.toFixed(1)}%`}
           status={value >= 100 ? 'success' : value >= 80 ? 'normal' : 'exception'}
         />
-      ),
-    },
+      )},
     {
       title: 'Доля',
       dataIndex: 'share_of_total',
       key: 'share_of_total',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
   ]
 
   return (
@@ -344,8 +323,7 @@ const RevenueAnalyticsExtendedPage = () => {
               precision={0}
               formatter={(value) => formatCurrency(Number(value))}
               valueStyle={{
-                color: data.total_variance >= 0 ? '#52c41a' : '#ff4d4f',
-              }}
+                color: data.total_variance >= 0 ? '#52c41a' : '#ff4d4f'}}
             />
             <div style={{ marginTop: 8 }}>
               <Text type="secondary">В процентах: </Text>
@@ -402,8 +380,7 @@ const RevenueAnalyticsExtendedPage = () => {
                   </LineChart>
                 </ResponsiveContainer>
               </Card>
-            ),
-          },
+            )},
           {
             key: 'regional',
             label: 'Региональная разбивка',
@@ -434,7 +411,7 @@ const RevenueAnalyticsExtendedPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация по потокам">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.by_stream}
                       columns={streamColumns}
                       rowKey="revenue_stream_id"
@@ -447,8 +424,7 @@ const RevenueAnalyticsExtendedPage = () => {
               </Row>
             ) : (
               <Card><Text type="secondary">Нет данных по потокам доходов</Text></Card>
-            ),
-          },
+            )},
           {
             key: 'product',
             label: 'Продуктовый микс',
@@ -479,7 +455,7 @@ const RevenueAnalyticsExtendedPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация по категориям">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.by_category}
                       columns={categoryColumns}
                       rowKey="revenue_category_id"
@@ -492,8 +468,7 @@ const RevenueAnalyticsExtendedPage = () => {
               </Row>
             ) : (
               <Card><Text type="secondary">Нет данных по категориям доходов</Text></Card>
-            ),
-          },
+            )},
         ]}
       />
     </div>

@@ -2097,13 +2097,13 @@ from app.utils.ndfl_calculator import (
 
 class NDFLCalculationRequest(BaseModel):
     """Request for NDFL calculation"""
-    annual_income: Decimal = Field(..., ge=0, description="Годовой доход (брутто)")
+    annual_income: Decimal = Field(..., ge=0, description="Годовой доход (gross)")
     year: Optional[int] = Field(None, description="Год (по умолчанию текущий)")
 
 
 class MonthlyNDFLRequest(BaseModel):
     """Request for monthly NDFL withholding calculation"""
-    current_month_income: Decimal = Field(..., ge=0, description="Доход за текущий месяц (брутто)")
+    current_month_income: Decimal = Field(..., ge=0, description="Доход за текущий месяц (gross)")
     ytd_income_before_month: Decimal = Field(0, ge=0, description="Доход с начала года до текущего месяца")
     ytd_tax_withheld: Decimal = Field(0, ge=0, description="НДФЛ удержанный с начала года")
     year: Optional[int] = Field(None, description="Год (по умолчанию текущий)")

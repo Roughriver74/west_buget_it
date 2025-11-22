@@ -14,19 +14,17 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Tooltip,
-  message,
-} from 'antd';
+  message} from 'antd';
 import {
   PlusOutlined,
   ReloadOutlined,
   SafetyOutlined,
-  SettingOutlined,
-} from '@ant-design/icons';
+  SettingOutlined} from '@ant-design/icons';
 import dayjs from 'dayjs';
 
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { taxRateAPI, TaxRateListItem, TaxType } from '../api/taxRates';
 
 const TAX_TYPE_LABELS: Record<TaxType, string> = {
@@ -34,16 +32,14 @@ const TAX_TYPE_LABELS: Record<TaxType, string> = {
   PENSION_FUND: 'ПФР',
   MEDICAL_INSURANCE: 'ФОМС',
   SOCIAL_INSURANCE: 'ФСС',
-  INJURY_INSURANCE: 'НС/ПЗ',
-};
+  INJURY_INSURANCE: 'НС/ПЗ'};
 
 const TAX_TYPE_COLORS: Record<TaxType, string> = {
   INCOME_TAX: 'volcano',
   PENSION_FUND: 'geekblue',
   MEDICAL_INSURANCE: 'purple',
   SOCIAL_INSURANCE: 'gold',
-  INJURY_INSURANCE: 'cyan',
-};
+  INJURY_INSURANCE: 'cyan'};
 
 const rateToPercent = (value?: number | null) =>
   value !== undefined && value !== null ? `${(value * 100).toFixed(2)}%` : '—';
@@ -62,24 +58,20 @@ export default function TaxRatesPage() {
   const {
     data: taxRates = [],
     isLoading,
-    isFetching,
-  } = useQuery({
+    isFetching} = useQuery({
     queryKey: ['tax-rates', filters],
     queryFn: () =>
       taxRateAPI.list({
         tax_type: filters.taxType,
         is_active: filters.isActive,
-        effective_date: filters.effectiveDate,
-      }),
-  });
+        effective_date: filters.effectiveDate})});
 
   const createMutation = useMutation({
     mutationFn: (values: any) =>
       taxRateAPI.create({
         ...values,
         effective_from: values.effective_from.format('YYYY-MM-DD'),
-        effective_to: values.effective_to ? values.effective_to.format('YYYY-MM-DD') : null,
-      }),
+        effective_to: values.effective_to ? values.effective_to.format('YYYY-MM-DD') : null}),
     onSuccess: () => {
       message.success('Ставка добавлена');
       queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
@@ -87,16 +79,14 @@ export default function TaxRatesPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось сохранить ставку');
-    },
-  });
+    }});
 
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: number; values: any }) =>
       taxRateAPI.update(id, {
         ...values,
         effective_from: values.effective_from.format('YYYY-MM-DD'),
-        effective_to: values.effective_to ? values.effective_to.format('YYYY-MM-DD') : null,
-      }),
+        effective_to: values.effective_to ? values.effective_to.format('YYYY-MM-DD') : null}),
     onSuccess: () => {
       message.success('Ставка обновлена');
       queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
@@ -104,8 +94,7 @@ export default function TaxRatesPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось обновить ставку');
-    },
-  });
+    }});
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => taxRateAPI.remove(id),
@@ -115,8 +104,7 @@ export default function TaxRatesPage() {
     },
     onError: () => {
       message.error('Не удалось удалить ставку');
-    },
-  });
+    }});
 
   const initMutation = useMutation({
     mutationFn: () => taxRateAPI.initializeDefault(),
@@ -126,8 +114,7 @@ export default function TaxRatesPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось инициализировать ставки');
-    },
-  });
+    }});
 
   const handleModalOpen = (record?: TaxRateListItem) => {
     setEditingRate(record || null);
@@ -143,16 +130,14 @@ export default function TaxRatesPage() {
         effective_from: dayjs(record.effective_from),
         effective_to: record.effective_to ? dayjs(record.effective_to) : null,
         is_active: record.is_active,
-        notes: record.notes,
-      });
+        notes: record.notes});
     } else {
       form.resetFields();
       form.setFieldsValue({
         tax_type: 'INCOME_TAX',
         rate: 0.13,
         effective_from: dayjs(),
-        is_active: true,
-      });
+        is_active: true});
     }
   };
 
@@ -185,15 +170,12 @@ export default function TaxRatesPage() {
       ),
       filters: Object.entries(TAX_TYPE_LABELS).map(([value, label]) => ({
         text: label,
-        value,
-      })),
-      onFilter: (value: any, record: TaxRateListItem) => record.tax_type === value,
-    },
+        value})),
+      onFilter: (value: any, record: TaxRateListItem) => record.tax_type === value},
     {
       title: 'Название',
       dataIndex: 'name',
-      key: 'name',
-    },
+      key: 'name'},
     {
       title: 'Ставка',
       dataIndex: 'rate',
@@ -207,14 +189,12 @@ export default function TaxRatesPage() {
             </div>
           )}
         </div>
-      ),
-    },
+      )},
     {
       title: 'Порог',
       dataIndex: 'threshold_amount',
       key: 'threshold_amount',
-      render: (value: number | null) => (value ? value.toLocaleString('ru-RU') + ' ₽' : '—'),
-    },
+      render: (value: number | null) => (value ? value.toLocaleString('ru-RU') + ' ₽' : '—')},
     {
       title: 'Период действия',
       key: 'period',
@@ -225,16 +205,14 @@ export default function TaxRatesPage() {
             по {record.effective_to ? dayjs(record.effective_to).format('DD.MM.YYYY') : '∞'}
           </div>
         </div>
-      ),
-    },
+      )},
     {
       title: 'Статус',
       dataIndex: 'is_active',
       key: 'is_active',
       render: (value: boolean) => (
         <Tag color={value ? 'green' : 'red'}>{value ? 'Активна' : 'Отключена'}</Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -255,8 +233,7 @@ export default function TaxRatesPage() {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ];
 
   return (
@@ -303,8 +280,7 @@ export default function TaxRatesPage() {
               onChange={(value) => setFilters((prev) => ({ ...prev, taxType: value }))}
               options={Object.entries(TAX_TYPE_LABELS).map(([value, label]) => ({
                 value,
-                label,
-              }))}
+                label}))}
             />
           </Col>
           <Col span={6}>
@@ -322,8 +298,7 @@ export default function TaxRatesPage() {
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
-                  isActive: value === undefined ? undefined : value === 'active',
-                }))
+                  isActive: value === undefined ? undefined : value === 'active'}))
               }
               options={[
                 { value: 'active', label: 'Активные' },
@@ -340,8 +315,7 @@ export default function TaxRatesPage() {
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
-                  effectiveDate: value ? value.format('YYYY-MM-DD') : undefined,
-                }))
+                  effectiveDate: value ? value.format('YYYY-MM-DD') : undefined}))
               }
             />
           </Col>
@@ -358,12 +332,13 @@ export default function TaxRatesPage() {
       </Card>
 
       <Card>
-        <Table
+        <ResponsiveTable
           loading={isLoading || isFetching}
           dataSource={taxRates}
           columns={columns}
           rowKey="id"
           pagination={{ pageSize: 10 }}
+          mobileLayout="card"
         />
       </Card>
 
@@ -373,7 +348,7 @@ export default function TaxRatesPage() {
         onCancel={handleModalClose}
         onOk={handleSubmit}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form layout="vertical" form={form}>
           <Form.Item
@@ -384,8 +359,7 @@ export default function TaxRatesPage() {
             <Select
               options={Object.entries(TAX_TYPE_LABELS).map(([value, label]) => ({
                 value,
-                label,
-              }))}
+                label}))}
             />
           </Form.Item>
 

@@ -82,18 +82,167 @@ async def import_credit_portfolio_task():
         logger.error(f"Error in scheduled credit portfolio import: {e}", exc_info=True)
 
 
+async def create_monthly_employee_kpis_task():
+    """
+    Scheduled task: Auto-create EmployeeKPI records for all active employees
+
+    Runs on the 1st day of each month at 00:01 AM Moscow time
+    Creates EmployeeKPI records with DRAFT status for the current month
+    Copies goals from previous month or creates default goals
+    """
+    logger.info("Starting automatic EmployeeKPI creation for current month")
+
+    try:
+        from datetime import datetime
+        from app.services.employee_kpi_auto_creator import EmployeeKPIAutoCreator
+
+        # Get current year and month
+        now = datetime.now()
+        year = now.year
+        month = now.month
+
+        logger.info(f"Creating EmployeeKPI records for {year}-{month:02d}")
+
+        # Get database session
+        db: Session = SessionLocal()
+
+        try:
+            # Create KPIs for all departments
+            creator = EmployeeKPIAutoCreator(db)
+            result = creator.create_monthly_kpis(year=year, month=month)
+
+            logger.info(
+                f"EmployeeKPI auto-creation completed: "
+                f"{result['created']} created, {result['skipped']} skipped, {result['errors']} errors "
+                f"(total {result['total_employees']} employees)"
+            )
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error in scheduled EmployeeKPI auto-creation: {e}", exc_info=True)
+
+
+async def check_expired_modules_task():
+    """
+    Scheduled task: Check and deactivate expired organization modules
+
+    Runs daily at configurable time (default: 1:00 AM Moscow time)
+    - Finds all OrganizationModule records where expires_at < now() and is_active = True
+    - Sets is_active = False for expired modules
+    - Creates MODULE_EXPIRED events for auditing
+    - Logs expired modules for admin notification
+    """
+    logger.info("Starting expired modules check")
+
+    try:
+        from datetime import datetime
+        from app.db.models import OrganizationModule, Organization, Module, ModuleEventTypeEnum
+        from app.services.module_service import ModuleService
+
+        db: Session = SessionLocal()
+
+        try:
+            # Find expired modules that are still active
+            expired_modules = db.query(OrganizationModule).join(
+                Organization, OrganizationModule.organization_id == Organization.id
+            ).join(
+                Module, OrganizationModule.module_id == Module.id
+            ).filter(
+                OrganizationModule.is_active == True,
+                OrganizationModule.expires_at.isnot(None),
+                OrganizationModule.expires_at < datetime.utcnow()
+            ).all()
+
+            if not expired_modules:
+                logger.info("No expired modules found")
+                return
+
+            logger.info(f"Found {len(expired_modules)} expired module(s)")
+
+            module_service = ModuleService(db)
+            deactivated_count = 0
+
+            for org_module in expired_modules:
+                try:
+                    # Get related data
+                    organization = db.query(Organization).get(org_module.organization_id)
+                    module = db.query(Module).get(org_module.module_id)
+
+                    if not organization or not module:
+                        logger.warning(
+                            f"Skipping OrganizationModule {org_module.id}: "
+                            f"Organization or Module not found"
+                        )
+                        continue
+
+                    logger.info(
+                        f"Deactivating expired module: "
+                        f"Organization={organization.short_name}, "
+                        f"Module={module.code}, "
+                        f"Expired at={org_module.expires_at}"
+                    )
+
+                    # Deactivate module
+                    org_module.is_active = False
+                    org_module.updated_at = datetime.utcnow()
+
+                    # Emit MODULE_EXPIRED event
+                    module_service.emit_event(
+                        organization_id=org_module.organization_id,
+                        module_id=org_module.module_id,
+                        event_type=ModuleEventTypeEnum.MODULE_EXPIRED,
+                        metadata={
+                            "expired_at": org_module.expires_at.isoformat(),
+                            "organization_name": organization.short_name,
+                            "module_code": module.code,
+                            "module_name": module.name,
+                            "auto_deactivated": True
+                        }
+                    )
+
+                    deactivated_count += 1
+
+                except Exception as e:
+                    logger.error(
+                        f"Error deactivating OrganizationModule {org_module.id}: {e}",
+                        exc_info=True
+                    )
+
+            # Commit all changes
+            db.commit()
+
+            logger.info(
+                f"Expired modules check completed: "
+                f"{deactivated_count}/{len(expired_modules)} modules deactivated"
+            )
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error in scheduled expired modules check: {e}", exc_info=True)
+
+
 def start_scheduler():
     """
     Start background scheduler with all scheduled tasks
 
     Tasks:
     - Credit Portfolio Import: Configurable schedule (default: Daily at 6:00 AM Moscow time)
+    - Employee KPI Auto-Creation: Monthly on 1st day at 00:01 AM Moscow time
+    - Expired Modules Check: Daily at configurable time (default: Daily at 1:00 AM Moscow time)
 
     Configuration via environment variables:
     - SCHEDULER_ENABLED: Enable/disable scheduler (default: true)
     - CREDIT_PORTFOLIO_IMPORT_ENABLED: Enable credit portfolio auto-import (default: true)
     - CREDIT_PORTFOLIO_IMPORT_HOUR: Hour for import (0-23, default: 6)
     - CREDIT_PORTFOLIO_IMPORT_MINUTE: Minute for import (0-59, default: 0)
+    - EMPLOYEE_KPI_AUTO_CREATE_ENABLED: Enable auto-creation of EmployeeKPI (default: true)
+    - MODULE_EXPIRY_CHECK_ENABLED: Enable module expiry check (default: true)
+    - MODULE_EXPIRY_CHECK_HOUR: Hour for module expiry check (0-23, default: 1)
+    - MODULE_EXPIRY_CHECK_MINUTE: Minute for module expiry check (0-59, default: 0)
     """
     # Check if scheduler is enabled
     scheduler_enabled = getattr(settings, 'SCHEDULER_ENABLED', True)
@@ -121,6 +270,41 @@ def start_scheduler():
         logger.info(f"Credit portfolio import scheduled: Daily at {import_hour:02d}:{import_minute:02d} Moscow time")
     else:
         logger.info("Credit portfolio auto-import is disabled via CREDIT_PORTFOLIO_IMPORT_ENABLED setting")
+
+    # Employee KPI Auto-Creation - Monthly on 1st day at 00:01 AM
+    kpi_auto_create_enabled = getattr(settings, 'EMPLOYEE_KPI_AUTO_CREATE_ENABLED', True)
+    if kpi_auto_create_enabled:
+        scheduler.add_job(
+            create_monthly_employee_kpis_task,
+            CronTrigger(day=1, hour=0, minute=1, timezone='Europe/Moscow'),
+            id='employee_kpi_auto_create',
+            name='Auto-create Monthly EmployeeKPI Records',
+            replace_existing=True,
+            max_instances=1  # Prevent concurrent runs
+        )
+
+        logger.info("EmployeeKPI auto-creation scheduled: Monthly on 1st day at 00:01 AM Moscow time")
+    else:
+        logger.info("EmployeeKPI auto-creation is disabled via EMPLOYEE_KPI_AUTO_CREATE_ENABLED setting")
+
+    # Expired Modules Check - Daily at configurable time
+    module_expiry_check_enabled = getattr(settings, 'MODULE_EXPIRY_CHECK_ENABLED', True)
+    if module_expiry_check_enabled:
+        expiry_check_hour = getattr(settings, 'MODULE_EXPIRY_CHECK_HOUR', 1)
+        expiry_check_minute = getattr(settings, 'MODULE_EXPIRY_CHECK_MINUTE', 0)
+
+        scheduler.add_job(
+            check_expired_modules_task,
+            CronTrigger(hour=expiry_check_hour, minute=expiry_check_minute, timezone='Europe/Moscow'),
+            id='module_expiry_check',
+            name='Check and Deactivate Expired Organization Modules',
+            replace_existing=True,
+            max_instances=1  # Prevent concurrent runs
+        )
+
+        logger.info(f"Module expiry check scheduled: Daily at {expiry_check_hour:02d}:{expiry_check_minute:02d} Moscow time")
+    else:
+        logger.info("Module expiry check is disabled via MODULE_EXPIRY_CHECK_ENABLED setting")
 
     logger.info("Scheduled jobs:")
     for job in scheduler.get_jobs():

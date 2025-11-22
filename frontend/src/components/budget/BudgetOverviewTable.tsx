@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { Table, Tag, Button, Spin, Space, message } from 'antd'
+import { Tag, Button, Spin, Space, message } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { PlusOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
@@ -22,8 +23,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
   // Загрузка данных обзора
   const { data: overview, isLoading } = useQuery({
     queryKey: ['budget-overview', year, month, selectedDepartment?.id],
-    queryFn: () => budgetApi.getOverview(year, month, selectedDepartment?.id),
-  })
+    queryFn: () => budgetApi.getOverview(year, month, selectedDepartment?.id)})
 
   const handleExport = () => {
     const apiUrl = getApiBaseUrl()
@@ -87,8 +87,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         (acc, child) => ({
           planned: acc.planned + child.planned,
           actual: acc.actual + child.actual,
-          remaining: acc.remaining + child.remaining,
-        }),
+          remaining: acc.remaining + child.remaining}),
         { planned: 0, actual: 0, remaining: 0 }
       )
 
@@ -105,8 +104,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         execution_percent: parentTotals.planned > 0 ? Math.round((parentTotals.actual / parentTotals.planned) * 100) : 0,
         is_overspent: parentTotals.remaining < 0,
         isParent: true,
-        isChild: false,
-      })
+        isChild: false})
 
       // Add children
       children.forEach(child => {
@@ -114,8 +112,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
           key: `child-${child.category_id}`,
           ...child,
           isParent: false,
-          isChild: true,
-        })
+          isChild: true})
       })
     })
 
@@ -172,24 +169,21 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
             </div>
           </div>
         )
-      },
-    },
+      }},
     {
       title: 'План',
       dataIndex: 'planned',
       key: 'planned',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Факт',
       dataIndex: 'actual',
       key: 'actual',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatNumber(value),
-    },
+      render: (value: number) => formatNumber(value)},
     {
       title: 'Остаток',
       dataIndex: 'remaining',
@@ -200,8 +194,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         <span style={{ color: getRemainingColor(value, record.planned), fontWeight: 'bold' }}>
           {formatNumber(value)}
         </span>
-      ),
-    },
+      )},
     {
       title: 'Исполнение',
       dataIndex: 'execution_percent',
@@ -209,8 +202,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
       width: 120,
       align: 'center' as const,
       render: (value: number, record: BudgetOverviewCategory) =>
-        getExecutionTag(value, record.is_overspent),
-    },
+        getExecutionTag(value, record.is_overspent)},
   ]
 
   // Данные для таблицы используют groupedCategories, который уже определен выше
@@ -224,8 +216,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     category_type: 'OPEX' as const,
     parent_id: null,
     ...overview.opex_totals,
-    is_overspent: overview.opex_totals.remaining < 0,
-  }
+    is_overspent: overview.opex_totals.remaining < 0}
 
   const capexRow = {
     key: 'capex-total',
@@ -234,8 +225,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     category_type: 'CAPEX' as const,
     parent_id: null,
     ...overview.capex_totals,
-    is_overspent: overview.capex_totals.remaining < 0,
-  }
+    is_overspent: overview.capex_totals.remaining < 0}
 
   const totalRow = {
     key: 'grand-total',
@@ -244,8 +234,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
     category_type: '' as any,
     parent_id: null,
     ...overview.totals,
-    is_overspent: overview.totals.remaining < 0,
-  }
+    is_overspent: overview.totals.remaining < 0}
 
   const dataWithTotals = [...dataSource, opexRow, capexRow, totalRow] as any[]
 
@@ -274,7 +263,7 @@ const BudgetOverviewTable: React.FC<BudgetOverviewTableProps> = ({ year, month }
         </Space>
       </div>
 
-      <Table
+      <ResponsiveTable
         columns={columns}
         dataSource={dataWithTotals}
         pagination={false}

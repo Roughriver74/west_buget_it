@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Drawer,
   Button,
-  Table,
   Space,
   Tag,
   Popconfirm,
@@ -27,6 +26,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTokens, createToken, updateToken, deleteToken, revokeToken } from '@/api/apiTokens'
 import type { APIToken, CreateTokenRequest, UpdateTokenRequest, APITokenScope, APITokenStatus } from '@/types/apiToken'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 
 const { Title, Text, Paragraph } = Typography
@@ -278,7 +278,7 @@ const ApiTokensDrawer: React.FC<ApiTokensDrawerProps> = ({ visible, onClose }) =
             showIcon
           />
 
-          <Table
+          <ResponsiveTable
             columns={columns}
             dataSource={tokens}
             loading={isLoading}

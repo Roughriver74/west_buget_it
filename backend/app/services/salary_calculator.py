@@ -33,7 +33,7 @@ class SalaryCalculator:
         Calculate net salary and NDFL amount from gross salary.
 
         Args:
-            gross_salary: Salary before tax deduction (Брутто)
+            gross_salary: Salary before tax deduction (Gross)
             ndfl_rate: NDFL tax rate (default: 0.13 for 13%)
 
         Returns:
@@ -79,7 +79,7 @@ class SalaryCalculator:
         Calculate gross salary and NDFL amount from desired net salary.
 
         Args:
-            net_salary: Desired take-home salary (Нетто)
+            net_salary: Desired take-home salary (Net)
             ndfl_rate: NDFL tax rate (default: 0.13 for 13%)
 
         Returns:

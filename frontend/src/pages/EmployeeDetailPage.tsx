@@ -7,14 +7,12 @@ import {
   Button,
   Space,
   Spin,
-  Table,
   Row,
   Col,
   Statistic,
   Tabs,
   message,
-  Popconfirm,
-} from 'antd';
+  Popconfirm} from 'antd';
 import {
   ArrowLeftOutlined,
   EditOutlined,
@@ -23,9 +21,9 @@ import {
   CalendarOutlined,
   HistoryOutlined,
   DeleteOutlined,
-  PlusOutlined,
-} from '@ant-design/icons';
+  PlusOutlined} from '@ant-design/icons';
 import { useMemo, useState } from 'react';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { employeeAPI, payrollPlanAPI, payrollActualAPI, employeeTaxAPI } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import EmployeeFormModal from '../components/employees/EmployeeFormModal';
@@ -35,15 +33,13 @@ const STATUS_COLORS: Record<string, string> = {
   ACTIVE: 'green',
   ON_VACATION: 'blue',
   ON_LEAVE: 'orange',
-  FIRED: 'red',
-};
+  FIRED: 'red'};
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Активен',
   ON_VACATION: 'В отпуске',
   ON_LEAVE: 'В отпуске/Больничный',
-  FIRED: 'Уволен',
-};
+  FIRED: 'Уволен'};
 
 const MONTHS = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -61,27 +57,23 @@ export default function EmployeeDetailPage() {
   // Fetch employee details with salary history
   const { data: employee, isLoading } = useQuery({
     queryKey: ['employee', id],
-    queryFn: () => employeeAPI.get(Number(id)),
-  });
+    queryFn: () => employeeAPI.get(Number(id))});
 
   // Fetch payroll plans
   const { data: plans = [] } = useQuery({
     queryKey: ['payroll-plans', id],
-    queryFn: () => payrollPlanAPI.list({ employee_id: Number(id) }),
-  });
+    queryFn: () => payrollPlanAPI.list({ employee_id: Number(id) })});
 
   // Fetch payroll actuals
   const { data: actuals = [] } = useQuery({
     queryKey: ['payroll-actuals', id],
-    queryFn: () => payrollActualAPI.list({ employee_id: Number(id) }),
-  });
+    queryFn: () => payrollActualAPI.list({ employee_id: Number(id) })});
 
   // Fetch tax calculation
   const { data: taxCalculation } = useQuery({
     queryKey: ['employee-tax-calculation', id],
     queryFn: () => employeeTaxAPI.getTaxCalculation(Number(id)),
-    enabled: !!id && !!employee,
-  });
+    enabled: !!id && !!employee});
 
   // Delete plan mutation
   const deletePlanMutation = useMutation({
@@ -92,8 +84,7 @@ export default function EmployeeDetailPage() {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при удалении плана');
-    },
-  });
+    }});
 
   const handleEditPlan = (plan: any) => {
     setEditingPlan(plan);
@@ -167,20 +158,17 @@ export default function EmployeeDetailPage() {
       title: 'Дата',
       dataIndex: 'effective_date',
       key: 'effective_date',
-      render: (date: string) => new Date(date).toLocaleDateString('ru-RU'),
-    },
+      render: (date: string) => new Date(date).toLocaleDateString('ru-RU')},
     {
       title: 'Старый оклад',
       dataIndex: 'old_salary',
       key: 'old_salary',
-      render: (salary: number) => salary ? formatCurrency(salary) : '-',
-    },
+      render: (salary: number) => salary ? formatCurrency(salary) : '-'},
     {
       title: 'Новый оклад',
       dataIndex: 'new_salary',
       key: 'new_salary',
-      render: (salary: number) => formatCurrency(salary),
-    },
+      render: (salary: number) => formatCurrency(salary)},
     {
       title: 'Изменение',
       key: 'change',
@@ -194,13 +182,11 @@ export default function EmployeeDetailPage() {
             {change > 0 ? '+' : ''}{formatCurrency(change)} ({percent > 0 ? '+' : ''}{percent.toFixed(1)}%)
           </span>
         );
-      },
-    },
+      }},
     {
       title: 'Причина',
       dataIndex: 'reason',
-      key: 'reason',
-    },
+      key: 'reason'},
   ];
 
   // Payroll plans columns
@@ -208,44 +194,37 @@ export default function EmployeeDetailPage() {
     {
       title: 'Период',
       key: 'period',
-      render: (_: any, record: any) => `${MONTHS[record.month - 1]} ${record.year}`,
-    },
+      render: (_: any, record: any) => `${MONTHS[record.month - 1]} ${record.year}`},
     {
       title: 'Оклад',
       dataIndex: 'base_salary',
       key: 'base_salary',
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Премия (мес)',
       dataIndex: 'monthly_bonus',
       key: 'monthly_bonus',
-      render: (value: number) => formatCurrency(value || 0),
-    },
+      render: (value: number) => formatCurrency(value || 0)},
     {
       title: 'Премия (квар)',
       dataIndex: 'quarterly_bonus',
       key: 'quarterly_bonus',
-      render: (value: number) => formatCurrency(value || 0),
-    },
+      render: (value: number) => formatCurrency(value || 0)},
     {
       title: 'Премия (год)',
       dataIndex: 'annual_bonus',
       key: 'annual_bonus',
-      render: (value: number) => formatCurrency(value || 0),
-    },
+      render: (value: number) => formatCurrency(value || 0)},
     {
       title: 'Прочие',
       dataIndex: 'other_payments',
       key: 'other_payments',
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Итого',
       dataIndex: 'total_planned',
       key: 'total_planned',
-      render: (value: number) => <strong>{formatCurrency(value)}</strong>,
-    },
+      render: (value: number) => <strong>{formatCurrency(value)}</strong>},
     {
       title: 'Действия',
       key: 'actions',
@@ -272,8 +251,7 @@ export default function EmployeeDetailPage() {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ];
 
   // Payroll actuals columns
@@ -281,20 +259,17 @@ export default function EmployeeDetailPage() {
     {
       title: 'Период',
       key: 'period',
-      render: (_: any, record: any) => `${MONTHS[record.month - 1]} ${record.year}`,
-    },
+      render: (_: any, record: any) => `${MONTHS[record.month - 1]} ${record.year}`},
     {
       title: 'Дата выплаты',
       dataIndex: 'payment_date',
       key: 'payment_date',
-      render: (date: string) => date ? new Date(date).toLocaleDateString('ru-RU') : '-',
-    },
+      render: (date: string) => date ? new Date(date).toLocaleDateString('ru-RU') : '-'},
     {
       title: 'Начислено (Gross)',
       dataIndex: 'total_paid',
       key: 'total_paid',
-      render: (value: number) => <strong>{formatCurrency(value)}</strong>,
-    },
+      render: (value: number) => <strong>{formatCurrency(value)}</strong>},
     {
       title: 'НДФЛ',
       key: 'income_tax',
@@ -306,22 +281,19 @@ export default function EmployeeDetailPage() {
             ({((record.income_tax_rate || 0) * 100).toFixed(1)}%)
           </span>
         </span>
-      ),
-    },
+      )},
     {
       title: 'На руки (Net)',
       key: 'net_amount',
       render: (_: any, record: any) => {
         const netAmount = Number(record.total_paid) - Number(record.income_tax_amount || 0);
         return <strong style={{ color: '#52c41a' }}>{formatCurrency(netAmount)}</strong>;
-      },
-    },
+      }},
     {
       title: 'Страховые взносы',
       dataIndex: 'social_tax_amount',
       key: 'social_tax_amount',
-      render: (value: number) => <span style={{ color: '#fa8c16' }}>{formatCurrency(value || 0)}</span>,
-    },
+      render: (value: number) => <span style={{ color: '#fa8c16' }}>{formatCurrency(value || 0)}</span>},
   ];
 
   return (
@@ -470,7 +442,7 @@ export default function EmployeeDetailPage() {
                   {taxCalculation.salary_type === 'NET' ? (
                     <>
                       <Descriptions.Item label="Оклад введен как">
-                        <Tag color="green">Нетто (на руки)</Tag>
+                        <Tag color="green">Net (на руки)</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Net (на руки, после всех вычетов)">
                         <strong style={{ color: '#52c41a' }}>
@@ -484,7 +456,7 @@ export default function EmployeeDetailPage() {
                   ) : (
                     <>
                       <Descriptions.Item label="Оклад введен как">
-                        <Tag color="blue">Брутто (до вычета НДФЛ)</Tag>
+                        <Tag color="blue">Gross (до вычета НДФЛ)</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Gross (до вычета налогов, начислено)">
                         <strong>{formatCurrency(taxCalculation.gross_salary)}</strong>
@@ -571,15 +543,15 @@ export default function EmployeeDetailPage() {
                       Добавить план
                     </Button>
                   </div>
-                  <Table
+                  <ResponsiveTable
                     columns={plansColumns}
                     dataSource={sortedPlans}
                     rowKey="id"
                     pagination={{ pageSize: 12 }}
+                    mobileLayout="card"
                   />
                 </>
-              ),
-            },
+              )},
             {
               key: 'actuals',
               label: (
@@ -588,14 +560,14 @@ export default function EmployeeDetailPage() {
                 </span>
               ),
               children: (
-                <Table
+                <ResponsiveTable
                   columns={actualsColumns}
                   dataSource={sortedActuals}
                   rowKey="id"
                   pagination={{ pageSize: 12 }}
+                  mobileLayout="card"
                 />
-              ),
-            },
+              )},
             {
               key: 'history',
               label: (
@@ -604,18 +576,18 @@ export default function EmployeeDetailPage() {
                 </span>
               ),
               children: sortedSalaryHistory.length > 0 ? (
-                <Table
+                <ResponsiveTable
                   columns={salaryHistoryColumns}
                   dataSource={sortedSalaryHistory}
                   rowKey="id"
                   pagination={false}
+                  mobileLayout="card"
                 />
               ) : (
                 <div style={{ textAlign: 'center', padding: '40px' }}>
                   <p>История изменений оклада пуста</p>
                 </div>
-              ),
-            },
+              )},
           ]}
         />
       </Card>
@@ -630,8 +602,7 @@ export default function EmployeeDetailPage() {
         visible={planModalVisible}
         planId={editingPlan?.id}
         defaultValues={{
-          employee_id: Number(id),
-        }}
+          employee_id: Number(id)}}
         onCancel={() => {
           setPlanModalVisible(false);
           setEditingPlan(null);

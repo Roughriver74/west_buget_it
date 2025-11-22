@@ -3,7 +3,7 @@
  * Visual comparison of planned vs actual budget execution by month
  */
 import React, { useMemo } from 'react'
-import { Card, Statistic, Row, Col, Typography, Space, Tag } from 'antd'
+import { Statistic, Typography, Tag } from 'antd'
 import {
   ResponsiveContainer,
   BarChart,
@@ -21,6 +21,7 @@ import { analyticsApi } from '@/api/analytics'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import { Card } from '@/components/ui/Card'
 
 const { Text } = Typography
 
@@ -50,8 +51,8 @@ interface ChartDatum {
 }
 
 const CATEGORY_CONFIG: Record<CategoryKey, { label: string; color: string }> = {
-  plan: { label: 'План', color: '#1890ff' },
-  actual: { label: 'Факт', color: '#fa8c16' },
+  plan: { label: 'План', color: '#3b82f6' },
+  actual: { label: 'Факт', color: '#f59e0b' },
 }
 
 const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
@@ -139,33 +140,19 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
     }
 
     return (
-      <div
-        style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          border: '1px solid #f0f0f0',
-          borderRadius: 8,
-          padding: '12px 16px',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>{label}</div>
+      <div className="bg-white/95 dark:bg-gray-900/95 border border-gray-100 dark:border-gray-800 rounded-lg p-3 shadow-lg backdrop-blur-sm">
+        <div className="font-semibold mb-2">{label}</div>
         {payload.map((entry) => {
           const key = entry.dataKey as CategoryKey
           const config = CATEGORY_CONFIG[key]
           return (
-            <div key={entry.dataKey as string} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+            <div key={entry.dataKey as string} className="flex items-center mb-1 gap-2">
               <span
-                style={{
-                  backgroundColor: config?.color ?? '#1890ff',
-                  width: 10,
-                  height: 10,
-                  display: 'inline-block',
-                  borderRadius: 2,
-                  marginRight: 8,
-                }}
+                className="w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: config?.color ?? '#1890ff' }}
               />
-              <span style={{ flex: 1 }}>{config?.label ?? entry.name}</span>
-              <strong>{currencyFormatter.format(Number(entry.value))}</strong>
+              <span className="flex-1 text-sm text-gray-600 dark:text-gray-300">{config?.label ?? entry.name}</span>
+              <strong className="text-sm">{currencyFormatter.format(Number(entry.value))}</strong>
             </div>
           )
         })}
@@ -175,7 +162,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (isLoading) {
     return (
-      <Card title="Исполнение бюджета">
+      <Card title="Исполнение бюджета" variant="default">
         <LoadingState />
       </Card>
     )
@@ -183,7 +170,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (isError) {
     return (
-      <Card title="Исполнение бюджета">
+      <Card title="Исполнение бюджета" variant="default">
         <ErrorState
           description={error instanceof Error ? error.message : 'Не удалось загрузить данные'}
           onRetry={() => {}}
@@ -194,7 +181,7 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
 
   if (!data || !stats) {
     return (
-      <Card title="Исполнение бюджета">
+      <Card title="Исполнение бюджета" variant="default">
         <Text type="secondary">Нет данных для отображения</Text>
       </Card>
     )
@@ -203,98 +190,101 @@ const BudgetPlanVsActualWidget: React.FC<BudgetPlanVsActualWidgetProps> = ({
   return (
     <Card
       title="Исполнение бюджета"
+      variant="default"
       extra={
-        <Tag color={stats.executionPercent > 100 ? 'red' : stats.executionPercent > 90 ? 'orange' : 'green'}>
+        <Tag color={stats.executionPercent > 100 ? 'red' : stats.executionPercent > 90 ? 'orange' : 'green'} className="mr-0 rounded-full px-3">
           {stats.executionPercent.toFixed(1)}% исполнено
         </Tag>
       }
     >
       {showStats && (
-        <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={8}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800/50">
             <Statistic
-              title="План на год"
+              title={<span className="text-blue-600/80 dark:text-blue-400/80 text-sm font-medium">План на год</span>}
               value={stats.totalPlanned}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: '#3b82f6', fontWeight: 600 }}
             />
-          </Col>
-          <Col xs={24} sm={8}>
+          </div>
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800/50">
             <Statistic
-              title="Факт"
+              title={<span className="text-green-600/80 dark:text-green-400/80 text-sm font-medium">Факт</span>}
               value={stats.totalActual}
               precision={0}
               suffix="₽"
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: '#10b981', fontWeight: 600 }}
             />
-          </Col>
-          <Col xs={24} sm={8}>
+          </div>
+          <div className={`p-4 rounded-lg border ${stats.totalRemaining >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50' : 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/50'}`}>
             <Statistic
-              title="Остаток"
+              title={<span className={`${stats.totalRemaining >= 0 ? 'text-emerald-600/80 dark:text-emerald-400/80' : 'text-red-600/80 dark:text-red-400/80'} text-sm font-medium`}>Остаток</span>}
               value={stats.totalRemaining}
               precision={0}
               suffix="₽"
               prefix={stats.totalRemaining > 0 ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
               valueStyle={{
-                color: stats.totalRemaining > 0 ? '#52c41a' : '#cf1322',
+                color: stats.totalRemaining > 0 ? '#10b981' : '#ef4444',
+                fontWeight: 600
               }}
             />
-          </Col>
-        </Row>
+          </div>
+        </div>
       )}
 
       {stats.currentMonthData && showStats && (
-        <Space direction="vertical" size="small" style={{ marginBottom: 16, width: '100%' }}>
-          <Text strong>Текущий месяц ({stats.currentMonthData.month_name}):</Text>
-          <Row gutter={8}>
-            <Col span={8}>
-              <Text type="secondary">План: </Text>
-              <Text strong>
-                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(
+        <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
+          <div className="text-sm font-semibold mb-3">Текущий месяц ({stats.currentMonthData.month_name})</div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">План</div>
+              <div className="font-medium">
+                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
                   stats.currentMonthData.planned
                 )}
-              </Text>
-            </Col>
-            <Col span={8}>
-              <Text type="secondary">Факт: </Text>
-              <Text strong>
-                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Факт</div>
+              <div className="font-medium">
+                {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(
                   stats.currentMonthData.actual
                 )}
-              </Text>
-            </Col>
-            <Col span={8}>
-              <Text type="secondary">Исполнение: </Text>
-              <Text
-                strong
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Исполнение</div>
+              <div
+                className="font-bold"
                 style={{
                   color:
                     stats.currentMonthData.execution_percent > 100
-                      ? '#cf1322'
+                      ? '#ef4444'
                       : stats.currentMonthData.execution_percent > 90
-                        ? '#faad14'
-                        : '#52c41a',
+                        ? '#f59e0b'
+                        : '#10b981',
                 }}
               >
                 {stats.currentMonthData.execution_percent.toFixed(1)}%
-              </Text>
-            </Col>
-          </Row>
-        </Space>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 8 }} barGap={12}>
+        <BarChart data={chartData} margin={{ top: 8, right: 24, left: 0, bottom: 8 }} barGap={8}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-          <XAxis dataKey="month" tickLine={false} axisLine={{ stroke: '#d9d9d9' }} />
+          <XAxis dataKey="month" tickLine={false} axisLine={{ stroke: '#e5e7eb' }} tick={{ fontSize: 12 }} />
           <YAxis
             tickLine={false}
-            axisLine={{ stroke: '#d9d9d9' }}
+            axisLine={{ stroke: '#e5e7eb' }}
             tickFormatter={(value: number) => formatAxisLabel(value).toString()}
             width={80}
+            tick={{ fontSize: 12 }}
           />
-          <RechartsTooltip content={<CustomTooltip />} />
+          <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
           <Legend formatter={renderLegendText} />
           <Bar
             dataKey="plan"

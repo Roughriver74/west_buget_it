@@ -5,7 +5,6 @@ import {
   Card,
   Space,
   Button,
-  Table,
   Tag,
   Modal,
   Form,
@@ -13,23 +12,21 @@ import {
   Select,
   message,
   Popconfirm,
-  Tooltip,
-} from 'antd'
+  Tooltip} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   CheckOutlined,
-  CloseOutlined,
-} from '@ant-design/icons'
+  CloseOutlined} from '@ant-design/icons'
 import { revenueCategoriesApi } from '@/api'
 import type {
   RevenueCategory,
   RevenueCategoryCreate,
   RevenueCategoryUpdate,
-  RevenueCategoryType,
-} from '@/types/revenue'
+  RevenueCategoryType} from '@/types/revenue'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 
@@ -46,8 +43,7 @@ const RevenueCategoriesPage = () => {
   // Fetch revenue categories
   const { data: categories, isLoading, error } = useQuery({
     queryKey: ['revenue-categories', selectedDepartment?.id],
-    queryFn: () => revenueCategoriesApi.getAll({ department_id: selectedDepartment?.id }),
-  })
+    queryFn: () => revenueCategoriesApi.getAll({ department_id: selectedDepartment?.id })})
 
   // Create mutation
   const createMutation = useMutation({
@@ -60,8 +56,7 @@ const RevenueCategoriesPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при создании категории')
-    },
-  })
+    }})
 
   // Update mutation
   const updateMutation = useMutation({
@@ -76,8 +71,7 @@ const RevenueCategoriesPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при обновлении категории')
-    },
-  })
+    }})
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -88,8 +82,7 @@ const RevenueCategoriesPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при удалении категории')
-    },
-  })
+    }})
 
   // Bulk update mutation
   const bulkUpdateMutation = useMutation({
@@ -102,8 +95,7 @@ const RevenueCategoriesPage = () => {
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Ошибка при обновлении категорий')
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setEditingCategory(null)
@@ -128,8 +120,7 @@ const RevenueCategoriesPage = () => {
       // Add selected department_id to ensure multi-tenancy
       const dataWithDepartment = {
         ...values,
-        department_id: selectedDepartment?.id,
-      }
+        department_id: selectedDepartment?.id}
 
       if (editingCategory) {
         updateMutation.mutate({ id: editingCategory.id, data: dataWithDepartment })
@@ -162,8 +153,7 @@ const RevenueCategoriesPage = () => {
       PRODUCT: 'Продукция',
       SERVICE: 'Услуги',
       EQUIPMENT: 'Оборудование',
-      TENDER: 'Тендеры',
-    }
+      TENDER: 'Тендеры'}
     return labels[type]
   }
 
@@ -172,8 +162,7 @@ const RevenueCategoriesPage = () => {
       PRODUCT: 'blue',
       SERVICE: 'green',
       EQUIPMENT: 'orange',
-      TENDER: 'purple',
-    }
+      TENDER: 'purple'}
     return colors[type]
   }
 
@@ -182,13 +171,11 @@ const RevenueCategoriesPage = () => {
       title: 'Код',
       dataIndex: 'code',
       key: 'code',
-      width: 100,
-    },
+      width: 100},
     {
       title: 'Название',
       dataIndex: 'name',
-      key: 'name',
-    },
+      key: 'name'},
     {
       title: 'Тип',
       dataIndex: 'category_type',
@@ -196,14 +183,12 @@ const RevenueCategoriesPage = () => {
       width: 150,
       render: (type: RevenueCategoryType) => (
         <Tag color={getCategoryTypeColor(type)}>{getCategoryTypeLabel(type)}</Tag>
-      ),
-    },
+      )},
     {
       title: 'Описание',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -213,8 +198,7 @@ const RevenueCategoriesPage = () => {
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Активна' : 'Неактивна'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -240,8 +224,7 @@ const RevenueCategoriesPage = () => {
             </Popconfirm>
           </Tooltip>
         </Space>
-      ),
-    },
+      )},
   ]
 
   if (isLoading) {
@@ -279,19 +262,18 @@ const RevenueCategoriesPage = () => {
           </Button>
         </Space>
 
-        <Table
+        <ResponsiveTable
           rowSelection={{
             selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
+            onChange: setSelectedRowKeys}}
           columns={columns}
           dataSource={categories}
           rowKey="id"
+          mobileLayout="card"
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
-            showTotal: (total) => `Всего: ${total}`,
-          }}
+            showTotal: (total) => `Всего: ${total}`}}
         />
       </Card>
 

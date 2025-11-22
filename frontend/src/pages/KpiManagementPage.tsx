@@ -5,10 +5,12 @@ import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { KpiSummaryTab } from '@/components/kpi/KpiSummaryTab'
 import { KpiGoalsTab } from '@/components/kpi/KpiGoalsTab'
+import { KpiGoalTemplatesTab } from '@/components/kpi/KpiGoalTemplatesTab'
 import { EmployeeKpiTab } from '@/components/kpi/EmployeeKpiTab'
 import { KpiAssignmentsTab } from '@/components/kpi/KpiAssignmentsTab'
 import { KpiCalendar } from '@/components/kpi/KpiCalendar'
-import KpiAllTasksTab from '@/components/kpi/KpiAllTasksTab'
+import { KpiDashboard } from '@/components/kpi/KpiDashboard'
+// KpiAllTasksTab removed - Tasks feature deprecated
 
 const { Title } = Typography
 
@@ -26,31 +28,47 @@ const KPIManagementPage = () => {
         KPI сотрудников
       </Title>
 
-      <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        <Tabs.TabPane tab="Сводка" key="summary">
-          <KpiSummaryTab departmentId={departmentId} />
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="Цели KPI" key="goals">
-          <KpiGoalsTab departmentId={departmentId} />
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="Показатели сотрудников" key="employee-kpi">
-          <EmployeeKpiTab departmentId={departmentId} year={currentYear} />
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="Назначения целей" key="assignments">
-          <KpiAssignmentsTab departmentId={departmentId} year={currentYear} />
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="Задачи KPI" key="tasks">
-          <KpiAllTasksTab departmentId={departmentId} />
-        </Tabs.TabPane>
-
-        <Tabs.TabPane tab="Календарь бонусов" key="calendar">
-          <KpiCalendar departmentId={departmentId} />
-        </Tabs.TabPane>
-      </Tabs>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'dashboard',
+            label: '📊 Dashboard',
+            children: <KpiDashboard departmentId={departmentId} />,
+          },
+          {
+            key: 'summary',
+            label: 'Сводка',
+            children: <KpiSummaryTab departmentId={departmentId} />,
+          },
+          {
+            key: 'goals',
+            label: 'Цели KPI',
+            children: <KpiGoalsTab departmentId={departmentId} />,
+          },
+          {
+            key: 'templates',
+            label: 'Шаблоны целей',
+            children: <KpiGoalTemplatesTab departmentId={departmentId} />,
+          },
+          {
+            key: 'employee-kpi',
+            label: 'Показатели сотрудников',
+            children: <EmployeeKpiTab departmentId={departmentId} year={currentYear} />,
+          },
+          {
+            key: 'assignments',
+            label: 'Назначения целей',
+            children: <KpiAssignmentsTab departmentId={departmentId} year={currentYear} />,
+          },
+          {
+            key: 'calendar',
+            label: 'Календарь бонусов',
+            children: <KpiCalendar departmentId={departmentId} />,
+          },
+        ]}
+      />
     </div>
   )
 }

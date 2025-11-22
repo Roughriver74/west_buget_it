@@ -7,20 +7,17 @@ import {
   Statistic,
   Select,
   Alert,
-  Table,
   Tag,
   Progress,
   Divider,
-  Typography,
-} from 'antd'
+  Typography} from 'antd'
 import {
   DollarOutlined,
   TeamOutlined,
   TrophyOutlined,
   BankOutlined,
   RiseOutlined,
-  FallOutlined,
-} from '@ant-design/icons'
+  FallOutlined} from '@ant-design/icons'
 import { founderDashboardApi } from '@/api/founderDashboard'
 import {
   BarChart,
@@ -32,11 +29,11 @@ import {
   Legend,
   ResponsiveContainer,
   LineChart,
-  Line,
-} from 'recharts'
+  Line} from 'recharts'
 import dayjs from 'dayjs'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Title, Text } = Typography
 
@@ -47,8 +44,7 @@ const FounderDashboardPage = () => {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['founderDashboard', year, month],
-    queryFn: () => founderDashboardApi.getDashboard({ year, month }),
-  })
+    queryFn: () => founderDashboardApi.getDashboard({ year, month })})
 
   if (isLoading) {
     return <LoadingState />
@@ -66,8 +62,7 @@ const FounderDashboardPage = () => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(value)
+      minimumFractionDigits: 0}).format(value)
   }
 
   const formatPercent = (value: number) => {
@@ -93,22 +88,19 @@ const FounderDashboardPage = () => {
       dataIndex: 'department_name',
       key: 'department_name',
       width: 200,
-      fixed: 'left' as const,
-    },
+      fixed: 'left' as const},
     {
       title: 'Бюджет',
       dataIndex: 'budget_planned',
       key: 'budget_planned',
       render: (value: number) => formatCurrency(value),
-      align: 'right' as const,
-    },
+      align: 'right' as const},
     {
       title: 'Факт',
       dataIndex: 'budget_actual',
       key: 'budget_actual',
       render: (value: number) => formatCurrency(value),
-      align: 'right' as const,
-    },
+      align: 'right' as const},
     {
       title: 'Выполнение',
       dataIndex: 'budget_execution_percent',
@@ -122,14 +114,12 @@ const FounderDashboardPage = () => {
         />
       ),
       align: 'center' as const,
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Сотрудники',
       dataIndex: 'employees_count',
       key: 'employees_count',
-      align: 'center' as const,
-    },
+      align: 'center' as const},
     {
       title: 'КПИ',
       dataIndex: 'avg_kpi_achievement',
@@ -142,8 +132,7 @@ const FounderDashboardPage = () => {
         ) : (
           <Text type="secondary">-</Text>
         ),
-      align: 'center' as const,
-    },
+      align: 'center' as const},
   ]
 
   return (
@@ -232,8 +221,7 @@ const FounderDashboardPage = () => {
               prefix={<DollarOutlined />}
               valueStyle={{
                 color:
-                  data.company_summary.total_budget_execution_percent > 100 ? '#cf1322' : '#52c41a',
-              }}
+                  data.company_summary.total_budget_execution_percent > 100 ? '#cf1322' : '#52c41a'}}
             />
           </Card>
         </Col>
@@ -263,8 +251,7 @@ const FounderDashboardPage = () => {
               }
               valueStyle={{
                 color:
-                  data.company_summary.total_budget_execution_percent > 100 ? '#cf1322' : '#52c41a',
-              }}
+                  data.company_summary.total_budget_execution_percent > 100 ? '#cf1322' : '#52c41a'}}
             />
           </Card>
         </Col>
@@ -282,8 +269,7 @@ const FounderDashboardPage = () => {
                   tickFormatter={(value) =>
                     new Intl.NumberFormat('ru-RU', {
                       notation: 'compact',
-                      compactDisplay: 'short',
-                    }).format(value)
+                      compactDisplay: 'short'}).format(value)
                   }
                 />
                 <Tooltip
@@ -315,7 +301,7 @@ const FounderDashboardPage = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={24}>
           <Card title="Показатели по отделам">
-            <Table
+            <ResponsiveTable
               columns={departmentColumns}
               dataSource={data.departments}
               rowKey="department_id"
@@ -338,8 +324,7 @@ const FounderDashboardPage = () => {
                   tickFormatter={(value) =>
                     new Intl.NumberFormat('ru-RU', {
                       notation: 'compact',
-                      compactDisplay: 'short',
-                    }).format(value)
+                      compactDisplay: 'short'}).format(value)
                   }
                 />
                 <Tooltip
@@ -379,8 +364,7 @@ const FounderDashboardPage = () => {
                                   ? '#52c41a'
                                   : kpi.avg_achievement >= 80
                                   ? '#faad14'
-                                  : '#f5222d',
-                            }}
+                                  : '#f5222d'}}
                           />
                         </Col>
                         <Col span={12}>

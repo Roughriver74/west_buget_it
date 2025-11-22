@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Table, Tag, Spin, message, Button, Space, Alert, Segmented, theme } from 'antd'
+import { Tag, Spin, message, Button, Space, Alert, Segmented, theme } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { CopyOutlined, PlusOutlined, DownloadOutlined, WarningOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { budgetApi } from '@/api'
@@ -54,8 +55,7 @@ const BudgetPlanTable = React.forwardRef<
     },
     onError: (error: any) => {
       message.error(`Ошибка инициализации: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Обновление ячейки
   const updateCellMutation = useMutation({
@@ -81,16 +81,14 @@ const BudgetPlanTable = React.forwardRef<
         newSet.delete(cellKey)
         return newSet
       })
-    },
-  })
+    }})
 
   const handleCellChange = (categoryId: number, month: number, value: number) => {
     updateCellMutation.mutate({
       year,
       month,
       category_id: categoryId,
-      planned_amount: value,
-    })
+      planned_amount: value})
   }
 
   const isCellUpdating = (categoryId: number, month: number): boolean => {
@@ -215,8 +213,7 @@ const BudgetPlanTable = React.forwardRef<
   React.useImperativeHandle(
     ref,
     () => ({
-      scrollBy,
-    }),
+      scrollBy}),
     [scrollBy]
   )
 
@@ -338,8 +335,7 @@ const BudgetPlanTable = React.forwardRef<
             </div>
           </div>
         )
-      },
-    },
+      }},
     ...Array.from({ length: 12 }, (_, i) => i + 1).map((month) => ({
       title: MONTH_NAMES[month - 1],
       key: `month-${month}`,
@@ -347,8 +343,7 @@ const BudgetPlanTable = React.forwardRef<
       align: 'right' as const,
       className: activeMonth === month ? 'active-month-header' : undefined,
       onHeaderCell: () => ({
-        className: activeMonth === month ? 'active-month-header' : undefined,
-      }),
+        className: activeMonth === month ? 'active-month-header' : undefined}),
       children: [
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>План</div>,
@@ -356,11 +351,9 @@ const BudgetPlanTable = React.forwardRef<
           width: 90,
           align: 'right' as const,
           onHeaderCell: () => ({
-            className: activeMonth === month ? 'active-month-subheader' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-subheader' : undefined}),
           onCell: () => ({
-            className: activeMonth === month ? 'active-month-cell' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-cell' : undefined}),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const isEditable = record.isChild === true
@@ -380,19 +373,16 @@ const BudgetPlanTable = React.forwardRef<
                 {formatNumber(value)}
               </span>
             )
-          },
-        },
+          }},
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>Факт</div>,
           key: `month-${month}-actual`,
           width: 90,
           align: 'right' as const,
           onHeaderCell: () => ({
-            className: activeMonth === month ? 'active-month-subheader' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-subheader' : undefined}),
           onCell: () => ({
-            className: activeMonth === month ? 'active-month-cell' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-cell' : undefined}),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const value = monthData?.actual_amount || 0
@@ -401,19 +391,16 @@ const BudgetPlanTable = React.forwardRef<
                 {formatNumber(value)}
               </span>
             )
-          },
-        },
+          }},
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>Остаток</div>,
           key: `month-${month}-remaining`,
           width: 90,
           align: 'right' as const,
           onHeaderCell: () => ({
-            className: activeMonth === month ? 'active-month-subheader' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-subheader' : undefined}),
           onCell: () => ({
-            className: activeMonth === month ? 'active-month-cell' : undefined,
-          }),
+            className: activeMonth === month ? 'active-month-cell' : undefined}),
           render: (_: any, record: any) => {
             const monthData = record.months[month.toString()]
             const remaining = monthData?.remaining || 0
@@ -423,14 +410,12 @@ const BudgetPlanTable = React.forwardRef<
                 style={{
                   fontSize: 13,
                   color,
-                  fontWeight: remaining < 0 || activeMonth === month ? 'bold' : 'normal',
-                }}
+                  fontWeight: remaining < 0 || activeMonth === month ? 'bold' : 'normal'}}
               >
                 {formatNumber(remaining)}
               </span>
             )
-          },
-        },
+          }},
       ]
     })),
     {
@@ -448,8 +433,7 @@ const BudgetPlanTable = React.forwardRef<
           render: (_: any, record: any) => {
             const total = Object.values(record.months).reduce((sum: number, m: any) => sum + (m.planned_amount || 0), 0)
             return <strong style={{ color: '#1890ff', fontSize: 13 }}>{formatNumber(total)}</strong>
-          },
-        },
+          }},
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>Факт</div>,
           key: 'total-actual',
@@ -458,8 +442,7 @@ const BudgetPlanTable = React.forwardRef<
           render: (_: any, record: any) => {
             const total = Object.values(record.months).reduce((sum: number, m: any) => sum + (m.actual_amount || 0), 0)
             return <strong style={{ color: '#666', fontSize: 13 }}>{formatNumber(total)}</strong>
-          },
-        },
+          }},
         {
           title: <div style={{fontSize: 12, fontWeight: 500}}>Остаток</div>,
           key: 'total-remaining',
@@ -469,8 +452,7 @@ const BudgetPlanTable = React.forwardRef<
             const total = Object.values(record.months).reduce((sum: number, m: any) => sum + (m.remaining || 0), 0)
             const color = total < 0 ? '#ff4d4f' : (total > 0 ? '#52c41a' : '#666')
             return <strong style={{ color, fontSize: 13 }}>{formatNumber(total)}</strong>
-          },
-        },
+          }},
       ]
     },
   ]
@@ -487,8 +469,7 @@ const BudgetPlanTable = React.forwardRef<
       category_type: parent.category_type,
       isParent: true,
       isChild: false,
-      months: calculateParentTotals(parent.category_id),
-    })
+      months: calculateParentTotals(parent.category_id)})
 
     // Добавляем дочерние категории
     const children = childCategoriesMap.get(parent.category_id) || []
@@ -501,8 +482,7 @@ const BudgetPlanTable = React.forwardRef<
         parent_id: child.parent_id,
         isParent: false,
         isChild: true,
-        months: child.months,
-      })
+        months: child.months})
     })
   })
 
@@ -521,8 +501,7 @@ const BudgetPlanTable = React.forwardRef<
         const actual = opexCategories.reduce((sum, cat) => sum + (cat.months[monthStr]?.actual_amount || 0), 0)
         return [monthStr, { planned_amount: planned, actual_amount: actual, remaining: planned - actual }]
       })
-    ),
-  }
+    )}
 
   // Строка итогов CAPEX
   const capexCategories = planData.categories.filter(cat => cat.category_type === 'CAPEX')
@@ -539,8 +518,7 @@ const BudgetPlanTable = React.forwardRef<
         const actual = capexCategories.reduce((sum, cat) => sum + (cat.months[monthStr]?.actual_amount || 0), 0)
         return [monthStr, { planned_amount: planned, actual_amount: actual, remaining: planned - actual }]
       })
-    ),
-  }
+    )}
 
   // Строка общих итогов
   const grandTotalRow = {
@@ -556,8 +534,7 @@ const BudgetPlanTable = React.forwardRef<
         const actual = planData.categories.reduce((sum, cat) => sum + (cat.months[monthStr]?.actual_amount || 0), 0)
         return [monthStr, { planned_amount: planned, actual_amount: actual, remaining: planned - actual }]
       })
-    ),
-  }
+    )}
 
   // Добавляем строки итогов в таблицу
   const dataWithTotals = [...dataSource, opexRow, capexRow, grandTotalRow]
@@ -612,8 +589,7 @@ const BudgetPlanTable = React.forwardRef<
           paddingBottom: 12,
           marginBottom: 0,
           borderBottom: `2px solid ${token.colorBorderSecondary}`,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-        }}
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'}}
       >
         <div
           style={{
@@ -622,8 +598,7 @@ const BudgetPlanTable = React.forwardRef<
             alignItems: 'center',
             gap: 16,
             flexWrap: 'wrap',
-            marginBottom: 12,
-          }}
+            marginBottom: 12}}
         >
           <Space size="middle" align="center" wrap>
             <span style={{ fontWeight: 500 }}>Месяц:</span>
@@ -668,7 +643,7 @@ const BudgetPlanTable = React.forwardRef<
         ref={scrollContainerRef}
         style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
       >
-        <Table
+        <ResponsiveTable
           sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
           columns={columns}
           dataSource={dataWithTotals}

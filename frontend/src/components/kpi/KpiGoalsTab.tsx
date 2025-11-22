@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Card,
   Button,
-  Table,
   Tag,
   Space,
   Modal,
@@ -12,19 +11,18 @@ import {
   Select,
   message,
   Radio,
-  Typography,
-} from 'antd'
+  Typography} from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { UploadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   KPIGoal,
   KPIGoalStatus,
   KPIGoalCreate,
-  KPIGoalUpdate,
-} from '@/api/kpi'
+  KPIGoalUpdate} from '@/api/kpi'
 import ImportKPIModal from './ImportKPIModal'
 
 const { Option } = Select
@@ -35,8 +33,7 @@ const statusColor: Record<KPIGoalStatus, string> = {
   ACTIVE: 'processing',
   ACHIEVED: 'success',
   NOT_ACHIEVED: 'error',
-  CANCELLED: 'warning',
-}
+  CANCELLED: 'warning'}
 
 interface KpiGoalsTabProps {
   departmentId?: number
@@ -46,12 +43,10 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
   const queryClient = useQueryClient()
 
   const [goalFilters, setGoalFilters] = useState<{ year: number; status?: KPIGoalStatus }>(() => ({
-    year: dayjs().year(),
-  }))
+    year: dayjs().year()}))
 
   const [goalModal, setGoalModal] = useState<{ open: boolean; editing?: KPIGoal }>({
-    open: false,
-  })
+    open: false})
 
   const [importModalVisible, setImportModalVisible] = useState(false)
 
@@ -64,10 +59,8 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       kpiApi.listGoals({
         year: goalFilters.year,
         status: goalFilters.status,
-        department_id: departmentId,
-      }),
-    enabled: !!departmentId,
-  })
+        department_id: departmentId}),
+    enabled: !!departmentId})
 
   // Mutations
   const createGoalMutation = useMutation({
@@ -75,8 +68,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
     onSuccess: () => {
       message.success('Цель KPI создана')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const updateGoalMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: KPIGoalUpdate }) =>
@@ -84,16 +76,14 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
     onSuccess: () => {
       message.success('Цель KPI обновлена')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const deleteGoalMutation = useMutation({
     mutationFn: (id: number) => kpiApi.deleteGoal(id),
     onSuccess: () => {
       message.success('Цель KPI удалена')
       queryClient.invalidateQueries({ queryKey: ['kpi-goals'] })
-    },
-  })
+    }})
 
   const goals = goalsQuery.data || []
 
@@ -114,8 +104,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       year: goal.year,
       is_annual: goal.is_annual,
       status: goal.status,
-      department_id: goal.department_id,
-    })
+      department_id: goal.department_id})
   }
 
   const onCreateGoal = () => {
@@ -126,8 +115,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       department_id: departmentId,
       is_annual: true,
       weight: 100,
-      status: 'ACTIVE',
-    })
+      status: 'ACTIVE'})
   }
 
   const handleGoalSubmit = async () => {
@@ -142,14 +130,12 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       target_value: values.target_value ?? null,
       weight: values.weight ?? 100,
       department_id: departmentId,
-      is_annual: Boolean(values.is_annual),
-    } as KPIGoalCreate
+      is_annual: Boolean(values.is_annual)} as KPIGoalCreate
 
     if (goalModal.editing) {
       await updateGoalMutation.mutateAsync({
         id: goalModal.editing.id,
-        payload,
-      })
+        payload})
     } else {
       await createGoalMutation.mutateAsync(payload)
     }
@@ -176,23 +162,20 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             </Text>
           )}
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Категория',
       dataIndex: 'category',
       key: 'category',
       width: 140,
-      render: (value) => value || '—',
-    },
+      render: (value) => value || '—'},
     {
       title: 'Метрика',
       dataIndex: 'metric_name',
       key: 'metric_name',
       width: 160,
       render: (_, record) =>
-        record.metric_name ? `${record.metric_name} (${record.metric_unit || ''})` : '—',
-    },
+        record.metric_name ? `${record.metric_name} (${record.metric_unit || ''})` : '—'},
     {
       title: 'Цель',
       dataIndex: 'target_value',
@@ -201,36 +184,31 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
       render: (value) =>
         value !== null && value !== undefined
           ? Number(value).toLocaleString('ru-RU')
-          : '—',
-    },
+          : '—'},
     {
       title: 'Вес',
       dataIndex: 'weight',
       key: 'weight',
       width: 80,
       render: (value) =>
-        value !== null && value !== undefined ? `${Number(value)} %` : '—',
-    },
+        value !== null && value !== undefined ? `${Number(value)} %` : '—'},
     {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 80,
-    },
+      width: 80},
     {
       title: 'Тип',
       dataIndex: 'is_annual',
       key: 'is_annual',
       width: 120,
-      render: (value) => (value ? 'Годовая' : 'Месячная'),
-    },
+      render: (value) => (value ? 'Годовая' : 'Месячная')},
     {
       title: 'Статус',
       dataIndex: 'status',
       key: 'status',
       width: 140,
-      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>,
-    },
+      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>},
     {
       title: 'Действия',
       key: 'actions',
@@ -246,15 +224,13 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             onClick={async () => {
               Modal.confirm({
                 title: 'Удалить KPI цель?',
-                onOk: () => deleteGoalMutation.mutate(record.id),
-              })
+                onOk: () => deleteGoalMutation.mutate(record.id)})
             }}
           >
             Удалить
           </Button>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -296,7 +272,8 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
           </Space>
         }
       >
-        <Table<KPIGoal>
+        <ResponsiveTable<KPIGoal>
+          mobileLayout="card"
           rowKey="id"
           columns={goalColumns}
           dataSource={goals}
@@ -313,7 +290,7 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
         onOk={handleGoalSubmit}
         okText={goalModal.editing ? 'Обновить' : 'Создать'}
         confirmLoading={createGoalMutation.isPending || updateGoalMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={goalForm} layout="vertical">
           <Form.Item name="name" label="Название" rules={[{ required: true, message: 'Введите название' }]}>
@@ -335,7 +312,10 @@ export const KpiGoalsTab: React.FC<KpiGoalsTabProps> = ({ departmentId }) => {
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="weight" label="Вес цели">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} addonAfter="%" />
+            <Space.Compact style={{ width: '100%' }}>
+              <InputNumber min={0} max={100} style={{ width: 'calc(100% - 30px)' }} />
+              <div style={{ width: 30, border: '1px solid #d9d9d9', borderLeft: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', borderRadius: '0 6px 6px 0' }}>%</div>
+            </Space.Compact>
           </Form.Item>
           <Form.Item name="year" label="Год" rules={[{ required: true }]}>
             <InputNumber min={2020} max={2100} style={{ width: '100%' }} />

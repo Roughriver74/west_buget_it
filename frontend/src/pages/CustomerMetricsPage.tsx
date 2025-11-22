@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Card,
-  Table,
   Button,
   Space,
   Modal,
@@ -17,17 +16,16 @@ import {
   Col,
   Statistic,
   Progress,
-  Spin,
-} from 'antd'
+  Spin} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   TeamOutlined,
   PercentageOutlined,
-  DollarOutlined,
-} from '@ant-design/icons'
+  DollarOutlined} from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { CustomerMetrics, CustomerMetricsCreate } from '@/types/revenue'
 
@@ -51,10 +49,8 @@ const CustomerMetricsPage = () => {
         year: selectedYear,
         month: selectedMonth,
         region: selectedRegion,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Create metrics mutation
   const createMetricsMutation = useMutation({
@@ -67,8 +63,7 @@ const CustomerMetricsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка создания метрик: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Update metrics mutation
   const updateMetricsMutation = useMutation({
@@ -82,8 +77,7 @@ const CustomerMetricsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления метрик: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Delete metrics mutation
   const deleteMetricsMutation = useMutation({
@@ -94,8 +88,7 @@ const CustomerMetricsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка удаления метрик: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Calculate summary statistics
   const summary = useMemo(() => {
@@ -113,8 +106,7 @@ const CustomerMetricsPage = () => {
       activeCustomerBase,
       avgCoverage,
       avgCheckRegular,
-      avgCheckNetwork,
-    }
+      avgCheckNetwork}
   }, [metrics])
 
   const handleOpenModal = useCallback(
@@ -136,8 +128,7 @@ const CustomerMetricsPage = () => {
         setEditingMetrics(null)
         form.setFieldsValue({
           year: selectedYear,
-          month: selectedMonth || new Date().getMonth() + 1,
-        })
+          month: selectedMonth || new Date().getMonth() + 1})
       }
       setIsModalVisible(true)
     },
@@ -165,8 +156,7 @@ const CustomerMetricsPage = () => {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 80,
-    },
+      width: 80},
     {
       title: 'Месяц',
       dataIndex: 'month',
@@ -175,30 +165,26 @@ const CustomerMetricsPage = () => {
       render: (month: number) => {
         const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
         return months[month - 1] || month
-      },
-    },
+      }},
     {
       title: 'Регион',
       dataIndex: 'region',
       key: 'region',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'ОКБ',
       dataIndex: 'total_customer_base',
       key: 'total_customer_base',
       width: 100,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString('ru-RU') || '—',
-    },
+      render: (value: number) => value?.toLocaleString('ru-RU') || '—'},
     {
       title: 'АКБ',
       dataIndex: 'active_customer_base',
       key: 'active_customer_base',
       width: 100,
       align: 'right' as const,
-      render: (value: number) => value?.toLocaleString('ru-RU') || '—',
-    },
+      render: (value: number) => value?.toLocaleString('ru-RU') || '—'},
     {
       title: 'Покрытие',
       dataIndex: 'coverage_percent',
@@ -216,38 +202,33 @@ const CustomerMetricsPage = () => {
             format={(percent) => `${percent?.toFixed(1)}%`}
           />
         )
-      },
-    },
+      }},
     {
       title: 'Средний чек (обычные)',
       dataIndex: 'avg_order_value_regular',
       key: 'avg_order_value_regular',
       width: 140,
       align: 'right' as const,
-      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
-    },
+      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—')},
     {
       title: 'Средний чек (сетевые)',
       dataIndex: 'avg_order_value_network',
       key: 'avg_order_value_network',
       width: 140,
       align: 'right' as const,
-      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
-    },
+      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—')},
     {
       title: 'Средний чек (новые клиники)',
       dataIndex: 'avg_order_value_new',
       key: 'avg_order_value_new',
       width: 160,
       align: 'right' as const,
-      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—'),
-    },
+      render: (value: number) => (value ? `${value.toLocaleString('ru-RU')} ₽` : '—')},
     {
       title: 'Примечания',
       dataIndex: 'notes',
       key: 'notes',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Действия',
       key: 'actions',
@@ -274,8 +255,7 @@ const CustomerMetricsPage = () => {
             <Button type="link" danger size="small" icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   if (!selectedDepartment) {
@@ -409,7 +389,7 @@ const CustomerMetricsPage = () => {
 
       {/* Metrics Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={metrics}
           rowKey="id"
@@ -417,9 +397,9 @@ const CustomerMetricsPage = () => {
           pagination={{
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total}`,
-            defaultPageSize: 20,
-          }}
+            defaultPageSize: 20}}
           scroll={{ x: 1600 }}
+          mobileLayout="card"
         />
       </Card>
 

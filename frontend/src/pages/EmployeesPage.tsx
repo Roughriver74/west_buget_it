@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-	Table,
 	Button,
 	Space,
 	Card,
@@ -14,8 +13,7 @@ import {
 	Statistic,
 	Row,
 	Col,
-	Modal,
-} from 'antd'
+	Modal} from 'antd'
 import {
 	PlusOutlined,
 	EditOutlined,
@@ -23,18 +21,17 @@ import {
 	SearchOutlined,
 	UserOutlined,
 	DownloadOutlined,
-	UploadOutlined,
-} from '@ant-design/icons'
+	UploadOutlined} from '@ant-design/icons'
 import { useDepartment } from '../contexts/DepartmentContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import {
 	employeeAPI,
 	Employee,
 	payrollPlanAPI,
 	PayrollPlanWithEmployee,
 	payrollActualAPI,
-	PayrollActualWithEmployee,
-} from '../api/payroll'
+	PayrollActualWithEmployee} from '../api/payroll'
 import { formatCurrency } from '../utils/formatters'
 import EmployeeFormModal from '../components/employees/EmployeeFormModal'
 import EmployeeImportModal from '../components/employees/EmployeeImportModal'
@@ -46,15 +43,13 @@ const STATUS_COLORS: Record<string, string> = {
 	ACTIVE: 'green',
 	ON_VACATION: 'blue',
 	ON_LEAVE: 'orange',
-	FIRED: 'red',
-}
+	FIRED: 'red'}
 
 const STATUS_LABELS: Record<string, string> = {
 	ACTIVE: 'Активен',
 	ON_VACATION: 'В отпуске',
 	ON_LEAVE: 'В отпуске/Больничный',
-	FIRED: 'Уволен',
-}
+	FIRED: 'Уволен'}
 
 export default function EmployeesPage() {
 	const navigate = useNavigate()
@@ -76,9 +71,7 @@ export default function EmployeesPage() {
 			employeeAPI.list({
 				department_id: selectedDepartment?.id,
 				search: searchText || undefined,
-				status: statusFilter,
-			}),
-	})
+				status: statusFilter})})
 
 	// Fetch payroll plans for current year
 	const currentYear = new Date().getFullYear()
@@ -96,8 +89,7 @@ export default function EmployeesPage() {
 					department_id: selectedDepartment?.id,
 					year: currentYear,
 					skip,
-					limit,
-				})
+					limit})
 				allPlans = [...allPlans, ...plans]
 				hasMore = plans.length === limit
 				skip += limit
@@ -105,8 +97,7 @@ export default function EmployeesPage() {
 
 			return allPlans
 		},
-		enabled: !!selectedDepartment?.id,
-	})
+		enabled: !!selectedDepartment?.id})
 
 	// Fetch payroll actuals (фактические выплаты) for current year
 	const { data: payrollActuals = [] } = useQuery<PayrollActualWithEmployee[]>({
@@ -123,8 +114,7 @@ export default function EmployeesPage() {
 					department_id: selectedDepartment?.id,
 					year: currentYear,
 					skip,
-					limit,
-				})
+					limit})
 				allActuals = [...allActuals, ...actuals]
 				hasMore = actuals.length === limit
 				skip += limit
@@ -132,8 +122,7 @@ export default function EmployeesPage() {
 
 			return allActuals
 		},
-		enabled: !!selectedDepartment?.id,
-	})
+		enabled: !!selectedDepartment?.id})
 
 	// Delete employee mutation
 	const deleteMutation = useMutation({
@@ -179,16 +168,14 @@ export default function EmployeesPage() {
 									style={{
 										marginTop: 16,
 										fontWeight: 'bold',
-										color: mode === 'dark' ? '#69b7ff' : '#1890ff',
-									}}
+										color: mode === 'dark' ? '#69b7ff' : '#1890ff'}}
 								>
 									💡 {errorDetail.suggestion}
 								</p>
 							)}
 						</div>
 					),
-					width: 600,
-				})
+					width: 600})
 			} else {
 				// Fallback for other errors
 				message.error(
@@ -197,8 +184,7 @@ export default function EmployeesPage() {
 						: 'Ошибка при удалении сотрудника'
 				)
 			}
-		},
-	})
+		}})
 
 	const handleDelete = (id: number) => {
 		deleteMutation.mutate(id)
@@ -223,8 +209,7 @@ export default function EmployeesPage() {
 		try {
 			await employeeAPI.exportToExcel({
 				department_id: selectedDepartment?.id,
-				status: statusFilter,
-			})
+				status: statusFilter})
 			message.success('Экспорт выполнен успешно')
 		} catch (error) {
 			message.error('Ошибка при экспорте')
@@ -410,7 +395,7 @@ export default function EmployeesPage() {
 			? activeEmployees.reduce(
 					(sum, e) => sum + Number(e.base_salary || 0),
 					0
-			  ) / activeEmployees.length
+				) / activeEmployees.length
 			: 0
 
 	// Calculate effective tax rate for display
@@ -432,26 +417,22 @@ export default function EmployeesPage() {
 				>
 					{name}
 				</Button>
-			),
-		},
+			)},
 		{
 			title: 'Должность',
 			dataIndex: 'position',
-			key: 'position',
-		},
+			key: 'position'},
 		{
 			title: 'Табельный номер',
 			dataIndex: 'employee_number',
-			key: 'employee_number',
-		},
+			key: 'employee_number'},
 		{
 			title: 'Оклад',
 			dataIndex: 'base_salary',
 			key: 'base_salary',
 			render: (salary: number) => formatCurrency(salary),
 			sorter: (a: Employee, b: Employee) =>
-				Number(a.base_salary) - Number(b.base_salary),
-		},
+				Number(a.base_salary) - Number(b.base_salary)},
 		{
 			title: 'Премии (мес/квар/год)',
 			key: 'bonuses',
@@ -463,10 +444,9 @@ export default function EmployeesPage() {
 				return total > 0
 					? `${formatCurrency(monthly)} / ${formatCurrency(
 							quarterly
-					  )} / ${formatCurrency(annual)}`
+						)} / ${formatCurrency(annual)}`
 					: '-'
-			},
-		},
+			}},
 		{
 			title: 'Статус',
 			dataIndex: 'status',
@@ -476,27 +456,22 @@ export default function EmployeesPage() {
 			),
 			filters: Object.keys(STATUS_LABELS).map(key => ({
 				text: STATUS_LABELS[key],
-				value: key,
-			})),
-			onFilter: (value: any, record: Employee) => record.status === value,
-		},
+				value: key})),
+			onFilter: (value: any, record: Employee) => record.status === value},
 		{
 			title: 'Email',
 			dataIndex: 'email',
-			key: 'email',
-		},
+			key: 'email'},
 		{
 			title: 'Телефон',
 			dataIndex: 'phone',
-			key: 'phone',
-		},
+			key: 'phone'},
 		{
 			title: 'Дата приема',
 			dataIndex: 'hire_date',
 			key: 'hire_date',
 			render: (date: string) =>
-				date ? new Date(date).toLocaleDateString('ru-RU') : '-',
-		},
+				date ? new Date(date).toLocaleDateString('ru-RU') : '-'},
 		{
 			title: 'Действия',
 			key: 'actions',
@@ -518,8 +493,7 @@ export default function EmployeesPage() {
 						<Button type='link' danger icon={<DeleteOutlined />} />
 					</Popconfirm>
 				</Space>
-			),
-		},
+			)},
 	]
 
 	return (
@@ -530,8 +504,7 @@ export default function EmployeesPage() {
 						color:
 							mode === 'dark'
 								? 'rgba(255, 255, 255, 0.85)'
-								: 'rgba(0, 0, 0, 0.85)',
-					}}
+								: 'rgba(0, 0, 0, 0.85)'}}
 				>
 					<UserOutlined /> Управление сотрудниками
 				</h1>
@@ -556,8 +529,7 @@ export default function EmployeesPage() {
 							value={activeEmployees.length}
 							valueStyle={{
 								color: mode === 'dark' ? '#73d13d' : '#3f8600',
-								fontSize: '20px',
-							}}
+								fontSize: '20px'}}
 						/>
 					</Card>
 				</Col>
@@ -592,8 +564,7 @@ export default function EmployeesPage() {
 							suffix='₽'
 							valueStyle={{
 								color: mode === 'dark' ? '#73d13d' : '#3f8600',
-								fontSize: '20px',
-							}}
+								fontSize: '20px'}}
 						/>
 					</Card>
 				</Col>
@@ -606,8 +577,7 @@ export default function EmployeesPage() {
 							suffix='₽'
 							valueStyle={{
 								color: mode === 'dark' ? '#ff7875' : '#cf1322',
-								fontSize: '20px',
-							}}
+								fontSize: '20px'}}
 						/>
 					</Card>
 				</Col>
@@ -623,8 +593,7 @@ export default function EmployeesPage() {
 							suffix='₽'
 							valueStyle={{
 								color: mode === 'dark' ? '#ffa940' : '#d46b08',
-								fontSize: '20px',
-							}}
+								fontSize: '20px'}}
 						/>
 					</Card>
 				</Col>
@@ -634,8 +603,7 @@ export default function EmployeesPage() {
 						style={{
 							backgroundColor: mode === 'dark' ? '#2b2111' : '#fff7e6',
 							border:
-								mode === 'dark' ? '1px solid #fa8c16' : '1px solid #ffd591',
-						}}
+								mode === 'dark' ? '1px solid #fa8c16' : '1px solid #ffd591'}}
 					>
 						<Statistic
 							title={`Стоимость для компании (${currentYear})`}
@@ -645,8 +613,7 @@ export default function EmployeesPage() {
 							valueStyle={{
 								color: mode === 'dark' ? '#ffa940' : '#fa8c16',
 								fontWeight: 'bold',
-								fontSize: '20px',
-							}}
+								fontSize: '20px'}}
 						/>
 					</Card>
 				</Col>
@@ -658,8 +625,7 @@ export default function EmployeesPage() {
 					style={{
 						marginBottom: '16px',
 						width: '100%',
-						justifyContent: 'space-between',
-					}}
+						justifyContent: 'space-between'}}
 				>
 					<Space>
 						<Search
@@ -700,7 +666,7 @@ export default function EmployeesPage() {
 				</Space>
 
 				{/* Employees Table */}
-				<Table
+				<ResponsiveTable
 					columns={columns}
 					dataSource={employees}
 					rowKey='id'
@@ -708,9 +674,9 @@ export default function EmployeesPage() {
 					pagination={{
 						pageSize: 20,
 						showSizeChanger: true,
-						showTotal: total => `Всего сотрудников: ${total}`,
-					}}
+						showTotal: total => `Всего сотрудников: ${total}`}}
 					scroll={{ x: 1200 }}
+					mobileLayout="card"
 				/>
 			</Card>
 

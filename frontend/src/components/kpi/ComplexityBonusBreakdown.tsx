@@ -9,7 +9,6 @@ import { useState } from 'react'
 import {
   Modal,
   Descriptions,
-  Table,
   Space,
   Tag,
   Typography,
@@ -36,6 +35,7 @@ import type { ColumnsType } from 'antd/es/table'
 import * as complexityBonusApi from '@/api/complexityBonus'
 import type { ComplexityBonusBreakdown as ComplexityBreakdownType } from '@/api/complexityBonus'
 import { formatCurrency } from '@/utils/formatters'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Text, Title } = Typography
 
@@ -179,7 +179,7 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
         </Button>,
       ]}
       width={1000}
-      destroyOnClose
+      destroyOnHidden
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Employee and Period Info */}
@@ -249,7 +249,8 @@ export const ComplexityBonusBreakdown: React.FC<ComplexityBonusBreakdownProps> =
         {breakdown.completed_tasks_count > 0 ? (
           <div>
             <Title level={5}>Завершенные задачи</Title>
-            <Table<ComplexityBreakdownType['completed_tasks'][0]>
+            <ResponsiveTable<ComplexityBreakdownType['completed_tasks'][0]>
+              mobileLayout="card"
               rowKey="id"
               columns={taskColumns}
               dataSource={breakdown.completed_tasks}

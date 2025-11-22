@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from app.db import get_db
 from app.core.config import settings
 from app.utils.auth import get_current_active_user
 from app.db.models import User, UserRoleEnum
+from app.services.admin_settings_service import AdminSettingsService
 
 router = APIRouter()
 
@@ -65,30 +68,37 @@ def ensure_admin(current_user: User) -> None:
 
 
 @router.get("/config", response_model=AdminConfigResponse, tags=["Admin"])
-async def get_admin_config(current_user: User = Depends(get_current_active_user)) -> AdminConfigResponse:
+async def get_admin_config(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+) -> AdminConfigResponse:
     """
-    Возвращает чувствительные настройки для администраторов (только чтение).
+    Возвращает чувствительные настройки для администраторов из БД.
+    Настройки сохраняются между перезапусками.
     """
     ensure_admin(current_user)
 
+    # Get settings from DB (with .env fallback)
+    admin_settings = AdminSettingsService.get_or_create(db)
+
     return AdminConfigResponse(
-        app_name=settings.APP_NAME,
-        odata_url=settings.ODATA_1C_URL,
-        odata_username=settings.ODATA_1C_USERNAME,
-        odata_password=settings.ODATA_1C_PASSWORD,
-        odata_custom_auth_token=settings.ODATA_1C_CUSTOM_AUTH_TOKEN,
-        vsegpt_api_key=settings.VSEGPT_API_KEY,
-        vsegpt_base_url=settings.VSEGPT_BASE_URL,
-        vsegpt_model=settings.VSEGPT_MODEL,
-        credit_portfolio_ftp_host=settings.CREDIT_PORTFOLIO_FTP_HOST,
-        credit_portfolio_ftp_user=settings.CREDIT_PORTFOLIO_FTP_USER,
-        credit_portfolio_ftp_password=settings.CREDIT_PORTFOLIO_FTP_PASSWORD,
-        credit_portfolio_ftp_remote_dir=settings.CREDIT_PORTFOLIO_FTP_REMOTE_DIR,
-        credit_portfolio_ftp_local_dir=settings.CREDIT_PORTFOLIO_FTP_LOCAL_DIR,
-        scheduler_enabled=settings.SCHEDULER_ENABLED,
-        credit_portfolio_import_enabled=settings.CREDIT_PORTFOLIO_IMPORT_ENABLED,
-        credit_portfolio_import_hour=settings.CREDIT_PORTFOLIO_IMPORT_HOUR,
-        credit_portfolio_import_minute=settings.CREDIT_PORTFOLIO_IMPORT_MINUTE,
+        app_name=admin_settings.app_name or settings.APP_NAME,
+        odata_url=admin_settings.odata_url or settings.ODATA_1C_URL,
+        odata_username=admin_settings.odata_username or settings.ODATA_1C_USERNAME,
+        odata_password=admin_settings.odata_password or settings.ODATA_1C_PASSWORD,
+        odata_custom_auth_token=admin_settings.odata_custom_auth_token or settings.ODATA_1C_CUSTOM_AUTH_TOKEN,
+        vsegpt_api_key=admin_settings.vsegpt_api_key or settings.VSEGPT_API_KEY,
+        vsegpt_base_url=admin_settings.vsegpt_base_url or settings.VSEGPT_BASE_URL,
+        vsegpt_model=admin_settings.vsegpt_model or settings.VSEGPT_MODEL,
+        credit_portfolio_ftp_host=admin_settings.credit_portfolio_ftp_host or settings.CREDIT_PORTFOLIO_FTP_HOST,
+        credit_portfolio_ftp_user=admin_settings.credit_portfolio_ftp_user or settings.CREDIT_PORTFOLIO_FTP_USER,
+        credit_portfolio_ftp_password=admin_settings.credit_portfolio_ftp_password or settings.CREDIT_PORTFOLIO_FTP_PASSWORD,
+        credit_portfolio_ftp_remote_dir=admin_settings.credit_portfolio_ftp_remote_dir or settings.CREDIT_PORTFOLIO_FTP_REMOTE_DIR,
+        credit_portfolio_ftp_local_dir=admin_settings.credit_portfolio_ftp_local_dir or settings.CREDIT_PORTFOLIO_FTP_LOCAL_DIR,
+        scheduler_enabled=admin_settings.scheduler_enabled,
+        credit_portfolio_import_enabled=admin_settings.credit_portfolio_import_enabled,
+        credit_portfolio_import_hour=admin_settings.credit_portfolio_import_hour,
+        credit_portfolio_import_minute=admin_settings.credit_portfolio_import_minute,
     )
 
 
@@ -96,42 +106,18 @@ async def get_admin_config(current_user: User = Depends(get_current_active_user)
 async def update_admin_config(
     payload: AdminConfigUpdate,
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ) -> AdminConfigResponse:
     """
-    Обновляет чувствительные настройки для администраторов (только в памяти).
+    Обновляет чувствительные настройки для администраторов в БД.
 
-    Значения не сохраняются между рестартами приложения — это runtime override.
+    ✅ Значения сохраняются между перезапусками!
     """
     ensure_admin(current_user)
     updates = payload.model_dump(exclude_unset=True)
 
-    # Map API fields → settings attributes
-    mapping = {
-        "app_name": "APP_NAME",
-        "odata_url": "ODATA_1C_URL",
-        "odata_username": "ODATA_1C_USERNAME",
-        "odata_password": "ODATA_1C_PASSWORD",
-        "odata_custom_auth_token": "ODATA_1C_CUSTOM_AUTH_TOKEN",
-        "vsegpt_api_key": "VSEGPT_API_KEY",
-        "vsegpt_base_url": "VSEGPT_BASE_URL",
-        "vsegpt_model": "VSEGPT_MODEL",
-        "credit_portfolio_ftp_host": "CREDIT_PORTFOLIO_FTP_HOST",
-        "credit_portfolio_ftp_user": "CREDIT_PORTFOLIO_FTP_USER",
-        "credit_portfolio_ftp_password": "CREDIT_PORTFOLIO_FTP_PASSWORD",
-        "credit_portfolio_ftp_remote_dir": "CREDIT_PORTFOLIO_FTP_REMOTE_DIR",
-        "credit_portfolio_ftp_local_dir": "CREDIT_PORTFOLIO_FTP_LOCAL_DIR",
-        "scheduler_enabled": "SCHEDULER_ENABLED",
-        "credit_portfolio_import_enabled": "CREDIT_PORTFOLIO_IMPORT_ENABLED",
-        "credit_portfolio_import_hour": "CREDIT_PORTFOLIO_IMPORT_HOUR",
-        "credit_portfolio_import_minute": "CREDIT_PORTFOLIO_IMPORT_MINUTE",
-    }
-
-    for field, value in updates.items():
-        attr = mapping.get(field)
-        if attr is None:
-            continue
-        # Simple runtime override; not persisted across restarts
-        setattr(settings, attr, value)
+    # Save to database
+    AdminSettingsService.update(db, updates, current_user)
 
     # Return refreshed config snapshot
-    return await get_admin_config(current_user)
+    return await get_admin_config(current_user, db)

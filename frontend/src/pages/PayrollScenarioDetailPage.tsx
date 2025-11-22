@@ -12,9 +12,8 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
+import { Table, 
   Card,
-  Table,
   Typography,
   Statistic,
   Row,
@@ -30,8 +29,7 @@ import {
   Form,
   InputNumber,
   message,
-  Tabs,
-} from 'antd';
+  Tabs} from 'antd';
 import {
   ArrowLeftOutlined,
   UserOutlined,
@@ -42,13 +40,12 @@ import {
   CalculatorOutlined,
   ExperimentOutlined,
   TableOutlined,
-  BarChartOutlined,
-} from '@ant-design/icons';
+  BarChartOutlined} from '@ant-design/icons';
 import { payrollScenarioAPI, type PayrollScenarioWithDetails } from '@/api/payrollScenarios';
 import { taxRateAPI, type TaxRateListItem, type TaxType } from '@/api/taxRates';
-import { employeeAPI, type Employee } from '@/api/payroll';
 import { PayrollWhatIfAnalysis } from '../components/payroll/PayrollWhatIfAnalysis';
 import PayrollScenarioCharts from '../components/payroll/PayrollScenarioCharts';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 
 const { Title, Text } = Typography;
 
@@ -56,27 +53,23 @@ const SCENARIO_TYPE_LABELS: Record<string, string> = {
   BASE: 'Базовый',
   OPTIMISTIC: 'Оптимистичный',
   PESSIMISTIC: 'Пессимистичный',
-  CUSTOM: 'Пользовательский',
-};
+  CUSTOM: 'Пользовательский'};
 
 const SCENARIO_TYPE_COLORS: Record<string, string> = {
   BASE: 'blue',
   OPTIMISTIC: 'green',
   PESSIMISTIC: 'red',
-  CUSTOM: 'purple',
-};
+  CUSTOM: 'purple'};
 
 const DATA_SOURCE_LABELS: Record<string, string> = {
   EMPLOYEES: 'Сотрудники',
   PLAN: 'План ФОТ',
-  ACTUAL: 'Факт',
-};
+  ACTUAL: 'Факт'};
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
   EMPLOYEES: 'blue',
   PLAN: 'orange',
-  ACTUAL: 'green',
-};
+  ACTUAL: 'green'};
 
 const formatCurrency = (value?: number) => {
   if (value === undefined || value === null) return '—';
@@ -84,8 +77,7 @@ const formatCurrency = (value?: number) => {
     style: 'currency',
     currency: 'RUB',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+    maximumFractionDigits: 2}).format(value);
 };
 
 const formatPercent = (value?: number) => {
@@ -110,22 +102,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
   const { data: scenario, isLoading } = useQuery<PayrollScenarioWithDetails>({
     queryKey: ['payroll-scenario', id],
     queryFn: () => payrollScenarioAPI.get(Number(id)),
-    enabled: !!id,
-  });
-
-  // Получаем данные сотрудников для расчета годовой ЗП с учетом квартальных и годовых премий
-  const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ['employees', scenario?.department_id],
-    queryFn: () => employeeAPI.list({ department_id: scenario?.department_id }),
-    enabled: !!scenario?.department_id,
-  });
-
-  // Создаем Map для быстрого доступа к данным сотрудника по employee_id
-  const employeesMap = useMemo(() => {
-    const map = new Map<number, Employee>();
-    employees.forEach(emp => map.set(emp.id, emp));
-    return map;
-  }, [employees]);
+    enabled: !!id});
 
   // Получаем страховые взносы для целевого года из справочника tax-rates
   // Используем department_id из сценария, а не из контекста
@@ -149,13 +126,11 @@ export const PayrollScenarioDetailPage: React.FC = () => {
           type: r.tax_type, 
           dept: r.department_id,
           from: r.effective_from 
-        })),
-      });
+        }))});
       
       return allRates;
     },
-    enabled: !!scenario?.department_id,
-  });
+    enabled: !!scenario?.department_id});
 
   // Фильтруем ставки для целевого года (актуальные на 1 января или будущие в течение года)
   const insuranceRates = useMemo(() => {
@@ -324,8 +299,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
       message.error(errorMsg);
       console.error('Update scenario error:', error);
       console.error('Error details:', error?.response?.data);
-    },
-  });
+    }});
 
   const calculateMutation = useMutation({
     mutationFn: () => payrollScenarioAPI.calculate(Number(id)),
@@ -335,15 +309,13 @@ export const PayrollScenarioDetailPage: React.FC = () => {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось пересчитать сценарий');
-    },
-  });
+    }});
 
   const handleEditOpen = () => {
     if (scenario) {
       form.setFieldsValue({
         headcount_change_percent: scenario.headcount_change_percent || 0,
-        salary_change_percent: scenario.salary_change_percent || 0,
-      });
+        salary_change_percent: scenario.salary_change_percent || 0});
       setEditModalOpen(true);
     }
   };
@@ -393,8 +365,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         if (Math.abs(existing.rate - rateFraction) > 1e-6) {
           updates.push(
             taxRateAPI.update(existing.id, {
-              rate: rateFraction,
-            })
+              rate: rateFraction})
           );
         }
       } else {
@@ -405,8 +376,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             rate: rateFraction,
             effective_from: yearStart,
             department_id: departmentId,
-            is_active: true,
-          })
+            is_active: true})
         );
       }
     });
@@ -420,7 +390,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="Загрузка деталей сценария..." />
+        <Spin size="large" tip="Загрузка деталей сценария..."  />
       </div>
     );
   }
@@ -432,7 +402,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         description="Запрашиваемый сценарий не существует или был удален."
         type="error"
         showIcon
-      />
+       />
     );
   }
 
@@ -450,95 +420,93 @@ export const PayrollScenarioDetailPage: React.FC = () => {
           {record.is_new_hire && <Tag color="green" style={{ marginTop: 4 }}>Новый</Tag>}
           {record.is_terminated && <Tag color="red" style={{ marginTop: 4 }}>Увольнение</Tag>}
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Оклад (месяц)',
       dataIndex: 'base_salary',
       key: 'base_salary',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Премия (месяц)',
       dataIndex: 'monthly_bonus',
       key: 'monthly_bonus',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
+    {
+      title: 'Премия (квартал)',
+      dataIndex: 'quarterly_bonus',
+      key: 'quarterly_bonus',
+      width: 130,
+      align: 'right' as const,
+      render: (value: number) => formatCurrency(value || 0)},
+    {
+      title: 'Премия (год)',
+      dataIndex: 'annual_bonus',
+      key: 'annual_bonus',
+      width: 120,
+      align: 'right' as const,
+      render: (value: number) => formatCurrency(value || 0)},
     {
       title: 'Годовая ЗП',
       key: 'annual_salary',
-      width: 130,
+      width: 140,
       align: 'right' as const,
       render: (_: any, record: any) => {
-        // Рассчитываем годовую ЗП с учетом всех премий
-        const monthlyTotal = (record.base_salary + record.monthly_bonus) * 12;
-        
-        // Получаем данные сотрудника для квартальных и годовых премий
-        let quarterlyBonus = 0;
-        let annualBonus = 0;
-        
-        if (record.employee_id && employeesMap.has(record.employee_id)) {
-          const employee = employeesMap.get(record.employee_id)!;
-          quarterlyBonus = (employee.quarterly_bonus_base || 0) * 4;
-          annualBonus = employee.annual_bonus_base || 0;
-        }
-        
-        const annual = monthlyTotal + quarterlyBonus + annualBonus;
-        return <Text strong>{formatCurrency(annual)}</Text>;
-      },
-    },
+        // ИСПРАВЛЕНО: Учитываем все виды премий
+        const months_worked = record.is_terminated && record.termination_month
+          ? record.termination_month
+          : 12;
+        const monthly_total = (record.base_salary + record.monthly_bonus) * months_worked;
+        const quarterly_total = (record.quarterly_bonus || 0) * 4;
+        const annual_total = record.annual_bonus || 0;
+        const total = monthly_total + quarterly_total + annual_total;
+        return <Text strong>{formatCurrency(total)}</Text>;
+      }},
     {
       title: 'ПФР',
       dataIndex: 'pension_contribution',
       key: 'pension_contribution',
       width: 110,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'ФОМС',
       dataIndex: 'medical_contribution',
       key: 'medical_contribution',
       width: 110,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'ФСС',
       dataIndex: 'social_contribution',
       key: 'social_contribution',
       width: 110,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Травматизм',
       dataIndex: 'injury_contribution',
       key: 'injury_contribution',
       width: 110,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Всего взносы',
       dataIndex: 'total_insurance',
       key: 'total_insurance',
       width: 130,
       align: 'right' as const,
-      render: (value: number) => <Text strong style={{ color: '#1890ff' }}>{formatCurrency(value)}</Text>,
-    },
+      render: (value: number) => <Text strong style={{ color: '#1890ff' }}>{formatCurrency(value)}</Text>},
     {
       title: 'НДФЛ (13%)',
       dataIndex: 'income_tax',
       key: 'income_tax',
       width: 120,
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Общая стоимость',
       dataIndex: 'total_employee_cost',
@@ -550,8 +518,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         <Text strong style={{ color: '#52c41a', fontSize: 14 }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Изменение',
       dataIndex: 'cost_increase',
@@ -569,8 +536,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             <Text style={{ color }}>{formatCurrency(Math.abs(value))}</Text>
           </Space>
         );
-      },
-    },
+      }},
   ];
 
   return (
@@ -630,7 +596,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
           </Descriptions.Item>
         </Descriptions>
 
-        <Divider />
+        <Divider  />
 
         {/* Параметры сценария */}
         <Descriptions title="Параметры сценария" column={2} bordered size="small" style={{ marginBottom: 16 }}>
@@ -651,14 +617,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         {/* Страховые взносы */}
         {insuranceRates.length > 0 && (
           <>
-            <Divider />
+            <Divider  />
             <Alert
               message="Ставки страховых взносов берутся из справочника"
               description={`Ставки для ${scenario.target_year} года загружаются из справочника страховых взносов. Для изменения ставок используйте раздел управления ставками.`}
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-            />
+             />
             <Descriptions title={`Ставки страховых взносов (${scenario.target_year} год)`} column={2} bordered size="small" style={{ marginBottom: 16 }}>
               {(() => {
                 // Фильтруем дубликаты - оставляем только одну ставку для каждого типа
@@ -680,8 +646,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                   MEDICAL_INSURANCE: 'ФОМС',
                   SOCIAL_INSURANCE: 'ФСС',
                   INJURY_INSURANCE: 'Травматизм',
-                  INCOME_TAX: 'НДФЛ',
-                };
+                  INCOME_TAX: 'НДФЛ'};
                 
                 // Фильтруем только страховые взносы (без НДФЛ)
                 const insuranceTypes = ['PENSION_FUND', 'MEDICAL_INSURANCE', 'SOCIAL_INSURANCE', 'INJURY_INSURANCE'];
@@ -699,7 +664,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                           <>
                             <Tag>{baseRatePercent}%</Tag>
                             <Text>→</Text>
-                          </>
+</>
                         )}
                         <Tag color={change > 0 ? 'volcano' : change < 0 ? 'green' : 'default'}>
                           {ratePercent}%
@@ -715,22 +680,22 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 });
               })()}
             </Descriptions>
-          </>
+</>
         )}
         {insuranceRates.length === 0 && scenario.target_year && (
           <>
-            <Divider />
+            <Divider  />
             <Alert
               message="Ставки страховых взносов не найдены"
               description={`Ставки для ${scenario.target_year} года отсутствуют в справочнике. Будут использованы значения по умолчанию (ПФР: 22%, ФОМС: 5.1%, ФСС: 2.9%, Травматизм: 0.2%).`}
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
-            />
-          </>
+             />
+</>
         )}
 
-        <Divider />
+        <Divider  />
 
         {/* Key Statistics */}
         <Row gutter={[16, 16]}>
@@ -741,7 +706,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_headcount}
                 prefix={<UserOutlined />}
                 suffix="чел."
-              />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -751,7 +716,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_base_salary}
                 prefix={<DollarOutlined />}
                 formatter={(value) => formatCurrency(Number(value))}
-              />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -761,7 +726,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_insurance_cost}
                 formatter={(value) => formatCurrency(Number(value))}
                 valueStyle={{ color: '#1890ff' }}
-              />
+               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
@@ -771,7 +736,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                 value={scenario.total_payroll_cost}
                 formatter={(value) => formatCurrency(Number(value))}
                 valueStyle={{ color: '#52c41a' }}
-              />
+               />
             </Card>
           </Col>
         </Row>
@@ -779,7 +744,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
         {/* Comparison with Base Year */}
         {scenario.base_year_total_cost && (
           <>
-            <Divider />
+            <Divider  />
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={12}>
                 <Card>
@@ -787,7 +752,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     title={`Базовый год (${scenario.base_year})`}
                     value={scenario.base_year_total_cost}
                     formatter={(value) => formatCurrency(Number(value))}
-                  />
+                   />
                 </Card>
               </Col>
               <Col xs={24} sm={12}>
@@ -798,14 +763,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     formatter={(value) => formatCurrency(Number(value))}
                     valueStyle={{ color: (scenario.cost_difference || 0) >= 0 ? '#52c41a' : '#f5222d' }}
                     prefix={(scenario.cost_difference || 0) >= 0 ? <RiseOutlined /> : <FallOutlined />}
-                  />
+                   />
                   <div style={{ marginTop: 8 }}>
                     {formatPercent(scenario.cost_difference_percent)}
                   </div>
                 </Card>
               </Col>
             </Row>
-          </>
+</>
         )}
       </Card>
 
@@ -817,7 +782,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             key: 'employees',
             label: (
               <span>
-                <TableOutlined />
+                <TableOutlined  />
                 Детализация по сотрудникам
               </span>
             ),
@@ -830,7 +795,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                   </Space>
                 }
               >
-                <Table
+                <ResponsiveTable
                   columns={columns}
                   dataSource={scenario.scenario_details || []}
                   rowKey="id"
@@ -838,22 +803,17 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                   pagination={{
                     pageSize: 20,
                     showSizeChanger: true,
-                    showTotal: (total) => `Всего: ${total} записей`,
-                  }}
+                    showTotal: (total) => `Всего: ${total} записей`}}
                   summary={(data) => {
-                    // Рассчитываем итоговую годовую ЗП с учетом всех премий
+                    // ИСПРАВЛЕНО: Учитываем все виды премий
                     const totalSalary = data.reduce((sum, record) => {
-                      const monthlyTotal = (record.base_salary + record.monthly_bonus) * 12;
-                      let quarterlyBonus = 0;
-                      let annualBonus = 0;
-                      
-                      if (record.employee_id && employeesMap.has(record.employee_id)) {
-                        const employee = employeesMap.get(record.employee_id)!;
-                        quarterlyBonus = (employee.quarterly_bonus_base || 0) * 4;
-                        annualBonus = employee.annual_bonus_base || 0;
-                      }
-                      
-                      return sum + monthlyTotal + quarterlyBonus + annualBonus;
+                      const months_worked = record.is_terminated && record.termination_month
+                        ? record.termination_month
+                        : 12;
+                      const monthly_total = (record.base_salary + record.monthly_bonus) * months_worked;
+                      const quarterly_total = (record.quarterly_bonus || 0) * 4;
+                      const annual_total = record.annual_bonus || 0;
+                      return sum + monthly_total + quarterly_total + annual_total;
                     }, 0);
                     const totalPension = data.reduce((sum, record) => sum + (record.pension_contribution || 0), 0);
                     const totalMedical = data.reduce((sum, record) => sum + (record.medical_contribution || 0), 0);
@@ -893,15 +853,14 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                       </Table.Summary>
                     );
                   }}
-                />
+                 />
               </Card>
-            ),
-          },
+            )},
           {
             key: 'what-if',
             label: (
               <span>
-                <ExperimentOutlined />
+                <ExperimentOutlined  />
                 What-If Анализ
               </span>
             ),
@@ -929,8 +888,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
                     salary_change_percent: scenario.salary_change_percent || 0,
                     base_year_total_cost: scenario.base_year_total_cost,
                     base_year: scenario.base_year,
-                    scenario_details: scenario.scenario_details || [],
-                  }}
+                    scenario_details: scenario.scenario_details || []}}
                   insuranceRates={mappedRates}
                   onApplyChanges={async (params) => {
                     console.log('onApplyChanges called with params:', params);
@@ -964,36 +922,31 @@ export const PayrollScenarioDetailPage: React.FC = () => {
 
                     console.log('Overall change (relative to base year):', {
                       overallHeadcountChangePercent,
-                      overallSalaryChangePercent,
-                    });
+                      overallSalaryChangePercent});
 
                     console.log('Sending to API:', {
                       headcount_change_percent: overallHeadcountChangePercent,
-                      salary_change_percent: overallSalaryChangePercent,
-                    });
+                      salary_change_percent: overallSalaryChangePercent});
 
                     // Применяем изменения к сценарию
                     updateMutation.mutate({
                       headcount_change_percent: overallHeadcountChangePercent,
-                      salary_change_percent: overallSalaryChangePercent,
-                    });
+                      salary_change_percent: overallSalaryChangePercent});
                   }}
-              />
+               />
               );
-            })(),
-          },
+            })()},
           {
             key: 'charts',
             label: (
               <span>
-                <BarChartOutlined />
+                <BarChartOutlined  />
                 Графики и аналитика
               </span>
             ),
-            children: <PayrollScenarioCharts scenario={scenario} />,
-          },
+            children: <PayrollScenarioCharts scenario={scenario} />},
         ]}
-      />
+       />
 
       {/* Модальное окно редактирования параметров */}
       <Modal
@@ -1025,7 +978,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
               style={{ width: '100%' }}
               formatter={(value) => `${value}%`}
               parser={(value) => Number(value?.replace('%', '') || 0) as any}
-            />
+             />
           </Form.Item>
 
           <Form.Item
@@ -1044,7 +997,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
               style={{ width: '100%' }}
               formatter={(value) => `${value}%`}
               parser={(value) => Number(value?.replace('%', '') || 0) as any}
-            />
+             />
           </Form.Item>
 
           <Alert
@@ -1052,7 +1005,7 @@ export const PayrollScenarioDetailPage: React.FC = () => {
             type="info"
             showIcon
             style={{ marginTop: 16 }}
-          />
+           />
         </Form>
       </Modal>
     </div>

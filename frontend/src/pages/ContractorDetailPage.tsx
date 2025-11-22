@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Descriptions, Table, Tag, Spin, Statistic, Row, Col, Button, Space, Typography, Divider } from 'antd'
+import { Card, Descriptions, Tag, Spin, Statistic, Row, Col, Button, Space, Typography, Divider } from 'antd'
 import { ArrowLeftOutlined, DollarOutlined, FileTextOutlined, EditOutlined, TeamOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { contractorsApi, expensesApi } from '@/api'
 import { ExpenseStatus } from '@/types'
 import type { Expense } from '@/types'
@@ -20,15 +21,13 @@ const ContractorDetailPage = () => {
   const { data: contractor, isLoading: contractorLoading } = useQuery({
     queryKey: ['contractor', contractorId],
     queryFn: () => contractorsApi.getOne(contractorId),
-    enabled: !!contractorId,
-  })
+    enabled: !!contractorId})
 
   // Fetch expenses for this contractor
   const { data: expenses, isLoading: expensesLoading } = useQuery({
     queryKey: ['expenses', 'contractor', contractorId],
     queryFn: () => expensesApi.getAll({ contractor_id: contractorId, limit: 100 }),
-    enabled: !!contractorId,
-  })
+    enabled: !!contractorId})
 
   if (contractorLoading || expensesLoading) {
     return (
@@ -60,21 +59,18 @@ const ContractorDetailPage = () => {
         <Link to={`/expenses`} style={{ color: '#1890ff' }}>
           {number}
         </Link>
-      ),
-    },
+      )},
     {
       title: 'Дата',
       dataIndex: 'request_date',
       key: 'request_date',
       width: 120,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY'),
-    },
+      render: (date: string) => dayjs(date).format('DD.MM.YYYY')},
     {
       title: 'Категория',
       dataIndex: ['category', 'name'],
       key: 'category',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -85,9 +81,7 @@ const ContractorDetailPage = () => {
         new Intl.NumberFormat('ru-RU', {
           style: 'currency',
           currency: 'RUB',
-          minimumFractionDigits: 0,
-        }).format(amount),
-    },
+          minimumFractionDigits: 0}).format(amount)},
     {
       title: 'Статус',
       dataIndex: 'status',
@@ -97,20 +91,17 @@ const ContractorDetailPage = () => {
         <Tag color={getExpenseStatusColor(status)}>
           {getExpenseStatusLabel(status)}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Организация',
       dataIndex: ['organization', 'name'],
       key: 'organization',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Комментарий',
       dataIndex: 'comment',
       key: 'comment',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Действия',
       key: 'actions',
@@ -127,8 +118,7 @@ const ContractorDetailPage = () => {
         >
           Изменить
         </Button>
-      ),
-    },
+      )},
   ]
 
   const handleModalClose = () => {
@@ -213,8 +203,7 @@ const ContractorDetailPage = () => {
                 new Intl.NumberFormat('ru-RU', {
                   style: 'currency',
                   currency: 'RUB',
-                  minimumFractionDigits: 0,
-                }).format(value as number)
+                  minimumFractionDigits: 0}).format(value as number)
               }
             />
           </Card>
@@ -240,8 +229,7 @@ const ContractorDetailPage = () => {
                 new Intl.NumberFormat('ru-RU', {
                   style: 'currency',
                   currency: 'RUB',
-                  minimumFractionDigits: 0,
-                }).format(value as number)
+                  minimumFractionDigits: 0}).format(value as number)
               }
             />
           </Card>
@@ -249,12 +237,13 @@ const ContractorDetailPage = () => {
       </Row>
 
       <Card title="Заявки">
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={expenses?.items}
           rowKey="id"
           pagination={{ pageSize: 20, showSizeChanger: true }}
           scroll={{ x: 1000 }}
+          mobileLayout="card"
         />
       </Card>
 

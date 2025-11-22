@@ -55,6 +55,8 @@ export interface PayrollScenarioDetail {
   termination_month?: number;
   base_salary: number;
   monthly_bonus: number;
+  quarterly_bonus: number;
+  annual_bonus: number;
   pension_contribution?: number;
   medical_contribution?: number;
   social_contribution?: number;

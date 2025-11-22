@@ -140,6 +140,15 @@ class Settings(BaseSettings):
     ODATA_1C_PASSWORD: str = "ak228Hu2hbs28"
     ODATA_1C_CUSTOM_AUTH_TOKEN: str = "Basic 0KjQuNC60YPQvdC+0LLQlTohUUFaMndzeA=="
 
+    # 1C OData File Upload Configuration
+    ODATA_1C_ATTACHMENT_ENDPOINT: str = "Catalog_Файлы"
+    ODATA_1C_MAX_FILE_SIZE_MB: int = 6  # Максимальный размер файла в МБ
+
+    @property
+    def ODATA_1C_MAX_FILE_SIZE(self) -> int:
+        """Максимальный размер файла в байтах"""
+        return self.ODATA_1C_MAX_FILE_SIZE_MB * 1024 * 1024
+
     # Credit Portfolio FTP (для автоматического импорта из 1С)
     CREDIT_PORTFOLIO_FTP_HOST: str = "floppisw.beget.tech"
     CREDIT_PORTFOLIO_FTP_USER: str = "floppisw_fin"
@@ -152,6 +161,14 @@ class Settings(BaseSettings):
     CREDIT_PORTFOLIO_IMPORT_ENABLED: bool = True
     CREDIT_PORTFOLIO_IMPORT_HOUR: int = 6  # 0-23
     CREDIT_PORTFOLIO_IMPORT_MINUTE: int = 0  # 0-59
+
+    # Employee KPI Auto-Creation
+    EMPLOYEE_KPI_AUTO_CREATE_ENABLED: bool = True  # Auto-create EmployeeKPI records monthly
+
+    # Module Expiry Check
+    MODULE_EXPIRY_CHECK_ENABLED: bool = True  # Check and deactivate expired modules
+    MODULE_EXPIRY_CHECK_HOUR: int = 1  # Hour to run expiry check (0-23)
+    MODULE_EXPIRY_CHECK_MINUTE: int = 0  # Minute to run expiry check (0-59)
 
     # ============================================================================
     # RATE LIMITING

@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from 'react'
 import {
   Card,
   Button,
-  Table,
   Tag,
   Space,
   Modal,
@@ -12,20 +11,19 @@ import {
   Select,
   message,
   Alert,
-  Tooltip,
-} from 'antd'
+  Tooltip} from 'antd'
 import { CalculatorOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { kpiApi } from '@/api/kpi'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type {
   EmployeeKPIGoal,
   EmployeeKPIGoalCreate,
   EmployeeKPIGoalUpdate,
   KPIGoal,
-  KPIGoalStatus,
-} from '@/api/kpi'
+  KPIGoalStatus} from '@/api/kpi'
 import { employeeAPI } from '@/api/payroll'
 import type { Employee } from '@/api/payroll'
 
@@ -38,8 +36,7 @@ const statusColor: Record<KPIGoalStatus, string> = {
   ACTIVE: 'processing',
   ACHIEVED: 'success',
   NOT_ACHIEVED: 'error',
-  CANCELLED: 'warning',
-}
+  CANCELLED: 'warning'}
 
 const monthLabel = (month: number | null | undefined) =>
   typeof month === 'number' ? dayjs().month(month - 1).format('MMMM') : 'Годовая'
@@ -67,20 +64,16 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
     queryKey: ['kpi-assignments', departmentId, currentYear],
     queryFn: () =>
       kpiApi.listAssignments({
-        year: currentYear,
-      }),
-    enabled: !!departmentId,
-  })
+        year: currentYear}),
+    enabled: !!departmentId})
 
   const goalsQuery = useQuery({
     queryKey: ['kpi-goals', currentYear, departmentId],
     queryFn: () =>
       kpiApi.listGoals({
         year: currentYear,
-        department_id: departmentId,
-      }),
-    enabled: !!departmentId,
-  })
+        department_id: departmentId}),
+    enabled: !!departmentId})
 
   const employeesQuery = useQuery({
     queryKey: ['department-employees', departmentId],
@@ -88,27 +81,22 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
       employeeAPI.list({
         department_id: departmentId,
         status: 'ACTIVE',
-        limit: 500,
-      }),
-    enabled: !!departmentId,
-  })
+        limit: 500}),
+    enabled: !!departmentId})
 
   const employeeKpiQuery = useQuery({
     queryKey: ['kpi-employee', departmentId, currentYear],
     queryFn: () =>
       kpiApi.listEmployeeKpis({
         department_id: departmentId,
-        year: currentYear,
-      }),
-    enabled: !!departmentId,
-  })
+        year: currentYear}),
+    enabled: !!departmentId})
 
   // Mutations
   const upsertAssignmentMutation = useMutation({
     mutationFn: async ({
       id,
-      payload,
-    }: {
+      payload}: {
       id?: number
       payload: EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate
     }) => {
@@ -141,8 +129,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
       queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
       queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
       queryClient.invalidateQueries({ queryKey: ['kpi-employee'] })
-    },
-  })
+    }})
 
   const deleteAssignmentMutation = useMutation({
     mutationFn: (id: number) => kpiApi.deleteAssignment(id),
@@ -150,8 +137,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
       message.success('Назначение KPI удалено')
       queryClient.invalidateQueries({ queryKey: ['kpi-assignments'] })
       queryClient.invalidateQueries({ queryKey: ['kpi-summary'] })
-    },
-  })
+    }})
 
   const assignments = assignmentsQuery.data || []
   const goals = goalsQuery.data || []
@@ -238,8 +224,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
             ? Number(assignment.achievement_percentage)
             : undefined,
         status: assignment.status,
-        notes: assignment.notes,
-      })
+        notes: assignment.notes})
 
       // Calculate and check for manual override
       setTimeout(() => {
@@ -257,8 +242,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
     } else {
       assignmentForm.setFieldsValue({
         year: currentYear,
-        status: 'ACTIVE',
-      })
+        status: 'ACTIVE'})
     }
   }
 
@@ -269,13 +253,11 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
       target_value: values.target_value ?? null,
       actual_value: values.actual_value ?? null,
       achievement_percentage: values.achievement_percentage ?? null,
-      month: values.month ?? null,
-    } as EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate
+      month: values.month ?? null} as EmployeeKPIGoalCreate | EmployeeKPIGoalUpdate
 
     await upsertAssignmentMutation.mutateAsync({
       id: assignmentModal.editing?.id,
-      payload,
-    })
+      payload})
 
     setAssignmentModal({ open: false })
     assignmentForm.resetFields()
@@ -287,34 +269,29 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
       dataIndex: 'employee_id',
       key: 'employee',
       render: (_, record) =>
-        employeeMap.get(record.employee_id)?.full_name || `ID ${record.employee_id}`,
-    },
+        employeeMap.get(record.employee_id)?.full_name || `ID ${record.employee_id}`},
     {
       title: 'Цель',
       dataIndex: 'goal_id',
       key: 'goal',
       render: (_, record) =>
-        record.goal?.name || goalMap.get(record.goal_id)?.name || `Цель #${record.goal_id}`,
-    },
+        record.goal?.name || goalMap.get(record.goal_id)?.name || `Цель #${record.goal_id}`},
     {
       title: 'Период',
       dataIndex: 'month',
       key: 'month',
-      render: (value, record) => `${monthLabel(value)} ${record.year}`,
-    },
+      render: (value, record) => `${monthLabel(value)} ${record.year}`},
     {
       title: 'Прогресс',
       dataIndex: 'achievement_percentage',
       key: 'achievement',
       render: (value) =>
-        value !== null && value !== undefined ? `${Number(value).toFixed(1)} %` : '—',
-    },
+        value !== null && value !== undefined ? `${Number(value).toFixed(1)} %` : '—'},
     {
       title: 'Статус',
       dataIndex: 'status',
       key: 'status',
-      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>,
-    },
+      render: (value: KPIGoalStatus) => <Tag color={statusColor[value]}>{value}</Tag>},
     {
       title: 'Действия',
       key: 'actions',
@@ -330,15 +307,13 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
             onClick={() =>
               Modal.confirm({
                 title: 'Удалить назначение цели?',
-                onOk: () => deleteAssignmentMutation.mutate(record.id),
-              })
+                onOk: () => deleteAssignmentMutation.mutate(record.id)})
             }
           >
             Удалить
           </Button>
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -351,7 +326,8 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
           </Button>
         }
       >
-        <Table<EmployeeKPIGoal>
+        <ResponsiveTable<EmployeeKPIGoal>
+          mobileLayout="card"
           rowKey="id"
           columns={assignmentColumns}
           dataSource={filteredAssignments}
@@ -367,7 +343,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
         onCancel={() => setAssignmentModal({ open: false })}
         onOk={handleAssignmentSubmit}
         confirmLoading={upsertAssignmentMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
         width={600}
       >
         <Form form={assignmentForm} layout="vertical">
@@ -503,8 +479,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
                   icon={<CalculatorOutlined />}
                   onClick={() => {
                     assignmentForm.setFieldsValue({
-                      achievement_percentage: calculatedAchievement,
-                    })
+                      achievement_percentage: calculatedAchievement})
                     setIsManualOverride(false)
                   }}
                 >
@@ -557,8 +532,7 @@ export const KpiAssignmentsTab: React.FC<KpiAssignmentsTabProps> = ({ department
                 ? [
                     {
                       required: true,
-                      message: 'При ручной корректировке необходимо указать обоснование',
-                    },
+                      message: 'При ручной корректировке необходимо указать обоснование'},
                   ]
                 : undefined
             }

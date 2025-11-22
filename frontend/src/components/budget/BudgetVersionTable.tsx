@@ -3,7 +3,8 @@
  * Displays budget versions with status and actions
  */
 import React, { Key } from 'react'
-import { Table, Tag, Button, Space, Popconfirm, Tooltip } from 'antd'
+import { Tag, Button, Space, Popconfirm, Tooltip } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import type { ColumnsType } from 'antd/es/table'
 import {
   EditOutlined,
@@ -14,8 +15,7 @@ import {
   CheckCircleOutlined,
   CheckOutlined,
   UploadOutlined,
-  UndoOutlined,
-} from '@ant-design/icons'
+  UndoOutlined} from '@ant-design/icons'
 import { BudgetVersionStatus } from '@/types/budgetPlanning'
 import type { BudgetVersion } from '@/types/budgetPlanning'
 import { useAuth } from '@/contexts/AuthContext'
@@ -43,8 +43,7 @@ const statusColors: Record<BudgetVersionStatus, string> = {
   [BudgetVersionStatus.REVISION_REQUESTED]: 'warning',
   [BudgetVersionStatus.APPROVED]: 'success',
   [BudgetVersionStatus.REJECTED]: 'error',
-  [BudgetVersionStatus.ARCHIVED]: 'default',
-}
+  [BudgetVersionStatus.ARCHIVED]: 'default'}
 
 const statusLabels: Record<BudgetVersionStatus, string> = {
   [BudgetVersionStatus.DRAFT]: 'Черновик',
@@ -52,8 +51,7 @@ const statusLabels: Record<BudgetVersionStatus, string> = {
   [BudgetVersionStatus.REVISION_REQUESTED]: 'Требуется доработка',
   [BudgetVersionStatus.APPROVED]: 'Утверждена',
   [BudgetVersionStatus.REJECTED]: 'Отклонена',
-  [BudgetVersionStatus.ARCHIVED]: 'Архив',
-}
+  [BudgetVersionStatus.ARCHIVED]: 'Архив'}
 
 export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   versions,
@@ -68,8 +66,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
   onImport,
   onApplyToPlan,
   selectedRowKeys,
-  onSelectionChange,
-}) => {
+  onSelectionChange}) => {
   const { user } = useAuth()
   const canApprove = user?.role === 'ADMIN' || user?.role === 'MANAGER'
   const columns: ColumnsType<BudgetVersion> = [
@@ -78,21 +75,18 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
       dataIndex: 'year',
       key: 'year',
       width: 80,
-      sorter: (a, b) => a.year - b.year,
-    },
+      sorter: (a, b) => a.year - b.year},
     {
       title: 'Версия',
       dataIndex: 'version_number',
       key: 'version_number',
       width: 80,
-      render: (num) => `v${num}`,
-    },
+      render: (num) => `v${num}`},
     {
       title: 'Название',
       dataIndex: 'version_name',
       key: 'version_name',
-      render: (name) => name || '-',
-    },
+      render: (name) => name || '-'},
     {
       title: 'Статус',
       dataIndex: 'status',
@@ -102,8 +96,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
         <Tag color={statusColors[status]}>{statusLabels[status]}</Tag>
       ),
       filters: Object.entries(statusLabels).map(([value, text]) => ({ text, value })),
-      onFilter: (value, record) => record.status === value,
-    },
+      onFilter: (value, record) => record.status === value},
     {
       title: 'Сумма',
       dataIndex: 'total_amount',
@@ -111,39 +104,34 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
       width: 150,
       align: 'right',
       render: (amount) => `${Number(amount).toLocaleString('ru-RU')} ₽`,
-      sorter: (a, b) => Number(a.total_amount) - Number(b.total_amount),
-    },
+      sorter: (a, b) => Number(a.total_amount) - Number(b.total_amount)},
     {
       title: 'CAPEX',
       dataIndex: 'total_capex',
       key: 'total_capex',
       width: 130,
       align: 'right',
-      render: (amount) => `${Number(amount).toLocaleString('ru-RU')} ₽`,
-    },
+      render: (amount) => `${Number(amount).toLocaleString('ru-RU')} ₽`},
     {
       title: 'OPEX',
       dataIndex: 'total_opex',
       key: 'total_opex',
       width: 130,
       align: 'right',
-      render: (amount) => `${Number(amount).toLocaleString('ru-RU')} ₽`,
-    },
+      render: (amount) => `${Number(amount).toLocaleString('ru-RU')} ₽`},
     {
       title: 'Создана',
       dataIndex: 'created_at',
       key: 'created_at',
       width: 120,
       render: (date) => dayjs(date).format('DD.MM.YYYY'),
-      sorter: (a, b) => dayjs(a.created_at).unix() - dayjs(b.created_at).unix(),
-    },
+      sorter: (a, b) => dayjs(a.created_at).unix() - dayjs(b.created_at).unix()},
     {
       title: 'Автор',
       dataIndex: 'created_by',
       key: 'created_by',
       width: 120,
-      render: (author) => author || '-',
-    },
+      render: (author) => author || '-'},
     {
       title: 'Действия',
       key: 'actions',
@@ -257,8 +245,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
             </Tooltip>
           )}
         </Space>
-      ),
-    },
+      )},
   ]
 
   const rowSelection = onSelectionChange
@@ -268,13 +255,11 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
         type: 'checkbox' as const,
         getCheckboxProps: () => ({
           // Можно ограничить выбор только двумя версиями
-          disabled: (selectedRowKeys?.length || 0) >= 2 && !(selectedRowKeys || []).includes,
-        }),
-      }
+          disabled: (selectedRowKeys?.length || 0) >= 2 && !(selectedRowKeys || []).includes})}
     : undefined
 
   return (
-    <Table
+    <ResponsiveTable
       columns={columns}
       dataSource={versions}
       rowKey="id"
@@ -284,8 +269,7 @@ export const BudgetVersionTable: React.FC<BudgetVersionTableProps> = ({
       pagination={{
         pageSize: 10,
         showSizeChanger: true,
-        showTotal: (total) => `Всего: ${total}`,
-      }}
+        showTotal: (total) => `Всего: ${total}`}}
     />
   )
 }

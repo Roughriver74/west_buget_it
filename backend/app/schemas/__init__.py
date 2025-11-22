@@ -258,6 +258,36 @@ from .payroll_scenario import (
     ScenarioCalculationResponse,
     InsuranceImpactAnalysis,
 )
+from .timesheet import (
+    # WorkTimesheet
+    WorkTimesheetCreate,
+    WorkTimesheetUpdate,
+    WorkTimesheetApprove,
+    WorkTimesheetInDB,
+    WorkTimesheetWithEmployee,
+    WorkTimesheetWithRecords,
+    # DailyWorkRecord
+    DailyWorkRecordCreate,
+    DailyWorkRecordUpdate,
+    DailyWorkRecordInDB,
+    DailyWorkRecordBulkCreate,
+    DailyWorkRecordBulkUpdate,
+    # Grid/Calendar
+    TimesheetGridDay,
+    TimesheetGridEmployee,
+    TimesheetGrid,
+    # Analytics
+    TimesheetSummary,
+    EmployeeTimesheetStats,
+    DepartmentTimesheetStats,
+    TimesheetMonthlyComparison,
+    # Excel
+    TimesheetExcelRow,
+    TimesheetExcelImport,
+    TimesheetExcelImportResult,
+    # Payroll Integration
+    TimesheetPayrollData,
+)
 
 # Rebuild models to resolve forward references
 ExpenseInDB.model_rebuild()
@@ -267,6 +297,7 @@ EmployeeKPIWithGoals.model_rebuild()
 EmployeeKPIGoalWithDetails.model_rebuild()
 RevenueStreamTree.model_rebuild()
 RevenueCategoryTree.model_rebuild()
+WorkTimesheetWithRecords.model_rebuild()
 
 __all__ = [
     # Expense
@@ -518,4 +549,32 @@ __all__ = [
     "ScenarioCalculationRequest",
     "ScenarioCalculationResponse",
     "InsuranceImpactAnalysis",
+    # Timesheet - WorkTimesheet
+    "WorkTimesheetCreate",
+    "WorkTimesheetUpdate",
+    "WorkTimesheetApprove",
+    "WorkTimesheetInDB",
+    "WorkTimesheetWithEmployee",
+    "WorkTimesheetWithRecords",
+    # Timesheet - DailyWorkRecord
+    "DailyWorkRecordCreate",
+    "DailyWorkRecordUpdate",
+    "DailyWorkRecordInDB",
+    "DailyWorkRecordBulkCreate",
+    "DailyWorkRecordBulkUpdate",
+    # Timesheet - Grid/Calendar
+    "TimesheetGridDay",
+    "TimesheetGridEmployee",
+    "TimesheetGrid",
+    # Timesheet - Analytics
+    "TimesheetSummary",
+    "EmployeeTimesheetStats",
+    "DepartmentTimesheetStats",
+    "TimesheetMonthlyComparison",
+    # Timesheet - Excel
+    "TimesheetExcelRow",
+    "TimesheetExcelImport",
+    "TimesheetExcelImportResult",
+    # Timesheet - Payroll Integration
+    "TimesheetPayrollData",
 ]

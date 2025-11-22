@@ -7,7 +7,7 @@ export default function CreditPortfolioPage() {
 
 	return (
 		<div className='space-y-6 p-4 md:p-6'>
-			<div className='bg-white rounded-2xl shadow-sm border border-gray-100'>
+			<div className='bg-card dark:bg-slate-800/50 rounded-2xl shadow-sm border border-border'>
 				<Filters />
 			</div>
 

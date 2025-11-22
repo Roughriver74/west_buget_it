@@ -16,11 +16,9 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   Typography,
-  message,
-} from 'antd';
+  message} from 'antd';
 
 const { Text } = Typography;
 import {
@@ -32,17 +30,16 @@ import {
   RiseOutlined,
   FallOutlined,
   EditOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons';
+  DeleteOutlined} from '@ant-design/icons';
 
 import { useDepartment } from '../contexts/DepartmentContext';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import {
   payrollAnalysisAPI,
   payrollScenarioAPI,
   ImpactAnalysis,
   PayrollScenario,
-  ScenarioType,
-} from '../api/payrollScenarios';
+  ScenarioType} from '../api/payrollScenarios';
 import { taxRateAPI, type TaxRateListItem } from '../api/taxRates';
 import { useMemo } from 'react';
 
@@ -50,27 +47,23 @@ const SCENARIO_TYPE_LABELS: Record<ScenarioType, string> = {
   BASE: 'Базовый',
   OPTIMISTIC: 'Оптимистичный',
   PESSIMISTIC: 'Пессимистичный',
-  CUSTOM: 'Кастомный',
-};
+  CUSTOM: 'Кастомный'};
 
 const SCENARIO_TYPE_COLORS: Record<ScenarioType, string> = {
   BASE: 'blue',
   OPTIMISTIC: 'green',
   PESSIMISTIC: 'volcano',
-  CUSTOM: 'purple',
-};
+  CUSTOM: 'purple'};
 
 const DATA_SOURCE_LABELS: Record<string, string> = {
   EMPLOYEES: 'Сотрудники',
   PLAN: 'План ФОТ',
-  ACTUAL: 'Факт',
-};
+  ACTUAL: 'Факт'};
 
 const DATA_SOURCE_COLORS: Record<string, string> = {
   EMPLOYEES: 'blue',
   PLAN: 'orange',
-  ACTUAL: 'green',
-};
+  ACTUAL: 'green'};
 
 export default function PayrollScenariosPage() {
   const { selectedDepartment } = useDepartment();
@@ -94,23 +87,19 @@ export default function PayrollScenariosPage() {
       payrollAnalysisAPI.getImpactAnalysis({
         base_year: baseYear,
         target_year: targetYear,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment && !!baseYear && !!targetYear,
-  });
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment && !!baseYear && !!targetYear});
 
   // Fetch scenarios
   const { data: scenarios = [], isLoading: scenariosLoading } = useQuery({
     queryKey: ['payroll-scenarios', selectedDepartment?.id],
     queryFn: async () => {
       const result = await payrollScenarioAPI.list({
-        department_id: selectedDepartment?.id,
-      });
+        department_id: selectedDepartment?.id});
       console.log('Scenarios API response:', result);
       return result;
     },
-    enabled: !!selectedDepartment,
-  });
+    enabled: !!selectedDepartment});
 
   // Получаем все активные ставки для отображения
   const { data: allTaxRates = [] } = useQuery<TaxRateListItem[]>({
@@ -119,12 +108,10 @@ export default function PayrollScenariosPage() {
       // Запрашиваем ВСЕ активные ставки (без фильтра по department_id)
       const allRates = await taxRateAPI.list({ 
         is_active: true,
-        limit: 500,
-      });
+        limit: 500});
       return allRates;
     },
-    enabled: !!selectedDepartment,
-  });
+    enabled: !!selectedDepartment});
 
   // Функция для получения ставок для конкретного года и департамента
   const getRatesForScenario = useMemo(() => {
@@ -208,8 +195,7 @@ export default function PayrollScenariosPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось создать сценарий');
-    },
-  });
+    }});
 
   const calculateMutation = useMutation({
     mutationFn: (id: number) => payrollScenarioAPI.calculate(id),
@@ -219,8 +205,7 @@ export default function PayrollScenariosPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось рассчитать');
-    },
-  });
+    }});
 
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: number; values: any }) => payrollScenarioAPI.update(id, values),
@@ -243,8 +228,7 @@ export default function PayrollScenariosPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось обновить параметры');
-    },
-  });
+    }});
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => payrollScenarioAPI.delete(id),
@@ -254,8 +238,7 @@ export default function PayrollScenariosPage() {
     },
     onError: (error: any) => {
       message.error(error?.response?.data?.detail || 'Не удалось удалить сценарий');
-    },
-  });
+    }});
 
   const handleDelete = (scenario: PayrollScenario) => {
     Modal.confirm({
@@ -264,8 +247,7 @@ export default function PayrollScenariosPage() {
       okText: 'Удалить',
       okType: 'danger',
       cancelText: 'Отмена',
-      onOk: () => deleteMutation.mutate(scenario.id),
-    });
+      onOk: () => deleteMutation.mutate(scenario.id)});
   };
 
   const handleModalOpen = () => {
@@ -277,8 +259,7 @@ export default function PayrollScenariosPage() {
       base_year: baseYear,
       target_year: targetYear,
       headcount_change_percent: 0,
-      salary_change_percent: 0,
-    });
+      salary_change_percent: 0});
   };
 
   const handleModalClose = () => {
@@ -289,16 +270,14 @@ export default function PayrollScenariosPage() {
   const handleSubmit = (values: any) => {
     createMutation.mutate({
       ...values,
-      department_id: selectedDepartment?.id,
-    });
+      department_id: selectedDepartment?.id});
   };
 
   const handleEditOpen = (scenario: PayrollScenario) => {
     setEditingScenario(scenario);
     editForm.setFieldsValue({
       headcount_change_percent: scenario.headcount_change_percent || 0,
-      salary_change_percent: scenario.salary_change_percent || 0,
-    });
+      salary_change_percent: scenario.salary_change_percent || 0});
     setEditModalOpen(true);
   };
 
@@ -335,16 +314,14 @@ export default function PayrollScenariosPage() {
     {
       title: 'Название',
       dataIndex: 'name',
-      key: 'name',
-    },
+      key: 'name'},
     {
       title: 'Тип',
       dataIndex: 'scenario_type',
       key: 'scenario_type',
       render: (type: ScenarioType) => (
         <Tag color={SCENARIO_TYPE_COLORS[type]}>{SCENARIO_TYPE_LABELS[type]}</Tag>
-      ),
-    },
+      )},
     {
       title: 'Данные',
       dataIndex: 'data_source',
@@ -353,25 +330,21 @@ export default function PayrollScenariosPage() {
         <Tag color={DATA_SOURCE_COLORS[source || 'EMPLOYEES']}>
           {DATA_SOURCE_LABELS[source || 'EMPLOYEES']}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Год',
       dataIndex: 'target_year',
-      key: 'target_year',
-    },
+      key: 'target_year'},
     {
       title: 'Численность',
       dataIndex: 'total_headcount',
       key: 'total_headcount',
-      render: (value?: number) => value || '—',
-    },
+      render: (value?: number) => value || '—'},
     {
       title: 'Общий ФОТ',
       dataIndex: 'total_payroll_cost',
       key: 'total_payroll_cost',
-      render: formatCurrency,
-    },
+      render: formatCurrency},
     {
       title: 'Изменение',
       dataIndex: 'cost_difference_percent',
@@ -383,8 +356,7 @@ export default function PayrollScenariosPage() {
           </Tag>
         ) : (
           '—'
-        ),
-    },
+        )},
     {
       title: 'Параметры',
       key: 'parameters',
@@ -404,8 +376,7 @@ export default function PayrollScenariosPage() {
             </Text>
           </Text>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Ставки страховых взносов',
       key: 'insurance_rates',
@@ -424,8 +395,7 @@ export default function PayrollScenariosPage() {
           PENSION_FUND: 'ПФР',
           MEDICAL_INSURANCE: 'ФОМС',
           SOCIAL_INSURANCE: 'ФСС',
-          INJURY_INSURANCE: 'Травматизм',
-        };
+          INJURY_INSURANCE: 'Травматизм'};
         
         return (
           <Space direction="vertical" size={2} style={{ fontSize: 11 }}>
@@ -436,8 +406,7 @@ export default function PayrollScenariosPage() {
             ))}
           </Space>
         );
-      },
-    },
+      }},
     {
       title: 'Действия',
       key: 'actions',
@@ -480,8 +449,7 @@ export default function PayrollScenariosPage() {
             Удалить
           </Button>
         </Space>
-      ),
-    },
+      )},
   ];
 
   return (
@@ -680,12 +648,13 @@ export default function PayrollScenariosPage() {
         }
         style={{ marginBottom: '24px' }}
       >
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={scenarios}
           rowKey="id"
           loading={scenariosLoading}
           pagination={{ pageSize: 10 }}
+          mobileLayout="card"
         />
       </Card>
 

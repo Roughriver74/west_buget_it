@@ -89,7 +89,8 @@ class OData1CClient:
             encoded_endpoint = quote(endpoint, safe='/:?=.$&_')
             # Формируем полный путь: base_path + endpoint + query params
             # Например: /trade/odata/standard.odata/Document_ЗаявкаНаРасходованиеДенежныхСредств?$format=json
-            full_endpoint = f"{parsed.path}/{encoded_endpoint}?$format=json"
+            # FIX: Не дублируем parsed.path если он уже есть в base_url
+            full_endpoint = f"{parsed.path.rstrip('/')}/{encoded_endpoint.lstrip('/')}?$format=json"
 
             # Создаем connection
             conn = http.client.HTTPConnection(parsed.netloc, timeout=timeout)
@@ -130,7 +131,8 @@ class OData1CClient:
                 if http_response.status >= 400:
                     error_text = response_data.decode('utf-8')
                     logger.error(f"HTTP error: {http_response.status} {http_response.reason}")
-                    logger.error(f"URL: {self.base_url}/{full_endpoint}")
+                    # FIX: Правильно формируем URL для логирования
+                    logger.error(f"URL: {parsed.scheme}://{parsed.netloc}{full_endpoint}")
                     logger.error(f"Response: {error_text}")
                     raise requests.exceptions.HTTPError(
                         f"{http_response.status} {http_response.reason}",
@@ -786,6 +788,74 @@ class OData1CClient:
             logger.error(f"Failed to search counterparty by INN {inn}: {e}")
             return None
 
+    def get_bank_account_by_number_and_owner(
+        self,
+        account_number: str,
+        owner_guid: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получить банковский счет контрагента по номеру счета и владельцу
+
+        Args:
+            account_number: Номер банковского счета (20 цифр)
+            owner_guid: GUID владельца счета (контрагента)
+
+        Returns:
+            Данные банковского счета или None если не найден
+        """
+        if not account_number or not owner_guid:
+            return None
+
+        try:
+            # Очистить номер счета от пробелов
+            clean_account = account_number.strip().replace(' ', '')
+
+            # OData $filter по номеру счета
+            # Сначала ищем по номеру счета
+            filter_str = f"НомерСчета eq '{clean_account}'"
+            endpoint_with_params = f"Catalog_БанковскиеСчетаКонтрагентов?$top=10&$format=json&$filter={filter_str}"
+
+            logger.debug(f"Searching bank account by number: {clean_account} for owner: {owner_guid}")
+            logger.debug(f"Request URL: {self.base_url}/{endpoint_with_params}")
+
+            response = self._make_request(
+                method='GET',
+                endpoint=endpoint_with_params,
+                params=None
+            )
+
+            logger.debug(f"Bank account search response: {response}")
+
+            results = response.get('value', [])
+
+            # Фильтруем результаты по владельцу (на клиенте, т.к. фильтр по Owner может не работать)
+            matching_accounts = []
+            for account in results:
+                # Owner может быть строкой или словарем
+                owner_ref = account.get('Owner_Key')
+                if not owner_ref:
+                    owner = account.get('Owner', '')
+                    if isinstance(owner, dict):
+                        owner_ref = owner.get('Ref_Key', '')
+                    else:
+                        owner_ref = owner  # Строка
+
+                if owner_ref == owner_guid:
+                    matching_accounts.append(account)
+
+            if matching_accounts:
+                # Возвращаем первый найденный счет
+                account = matching_accounts[0]
+                logger.info(f"Found bank account: {account.get('Description')} (Ref_Key: {account.get('Ref_Key')})")
+                return account
+            else:
+                logger.warning(f"Bank account {clean_account} not found for owner {owner_guid}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to search bank account {account_number} for owner {owner_guid}: {e}")
+            return None
+
     def get_organization_by_inn(self, inn: str) -> Optional[Dict[str, Any]]:
         """
         Получить организацию по ИНН
@@ -877,7 +947,7 @@ class OData1CClient:
             logger.error(f"Failed to create expense request in 1C: {e}")
             raise
 
-    def upload_attachment_base64(
+    def upload_attachment_to_expense_request(
         self,
         file_content: bytes,
         filename: str,
@@ -885,13 +955,99 @@ class OData1CClient:
         file_extension: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Загрузить файл в 1С через Base64 encoding
+        Загрузить файл к заявке на расход в 1С
+
+        Использует endpoint: Catalog_ЗаявкаНаРасходованиеДенежныхСредствПрисоединенныеФайлы
+
+        Args:
+            file_content: Содержимое файла (bytes)
+            filename: Имя файла (с расширением)
+            owner_guid: GUID заявки на расход (ВладелецФайла_Key)
+            file_extension: Расширение файла (без точки), например "pdf" или "png"
+
+        Returns:
+            Созданное вложение или None при ошибке
+        """
+        if not file_content:
+            logger.warning("File content is empty, skipping upload")
+            return None
+
+        # Определить расширение если не указано
+        if not file_extension and '.' in filename:
+            file_extension = filename.split('.')[-1].lower()
+
+        # Кодирование в Base64
+        base64_content = base64.b64encode(file_content).decode('utf-8')
+
+        # Определить MIME type по расширению
+        mime_types = {
+            'pdf': 'application/pdf',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'tiff': 'image/tiff',
+            'tif': 'image/tiff'
+        }
+        mime_type = mime_types.get(file_extension.lower(), 'application/octet-stream')
+
+        # Данные для создания вложения (из работающего примера пользователя)
+        attachment_data = {
+            "Description": filename,
+            "Расширение": file_extension or "pdf",
+            "ТипХраненияФайла": "ВИнформационнойБазе",
+            "ВладелецФайла_Key": owner_guid,
+            "ФайлХранилище_Type": mime_type,
+            "ФайлХранилище_Base64Data": base64_content,
+            "Размер": len(file_content)
+        }
+
+        logger.info(
+            f"📎 Uploading attachment to 1C expense request:\n"
+            f"   Filename: {filename}\n"
+            f"   Extension: {file_extension or 'pdf'}\n"
+            f"   MIME type: {mime_type}\n"
+            f"   Original size: {len(file_content)} bytes ({len(file_content) / 1024:.1f} KB)\n"
+            f"   Base64 size: {len(base64_content)} bytes ({len(base64_content) / 1024:.1f} KB)\n"
+            f"   Owner GUID: {owner_guid}"
+        )
+
+        try:
+            # Endpoint для прикрепленных файлов заявок на расход
+            endpoint = "Catalog_ЗаявкаНаРасходованиеДенежныхСредствПрисоединенныеФайлы"
+
+            response = self._make_request(
+                method='POST',
+                endpoint=endpoint,
+                data=attachment_data
+            )
+
+            logger.info(f"✅ Attachment uploaded successfully: {response}")
+            return response
+
+        except Exception as e:
+            logger.error(f"❌ Failed to upload attachment: {e}", exc_info=True)
+            # Не прерываем процесс если не удалось загрузить файл
+            return None
+
+    def upload_attachment_base64(
+        self,
+        file_content: bytes,
+        filename: str,
+        owner_guid: str,
+        file_extension: Optional[str] = None,
+        endpoint: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Загрузить файл в 1С через Base64 encoding (общий метод)
 
         Args:
             file_content: Содержимое файла (bytes)
             filename: Имя файла
             owner_guid: GUID владельца (документа)
             file_extension: Расширение файла (без точки), например "pdf"
+            endpoint: Кастомный endpoint (по умолчанию из настроек)
 
         Returns:
             Созданное вложение или None при ошибке
@@ -903,15 +1059,28 @@ class OData1CClient:
             logger.warning("File content is empty, skipping upload")
             return None
 
-        # Проверка размера (макс 6MB в байтах)
-        max_size = 6 * 1024 * 1024
+        # Получаем настройки из config (с fallback на дефолтные значения)
+        try:
+            from app.core.config import settings
+            max_size = settings.ODATA_1C_MAX_FILE_SIZE
+            upload_endpoint = endpoint or settings.ODATA_1C_ATTACHMENT_ENDPOINT
+        except Exception:
+            # Fallback если config не доступен
+            max_size = 6 * 1024 * 1024  # 6MB
+            upload_endpoint = endpoint or "InformationRegister_ПрисоединенныеФайлы"
+
+        # Проверка размера
         if len(file_content) > max_size:
-            logger.warning(f"File too large ({len(file_content)} bytes), max {max_size} bytes. Skipping upload.")
+            logger.warning(
+                f"File too large ({len(file_content)} bytes = {len(file_content) / 1024 / 1024:.2f}MB), "
+                f"max {max_size} bytes = {max_size / 1024 / 1024}MB. Skipping upload."
+            )
             return None
 
         try:
             # Кодирование в Base64
             base64_content = base64.b64encode(file_content).decode('utf-8')
+            base64_size = len(base64_content)
 
             # Определить расширение если не указано
             if not file_extension and '.' in filename:
@@ -919,7 +1088,6 @@ class OData1CClient:
 
             # Данные для создания вложения
             # ВАЖНО: Структура может отличаться в зависимости от конфигурации 1С
-            # Обычно используется InformationRegister_ПрисоединенныеФайлы
             attachment_data = {
                 "Наименование": filename,
                 "ДвоичныеДанные": base64_content,
@@ -927,24 +1095,32 @@ class OData1CClient:
                 "Расширение": file_extension or "pdf"
             }
 
-            logger.debug(f"Uploading attachment: {filename} ({len(file_content)} bytes) to owner {owner_guid}")
+            logger.info(
+                f"📎 Uploading attachment to 1C:\n"
+                f"   Filename: {filename}\n"
+                f"   Extension: {file_extension or 'pdf'}\n"
+                f"   Original size: {len(file_content)} bytes ({len(file_content) / 1024:.1f} KB)\n"
+                f"   Base64 size: {base64_size} bytes ({base64_size / 1024:.1f} KB)\n"
+                f"   Owner GUID: {owner_guid}\n"
+                f"   Endpoint: {upload_endpoint}"
+            )
 
             # ПРИМЕЧАНИЕ: Endpoint может отличаться в зависимости от конфигурации 1С
             # Возможные варианты:
-            # - InformationRegister_ПрисоединенныеФайлы
+            # - InformationRegister_ПрисоединенныеФайлы (по умолчанию)
             # - Catalog_ПрисоединенныеФайлы
             # - Catalog_ХранилищеФайлов
             response = self._make_request(
                 method='POST',
-                endpoint='InformationRegister_ПрисоединенныеФайлы',
+                endpoint=upload_endpoint,
                 data=attachment_data
             )
 
-            logger.debug(f"Attachment uploaded successfully")
+            logger.info(f"✅ Attachment uploaded successfully: {response}")
             return response
 
         except Exception as e:
-            logger.error(f"Failed to upload attachment: {e}")
+            logger.error(f"❌ Failed to upload attachment: {e}", exc_info=True)
             # Не прерываем процесс если не удалось загрузить файл
             return None
 

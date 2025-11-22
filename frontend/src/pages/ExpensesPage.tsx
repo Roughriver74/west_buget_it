@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Table, Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm, Modal } from 'antd'
+import { Button, Space, Tag, Input, Select, DatePicker, message, Tooltip, Badge, Popconfirm, Modal, Form, Row, Col } from 'antd'
 import { PlusOutlined, SearchOutlined, DownloadOutlined, EditOutlined, CloudUploadOutlined, CloudDownloadOutlined, DeleteOutlined, DollarOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons'
 import { expensesApi, categoriesApi, departmentsApi } from '@/api'
 import { ExpenseStatus, type Expense } from '@/types'
@@ -11,8 +11,11 @@ import FTPImportModal from '@/components/expenses/FTPImportModal'
 import RegisterPayrollPaymentModal from '@/components/payroll/RegisterPayrollPaymentModal'
 import InvoiceProcessingDrawer from '@/components/expenses/InvoiceProcessingDrawer'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
+import { MobileFilterDrawer } from '@/components/common/MobileFilterDrawer'
 import dayjs from 'dayjs'
 import { getApiBaseUrl } from '@/config/api'
+import { useIsMobile, useIsSmallScreen } from '@/hooks/useMediaQuery'
 
 const { RangePicker } = DatePicker
 
@@ -33,8 +36,20 @@ const ExpensesPage = () => {
   const [transferModalVisible, setTransferModalVisible] = useState(false)
   const [targetDepartmentId, setTargetDepartmentId] = useState<number | undefined>()
 
+  const isMobile = useIsMobile()
+  const isSmallScreen = useIsSmallScreen()
   const queryClient = useQueryClient()
   const { selectedDepartment } = useDepartment()
+
+  // Count active filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0
+    if (search) count++
+    if (status) count++
+    if (categoryId) count++
+    if (dateRange) count++
+    return count
+  }, [search, status, categoryId, dateRange])
 
   // Reset page when department changes
   useEffect(() => {
@@ -52,19 +67,15 @@ const ExpensesPage = () => {
         category_id: categoryId,
         department_id: selectedDepartment?.id,
         date_from: dateRange?.[0]?.toISOString(),
-        date_to: dateRange?.[1]?.toISOString(),
-      }),
-  })
+        date_to: dateRange?.[1]?.toISOString()})})
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoriesApi.getAll({ is_active: true }),
-  })
+    queryFn: () => categoriesApi.getAll({ is_active: true })})
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
-    queryFn: () => departmentsApi.getAll({ is_active: true }),
-  })
+    queryFn: () => departmentsApi.getAll({ is_active: true })})
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
@@ -77,8 +88,7 @@ const ExpensesPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при удалении: ${errorMessage}`)
-    },
-  })
+    }})
 
   // Bulk transfer department mutation
   const bulkTransferMutation = useMutation({
@@ -94,8 +104,7 @@ const ExpensesPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при переносе: ${errorMessage}`)
-    },
-  })
+    }})
 
   const handleBulkDelete = () => {
     if (selectedRowKeys.length === 0) {
@@ -120,8 +129,7 @@ const ExpensesPage = () => {
     }
     bulkTransferMutation.mutate({
       expenseIds: selectedRowKeys,
-      targetDepartmentId,
-    })
+      targetDepartmentId})
   }
 
   const handleExport = async () => {
@@ -203,21 +211,18 @@ const ExpensesPage = () => {
           )}
           <span>{number}</span>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Дата заявки',
       dataIndex: 'request_date',
       key: 'request_date',
       width: 120,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY'),
-    },
+      render: (date: string) => dayjs(date).format('DD.MM.YYYY')},
     {
       title: 'Категория',
       dataIndex: ['category', 'name'],
       key: 'category',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -228,9 +233,7 @@ const ExpensesPage = () => {
         new Intl.NumberFormat('ru-RU', {
           style: 'currency',
           currency: 'RUB',
-          minimumFractionDigits: 0,
-        }).format(amount),
-    },
+          minimumFractionDigits: 0}).format(amount)},
     {
       title: 'Статус',
       dataIndex: 'status',
@@ -240,8 +243,7 @@ const ExpensesPage = () => {
         <Tag color={getExpenseStatusColor(status)}>
           {getExpenseStatusLabel(status)}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Контрагент',
       dataIndex: ['contractor', 'name'],
@@ -258,8 +260,7 @@ const ExpensesPage = () => {
           </Link>
         ) : (
           '-'
-        ),
-    },
+        )},
     {
       title: 'Организация',
       dataIndex: ['organization', 'name'],
@@ -275,14 +276,12 @@ const ExpensesPage = () => {
           </Link>
         ) : (
           '-'
-        ),
-    },
+        )},
     {
       title: 'Заявитель',
       dataIndex: 'requester',
       key: 'requester',
-      width: 150,
-    },
+      width: 150},
     {
       title: 'Действия',
       key: 'actions',
@@ -319,106 +318,168 @@ const ExpensesPage = () => {
             </Tooltip>
           )}
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
     <div>
-      <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <Input
-          placeholder="Поиск по номеру, комментарию, заявителю"
-          prefix={<SearchOutlined />}
-          style={{ width: 300 }}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          allowClear
-        />
-        <Select
-          placeholder="Статус"
-          style={{ width: 150 }}
-          value={status}
-          onChange={setStatus}
-          allowClear
-          options={[
-            { value: ExpenseStatus.DRAFT, label: getExpenseStatusLabel(ExpenseStatus.DRAFT) },
-            { value: ExpenseStatus.PENDING, label: getExpenseStatusLabel(ExpenseStatus.PENDING) },
-            { value: ExpenseStatus.PAID, label: getExpenseStatusLabel(ExpenseStatus.PAID) },
-            { value: ExpenseStatus.REJECTED, label: getExpenseStatusLabel(ExpenseStatus.REJECTED) },
-            { value: ExpenseStatus.CLOSED, label: getExpenseStatusLabel(ExpenseStatus.CLOSED) },
-          ]}
-        />
-        <Select
-          placeholder="Категория"
-          style={{ width: 200 }}
-          value={categoryId}
-          onChange={setCategoryId}
-          allowClear
-          options={categories?.map((cat) => ({ value: cat.id, label: cat.name }))}
-        />
-        <RangePicker
-          format="DD.MM.YYYY"
-          value={dateRange}
-          onChange={setDateRange as any}
-        />
-        <Button icon={<CloudUploadOutlined />} onClick={() => setImportModalVisible(true)}>
-          Импорт из FTP
-        </Button>
-        <Button
-          icon={<FileTextOutlined />}
-          onClick={() => setInvoiceProcessingDrawerVisible(true)}
-        >
-          Обработка счетов AI
-        </Button>
-        <Button
-          icon={<DollarOutlined />}
-          onClick={() => setRegisterPaymentModalVisible(true)}
-          type="primary"
-        >
-          Зарегистрировать выплату ЗП
-        </Button>
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>
-          Экспорт в Excel
-        </Button>
-        <Button
-          icon={<SwapOutlined />}
-          onClick={handleBulkTransfer}
-          disabled={selectedRowKeys.length === 0}
-        >
-          Перенести в отдел ({selectedRowKeys.length})
-        </Button>
-        <Popconfirm
-          title="Удалить выбранные заявки?"
-          description={`Вы действительно хотите удалить ${selectedRowKeys.length} заявок?`}
-          onConfirm={handleBulkDelete}
-          okText="Да"
-          cancelText="Отмена"
-          disabled={selectedRowKeys.length === 0}
-        >
+      {/* Mobile: Create button at top */}
+      {isMobile && (
+        <div style={{ marginBottom: 16 }}>
           <Button
-            danger
-            icon={<DeleteOutlined />}
-            disabled={selectedRowKeys.length === 0}
-            loading={bulkDeleteMutation.isPending}
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreate}
+            block
+            size="large"
           >
-            Удалить выбранные ({selectedRowKeys.length})
+            Создать заявку
           </Button>
-        </Popconfirm>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Создать заявку
-        </Button>
+        </div>
+      )}
+
+      {/* Filters */}
+      <MobileFilterDrawer
+        title="Фильтры"
+        activeFilters={activeFiltersCount}
+        actions={
+          <Space>
+            <Button onClick={() => {
+              setSearch('')
+              setStatus(undefined)
+              setCategoryId(undefined)
+              setDateRange(null)
+            }}>
+              Сбросить
+            </Button>
+          </Space>
+        }
+      >
+        <Form layout="vertical">
+          <Row gutter={[16, 0]}>
+            <Col xs={24} sm={24} md={12} lg={6}>
+              <Form.Item label="Поиск">
+                <Input
+                  placeholder="Номер, комментарий, заявитель"
+                  prefix={<SearchOutlined />}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Form.Item label="Статус">
+                <Select
+                  placeholder="Выберите статус"
+                  value={status}
+                  onChange={setStatus}
+                  allowClear
+                  options={[
+                    { value: ExpenseStatus.DRAFT, label: getExpenseStatusLabel(ExpenseStatus.DRAFT) },
+                    { value: ExpenseStatus.PENDING, label: getExpenseStatusLabel(ExpenseStatus.PENDING) },
+                    { value: ExpenseStatus.PAID, label: getExpenseStatusLabel(ExpenseStatus.PAID) },
+                    { value: ExpenseStatus.REJECTED, label: getExpenseStatusLabel(ExpenseStatus.REJECTED) },
+                    { value: ExpenseStatus.CLOSED, label: getExpenseStatusLabel(ExpenseStatus.CLOSED) },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={5}>
+              <Form.Item label="Категория">
+                <Select
+                  placeholder="Выберите категорию"
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  allowClear
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={categories?.map((cat) => ({ value: cat.id, label: cat.name }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={24} md={12} lg={9}>
+              <Form.Item label="Период">
+                <RangePicker
+                  format="DD.MM.YYYY"
+                  value={dateRange}
+                  onChange={setDateRange as any}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </MobileFilterDrawer>
+
+      {/* Action Buttons */}
+      <div style={{ marginBottom: 16 }}>
+        <Space wrap size="small">
+          {!isMobile && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Создать заявку
+            </Button>
+          )}
+          <Button icon={<CloudUploadOutlined />} onClick={() => setImportModalVisible(true)}>
+            {isSmallScreen ? 'FTP' : 'Импорт из FTP'}
+          </Button>
+          <Button
+            icon={<FileTextOutlined />}
+            onClick={() => setInvoiceProcessingDrawerVisible(true)}
+          >
+            {isSmallScreen ? 'AI' : 'Обработка счетов AI'}
+          </Button>
+          <Button
+            icon={<DollarOutlined />}
+            onClick={() => setRegisterPaymentModalVisible(true)}
+            type="primary"
+          >
+            {isSmallScreen ? 'ЗП' : 'Зарегистрировать выплату ЗП'}
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            {isSmallScreen ? 'Excel' : 'Экспорт в Excel'}
+          </Button>
+          {selectedRowKeys.length > 0 && (
+            <>
+              <Button
+                icon={<SwapOutlined />}
+                onClick={handleBulkTransfer}
+              >
+                Перенести ({selectedRowKeys.length})
+              </Button>
+              <Popconfirm
+                title="Удалить выбранные заявки?"
+                description={`Вы действительно хотите удалить ${selectedRowKeys.length} заявок?`}
+                onConfirm={handleBulkDelete}
+                okText="Да"
+                cancelText="Отмена"
+              >
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  loading={bulkDeleteMutation.isPending}
+                >
+                  Удалить ({selectedRowKeys.length})
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
       </div>
 
-      <Table
+      {/* Table */}
+      <ResponsiveTable
         columns={columns}
         dataSource={expenses?.items}
         rowKey="id"
         loading={isLoading}
         scroll={{ x: 1200 }}
+        mobileLayout="card"
         rowSelection={{
           selectedRowKeys,
-          onChange: (selectedKeys) => setSelectedRowKeys(selectedKeys as number[]),
-        }}
+          onChange: (selectedKeys) => setSelectedRowKeys(selectedKeys as number[])}}
         pagination={{
           current: page,
           pageSize: pageSize,
@@ -428,8 +489,7 @@ const ExpensesPage = () => {
           onChange: (newPage, newPageSize) => {
             setPage(newPage)
             setPageSize(newPageSize)
-          },
-        }}
+          }}}
       />
 
       <ExpenseFormModal
@@ -477,8 +537,7 @@ const ExpensesPage = () => {
           onChange={setTargetDepartmentId}
           options={departments?.map((dept) => ({
             label: dept.name,
-            value: dept.id,
-          }))}
+            value: dept.id}))}
         />
       </Modal>
     </div>

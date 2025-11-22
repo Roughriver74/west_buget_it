@@ -11,7 +11,7 @@
  */
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Typography, Card, Row, Col, Select, Statistic, Table, Tabs, Space, Tag } from 'antd'
+import { Typography, Card, Row, Col, Select, Statistic, Tabs, Space, Tag } from 'antd'
 import {
   LineChart,
   Line,
@@ -23,17 +23,16 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
-} from 'recharts'
+  ComposedChart} from 'recharts'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import {
   DollarOutlined,
   RiseOutlined,
   FallOutlined,
-  PercentageOutlined,
-} from '@ant-design/icons'
+  PercentageOutlined} from '@ant-design/icons'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import ExportButton from '@/components/common/ExportButton'
@@ -111,23 +110,19 @@ const BudgetIncomeStatementPage = () => {
     data,
     isLoading,
     error,
-    refetch,
-  } = useQuery<BudgetIncomeStatement>({
+    refetch} = useQuery<BudgetIncomeStatement>({
     queryKey: ['budget-income-statement', year, selectedDepartment?.id],
     queryFn: () =>
       analyticsApi.getBudgetIncomeStatement({
         year,
-        department_id: selectedDepartment?.id,
-      }),
-  })
+        department_id: selectedDepartment?.id})})
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 0}).format(value)
   }
 
   const formatNumber = (value: number) => {
@@ -171,8 +166,7 @@ const BudgetIncomeStatementPage = () => {
     'Расходы (план)': item.expenses_planned,
     'Расходы (факт)': item.expenses_actual,
     'Прибыль (план)': item.profit_planned,
-    'Прибыль (факт)': item.profit_actual,
-  }))
+    'Прибыль (факт)': item.profit_actual}))
 
   // Monthly table columns
   const monthlyColumns = [
@@ -181,36 +175,31 @@ const BudgetIncomeStatementPage = () => {
       dataIndex: 'month_name',
       key: 'month_name',
       width: 100,
-      fixed: 'left' as const,
-    },
+      fixed: 'left' as const},
     {
       title: 'Доходы (план)',
       dataIndex: 'revenue_planned',
       key: 'revenue_planned',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Доходы (факт)',
       dataIndex: 'revenue_actual',
       key: 'revenue_actual',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Расходы (план)',
       dataIndex: 'expenses_planned',
       key: 'expenses_planned',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Расходы (факт)',
       dataIndex: 'expenses_actual',
       key: 'expenses_actual',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Прибыль (план)',
       dataIndex: 'profit_planned',
@@ -220,8 +209,7 @@ const BudgetIncomeStatementPage = () => {
         <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Прибыль (факт)',
       dataIndex: 'profit_actual',
@@ -231,22 +219,19 @@ const BudgetIncomeStatementPage = () => {
         <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Рентабельность (план)',
       dataIndex: 'profit_margin_planned',
       key: 'profit_margin_planned',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
     {
       title: 'Рентабельность (факт)',
       dataIndex: 'profit_margin_actual',
       key: 'profit_margin_actual',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
   ]
 
   // Category columns
@@ -255,8 +240,7 @@ const BudgetIncomeStatementPage = () => {
       title: 'Категория',
       dataIndex: 'category_name',
       key: 'category_name',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Тип',
       dataIndex: 'category_type',
@@ -266,22 +250,19 @@ const BudgetIncomeStatementPage = () => {
         <Tag color={type === 'revenue' ? 'green' : 'blue'}>
           {type === 'revenue' ? 'Доход' : 'Расход'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'План',
       dataIndex: 'planned',
       key: 'planned',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Факт',
       dataIndex: 'actual',
       key: 'actual',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Отклонение',
       dataIndex: 'difference',
@@ -291,15 +272,13 @@ const BudgetIncomeStatementPage = () => {
         <Text style={{ color: value >= 0 ? '#52c41a' : '#ff4d4f' }}>
           {formatCurrency(value)}
         </Text>
-      ),
-    },
+      )},
     {
       title: 'Исполнение',
       dataIndex: 'execution_percent',
       key: 'execution_percent',
       align: 'right' as const,
-      render: (value: number) => formatPercent(value),
-    },
+      render: (value: number) => formatPercent(value)},
   ]
 
   return (
@@ -414,8 +393,7 @@ const BudgetIncomeStatementPage = () => {
                 )
               }
               valueStyle={{
-                color: data.profit_planned >= 0 ? '#1890ff' : '#ff4d4f',
-              }}
+                color: data.profit_planned >= 0 ? '#1890ff' : '#ff4d4f'}}
             />
             <div style={{ marginTop: 8 }}>
               <Text type="secondary">Факт: </Text>
@@ -429,8 +407,7 @@ const BudgetIncomeStatementPage = () => {
                 <Text type="secondary">Отклонение: </Text>
                 <Text
                   style={{
-                    color: data.profit_difference >= 0 ? '#52c41a' : '#ff4d4f',
-                  }}
+                    color: data.profit_difference >= 0 ? '#52c41a' : '#ff4d4f'}}
                 >
                   {formatCurrency(data.profit_difference)}
                 </Text>
@@ -558,14 +535,13 @@ const BudgetIncomeStatementPage = () => {
                   </Card>
                 </Col>
               </Row>
-            ),
-          },
+            )},
           {
             key: 'monthly',
             label: 'Помесячная детализация',
             children: (
               <Card>
-                <Table
+                <ResponsiveTable
                   dataSource={data.by_month}
                   columns={monthlyColumns}
                   rowKey="month"
@@ -573,8 +549,7 @@ const BudgetIncomeStatementPage = () => {
                   scroll={{ x: 1200 }}
                 />
               </Card>
-            ),
-          },
+            )},
           {
             key: 'revenue',
             label: 'Доходы по категориям',
@@ -600,7 +575,7 @@ const BudgetIncomeStatementPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация доходов">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.revenue_by_category}
                       columns={categoryColumns}
                       rowKey="category_id"
@@ -614,8 +589,7 @@ const BudgetIncomeStatementPage = () => {
               <Card>
                 <Text type="secondary">Нет данных по категориям доходов</Text>
               </Card>
-            ),
-          },
+            )},
           {
             key: 'expenses',
             label: 'Расходы по категориям',
@@ -641,7 +615,7 @@ const BudgetIncomeStatementPage = () => {
                 </Col>
                 <Col xs={24} lg={12}>
                   <Card title="Детализация расходов">
-                    <Table
+                    <ResponsiveTable
                       dataSource={data.expenses_by_category}
                       columns={categoryColumns}
                       rowKey="category_id"
@@ -655,8 +629,7 @@ const BudgetIncomeStatementPage = () => {
               <Card>
                 <Text type="secondary">Нет данных по категориям расходов</Text>
               </Card>
-            ),
-          },
+            )},
         ]}
       />
     </div>

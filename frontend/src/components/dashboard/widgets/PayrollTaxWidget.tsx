@@ -78,7 +78,7 @@ const PayrollTaxWidget: React.FC<PayrollTaxWidgetProps> = ({
 
     return [
       {
-        type: 'ЗП (нетто)',
+        type: 'ЗП (net)',
         value: totals.net,
       },
       {
@@ -190,7 +190,7 @@ const PayrollTaxWidget: React.FC<PayrollTaxWidgetProps> = ({
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
           <Statistic
-            title="ФОТ (Брутто)"
+            title="ФОТ (Gross)"
             value={totals.gross}
             precision={0}
             suffix="₽"

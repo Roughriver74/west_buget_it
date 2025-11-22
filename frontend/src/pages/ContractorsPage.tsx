@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Typography, Card, Table, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
+import { Typography, Card, Button, Space, Tag, Popconfirm, message, Input, Select, Row, Col, Statistic, Upload, Modal } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, TeamOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined, CloseOutlined, CheckOutlined } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -9,6 +9,7 @@ import type { UploadProps } from 'antd'
 import axios from 'axios'
 import ContractorFormModal from '@/components/contractors/ContractorFormModal'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { getApiBaseUrl } from '@/config/api'
 
 const { Title, Paragraph } = Typography
@@ -38,9 +39,7 @@ const ContractorsPage = () => {
         limit: pageSize,
         search: search || undefined,
         is_active: activeFilter,
-        department_id: selectedDepartment?.id,
-      }),
-  })
+        department_id: selectedDepartment?.id})})
 
   const deleteMutation = useMutation({
     mutationFn: contractorsApi.delete,
@@ -50,8 +49,7 @@ const ContractorsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка при удалении: ${error.message}`)
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setModalMode('create')
@@ -133,15 +131,13 @@ const ContractorsPage = () => {
                 ))}
               </div>
             ),
-            width: 600,
-          })
+            width: 600})
         }
         queryClient.invalidateQueries({ queryKey: ['contractors'] })
       } else if (info.file.status === 'error') {
         message.error(`${info.file.name} загрузка не удалась`)
       }
-    },
-  }
+    }}
 
   const handleBulkActivate = async () => {
     if (selectedRowKeys.length === 0) {
@@ -153,8 +149,7 @@ const ContractorsPage = () => {
     try {
       await axios.post(`${API_BASE}/contractors/bulk/update`, {
         ids: selectedRowKeys,
-        is_active: true,
-      })
+        is_active: true})
       message.success(`Активировано ${selectedRowKeys.length} контрагентов`)
       setSelectedRowKeys([])
       queryClient.invalidateQueries({ queryKey: ['contractors'] })
@@ -175,8 +170,7 @@ const ContractorsPage = () => {
     try {
       await axios.post(`${API_BASE}/contractors/bulk/update`, {
         ids: selectedRowKeys,
-        is_active: false,
-      })
+        is_active: false})
       message.success(`Деактивировано ${selectedRowKeys.length} контрагентов`)
       setSelectedRowKeys([])
       queryClient.invalidateQueries({ queryKey: ['contractors'] })
@@ -200,8 +194,7 @@ const ContractorsPage = () => {
         setBulkLoading(true)
         try {
           await axios.post(`${API_BASE}/contractors/bulk/delete`, {
-            ids: selectedRowKeys,
-          })
+            ids: selectedRowKeys})
           message.success(`Удалено ${selectedRowKeys.length} контрагентов`)
           setSelectedRowKeys([])
           queryClient.invalidateQueries({ queryKey: ['contractors'] })
@@ -210,8 +203,7 @@ const ContractorsPage = () => {
         } finally {
           setBulkLoading(false)
         }
-      },
-    })
+      }})
   }
 
   const columns = [
@@ -225,30 +217,26 @@ const ContractorsPage = () => {
         <Link to={`/contractors/${record.id}`} style={{ color: '#1890ff', fontWeight: 500 }}>
           {name}
         </Link>
-      ),
-    },
+      )},
     {
       title: 'ИНН',
       dataIndex: 'inn',
       key: 'inn',
       width: 130,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
       width: 180,
       ellipsis: true,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Телефон',
       dataIndex: 'phone',
       key: 'phone',
       width: 130,
-      render: (text: string) => text || '—',
-    },
+      render: (text: string) => text || '—'},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -259,8 +247,7 @@ const ContractorsPage = () => {
         <Tag color={isActive ? 'success' : 'default'}>
           {isActive ? 'Да' : 'Нет'}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Действия',
       key: 'actions',
@@ -294,8 +281,7 @@ const ContractorsPage = () => {
             </Button>
           </Popconfirm>
         </Space>
-      ),
-    },
+      )},
   ]
 
   // Calculate statistics
@@ -413,13 +399,14 @@ const ContractorsPage = () => {
           </Button>
         </div>
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={contractors || []}
           loading={isLoading}
           rowKey="id"
           size="middle"
           scroll={{ x: 900 }}
+          mobileLayout="card"
           pagination={{
             current: page,
             pageSize: pageSize,
@@ -430,13 +417,11 @@ const ContractorsPage = () => {
             },
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total} контрагентов`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-          }}
+            pageSizeOptions: ['10', '20', '50', '100']}}
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
-            preserveSelectedRowKeys: true,
-          }}
+            preserveSelectedRowKeys: true}}
         />
 
         <ContractorFormModal

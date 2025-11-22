@@ -7,7 +7,6 @@ import {
   Space,
   Select,
   message,
-  Table,
   InputNumber,
   Input,
   Popconfirm,
@@ -16,8 +15,7 @@ import {
   Form,
   DatePicker,
   Result,
-  Empty,
-} from 'antd'
+  Empty} from 'antd'
 import {
   PlusOutlined, DeleteOutlined, EditOutlined,
   CheckOutlined, CloseOutlined, ThunderboltOutlined, DownloadOutlined, RobotOutlined
@@ -28,6 +26,7 @@ import type { AIForecastResponse } from '@/api/forecast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import dayjs from 'dayjs'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
@@ -54,14 +53,12 @@ const ForecastPage = () => {
   const sourceLabels = {
     plan: 'План',
     history: 'История',
-    other: 'Другое',
-  } as const
+    other: 'Другое'} as const
 
   const sourceColors = {
     plan: 'blue',
     history: 'purple',
-    other: 'default',
-  } as const
+    other: 'default'} as const
 
   const getConfidenceTagColor = (value: number) => {
     if (value >= 70) return 'success'
@@ -87,54 +84,46 @@ const ForecastPage = () => {
     isLoading: forecastsLoading,
     isError: forecastsError,
     error: forecastsErrorObj,
-    refetch: refetchForecasts,
-  } = useQuery({
+    refetch: refetchForecasts} = useQuery({
     queryKey: ['forecasts', selectedYear, selectedMonth, departmentId ?? 'none'],
     queryFn: () => {
       if (departmentId == null) {
         return []
       }
       return forecastApi.getAll(selectedYear, selectedMonth, departmentId)
-    },
-  })
+    }})
 
   const {
     data: categoriesData = [],
     isLoading: categoriesLoading,
     isError: categoriesError,
     error: categoriesErrorObj,
-    refetch: refetchCategories,
-  } = useQuery({
+    refetch: refetchCategories} = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoriesApi.getAll(),
-  })
+    queryFn: () => categoriesApi.getAll()})
 
   const {
     data: contractorsData,
     isLoading: contractorsLoading,
     isError: contractorsError,
     error: contractorsErrorObj,
-    refetch: refetchContractors,
-  } = useQuery({
+    refetch: refetchContractors} = useQuery({
     queryKey: ['contractors', departmentId ?? 'none'],
     queryFn: () => {
       if (departmentId == null) {
         return []
       }
       return contractorsApi.getAll({ limit: 1000, department_id: departmentId })
-    },
-  })
+    }})
 
   const {
     data: organizationsData,
     isLoading: organizationsLoading,
     isError: organizationsError,
     error: organizationsErrorObj,
-    refetch: refetchOrganizations,
-  } = useQuery({
+    refetch: refetchOrganizations} = useQuery({
     queryKey: ['organizations'],
-    queryFn: () => organizationsApi.getAll({ limit: 100 }),
-  })
+    queryFn: () => organizationsApi.getAll({ limit: 100 })})
 
   const forecasts = forecastsData ?? []
   const categories = categoriesData
@@ -180,8 +169,7 @@ const ForecastPage = () => {
         target_month: selectedMonth,
         department_id: departmentId,
         include_regular: true,
-        include_average: true,
-      })
+        include_average: true})
     },
     onSuccess: (data) => {
       message.success(`Прогноз создан! Добавлено: ${data.created} позиций`)
@@ -189,8 +177,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка генерации: ${error.message}`)
-    },
-  })
+    }})
 
   const generateAIMutation = useMutation({
     mutationFn: () => {
@@ -200,8 +187,7 @@ const ForecastPage = () => {
       return forecastApi.generateAI({
         target_year: selectedYear,
         target_month: selectedMonth,
-        department_id: departmentId,
-      })
+        department_id: departmentId})
     },
     onSuccess: (data) => {
       setAiResult(data)
@@ -215,8 +201,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка AI генерации: ${error.message}`)
-    },
-  })
+    }})
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<ForecastExpense> }) =>
@@ -229,8 +214,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления: ${error.message}`)
-    },
-  })
+    }})
 
   const createMutation = useMutation({
     mutationFn: (data: Partial<ForecastExpense>) => forecastApi.create(data),
@@ -242,8 +226,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка создания: ${error.message}`)
-    },
-  })
+    }})
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => forecastApi.delete(id),
@@ -253,8 +236,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка удаления: ${error.message}`)
-    },
-  })
+    }})
 
   const clearMutation = useMutation({
     mutationFn: () => {
@@ -269,8 +251,7 @@ const ForecastPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка очистки: ${error.message}`)
-    },
-  })
+    }})
 
   if (!departmentId) {
     return (
@@ -324,8 +305,7 @@ const ForecastPage = () => {
       createMutation.mutate({
         ...values,
         department_id: departmentId,
-        forecast_date: values.forecast_date.format('YYYY-MM-DD'),
-      })
+        forecast_date: values.forecast_date.format('YYYY-MM-DD')})
     })
   }
 
@@ -355,8 +335,7 @@ const ForecastPage = () => {
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(value)
+      minimumFractionDigits: 0}).format(value)
   }
 
   // Generate days for the selected month
@@ -406,8 +385,7 @@ const ForecastPage = () => {
             )}
           </div>
         )
-      },
-    },
+      }},
     {
       title: 'Контрагент',
       dataIndex: ['contractor', 'name'],
@@ -437,8 +415,7 @@ const ForecastPage = () => {
           )
         }
         return text || '—'
-      },
-    },
+      }},
     {
       title: 'Дата',
       dataIndex: 'forecast_date',
@@ -455,8 +432,7 @@ const ForecastPage = () => {
           )
         }
         return dayjs(date).format('DD.MM.YYYY')
-      },
-    },
+      }},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -476,8 +452,7 @@ const ForecastPage = () => {
           )
         }
         return formatCurrency(amount)
-      },
-    },
+      }},
     {
       title: 'Комментарий',
       dataIndex: 'comment',
@@ -494,8 +469,7 @@ const ForecastPage = () => {
           )
         }
         return text || '—'
-      },
-    },
+      }},
     {
       title: 'Действия',
       key: 'actions',
@@ -543,8 +517,7 @@ const ForecastPage = () => {
                   forecast_date: record.forecast_date,
                   amount: record.amount,
                   comment: record.comment,
-                  department_id: departmentId!,
-                })
+                  department_id: departmentId!})
               }}
             >
               Изменить
@@ -566,8 +539,7 @@ const ForecastPage = () => {
             </Popconfirm>
           </Space>
         )
-      },
-    },
+      }},
   ]
 
   const totalAmount = forecasts.reduce((sum, f) => sum + Number(f.amount), 0)
@@ -668,7 +640,7 @@ const ForecastPage = () => {
               </div>
             }
           >
-            <Table
+            <ResponsiveTable
               columns={columns}
               dataSource={forecasts}
               rowKey="id"
@@ -676,6 +648,7 @@ const ForecastPage = () => {
               scroll={{ x: 1200 }}
               size="small"
               rowClassName={(record) => record.is_regular ? 'regular-row' : ''}
+              mobileLayout="card"
             />
           </Card>
 
@@ -734,8 +707,7 @@ const ForecastPage = () => {
           layout="vertical"
           initialValues={{
             forecast_date: dayjs(`${selectedYear}-${selectedMonth}-15`),
-            is_regular: false,
-          }}
+            is_regular: false}}
         >
           <Form.Item
             name="category_id"

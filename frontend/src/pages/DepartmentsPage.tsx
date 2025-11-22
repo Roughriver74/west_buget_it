@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   Typography,
   Card,
-  Table,
   Button,
   Space,
   Tag,
@@ -12,21 +11,20 @@ import {
   Select,
   Row,
   Col,
-  Statistic,
-} from 'antd'
+  Statistic} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   StopOutlined,
   CheckCircleOutlined,
   SearchOutlined,
-  BankOutlined,
-} from '@ant-design/icons'
+  BankOutlined} from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { departmentsApi } from '@/api'
 import type { Department } from '@/contexts/DepartmentContext'
 import DepartmentFormModal from '@/components/departments/DepartmentFormModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { Title, Paragraph } = Typography
 const { Option } = Select
@@ -50,9 +48,7 @@ const DepartmentsPage = () => {
       departmentsApi.getAll({
         skip: (page - 1) * pageSize,
         limit: pageSize,
-        is_active: activeFilter,
-      }),
-  })
+        is_active: activeFilter})})
 
   const deactivateMutation = useMutation({
     mutationFn: departmentsApi.deactivate,
@@ -63,8 +59,7 @@ const DepartmentsPage = () => {
     onError: (error: any) => {
       const errorMessage = error.response?.data?.detail || error.message
       message.error(`Ошибка при деактивации: ${errorMessage}`)
-    },
-  })
+    }})
 
   const activateMutation = useMutation({
     mutationFn: departmentsApi.activate,
@@ -74,8 +69,7 @@ const DepartmentsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка при активации: ${error.message}`)
-    },
-  })
+    }})
 
   const handleCreate = () => {
     setModalMode('create')
@@ -129,36 +123,31 @@ const DepartmentsPage = () => {
           <BankOutlined />
           <strong>{text}</strong>
         </Space>
-      ),
-    },
+      )},
     {
       title: 'Код',
       dataIndex: 'code',
       key: 'code',
       width: 120,
-      render: (text: string) => <Tag color="blue">{text}</Tag>,
-    },
+      render: (text: string) => <Tag color="blue">{text}</Tag>},
     {
       title: 'Руководитель',
       dataIndex: 'manager_name',
       key: 'manager_name',
       width: 200,
-      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>,
-    },
+      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>},
     {
       title: 'Email',
       dataIndex: 'contact_email',
       key: 'contact_email',
       width: 200,
-      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>,
-    },
+      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>},
     {
       title: 'Телефон',
       dataIndex: 'contact_phone',
       key: 'contact_phone',
       width: 150,
-      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>,
-    },
+      render: (text: string | null) => text || <span style={{ color: '#999' }}>—</span>},
     {
       title: 'Статус',
       dataIndex: 'is_active',
@@ -174,8 +163,7 @@ const DepartmentsPage = () => {
           <Tag color="default" icon={<StopOutlined />}>
             Неактивен
           </Tag>
-        ),
-    },
+        )},
     {
       title: 'Действия',
       key: 'actions',
@@ -220,8 +208,7 @@ const DepartmentsPage = () => {
             </Button>
           )}
         </Space>
-      ),
-    },
+      )},
   ]
 
   return (
@@ -313,7 +300,7 @@ const DepartmentsPage = () => {
             </Row>
 
             {/* Table */}
-            <Table
+            <ResponsiveTable
               columns={columns}
               dataSource={filteredDepartments}
               rowKey="id"
@@ -328,9 +315,9 @@ const DepartmentsPage = () => {
                 },
                 showSizeChanger: true,
                 showTotal: (total) => `Всего ${total} отделов`,
-                pageSizeOptions: ['10', '20', '50', '100'],
-              }}
+                pageSizeOptions: ['10', '20', '50', '100']}}
               scroll={{ x: 1200 }}
+              mobileLayout="card"
             />
           </Space>
         </Card>

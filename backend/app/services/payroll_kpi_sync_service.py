@@ -8,7 +8,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from app.db.models import EmployeeKPI, PayrollActual, Employee
+from app.db.models import EmployeeKPI, PayrollActual, PayrollPlan, Employee
 import logging
 
 logger = logging.getLogger(__name__)
@@ -253,4 +253,107 @@ class PayrollKPISyncService:
                 "income_tax_amount": float(income_tax_amount),
                 "net_amount": float(total_paid - income_tax_amount)
             }
+        }
+
+    def sync_employee_kpi_to_payroll_plan(
+        self,
+        employee_kpi_id: int
+    ) -> Dict[str, Any]:
+        """
+        Синхронизирует рассчитанные бонусы из EmployeeKPI в PayrollPlan.
+
+        Вызывается автоматически при approve EmployeeKPI.
+        Обновляет плановые бонусы (monthly_bonus, quarterly_bonus, annual_bonus).
+
+        Args:
+            employee_kpi_id: ID записи EmployeeKPI
+
+        Returns:
+            Dict с результатами синхронизации
+        """
+        # Получаем запись EmployeeKPI
+        employee_kpi = self.db.query(EmployeeKPI).filter(
+            EmployeeKPI.id == employee_kpi_id
+        ).first()
+
+        if not employee_kpi:
+            raise ValueError(f"EmployeeKPI с ID {employee_kpi_id} не найден")
+
+        # Получаем сотрудника для базового оклада
+        employee = self.db.query(Employee).filter(
+            Employee.id == employee_kpi.employee_id
+        ).first()
+
+        if not employee:
+            raise ValueError(f"Сотрудник с ID {employee_kpi.employee_id} не найден")
+
+        # Ищем существующую запись PayrollPlan
+        payroll_plan = self.db.query(PayrollPlan).filter(
+            and_(
+                PayrollPlan.employee_id == employee_kpi.employee_id,
+                PayrollPlan.year == employee_kpi.year,
+                PayrollPlan.month == employee_kpi.month,
+                PayrollPlan.department_id == employee_kpi.department_id
+            )
+        ).first()
+
+        # Подготавливаем данные бонусов
+        monthly_bonus = employee_kpi.monthly_bonus_calculated or Decimal(0)
+        quarterly_bonus = employee_kpi.quarterly_bonus_calculated or Decimal(0)
+        annual_bonus = employee_kpi.annual_bonus_calculated or Decimal(0)
+
+        base_salary = employee.base_salary or Decimal(0)
+        total_planned = base_salary + monthly_bonus + quarterly_bonus + annual_bonus
+
+        if payroll_plan:
+            # Обновляем существующую запись
+            payroll_plan.monthly_bonus = monthly_bonus
+            payroll_plan.quarterly_bonus = quarterly_bonus
+            payroll_plan.annual_bonus = annual_bonus
+            payroll_plan.total_planned = total_planned
+
+            action = "updated"
+            logger.info(
+                f"PayrollPlan обновлён для сотрудника#{employee_kpi.employee_id} "
+                f"за {employee_kpi.year}-{employee_kpi.month:02d}"
+            )
+        else:
+            # Создаём новую запись
+            payroll_plan = PayrollPlan(
+                year=employee_kpi.year,
+                month=employee_kpi.month,
+                employee_id=employee_kpi.employee_id,
+                department_id=employee_kpi.department_id,
+                base_salary=base_salary,
+                monthly_bonus=monthly_bonus,
+                quarterly_bonus=quarterly_bonus,
+                annual_bonus=annual_bonus,
+                other_payments=Decimal(0),
+                total_planned=total_planned,
+                notes=f"Синхронизировано из EmployeeKPI#{employee_kpi_id} (APPROVED)"
+            )
+            self.db.add(payroll_plan)
+
+            action = "created"
+            logger.info(
+                f"PayrollPlan создан для сотрудника#{employee_kpi.employee_id} "
+                f"за {employee_kpi.year}-{employee_kpi.month:02d}"
+            )
+
+        self.db.commit()
+        self.db.refresh(payroll_plan)
+
+        return {
+            "action": action,
+            "payroll_plan_id": payroll_plan.id,
+            "employee_kpi_id": employee_kpi_id,
+            "employee_id": employee_kpi.employee_id,
+            "employee_name": employee.full_name,
+            "year": employee_kpi.year,
+            "month": employee_kpi.month,
+            "base_salary": float(base_salary),
+            "monthly_bonus": float(monthly_bonus),
+            "quarterly_bonus": float(quarterly_bonus),
+            "annual_bonus": float(annual_bonus),
+            "total_planned": float(total_planned)
         }

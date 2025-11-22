@@ -38,12 +38,20 @@ const PayrollScenarioCharts: React.FC<PayrollScenarioChartsProps> = ({ scenario 
   const salaryComparisonData = scenario.scenario_details
     .filter(detail => detail.base_year_salary && detail.base_year_salary > 0)
     .slice(0, 10) // Топ-10 сотрудников
-    .map(detail => ({
-      name: detail.employee_name.split(' ').slice(0, 2).join(' '), // Имя и фамилия
-      baseYear: detail.base_year_salary || 0,
-      targetYear: detail.base_salary + (detail.monthly_bonus || 0),
-      increase: detail.cost_increase || 0,
-    }));
+    .map(detail => {
+      // ИСПРАВЛЕНО: Учитываем все виды премий
+      const targetYearSalary =
+        (detail.base_salary + (detail.monthly_bonus || 0)) * 12 +
+        (detail.quarterly_bonus || 0) * 4 +
+        (detail.annual_bonus || 0);
+
+      return {
+        name: detail.employee_name.split(' ').slice(0, 2).join(' '), // Имя и фамилия
+        baseYear: detail.base_year_salary || 0,
+        targetYear: targetYearSalary,
+        increase: detail.cost_increase || 0,
+      };
+    });
 
   // Подготовка данных для графика распределения страховых взносов
   const insuranceDistributionData = [

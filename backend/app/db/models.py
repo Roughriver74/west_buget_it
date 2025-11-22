@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+import uuid
 from sqlalchemy import (
     Boolean,
     Column,
@@ -16,7 +17,10 @@ from sqlalchemy import (
     JSON,
     func,
     TypeDecorator,
+    CheckConstraint,
+    UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
 
@@ -177,6 +181,7 @@ class UserRoleEnum(str, enum.Enum):
     FOUNDER = "FOUNDER"  # Учредитель - дашборд с ключевыми показателями по всем отделам
     MANAGER = "MANAGER"  # Руководитель - доступ ко всем отделам, сводная аналитика
     ACCOUNTANT = "ACCOUNTANT"  # Финансист - справочники и НДФЛ, доступ ко всем отделам
+    HR = "HR"  # Сотрудник отдела кадров - доступ к модулю HR_DEPARTMENT для всех отделов
     USER = "USER"  # Пользователь отдела - доступ только к своему отделу
     REQUESTER = "REQUESTER"  # Запросчик заявок/расходов (ограниченные права)
 
@@ -207,28 +212,14 @@ class KPIGoalStatusEnum(str, enum.Enum):
 
 
 class EmployeeKPIStatusEnum(str, enum.Enum):
-    """Enum for EmployeeKPI workflow statuses"""
-    DRAFT = "DRAFT"  # Черновик - цели установлены, факт не введен
-    IN_PROGRESS = "IN_PROGRESS"  # В работе - период активен, сотрудник работает над целями
-    UNDER_REVIEW = "UNDER_REVIEW"  # На проверке - факт введен, ждет оценки руководителя
-    APPROVED = "APPROVED"  # Утверждено - руководитель утвердил оценку
-    REJECTED = "REJECTED"  # Отклонено - требуется пересмотр/корректировка
+    """Enum for EmployeeKPI workflow statuses (simplified workflow)"""
+    DRAFT = "DRAFT"  # Черновик - цели установлены, сотрудник работает над ними
+    UNDER_REVIEW = "UNDER_REVIEW"  # На проверке - результаты введены, ждет оценки руководителя
+    APPROVED = "APPROVED"  # Утверждено - руководитель утвердил, премии рассчитаны
+    REJECTED = "REJECTED"  # Отклонено - требуется доработка
 
 
-class KPITaskStatusEnum(str, enum.Enum):
-    """Enum for KPI task statuses"""
-    TODO = "TODO"  # К выполнению
-    IN_PROGRESS = "IN_PROGRESS"  # В работе
-    DONE = "DONE"  # Выполнено
-    CANCELLED = "CANCELLED"  # Отменено
-
-
-class KPITaskPriorityEnum(str, enum.Enum):
-    """Enum for KPI task priorities"""
-    LOW = "LOW"  # Низкий
-    MEDIUM = "MEDIUM"  # Средний
-    HIGH = "HIGH"  # Высокий
-    CRITICAL = "CRITICAL"  # Критический
+# KPITaskStatusEnum and KPITaskPriorityEnum removed - Tasks feature deprecated
 
 
 class RevenueStreamTypeEnum(str, enum.Enum):
@@ -706,8 +697,8 @@ class User(Base):
 
 class SalaryTypeEnum(str, enum.Enum):
     """Enum for salary type - how salary is entered"""
-    GROSS = "GROSS"  # Брутто (до вычета НДФЛ) - начисление
-    NET = "NET"      # Нетто (на руки) - желаемая сумма к выплате
+    GROSS = "GROSS"  # Gross (до вычета НДФЛ) - начисление
+    NET = "NET"      # Net (на руки) - желаемая сумма к выплате
 
 
 class EmployeeStatusEnum(str, enum.Enum):
@@ -794,13 +785,13 @@ class Employee(Base):
     fire_date = Column(Date, nullable=True)  # Дата увольнения
     status = Column(Enum(EmployeeStatusEnum), nullable=False, default=EmployeeStatusEnum.ACTIVE, index=True)
 
-    # Salary information (NEW in Task 1.4: Брутто ↔ Нетто расчет)
+    # Salary information (NEW in Task 1.4: Gross ↔ Net расчет)
     salary_type = Column(Enum(SalaryTypeEnum), nullable=False, default=SalaryTypeEnum.GROSS, index=True)  # Тип ввода оклада
     base_salary = Column(Numeric(15, 2), nullable=False)  # Оклад (значение которое ввели)
 
     # Calculated salary fields (auto-calculated based on salary_type)
-    base_salary_gross = Column(Numeric(15, 2), nullable=True)  # Оклад брутто (до вычета НДФЛ)
-    base_salary_net = Column(Numeric(15, 2), nullable=True)    # Оклад нетто (на руки после НДФЛ)
+    base_salary_gross = Column(Numeric(15, 2), nullable=True)  # Оклад gross (до вычета НДФЛ)
+    base_salary_net = Column(Numeric(15, 2), nullable=True)    # Оклад net (на руки после НДФЛ)
     ndfl_amount = Column(Numeric(15, 2), nullable=True)        # Сумма НДФЛ
     ndfl_rate = Column(Numeric(5, 4), nullable=False, default=0.13)  # Ставка НДФЛ (по умолчанию 13%)
 
@@ -828,6 +819,7 @@ class Employee(Base):
     payroll_plans = relationship("PayrollPlan", back_populates="employee")
     payroll_actuals = relationship("PayrollActual", back_populates="employee")
     salary_history = relationship("SalaryHistory", back_populates="employee", order_by="SalaryHistory.effective_date.desc()")
+    timesheets = relationship("WorkTimesheet", back_populates="employee")
 
     def __repr__(self):
         return f"<Employee {self.full_name} ({self.position})>"
@@ -1249,9 +1241,82 @@ class KPIGoal(Base):
     # Relationships
     department_rel = relationship("Department")
     employee_goals = relationship("EmployeeKPIGoal", back_populates="goal")
+    template_items = relationship("KPIGoalTemplateItem", back_populates="goal")
 
     def __repr__(self):
         return f"<KPIGoal {self.name} (weight={self.weight})>"
+
+
+class KPIGoalTemplate(Base):
+    """KPI Goal Template (шаблон набора целей для быстрого назначения сотрудникам)
+
+    Позволяет менеджерам создавать повторно используемые наборы целей (например, "Продажи Q1", "IT Стандарт")
+    и быстро применять их к сотрудникам, сокращая ручную работу.
+    """
+    __tablename__ = "kpi_goal_templates"
+    __table_args__ = (
+        Index('idx_kpi_template_dept_active', 'department_id', 'is_active'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Template information
+    name = Column(String(255), nullable=False, index=True)  # Название шаблона
+    description = Column(Text, nullable=True)  # Описание
+
+    # Department association (multi-tenancy)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False, index=True)
+
+    # Active status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    department_rel = relationship("Department")
+    created_by = relationship("User")
+    template_goals = relationship("KPIGoalTemplateItem", back_populates="template", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<KPIGoalTemplate {self.name} ({len(self.template_goals)} goals)>"
+
+
+class KPIGoalTemplateItem(Base):
+    """KPI Goal Template Item (цель в шаблоне с весом)
+
+    Связывает KPIGoal с шаблоном и задает вес для этой цели.
+    При применении шаблона создаются EmployeeKPIGoal записи с этими весами.
+    """
+    __tablename__ = "kpi_goal_template_items"
+    __table_args__ = (
+        Index('idx_template_item_template', 'template_id'),
+        Index('idx_template_item_goal', 'goal_id'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Relations
+    template_id = Column(Integer, ForeignKey("kpi_goal_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    goal_id = Column(Integer, ForeignKey("kpi_goals.id"), nullable=False, index=True)
+
+    # Weight for this goal in the template (0-100%)
+    weight = Column(Numeric(5, 2), nullable=False)  # Вес цели в шаблоне
+
+    # Default target value (optional, can override goal's default target_value)
+    default_target_value = Column(Numeric(15, 2), nullable=True)
+
+    # Order in template (for UI display)
+    display_order = Column(Integer, nullable=False, default=0)
+
+    # Relationships
+    template = relationship("KPIGoalTemplate", back_populates="template_goals")
+    goal = relationship("KPIGoal", back_populates="template_items")
+
+    def __repr__(self):
+        return f"<KPIGoalTemplateItem Template#{self.template_id} Goal#{self.goal_id} weight={self.weight}%>"
 
 
 class EmployeeKPI(Base):
@@ -1296,15 +1361,7 @@ class EmployeeKPI(Base):
     quarterly_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
     annual_bonus_fixed_part = Column(Numeric(5, 2), nullable=True)
 
-    # Task complexity bonus component (NEW in Task 3.2)
-    task_complexity_avg = Column(Numeric(5, 2), nullable=True)  # Средняя сложность выполненных задач (1-10)
-    task_complexity_multiplier = Column(Numeric(5, 4), nullable=True)  # Множитель премии по сложности (0.5-2.0)
-    task_complexity_weight = Column(Numeric(5, 2), nullable=True, default=20.00)  # Вес компонента сложности в премии (0-100%, default 20%)
-
-    # Complexity bonus components (calculated)
-    monthly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент месячной премии по сложности
-    quarterly_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент квартальной премии по сложности
-    annual_bonus_complexity = Column(Numeric(15, 2), nullable=True)  # Компонент годовой премии по сложности
+    # Task complexity bonus removed - Tasks feature deprecated
 
     # Workflow status
     status = Column(
@@ -1385,93 +1442,7 @@ class EmployeeKPIGoal(Base):
         return f"<EmployeeKPIGoal Employee#{self.employee_id} Goal#{self.goal_id} {self.achievement_percentage}%>"
 
 
-class KPITask(Base):
-    """KPI Task - задачи, привязанные к целям KPI для декомпозиции на выполнимые элементы"""
-    __tablename__ = "kpi_tasks"
-    __table_args__ = (
-        Index('idx_kpi_task_employee', 'employee_id'),
-        Index('idx_kpi_task_goal', 'employee_kpi_goal_id'),
-        Index('idx_kpi_task_status', 'status'),
-        Index('idx_kpi_task_priority', 'priority'),
-        Index('idx_kpi_task_due_date', 'due_date'),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    # Relations
-    employee_kpi_goal_id = Column(
-        Integer,
-        ForeignKey("employee_kpi_goals.id"),
-        nullable=False,
-        index=True
-    )
-    employee_id = Column(
-        Integer,
-        ForeignKey("employees.id"),
-        nullable=False,
-        index=True
-    )
-    assigned_by_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=True,
-        index=True
-    )
-    department_id = Column(
-        Integer,
-        ForeignKey("departments.id"),
-        nullable=False,
-        index=True
-    )
-
-    # Task details
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    status = Column(
-        Enum(KPITaskStatusEnum),
-        nullable=False,
-        default=KPITaskStatusEnum.TODO,
-        index=True
-    )
-    priority = Column(
-        Enum(KPITaskPriorityEnum),
-        nullable=False,
-        default=KPITaskPriorityEnum.MEDIUM,
-        index=True
-    )
-
-    # Complexity and estimation
-    complexity = Column(Integer, nullable=True)  # 1-10 scale (1=простая, 10=очень сложная)
-    estimated_hours = Column(Numeric(5, 2), nullable=True)  # Оценка времени в часах
-    actual_hours = Column(Numeric(5, 2), nullable=True)  # Фактическое время
-
-    # Progress tracking
-    completion_percentage = Column(
-        Numeric(5, 2),
-        nullable=True,
-        default=0
-    )  # Процент выполнения 0-100%
-
-    # Dates
-    due_date = Column(DateTime, nullable=True, index=True)  # Срок выполнения
-    start_date = Column(DateTime, nullable=True)  # Дата начала
-    completed_at = Column(DateTime, nullable=True)  # Дата завершения
-
-    # Additional information
-    notes = Column(Text, nullable=True)  # Комментарии и заметки
-
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationships
-    employee_kpi_goal = relationship("EmployeeKPIGoal", backref="tasks")
-    employee = relationship("Employee")
-    assigned_by = relationship("User", foreign_keys=[assigned_by_id])
-    department_rel = relationship("Department")
-
-    def __repr__(self):
-        return f"<KPITask #{self.id} '{self.title}' {self.status.value} {self.priority.value}>"
+# KPITask model removed - Tasks feature deprecated in favor of simplified KPI Goals workflow
 
 
 # ============================================================================
@@ -1806,6 +1777,23 @@ class InvoiceProcessingStatusEnum(str, enum.Enum):
     ERROR = "ERROR"  # Ошибка обработки
     MANUAL_REVIEW = "MANUAL_REVIEW"  # Требует ручной проверки
     EXPENSE_CREATED = "EXPENSE_CREATED"  # Расход создан
+
+
+class TimesheetStatusEnum(str, enum.Enum):
+    """Enum for timesheet statuses (Статусы табеля учета рабочего времени)"""
+    DRAFT = "DRAFT"  # Черновик (можно редактировать)
+    APPROVED = "APPROVED"  # Утвержден (редактирование запрещено)
+    PAID = "PAID"  # Оплачен (финальный статус)
+
+
+class DayTypeEnum(str, enum.Enum):
+    """Enum for day types (Типы дней в табеле)"""
+    WORK = "WORK"  # Рабочий день (оплачиваемый)
+    UNPAID_LEAVE = "UNPAID_LEAVE"  # День за свой счет (неоплачиваемый отпуск)
+    SICK_LEAVE = "SICK_LEAVE"  # Больничный
+    VACATION = "VACATION"  # Оплачиваемый отпуск
+    WEEKEND = "WEEKEND"  # Выходной
+    HOLIDAY = "HOLIDAY"  # Праздник
 
 
 class RevenueForecast(Base):
@@ -2595,9 +2583,11 @@ class PayrollScenarioDetail(Base):
     is_terminated = Column(Boolean, default=False, nullable=False)  # Увольнение
     termination_month = Column(Integer, nullable=True)  # Месяц увольнения (1-12)
 
-    # Плановый оклад
+    # Плановый оклад и премии
     base_salary = Column(Numeric(15, 2), nullable=False)
     monthly_bonus = Column(Numeric(15, 2), default=0, nullable=False)
+    quarterly_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Квартальная премия
+    annual_bonus = Column(Numeric(15, 2), default=0, nullable=False)  # Годовая премия
 
     # Расчет страховых взносов (по новым ставкам)
     pension_contribution = Column(Numeric(15, 2), nullable=True)  # ПФР
@@ -2874,3 +2864,191 @@ class ModuleEvent(Base):
 
     def __repr__(self):
         return f"<ModuleEvent {self.event_type} org={self.organization_id} module={self.module_id}>"
+
+
+# ==================== Admin Settings (Singleton) ====================
+
+class AdminSettings(Base):
+    """
+    Глобальные настройки администратора (singleton)
+    Хранятся в БД и не теряются после перезапуска
+    """
+    __tablename__ = "admin_settings"
+
+    id = Column(Integer, primary_key=True)  # Всегда = 1 (singleton)
+
+    # Основные настройки
+    app_name = Column(String(255), nullable=True)
+
+    # 1C OData
+    odata_url = Column(String(500), nullable=True)
+    odata_username = Column(String(255), nullable=True)
+    odata_password = Column(String(255), nullable=True)
+    odata_custom_auth_token = Column(Text, nullable=True)
+
+    # VseGPT (AI для обработки счетов)
+    vsegpt_api_key = Column(String(500), nullable=True)
+    vsegpt_base_url = Column(String(500), nullable=True)
+    vsegpt_model = Column(String(255), nullable=True)
+
+    # Credit Portfolio FTP
+    credit_portfolio_ftp_host = Column(String(255), nullable=True)
+    credit_portfolio_ftp_user = Column(String(255), nullable=True)
+    credit_portfolio_ftp_password = Column(String(255), nullable=True)
+    credit_portfolio_ftp_remote_dir = Column(String(500), nullable=True)
+    credit_portfolio_ftp_local_dir = Column(String(500), nullable=True)
+
+    # Scheduler настройки
+    scheduler_enabled = Column(Boolean, default=True, nullable=False)
+    credit_portfolio_import_enabled = Column(Boolean, default=False, nullable=False)
+    credit_portfolio_import_hour = Column(Integer, default=2, nullable=False)
+    credit_portfolio_import_minute = Column(Integer, default=0, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    updated_by_rel = relationship("User")
+
+    def __repr__(self):
+        return f"<AdminSettings id={self.id}>"
+
+
+# ==================== TIMESHEET MODELS (HR_DEPARTMENT) ====================
+
+class WorkTimesheet(Base):
+    """
+    Табель учета рабочего времени (HR_DEPARTMENT module)
+    Один табель на сотрудника за месяц
+    """
+    __tablename__ = "work_timesheets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Сотрудник
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Период
+    year = Column(Integer, nullable=False, index=True)
+    month = Column(Integer, nullable=False, index=True)
+
+    # Итоги
+    total_days_worked = Column(Integer, default=0, nullable=False)
+    total_hours_worked = Column(Numeric(6, 2), default=0, nullable=False)
+
+    # Статус
+    status = Column(Enum(TimesheetStatusEnum), default=TimesheetStatusEnum.DRAFT, nullable=False, index=True)
+
+    # Утверждение
+    approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    approved_at = Column(Date)
+
+    # Примечания
+    notes = Column(Text)
+
+    # Кэш для быстрого доступа (JSON)
+    daily_summary = Column(JSON)
+
+    # Multi-tenancy (ОБЯЗАТЕЛЬНО)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    employee = relationship("Employee", back_populates="timesheets")
+    approved_by = relationship("User", foreign_keys=[approved_by_id])
+    daily_records = relationship("DailyWorkRecord", back_populates="timesheet", cascade="all, delete-orphan")
+    department_rel = relationship("Department")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('employee_id', 'department_id', 'year', 'month', name='uq_timesheet_employee_period'),
+        CheckConstraint('year >= 2020 AND year <= 2100', name='ck_timesheet_year'),
+        CheckConstraint('month >= 1 AND month <= 12', name='ck_timesheet_month'),
+        CheckConstraint('total_days_worked >= 0 AND total_days_worked <= 31', name='ck_timesheet_days'),
+        CheckConstraint('total_hours_worked >= 0', name='ck_timesheet_hours'),
+        Index('ix_timesheet_employee_period', 'employee_id', 'year', 'month'),
+        Index('ix_timesheet_period', 'year', 'month'),
+        Index('ix_timesheet_department_period', 'department_id', 'year', 'month'),
+    )
+
+    @property
+    def can_edit(self) -> bool:
+        """Можно ли редактировать табель"""
+        return self.status == TimesheetStatusEnum.DRAFT
+
+    @property
+    def period_display(self) -> str:
+        """Отображение периода на русском"""
+        months_ru = [
+            "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+            "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+        ]
+        return f"{months_ru[self.month - 1]} {self.year}"
+
+    def __repr__(self):
+        return f"<WorkTimesheet employee={self.employee_id} period={self.year}-{self.month:02d} status={self.status}>"
+
+
+class DailyWorkRecord(Base):
+    """
+    Подневные записи табеля
+    Одна запись на день для каждого табеля
+    """
+    __tablename__ = "daily_work_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Связь с табелем
+    timesheet_id = Column(UUID(as_uuid=True), ForeignKey("work_timesheets.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Дата
+    work_date = Column(Date, nullable=False, index=True)
+
+    # Работа
+    is_working_day = Column(Boolean, default=False, nullable=False)
+    hours_worked = Column(Numeric(4, 2), default=0, nullable=False)
+
+    # Тип дня (NEW)
+    day_type = Column(Enum(DayTypeEnum), default=DayTypeEnum.WORK, nullable=False)
+
+    # Дополнительные часы
+    break_hours = Column(Numeric(3, 2), default=0)
+    overtime_hours = Column(Numeric(3, 2), default=0)
+
+    # Примечания
+    notes = Column(Text)
+
+    # Multi-tenancy (ОБЯЗАТЕЛЬНО)
+    department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    timesheet = relationship("WorkTimesheet", back_populates="daily_records")
+    department_rel = relationship("Department")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint('timesheet_id', 'work_date', name='uq_daily_record_timesheet_date'),
+        CheckConstraint('hours_worked >= 0 AND hours_worked <= 24', name='ck_daily_hours'),
+        CheckConstraint('break_hours >= 0', name='ck_break_hours'),
+        CheckConstraint('overtime_hours >= 0', name='ck_overtime_hours'),
+        Index('ix_daily_record_timesheet_date', 'timesheet_id', 'work_date'),
+        Index('ix_daily_record_date', 'work_date'),
+        Index('ix_daily_record_department', 'department_id'),
+    )
+
+    @property
+    def net_hours_worked(self) -> float:
+        """Чистое время работы (без перерывов)"""
+        return float(self.hours_worked) - float(self.break_hours or 0)
+
+    def __repr__(self):
+        return f"<DailyWorkRecord date={self.work_date} hours={self.hours_worked}>"

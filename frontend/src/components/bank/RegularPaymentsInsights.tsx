@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
-import { Card, Col, Empty, Row, Statistic, Table, Tag } from 'antd'
+import { Card, Col, Empty, Row, Statistic, Tag } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { CalendarOutlined, FieldTimeOutlined, FundOutlined } from '@ant-design/icons'
 import {
   Bar,
@@ -8,8 +9,7 @@ import {
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
-  YAxis,
-} from 'recharts'
+  YAxis} from 'recharts'
 import dayjs from 'dayjs'
 import type { RegularPaymentSummary } from '@/types/bankTransaction'
 
@@ -23,8 +23,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
     new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      maximumFractionDigits: 0,
-    }).format(value)
+      maximumFractionDigits: 0}).format(value)
 
   const hasData = data.length > 0
 
@@ -34,8 +33,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
         count: 0,
         avgAmount: 0,
         avgInterval: 0,
-        avgPayments: 0,
-      }
+        avgPayments: 0}
     }
 
     const totalAmount = data.reduce((sum, item) => sum + Number(item.avg_amount), 0)
@@ -46,8 +44,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
       count: data.length,
       avgAmount: totalAmount / data.length,
       avgInterval: totalInterval / data.length,
-      avgPayments: totalPayments / data.length,
-    }
+      avgPayments: totalPayments / data.length}
   }, [data, hasData])
 
   const chartData = useMemo(() => {
@@ -61,8 +58,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
           : item.counterparty_name,
         fullName: item.counterparty_name,
         amount: Number(item.avg_amount),
-        payments: item.payment_count,
-      }))
+        payments: item.payment_count}))
   }, [data])
 
   const columns = [
@@ -80,42 +76,36 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
             </Tag>
           )}
         </div>
-      ),
-    },
+      )},
     {
       title: 'Категория',
       dataIndex: 'category_name',
       key: 'category_name',
-      width: '18%',
-    },
+      width: '18%'},
     {
       title: 'Avg сумма',
       dataIndex: 'avg_amount',
       key: 'avg_amount',
       align: 'right' as const,
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Кол-во платежей',
       dataIndex: 'payment_count',
       key: 'payment_count',
       align: 'right' as const,
-      render: (value: number) => value.toLocaleString('ru-RU'),
-    },
+      render: (value: number) => value.toLocaleString('ru-RU')},
     {
       title: 'Интервал',
       dataIndex: 'avg_days_between',
       key: 'avg_days_between',
       align: 'right' as const,
-      render: (value?: number) => (value ? `~${value.toFixed(0)} дней` : '—'),
-    },
+      render: (value?: number) => (value ? `~${value.toFixed(0)} дней` : '—')},
     {
       title: 'Последний платёж',
       dataIndex: 'last_payment_date',
       key: 'last_payment_date',
       align: 'right' as const,
-      render: (value: string) => dayjs(value).format('DD.MM.YYYY'),
-    },
+      render: (value: string) => dayjs(value).format('DD.MM.YYYY')},
     {
       title: 'Следующий ожидается',
       dataIndex: 'next_expected_date',
@@ -133,8 +123,7 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
             {dayjs(value).format('DD.MM.YYYY')}
           </Tag>
         )
-      },
-    },
+      }},
   ]
 
   return (
@@ -204,14 +193,13 @@ const RegularPaymentsInsights: React.FC<RegularPaymentsInsightsProps> = ({ data 
 
             <Col xs={24} lg={14}>
               <h4 style={{ marginBottom: 12 }}>Детализация по контрагентам</h4>
-              <Table
+              <ResponsiveTable
                 columns={columns}
                 dataSource={data}
                 rowKey={(record) => `${record.counterparty_name}-${record.category_name}`}
                 pagination={{
                   pageSize: 8,
-                  showSizeChanger: false,
-                }}
+                  showSizeChanger: false}}
                 size="small"
                 scroll={{ x: 900 }}
               />

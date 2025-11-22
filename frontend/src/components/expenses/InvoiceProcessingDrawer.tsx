@@ -429,7 +429,7 @@ const InvoiceProcessingDrawer: React.FC<InvoiceProcessingDrawerProps> = ({
         width={1200}
         open={visible}
         onClose={onClose}
-        destroyOnClose
+        destroyOnHidden
       >
         <Tabs
           defaultActiveKey="quick"

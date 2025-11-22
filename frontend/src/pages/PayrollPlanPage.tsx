@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  Table,
+import { Table, 
   Card,
   Select,
   Space,
@@ -13,8 +12,7 @@ import {
   Dropdown,
   MenuProps,
   message,
-  Modal,
-} from 'antd';
+  Modal} from 'antd';
 import {
   DollarOutlined,
   TeamOutlined,
@@ -22,9 +20,9 @@ import {
   DownOutlined,
   DownloadOutlined,
   UploadOutlined,
-  FileTextOutlined,
-} from '@ant-design/icons';
+  FileTextOutlined} from '@ant-design/icons';
 import { useDepartment } from '../contexts/DepartmentContext';
+import { ResponsiveTable } from '@/components/common/ResponsiveTable';
 import { payrollPlanAPI, payrollActualAPI, PayrollPlanWithEmployee, PayrollActualWithEmployee } from '../api/payroll';
 import { formatCurrency } from '../utils/formatters';
 import PayrollPlanFormModal from '../components/payroll/PayrollPlanFormModal';
@@ -59,9 +57,7 @@ export default function PayrollPlanPage() {
     queryFn: () =>
       payrollPlanAPI.list({
         department_id: selectedDepartment?.id,
-        year: selectedYear,
-      }),
-  });
+        year: selectedYear})});
 
   // Fetch payroll actuals
   const { data: actuals = [], isLoading: actualsLoading } = useQuery<PayrollActualWithEmployee[]>({
@@ -78,16 +74,14 @@ export default function PayrollPlanPage() {
           department_id: selectedDepartment?.id,
           year: selectedYear,
           skip,
-          limit,
-        })
+          limit})
         allActuals = [...allActuals, ...actualsBatch]
         hasMore = actualsBatch.length === limit
         skip += limit
       }
 
       return allActuals
-    },
-  });
+    }});
 
   // Group data by month
   const monthlyData = MONTHS.map((monthName, index) => {
@@ -107,8 +101,7 @@ export default function PayrollPlanPage() {
       totalPlanned,
       totalPaid,
       variance,
-      variancePercent,
-    };
+      variancePercent};
   });
 
   // Calculate year totals
@@ -141,16 +134,14 @@ export default function PayrollPlanPage() {
         } catch (error: any) {
           message.error(error.response?.data?.detail || 'Ошибка при удалении плана');
         }
-      },
-    });
+      }});
   };
 
   const handleExportPlans = async () => {
     try {
       await payrollPlanAPI.exportToExcel({
         year: selectedYear,
-        department_id: selectedDepartment?.id,
-      });
+        department_id: selectedDepartment?.id});
       message.success('Экспорт планов выполнен успешно');
     } catch (error) {
       message.error('Ошибка при экспорте планов');
@@ -161,8 +152,7 @@ export default function PayrollPlanPage() {
     try {
       await payrollActualAPI.exportToExcel({
         year: selectedYear,
-        department_id: selectedDepartment?.id,
-      });
+        department_id: selectedDepartment?.id});
       message.success('Экспорт фактов выполнен успешно');
     } catch (error) {
       message.error('Ошибка при экспорте фактов');
@@ -174,73 +164,60 @@ export default function PayrollPlanPage() {
       key: 'plan',
       label: 'Добавить план',
       icon: <PlusOutlined />,
-      onClick: () => handleAddPlan(),
-    },
+      onClick: () => handleAddPlan()},
     {
       key: 'actual',
       label: 'Добавить факт',
       icon: <PlusOutlined />,
-      onClick: () => handleAddActual(),
-    },
+      onClick: () => handleAddActual()},
     {
-      type: 'divider',
-    },
+      type: 'divider'},
     {
       key: 'create-year-plan',
       label: 'Создать план на год',
       icon: <TeamOutlined />,
-      onClick: () => setCreateYearPlanModalVisible(true),
-    },
+      onClick: () => setCreateYearPlanModalVisible(true)},
     {
-      type: 'divider',
-    },
+      type: 'divider'},
     {
       key: 'import',
       label: 'Импорт из Excel',
       icon: <UploadOutlined />,
-      onClick: () => setImportModalVisible(true),
-    },
+      onClick: () => setImportModalVisible(true)},
     {
-      type: 'divider',
-    },
+      type: 'divider'},
     {
       key: 'generate-expenses',
       label: 'Создать заявки на ЗП',
       icon: <FileTextOutlined />,
-      onClick: () => setGenerateExpensesModalVisible(true),
-    },
+      onClick: () => setGenerateExpensesModalVisible(true)},
   ];
 
   const exportMenuItems: MenuProps['items'] = [
     {
       key: 'export-plans',
       label: 'Экспорт планов',
-      onClick: handleExportPlans,
-    },
+      onClick: handleExportPlans},
     {
       key: 'export-actuals',
       label: 'Экспорт фактов',
-      onClick: handleExportActuals,
-    },
+      onClick: handleExportActuals},
   ];
 
   const columns = [
     {
       title: 'Месяц',
       dataIndex: 'monthName',
-      key: 'monthName',
-    },
+      key: 'monthName'},
     {
       title: 'Сотрудников',
       dataIndex: 'employeeCount',
-      key: 'employeeCount',
-    },
+      key: 'employeeCount'},
     {
       title: 'План (₽)',
       dataIndex: 'totalPlanned',
       key: 'totalPlanned',
-      render: (value: number) => formatCurrency(value),
-    },
+      render: (value: number) => formatCurrency(value)},
     {
       title: 'Факт (₽)',
       dataIndex: 'totalPaid',
@@ -249,8 +226,7 @@ export default function PayrollPlanPage() {
         <span style={{ color: value > 0 ? '#3f8600' : undefined }}>
           {formatCurrency(value)}
         </span>
-      ),
-    },
+      )},
     {
       title: 'Отклонение (₽)',
       dataIndex: 'variance',
@@ -262,8 +238,7 @@ export default function PayrollPlanPage() {
             {value > 0 ? '+' : ''}{formatCurrency(value)}
           </span>
         );
-      },
-    },
+      }},
     {
       title: 'Отклонение (%)',
       dataIndex: 'variancePercent',
@@ -275,8 +250,7 @@ export default function PayrollPlanPage() {
             {value > 0 ? '+' : ''}{value.toFixed(2)}%
           </Tag>
         );
-      },
-    },
+      }},
   ];
 
   return (
@@ -359,8 +333,7 @@ export default function PayrollPlanPage() {
                     ? '#cf1322'
                     : yearVariance < 0
                     ? '#3f8600'
-                    : undefined,
-              }}
+                    : undefined}}
             />
           </Card>
         </Col>
@@ -368,12 +341,13 @@ export default function PayrollPlanPage() {
 
       {/* Monthly Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={monthlyData}
           rowKey="month"
           loading={plansLoading || actualsLoading}
           pagination={false}
+          mobileLayout="card"
           expandable={{
             expandedRowRender: (record) => {
               const monthPlans = plans.filter((p) => p.month === record.month);
@@ -388,44 +362,37 @@ export default function PayrollPlanPage() {
                 {
                   title: 'Сотрудник',
                   key: 'employee_name',
-                  render: (_: any, plan: PayrollPlanWithEmployee) => plan.employee?.full_name || '-',
-                },
+                  render: (_: any, plan: PayrollPlanWithEmployee) => plan.employee?.full_name || '-'},
                 {
                   title: 'Оклад',
                   dataIndex: 'base_salary',
                   key: 'base_salary',
-                  render: (value: number) => formatCurrency(value),
-                },
+                  render: (value: number) => formatCurrency(value)},
                 {
                   title: 'Премия (мес)',
                   dataIndex: 'monthly_bonus',
                   key: 'monthly_bonus',
-                  render: (value: number) => formatCurrency(value || 0),
-                },
+                  render: (value: number) => formatCurrency(value || 0)},
                 {
                   title: 'Премия (квар)',
                   dataIndex: 'quarterly_bonus',
                   key: 'quarterly_bonus',
-                  render: (value: number) => formatCurrency(value || 0),
-                },
+                  render: (value: number) => formatCurrency(value || 0)},
                 {
                   title: 'Премия (год)',
                   dataIndex: 'annual_bonus',
                   key: 'annual_bonus',
-                  render: (value: number) => formatCurrency(value || 0),
-                },
+                  render: (value: number) => formatCurrency(value || 0)},
                 {
                   title: 'Прочие',
                   dataIndex: 'other_payments',
                   key: 'other_payments',
-                  render: (value: number) => formatCurrency(value || 0),
-                },
+                  render: (value: number) => formatCurrency(value || 0)},
                 {
                   title: 'Итого',
                   dataIndex: 'total_planned',
                   key: 'total_planned',
-                  render: (value: number) => <strong>{formatCurrency(value)}</strong>,
-                },
+                  render: (value: number) => <strong>{formatCurrency(value)}</strong>},
                 {
                   title: 'Действия',
                   key: 'actions',
@@ -450,22 +417,21 @@ export default function PayrollPlanPage() {
                         Удалить
                       </Button>
                     </Space>
-                  ),
-                },
+                  )},
               ];
 
               return (
-                <Table
+                <ResponsiveTable
                   columns={detailColumns}
                   dataSource={monthPlans}
                   rowKey="id"
                   pagination={false}
                   size="small"
+                  mobileLayout="card"
                 />
               );
             },
-            rowExpandable: (record) => record.employeeCount > 0,
-          }}
+            rowExpandable: (record) => record.employeeCount > 0}}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row className="payroll-summary-row">
@@ -508,8 +474,7 @@ export default function PayrollPlanPage() {
         planId={editingPlan?.id}
         defaultValues={{
           year: selectedYear,
-          month: selectedMonth,
-        }}
+          month: selectedMonth}}
         onCancel={() => {
           setPlanModalVisible(false);
           setSelectedMonth(undefined);
@@ -521,8 +486,7 @@ export default function PayrollPlanPage() {
         visible={actualModalVisible}
         defaultValues={{
           year: selectedYear,
-          month: selectedMonth,
-        }}
+          month: selectedMonth}}
         onCancel={() => {
           setActualModalVisible(false);
           setSelectedMonth(undefined);

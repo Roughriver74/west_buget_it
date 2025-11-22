@@ -16,12 +16,10 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   Tooltip,
   Upload,
-  Typography,
-} from 'antd'
+  Typography} from 'antd'
 import {
   BankOutlined,
   CheckCircleOutlined,
@@ -36,8 +34,7 @@ import {
   UploadOutlined,
   WalletOutlined,
   DownOutlined,
-  UpOutlined,
-} from '@ant-design/icons'
+  UpOutlined} from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { bankTransactionsApi, categoriesApi, organizationsApi } from '@/api'
@@ -47,9 +44,11 @@ import { BankTransactionStatus, BankTransactionType } from '@/types/bankTransact
 import type { BankTransaction, BankTransactionList } from '@/types/bankTransaction'
 import { useDepartment } from '@/contexts/DepartmentContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import LoadingState from '@/components/common/LoadingState'
 import ErrorState from '@/components/common/ErrorState'
 import ColumnMappingModal from '@/components/bank/ColumnMappingModal'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 
 const { RangePicker } = DatePicker
 const { Search } = Input
@@ -82,6 +81,7 @@ const BankTransactionsPage = () => {
   const { user } = useAuth()
   const { modal } = App.useApp()
   const { message } = App.useApp()
+  const isMobile = useIsMobile()
 
   // Filters
   const [transactionType, setTransactionType] = useState<BankTransactionType | undefined>()
@@ -138,8 +138,7 @@ const BankTransactionsPage = () => {
       only_unprocessed: onlyUnprocessed,
       department_id: selectedDepartment?.id,
       organization_id: organizationFilter,
-      category_id: categoryFilter,
-    }),
+      category_id: categoryFilter}),
     [
       transactionType,
       paymentSource,
@@ -175,8 +174,7 @@ const BankTransactionsPage = () => {
       const response = await bankTransactionsApi.getTransactions({
         skip,
         limit,
-        ...transactionFilterParams,
-      })
+        ...transactionFilterParams})
 
       if (!response.items || response.items.length === 0) break
 
@@ -222,9 +220,7 @@ const BankTransactionsPage = () => {
       bankTransactionsApi.getTransactions({
         skip: (page - 1) * pageSize,
         limit: pageSize,
-        ...transactionFilterParams,
-      }),
-  })
+        ...transactionFilterParams})})
 
   const updateTransactionInCache = useCallback(
     (id: number, patch: Partial<BankTransaction>) => {
@@ -232,8 +228,7 @@ const BankTransactionsPage = () => {
         if (!oldData) return oldData
         return {
           ...oldData,
-          items: oldData.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-        }
+          items: oldData.items.map((item) => (item.id === id ? { ...item, ...patch } : item))}
       })
     },
     [queryClient, bankTransactionsQueryKey]
@@ -306,8 +301,7 @@ const BankTransactionsPage = () => {
           try {
             await bankTransactionsApi.bulkCategorize({
               transaction_ids: similar.map((item) => item.id),
-              category_id: categoryId,
-            })
+              category_id: categoryId})
             message.success(`Категория применена к ${similar.length} транзакциям`)
             queryClient.invalidateQueries({ queryKey: ['bankTransactions'] })
             queryClient.invalidateQueries({ queryKey: ['bankTransactionsStats'] })
@@ -315,8 +309,7 @@ const BankTransactionsPage = () => {
             message.error(error.response?.data?.detail || error.message)
             throw error
           }
-        },
-      })
+        }})
     },
     [data?.items, modal, message, queryClient]
   )
@@ -329,21 +322,17 @@ const BankTransactionsPage = () => {
     ],
     queryFn: () =>
       bankTransactionsApi.getStats({
-        ...transactionFilterParams,
-      }),
-  })
+        ...transactionFilterParams})})
 
   // Fetch categories
   const { data: categories } = useQuery({
     queryKey: ['categories', selectedDepartment?.id],
-    queryFn: () => categoriesApi.getAll({ department_id: selectedDepartment?.id, is_active: true }),
-  })
+    queryFn: () => categoriesApi.getAll({ department_id: selectedDepartment?.id, is_active: true })})
 
   // Fetch organizations for filters
   const { data: organizations, isLoading: organizationsLoading } = useQuery({
     queryKey: ['organizations', selectedDepartment?.id],
-    queryFn: () => organizationsApi.getAll({ is_active: true }),
-  })
+    queryFn: () => organizationsApi.getAll({ is_active: true })})
 
 
   // Fetch matching expenses
@@ -353,8 +342,7 @@ const BankTransactionsPage = () => {
       selectedTransaction
         ? bankTransactionsApi.getMatchingExpenses(selectedTransaction.id, 10)
         : Promise.resolve([]),
-    enabled: !!selectedTransaction && matchingDrawerOpen,
-  })
+    enabled: !!selectedTransaction && matchingDrawerOpen})
 
   // Fetch AI category suggestions
   const { data: categorySuggestions, isLoading: suggestionsLoading } = useQuery({
@@ -363,8 +351,7 @@ const BankTransactionsPage = () => {
       selectedTransaction
         ? bankTransactionsApi.getCategorySuggestions(selectedTransaction.id, 3)
         : Promise.resolve([]),
-    enabled: !!selectedTransaction && categorizeDrawerOpen,
-  })
+    enabled: !!selectedTransaction && categorizeDrawerOpen})
 
   // Preview mutation
   const previewMutation = useMutation({
@@ -376,8 +363,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка чтения файла: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Import mutation
   const importMutation = useMutation({
@@ -398,8 +384,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка импорта: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Categorize mutation
   const categorizeMutation = useMutation({
@@ -415,8 +400,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Link mutation
   const linkMutation = useMutation({
@@ -431,8 +415,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
@@ -445,8 +428,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка удаления: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Quick update mutation for inline editing
   type QuickUpdatePayload = {
@@ -470,8 +452,7 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // OData sync mutation (Background Task)
   const odataSyncMutation = useMutation({
@@ -531,16 +512,14 @@ const BankTransactionsPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка запуска синхронизации: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   const formatCurrency = (value: number) => {
     const numericValue = Number.isFinite(value) ? value : Number(value) || 0
     return new Intl.NumberFormat('ru-RU', {
       style: 'currency',
       currency: 'RUB',
-      minimumFractionDigits: 0,
-    }).format(numericValue)
+      minimumFractionDigits: 0}).format(numericValue)
   }
   const formatAccountNumber = useCallback((account?: string | null) => {
     if (!account) return ''
@@ -570,8 +549,7 @@ const BankTransactionsPage = () => {
         }
         return {
           value: entryValue,
-          label: entry.account ? formatAccountNumber(entry.account) : 'Счёт не указан',
-        }
+          label: entry.account ? formatAccountNumber(entry.account) : 'Счёт не указан'}
       })
       setPage(1)
     },
@@ -587,8 +565,7 @@ const BankTransactionsPage = () => {
       const current = prev[key] ?? true
       return {
         ...prev,
-        [key]: !current,
-      }
+        [key]: !current}
     })
   }, [])
 
@@ -596,14 +573,11 @@ const BankTransactionsPage = () => {
     BANK: {
       label: 'Безнал',
       color: 'geekblue',
-      icon: <BankOutlined />,
-    },
+      icon: <BankOutlined />},
     CASH: {
       label: 'Наличные',
       color: 'gold',
-      icon: <WalletOutlined />,
-    },
-  }
+      icon: <WalletOutlined />}}
 
   const pageSnapshot = useMemo(() => {
     const items = data?.items ?? []
@@ -630,8 +604,7 @@ const BankTransactionsPage = () => {
             department: item.department_name,
             credit: 0,
             debit: 0,
-            count: 0,
-          }
+            count: 0}
         }
         const bucket = acc.banks[accountKey]
         bucket.count += 1
@@ -657,8 +630,7 @@ const BankTransactionsPage = () => {
     const bankBreakdown = Object.values(summary.banks)
       .map((bank) => ({
         ...bank,
-        total: bank.credit + bank.debit,
-      }))
+        total: bank.credit + bank.debit}))
       .sort((a, b) => b.total - a.total)
 
     return {
@@ -667,8 +639,7 @@ const BankTransactionsPage = () => {
       pending: summary.pending,
       net: summary.credit - summary.debit,
       count: items.length,
-      bankBreakdown,
-    }
+      bankBreakdown}
   }, [data?.items])
 
   const hasTransactions = pageSnapshot.count > 0
@@ -681,8 +652,7 @@ const BankTransactionsPage = () => {
         pending: 0,
         credit: 0,
         debit: 0,
-        net: 0,
-      }
+        net: 0}
     }
     const credit = Number(stats.total_credit_amount ?? 0)
     const debit = Number(stats.total_debit_amount ?? 0)
@@ -691,8 +661,7 @@ const BankTransactionsPage = () => {
       pending: (stats.new_count ?? 0) + (stats.needs_review_count ?? 0),
       credit,
       debit,
-      net: credit - debit,
-    }
+      net: credit - debit}
   }, [stats])
 
   const processedCount = useMemo(() => {
@@ -729,8 +698,7 @@ const BankTransactionsPage = () => {
         const response = await bankTransactionsApi.getTransactions({
           skip,
           limit,
-          ...baseFilterParams,
-        })
+          ...baseFilterParams})
         total = response.total
         response.items.forEach((item) => {
           const accountKey = item.account_number || '—'
@@ -747,8 +715,7 @@ const BankTransactionsPage = () => {
               debit: 0,
               count: 0,
               net: 0,
-              pending: 0,
-            }
+              pending: 0}
           }
           const bucket = summary[accountKey]
           bucket.count += 1
@@ -777,17 +744,14 @@ const BankTransactionsPage = () => {
       const entries = Object.values(summary)
         .map((entry) => ({
           ...entry,
-          net: entry.credit - entry.debit,
-        }))
+          net: entry.credit - entry.debit}))
         .sort((a, b) => b.credit + b.debit - (a.credit + a.debit))
 
       return {
         entries,
-        usedCategoryIds: Array.from(usedCategoryIds),
-      }
+        usedCategoryIds: Array.from(usedCategoryIds)}
     },
-    enabled: !isNaN(data?.total ?? 0) && (data?.total ?? 0) > 0,
-  })
+    enabled: !isNaN(data?.total ?? 0) && (data?.total ?? 0) > 0})
 
   const shouldShowAccountBreakdown =
     bankBreakdownLoading || (bankAccountBreakdown && bankAccountBreakdown.entries.length > 0)
@@ -803,8 +767,7 @@ const BankTransactionsPage = () => {
     return usedCategoryIds
       .map((id) => ({
         value: id,
-        label: nameById.get(id) || `Категория #${id}`,
-      }))
+        label: nameById.get(id) || `Категория #${id}`}))
       .sort((a, b) => a.label.localeCompare(b.label, 'ru'))
   }, [categories, usedCategoryIds])
 
@@ -820,7 +783,7 @@ const BankTransactionsPage = () => {
       key: 'transaction_date',
       width: 170,
       sorter: (a, b) => dayjs(a.transaction_date).unix() - dayjs(b.transaction_date).unix(),
-      render: (date: string, record) => (
+      render: (date: string, record: BankTransaction) => (
         <div className="transaction-date-cell">
           <Text strong className="transaction-date-main">
             {dayjs(date).format('DD MMM YYYY')}
@@ -838,8 +801,7 @@ const BankTransactionsPage = () => {
             )}
           </div>
         </div>
-      ),
-    },
+      )},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -847,7 +809,7 @@ const BankTransactionsPage = () => {
       width: 150,
       align: 'right',
       sorter: (a, b) => a.amount - b.amount,
-      render: (amount: number, record) => {
+      render: (amount: number, record: BankTransaction) => {
         const isCredit = record.transaction_type === BankTransactionType.CREDIT
         return (
             <div className="transaction-amount-cell">
@@ -866,13 +828,12 @@ const BankTransactionsPage = () => {
             </div>
           </div>
         )
-      },
-    },
+      }},
     {
       title: 'Форма оплаты',
       key: 'payment_source',
       width: 260,
-      render: (_, record) => {
+      render: (_: any, record: BankTransaction) => {
         const sourceMeta = record.payment_source ? paymentSourceMeta[record.payment_source] : undefined
         return (
           <div className="payment-form-cell">
@@ -919,14 +880,13 @@ const BankTransactionsPage = () => {
             )}
           </div>
         )
-      },
-    },
+      }},
     {
       title: 'Контрагент',
       dataIndex: 'counterparty_name',
       key: 'counterparty_name',
       width: 280,
-      render: (name: string, record) => (
+      render: (name: string, record: BankTransaction) => (
         <div className="counterparty-cell">
           <Text strong>{name || 'Не указан'}</Text>
           {(record.counterparty_inn || record.counterparty_kpp || record.counterparty_bank) && (
@@ -947,8 +907,7 @@ const BankTransactionsPage = () => {
             </Space>
           )}
         </div>
-      ),
-    },
+      )},
     {
       title: 'Назначение',
       dataIndex: 'payment_purpose',
@@ -963,14 +922,13 @@ const BankTransactionsPage = () => {
             {purpose || 'Назначение не заполнено'}
           </Paragraph>
         </div>
-      ),
-    },
+      )},
     {
       title: 'Обработка',
       key: 'processing',
       width: 360,
       fixed: 'right',
-      render: (_, record) => {
+      render: (_: any, record: BankTransaction) => {
         const editable = isEditing(record)
         if (editable) {
           return (
@@ -986,8 +944,7 @@ const BankTransactionsPage = () => {
                   loading={!categories}
                   options={(categories || []).map((cat: BudgetCategory) => ({
                     value: cat.id,
-                    label: cat.name,
-                  }))}
+                    label: cat.name}))}
                   showSearch
                   filterOption={(input, option) =>
                     String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
@@ -1057,8 +1014,7 @@ const BankTransactionsPage = () => {
             </div>
           </div>
         )
-      },
-    },
+      }},
   ]
 
   const handleImport = () => {
@@ -1089,16 +1045,14 @@ const BankTransactionsPage = () => {
     categorizeMutation.mutate({
       id: selectedTransaction.id,
       categoryId: values.category_id,
-      notes: values.notes,
-    })
+      notes: values.notes})
   }
 
   const handleLinkToExpense = (expenseId: number) => {
     if (!selectedTransaction) return
     linkMutation.mutate({
       id: selectedTransaction.id,
-      expenseId,
-    })
+      expenseId})
   }
 
   const handleBulkDelete = () => {
@@ -1115,8 +1069,7 @@ const BankTransactionsPage = () => {
       cancelText: 'Отмена',
       onOk: () => {
         bulkDeleteMutation.mutate(selectedRowKeys)
-      },
-    })
+      }})
   }
 
   const handleDeleteAll = () => {
@@ -1133,8 +1086,7 @@ const BankTransactionsPage = () => {
           return Promise.reject()
         }
         return bulkDeleteMutation.mutateAsync(allIds)
-      },
-    })
+      }})
   }
 
   const isEditing = (record: BankTransaction) => record.id === editingKey
@@ -1143,8 +1095,7 @@ const BankTransactionsPage = () => {
     editForm.setFieldsValue({
       category_id: record.category_id,
       status: record.status,
-      notes: record.notes,
-    })
+      notes: record.notes})
     setEditingKey(record.id)
   }
 
@@ -1165,8 +1116,7 @@ const BankTransactionsPage = () => {
 
   const handleInlineCategorySelect = (record: BankTransaction, value: number | null) => {
     const updates: Record<string, any> = {
-      category_id: value ?? undefined,
-    }
+      category_id: value ?? undefined}
 
     const selectedCategory = value
       ? (categories || []).find((cat: BudgetCategory) => cat.id === value)
@@ -1175,8 +1125,7 @@ const BankTransactionsPage = () => {
     const localPatch: Partial<BankTransaction> = {
       category_id: value ?? undefined,
       category_name: selectedCategory?.name,
-      suggested_category_name: value ? undefined : record.suggested_category_name,
-    }
+      suggested_category_name: value ? undefined : record.suggested_category_name}
 
     if (
       value &&
@@ -1195,8 +1144,7 @@ const BankTransactionsPage = () => {
           if (value) {
             promptApplyCategoryToSimilar(record, value, selectedCategory?.name)
           }
-        },
-      }
+        }}
     )
   }
 
@@ -1220,8 +1168,7 @@ const BankTransactionsPage = () => {
         password: defaultPassword,
         department_id: selectedDepartment.id,
         date_from: values.date_range?.[0]?.format('YYYY-MM-DD'),
-        date_to: values.date_range?.[1]?.format('YYYY-MM-DD'),
-      })
+        date_to: values.date_range?.[1]?.format('YYYY-MM-DD')})
     } catch (error) {
       console.error('Validation failed:', error)
     }
@@ -1301,8 +1248,7 @@ const BankTransactionsPage = () => {
             style={{
               marginBottom: 8,
               display: 'flex',
-              justifyContent: 'flex-start',
-            }}
+              justifyContent: 'flex-start'}}
           >
             <Button
               type="dashed"
@@ -1597,8 +1543,7 @@ const BankTransactionsPage = () => {
               onChange={(value) => setOrganizationFilter(value ?? undefined)}
               options={(organizations || []).map((org) => ({
                 value: org.id,
-                label: org.name,
-              }))}
+                label: org.name}))}
             />
             <Search
               placeholder="Поиск по контрагенту, ИНН, назначению..."
@@ -1667,14 +1612,15 @@ const BankTransactionsPage = () => {
         )}
 
         <Form form={editForm} component={false}>
-          <Table
+          <ResponsiveTable
             className="bank-transactions-table"
             columns={columns}
             dataSource={data?.items || []}
             rowKey="id"
             size="middle"
             scroll={{ x: 1700 }}
-            sticky={{ offsetHeader: 64 }}
+            sticky={{ offsetHeader: isMobile ? 48 : 64 }}
+            mobileLayout="card"
             title={() => (
               <div className="bank-transactions-table__title">
                 <Space size="large" wrap>
@@ -1728,9 +1674,7 @@ const BankTransactionsPage = () => {
               selectedRowKeys,
               onChange: (keys) => setSelectedRowKeys(keys as number[]),
               getCheckboxProps: () => ({
-                disabled: !user || !['MANAGER', 'ADMIN'].includes(user.role),
-              }),
-            }}
+                disabled: !user || !['MANAGER', 'ADMIN'].includes(user.role)})}}
             pagination={{
               current: page,
               pageSize,
@@ -1740,8 +1684,7 @@ const BankTransactionsPage = () => {
               onChange: (newPage, newPageSize) => {
                 setPage(newPage)
                 setPageSize(newPageSize)
-              },
-            }}
+              }}}
           />
         </Form>
       </Card>
@@ -1765,8 +1708,7 @@ const BankTransactionsPage = () => {
             padding: 12,
             background: selectedDepartment ? '#f6ffed' : '#fff7e6',
             border: `1px solid ${selectedDepartment ? '#b7eb8f' : '#ffd591'}`,
-            borderRadius: 4,
-          }}>
+            borderRadius: 4}}>
             {selectedDepartment ? (
               <div>
                 <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
@@ -1838,8 +1780,7 @@ const BankTransactionsPage = () => {
                       hoverable
                       style={{
                         borderColor: suggestion.confidence >= 0.9 ? '#52c41a' : suggestion.confidence >= 0.7 ? '#1890ff' : '#faad14',
-                        cursor: 'pointer',
-                      }}
+                        cursor: 'pointer'}}
                       onClick={() => {
                         categorizeForm.setFieldsValue({ category_id: suggestion.category_id })
                       }}
@@ -1880,8 +1821,7 @@ const BankTransactionsPage = () => {
                   )}
                   options={categories?.map((cat: BudgetCategory) => ({
                     value: cat.id,
-                    label: cat.name,
-                  }))}
+                    label: cat.name}))}
                 />
               </Form.Item>
 
@@ -2014,8 +1954,7 @@ const BankTransactionsPage = () => {
               background: '#f6ffed',
               border: '1px solid #b7eb8f',
               borderRadius: 4,
-              marginBottom: 16,
-            }}>
+              marginBottom: 16}}>
               <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
               <strong>Отдел:</strong> {selectedDepartment.name}
             </div>

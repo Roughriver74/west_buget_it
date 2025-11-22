@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import { Select, Spin } from 'antd';
 import { BankOutlined } from '@ant-design/icons';
 import { useDepartment } from '../../contexts/DepartmentContext';

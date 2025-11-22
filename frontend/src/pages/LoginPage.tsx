@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, Alert, Row, Col } from 'antd';
+import { Form, Typography, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Card } from '../components/ui/Card';
 
 const { Title, Text } = Typography;
 
@@ -24,7 +27,6 @@ const LoginPage: React.FC = () => {
       await login(values.username, values.password);
 
       // Small delay to ensure React state is fully updated before navigation
-      // This prevents race conditions where components render before auth context updates
       await new Promise(resolve => setTimeout(resolve, 150));
 
       // Navigate to the page they were trying to access, or home
@@ -37,75 +39,93 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <Row justify="center" align="middle" style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      <Col xs={22} sm={18} md={12} lg={8} xl={6}>
-        <Card>
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <Title level={2}>BDR Manager</Title>
-            <Text type="secondary">Sign in to your account</Text>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-[#0f172a] dark:to-[#1e293b] p-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-400/20 blur-[100px]" />
+        <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] rounded-full bg-indigo-400/20 blur-[100px]" />
+      </div>
+
+      <Card variant="glass" className="w-full max-w-md relative z-10 !border-white/40 dark:!border-white/10">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary mb-4">
+            <LockOutlined style={{ fontSize: 24 }} />
           </div>
+          <Title level={2} className="!mb-2 !text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Welcome Back
+          </Title>
+          <Text className="text-base text-gray-500 dark:text-gray-400">
+            Sign in to BDR Manager to continue
+          </Text>
+        </div>
 
-          {error && (
-            <Alert
-              message="Login Failed"
-              description={error}
-              type="error"
-              showIcon
-              closable
-              onClose={() => setError(null)}
-              style={{ marginBottom: 16 }}
-            />
-          )}
+        {error && (
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setError(null)}
+            className="mb-6 !rounded-lg"
+          />
+        )}
 
-          <Form
-            name="login"
-            onFinish={onFinish}
-            layout="vertical"
-            size="large"
+        <Form
+          name="login"
+          onFinish={onFinish}
+          layout="vertical"
+          size="large"
+          requiredMark={false}
+        >
+          <Form.Item
+            name="username"
+            rules={[{ required: true, message: 'Please enter your username' }]}
+            className="mb-4"
           >
-            <Form.Item
-              name="username"
-              rules={[{ required: true, message: 'Please enter your username or email' }]}
+            <Input
+              prefix={<UserOutlined className="text-gray-400" />}
+              placeholder="Username or Email"
+              autoComplete="username"
+              className="!bg-white/50 dark:!bg-black/20 backdrop-blur-sm"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: 'Please enter your password' }]}
+            className="mb-6"
+          >
+            <Input.Password
+              prefix={<LockOutlined className="text-gray-400" />}
+              placeholder="Password"
+              autoComplete="current-password"
+              className="!bg-white/50 dark:!bg-black/20 backdrop-blur-sm"
+            />
+          </Form.Item>
+
+          <Form.Item className="mb-4">
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              block
+              size="large"
+              className="h-11 text-base font-semibold"
             >
-              <Input
-                prefix={<UserOutlined />}
-                placeholder="Username or Email"
-                autoComplete="username"
-              />
-            </Form.Item>
+              Sign In
+            </Button>
+          </Form.Item>
 
-            <Form.Item
-              name="password"
-              rules={[{ required: true, message: 'Please enter your password' }]}
-            >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="Password"
-                autoComplete="current-password"
-              />
-            </Form.Item>
-
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                block
-              >
-                Sign In
-              </Button>
-            </Form.Item>
-
-            <div style={{ textAlign: 'center' }}>
-              <Text type="secondary">
-                Don't have an account?{' '}
-                <Link to="/register">Register now</Link>
-              </Text>
-            </div>
-          </Form>
-        </Card>
-      </Col>
-    </Row>
+          <div className="text-center">
+            <Text type="secondary">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-medium text-primary hover:text-blue-600 transition-colors">
+                Register now
+              </Link>
+            </Text>
+          </div>
+        </Form>
+      </Card>
+    </div>
   );
 };
 

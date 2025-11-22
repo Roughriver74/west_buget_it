@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Typography, Card, Select, Space, Table, Tag, Spin, Alert } from 'antd'
+import { Table,  Typography, Card, Select, Space, Tag, Spin, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { analyticsApi } from '@/api'
 import { useDepartment } from '@/contexts/DepartmentContext'
 
@@ -392,7 +393,7 @@ const BalanceAnalyticsPage: React.FC = () => {
 
       <Card>
         <Spin spinning={loading}>
-          <Table<CategoryBalance>
+          <ResponsiveTable<CategoryBalance>
             columns={columns}
             dataSource={groupedCategories}
             rowKey="category_id"
@@ -403,6 +404,7 @@ const BalanceAnalyticsPage: React.FC = () => {
               if (record.isChild === true) return 'child-row'
               return ''
             }}
+            mobileLayout="card"
             summary={() => (
               <Table.Summary fixed>
                 {summaryData.map((row) => (

@@ -63,7 +63,7 @@ class EmployeeKPIBase(BaseModel):
     kpi_percentage: Optional[Decimal] = Field(None, ge=0, le=200, description="КПИ% (0-200)")
 
     # Depremium threshold
-    depremium_threshold: Decimal = Field(10.00, ge=0, le=100, description="Порог депремирования (%)")
+    depremium_threshold: Optional[Decimal] = Field(None, ge=0, le=100, description="Порог депремирования (%)")
     depremium_applied: bool = False
 
     # Bonus types
@@ -89,7 +89,7 @@ class EmployeeKPIBase(BaseModel):
     # Task complexity bonus component (NEW in Task 3.2)
     task_complexity_avg: Optional[Decimal] = Field(None, ge=1, le=10, description="Средняя сложность задач (1-10)")
     task_complexity_multiplier: Optional[Decimal] = Field(None, ge=0.5, le=2.0, description="Множитель премии по сложности")
-    task_complexity_weight: Decimal = Field(20.00, ge=0, le=100, description="Вес компонента сложности в премии (%)")
+    task_complexity_weight: Optional[Decimal] = Field(None, ge=0, le=100, description="Вес компонента сложности в премии (%)")
 
     # Complexity bonus components
     monthly_bonus_complexity: Optional[Decimal] = Field(None, ge=0, description="Компонент месячной премии по сложности")
@@ -277,3 +277,135 @@ class KPIGoalProgress(BaseModel):
     employees_achieved: int
     avg_achievement_percentage: Decimal
     total_weight: Decimal
+
+
+# ============ KPI Goal Template Schemas ============
+
+class KPIGoalTemplateItemBase(BaseModel):
+    """Base schema for KPI goal template item"""
+    goal_id: int
+    weight: Decimal = Field(..., ge=0, le=100, description="Вес цели в шаблоне (0-100)")
+    default_target_value: Optional[Decimal] = Field(None, ge=0)
+    display_order: int = Field(0, ge=0)
+
+
+class KPIGoalTemplateItemCreate(KPIGoalTemplateItemBase):
+    """Schema for creating KPI goal template item"""
+    pass
+
+
+class KPIGoalTemplateItemUpdate(BaseModel):
+    """Schema for updating KPI goal template item"""
+    goal_id: Optional[int] = None
+    weight: Optional[Decimal] = Field(None, ge=0, le=100)
+    default_target_value: Optional[Decimal] = Field(None, ge=0)
+    display_order: Optional[int] = Field(None, ge=0)
+
+
+class KPIGoalTemplateItemInDB(KPIGoalTemplateItemBase):
+    """Schema for KPI goal template item in database"""
+    id: int
+    template_id: int
+
+    class Config:
+        from_attributes = True
+
+
+class KPIGoalTemplateItemWithGoal(KPIGoalTemplateItemInDB):
+    """Schema for KPI goal template item with goal details"""
+    goal: KPIGoalInDB
+
+    class Config:
+        from_attributes = True
+
+
+class KPIGoalTemplateBase(BaseModel):
+    """Base schema for KPI goal template"""
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    department_id: int
+    is_active: bool = True
+
+
+class KPIGoalTemplateCreate(KPIGoalTemplateBase):
+    """Schema for creating KPI goal template with items"""
+    template_goals: List[KPIGoalTemplateItemCreate] = Field(..., min_items=1)
+
+
+class KPIGoalTemplateUpdate(BaseModel):
+    """Schema for updating KPI goal template"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    template_goals: Optional[List[KPIGoalTemplateItemCreate]] = None
+
+
+class KPIGoalTemplateInDB(KPIGoalTemplateBase):
+    """Schema for KPI goal template in database"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    created_by_id: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+class KPIGoalTemplateWithGoals(KPIGoalTemplateInDB):
+    """Schema for KPI goal template with all goals"""
+    template_goals: List[KPIGoalTemplateItemWithGoal]
+
+    class Config:
+        from_attributes = True
+
+
+class ApplyTemplateRequest(BaseModel):
+    """Schema for applying template to employees"""
+    employee_ids: List[int] = Field(..., min_items=1)
+    year: int = Field(..., ge=2020, le=2100)
+    month: int = Field(..., ge=1, le=12)
+
+
+class ApplyTemplateResponse(BaseModel):
+    """Schema for template application response"""
+    success: bool
+    message: str
+    employees_updated: int
+    goals_created: int
+    errors: List[str] = []
+
+
+# ============ Bulk Operations Schemas ============
+
+class BulkAssignGoalsRequest(BaseModel):
+    """Request для массового назначения целей сотрудникам"""
+    employee_ids: List[int] = Field(..., min_items=1, description="Список ID сотрудников")
+    goal_id: int = Field(..., description="ID цели для назначения")
+    year: int = Field(..., ge=2020, le=2100, description="Год")
+    month: int = Field(..., ge=1, le=12, description="Месяц")
+    weight: Decimal = Field(..., ge=0, le=100, description="Вес цели (0-100%)")
+    target_value: Optional[Decimal] = Field(None, ge=0, description="Целевое значение")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "employee_ids": [1, 2, 3],
+                "goal_id": 5,
+                "year": 2025,
+                "month": 11,
+                "weight": 30.0,
+                "target_value": 100.0
+            }
+        }
+
+
+class BulkAssignGoalsResponse(BaseModel):
+    """Response для массового назначения целей"""
+    success: bool
+    message: str
+    total_employees: int
+    assigned_count: int
+    skipped_count: int
+    error_count: int
+    details: List[Dict[str, Any]] = []
+    errors: List[str] = []

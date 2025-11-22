@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Card,
-  Table,
   Button,
   Space,
   Tag,
@@ -18,8 +17,7 @@ import {
   Row,
   Col,
   Statistic,
-  Spin,
-} from 'antd'
+  Spin} from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -29,9 +27,9 @@ import {
   EyeOutlined,
   CopyOutlined,
   SyncOutlined,
-  FolderOutlined,
-} from '@ant-design/icons'
+  FolderOutlined} from '@ant-design/icons'
 import { useDepartment } from '@/contexts/DepartmentContext'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { revenueApi } from '@/api/revenue'
 import type { RevenuePlan, RevenuePlanCreate, RevenuePlanStatus } from '@/types/revenue'
 import CopyRevenuePlanModal from '@/components/revenue/CopyRevenuePlanModal'
@@ -57,10 +55,8 @@ const RevenuePlanningPage = () => {
       revenueApi.plans.getAll({
         year: selectedYear,
         status: selectedStatus,
-        department_id: selectedDepartment?.id,
-      }),
-    enabled: !!selectedDepartment,
-  })
+        department_id: selectedDepartment?.id}),
+    enabled: !!selectedDepartment})
 
   // Create plan mutation
   const createPlanMutation = useMutation({
@@ -73,8 +69,7 @@ const RevenuePlanningPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка создания плана: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Update plan mutation
   const updatePlanMutation = useMutation({
@@ -88,8 +83,7 @@ const RevenuePlanningPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка обновления плана: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Delete plan mutation
   const deletePlanMutation = useMutation({
@@ -100,8 +94,7 @@ const RevenuePlanningPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка удаления плана: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Approve plan mutation
   const approvePlanMutation = useMutation({
@@ -112,8 +105,7 @@ const RevenuePlanningPage = () => {
     },
     onError: (error: any) => {
       message.error(`Ошибка утверждения плана: ${error.response?.data?.detail || error.message}`)
-    },
-  })
+    }})
 
   // Calculate summary statistics
   const summary = useMemo(() => {
@@ -125,8 +117,7 @@ const RevenuePlanningPage = () => {
       total,
       approvedCount,
       draftCount,
-      totalCount: plans.length,
-    }
+      totalCount: plans.length}
   }, [plans])
 
   const handleOpenModal = useCallback((plan?: RevenuePlan) => {
@@ -135,13 +126,11 @@ const RevenuePlanningPage = () => {
       form.setFieldsValue({
         name: plan.name,
         year: dayjs().year(plan.year),
-        description: plan.description,
-      })
+        description: plan.description})
     } else {
       setEditingPlan(null)
       form.setFieldsValue({
-        year: dayjs().year(selectedYear),
-      })
+        year: dayjs().year(selectedYear)})
     }
     setIsModalVisible(true)
   }, [form, selectedYear])
@@ -160,14 +149,12 @@ const RevenuePlanningPage = () => {
       const submitData = {
         ...values,
         year: values.year?.year() || values.year,
-        department_id: selectedDepartment?.id,
-      }
+        department_id: selectedDepartment?.id}
 
       if (editingPlan) {
         updatePlanMutation.mutate({
           id: editingPlan.id,
-          data: submitData,
-        })
+          data: submitData})
       } else {
         createPlanMutation.mutate(submitData)
       }
@@ -182,8 +169,7 @@ const RevenuePlanningPage = () => {
       PENDING_APPROVAL: { color: 'processing', icon: <SyncOutlined spin />, text: 'На согласовании' },
       APPROVED: { color: 'success', icon: <CheckCircleOutlined />, text: 'Утвержден' },
       ACTIVE: { color: 'blue', icon: <CheckCircleOutlined />, text: 'Активный' },
-      ARCHIVED: { color: 'default', icon: <FolderOutlined />, text: 'Архивный' },
-    }
+      ARCHIVED: { color: 'default', icon: <FolderOutlined />, text: 'Архивный' }}
 
     const config = statusConfig[status] || { color: 'default', icon: null, text: status }
 
@@ -199,21 +185,18 @@ const RevenuePlanningPage = () => {
       title: 'Название',
       dataIndex: 'name',
       key: 'name',
-      width: 250,
-    },
+      width: 250},
     {
       title: 'Год',
       dataIndex: 'year',
       key: 'year',
-      width: 100,
-    },
+      width: 100},
     {
       title: 'Статус',
       dataIndex: 'status',
       key: 'status',
       width: 150,
-      render: (status: RevenuePlanStatus) => getStatusTag(status),
-    },
+      render: (status: RevenuePlanStatus) => getStatusTag(status)},
     {
       title: 'Плановая выручка',
       dataIndex: 'total_planned_revenue',
@@ -226,23 +209,19 @@ const RevenuePlanningPage = () => {
           style: 'currency',
           currency: 'RUB',
           minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        }).format(value)
-      },
-    },
+          maximumFractionDigits: 0}).format(value)
+      }},
     {
       title: 'Создан',
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY HH:mm'),
-    },
+      render: (date: string) => dayjs(date).format('DD.MM.YYYY HH:mm')},
     {
       title: 'Описание',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Действия',
       key: 'actions',
@@ -298,8 +277,7 @@ const RevenuePlanningPage = () => {
             </>
           )}
         </Space>
-      ),
-    },
+      )},
   ]
 
   if (!selectedDepartment) {
@@ -419,7 +397,7 @@ const RevenuePlanningPage = () => {
 
       {/* Plans Table */}
       <Card>
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={plans}
           rowKey="id"
@@ -427,9 +405,9 @@ const RevenuePlanningPage = () => {
           pagination={{
             showSizeChanger: true,
             showTotal: (total) => `Всего: ${total}`,
-            defaultPageSize: 20,
-          }}
+            defaultPageSize: 20}}
           scroll={{ x: 1200 }}
+          mobileLayout="card"
         />
       </Card>
 

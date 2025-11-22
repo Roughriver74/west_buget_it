@@ -16,8 +16,23 @@ export type EmployeeKPI = components['schemas']['EmployeeKPIWithGoals'] & {
   annual_bonus_complexity?: number | null
 }
 
+// Temporary extension to support legacy/front-end-only fields used in the KPI wizard
+type EmployeeKpiWizardFields = {
+  status?: string
+  bonus_base?: number | string
+  bonus_type?: string
+  monthly_bonus_multiplier?: number
+  quarterly_bonus_multiplier?: number
+  annual_bonus_multiplier?: number
+  depremium_threshold?: number
+  comment?: string
+}
+
+export type EmployeeKPIExtended = EmployeeKPI & EmployeeKpiWizardFields
 export type EmployeeKPICreate = components['schemas']['EmployeeKPICreate']
 export type EmployeeKPIUpdate = components['schemas']['EmployeeKPIUpdate']
+export type EmployeeKPICreateExtended = EmployeeKPICreate & EmployeeKpiWizardFields
+export type EmployeeKPIUpdateExtended = EmployeeKPIUpdate & EmployeeKpiWizardFields
 
 export type EmployeeKPIGoal = components['schemas']['EmployeeKPIGoalWithDetails']
 export type EmployeeKPIGoalCreate = components['schemas']['EmployeeKPIGoalCreate']
@@ -82,6 +97,122 @@ export interface BonusDistributionData {
   annual_total: number
   total_bonus: number
   employee_count: number
+}
+
+// ============ KPI Goal Template Types ============
+// TEMPORARILY DISABLED: KPI Task types missing due to kpi_tasks endpoint being disabled
+
+// export type KPIGoalTemplate = components['schemas']['KPIGoalTemplateWithGoals']
+// export type KPIGoalTemplateCreate = components['schemas']['KPIGoalTemplateCreate']
+// export type KPIGoalTemplateUpdate = components['schemas']['KPIGoalTemplateUpdate']
+// export type KPIGoalTemplateItem = components['schemas']['KPIGoalTemplateItemWithGoal']
+
+// Temporary placeholder types until KPITask model is implemented
+export interface KPIGoalTemplate {
+  id: number
+  name: string
+  description?: string
+  department_id: number
+  is_active: boolean
+  template_items?: KPIGoalTemplateItem[]
+  template_goals?: any[] // For backward compatibility
+}
+
+export interface KPIGoalTemplateCreate {
+  name: string
+  description?: string
+  department_id?: number
+  is_active?: boolean
+}
+
+export interface KPIGoalTemplateUpdate {
+  name?: string
+  description?: string
+  is_active?: boolean
+}
+
+export interface KPIGoalTemplateItem {
+  id: number
+  template_id: number
+  kpi_goal?: any
+}
+
+export interface ApplyTemplateRequest {
+  employee_ids: number[]
+  year: number
+  month: number
+}
+
+export interface ApplyTemplateResponse {
+  success: boolean
+  message: string
+  employees_updated: number
+  goals_created: number
+  errors: string[]
+}
+
+// ============ Bulk Operations Types ============
+
+export interface BulkAssignGoalsRequest {
+  employee_ids: number[]
+  goal_id: number
+  year: number
+  month: number
+  weight: number
+  target_value?: number
+}
+
+export interface BulkAssignGoalsResponse {
+  success: boolean
+  message: string
+  total_employees: number
+  assigned_count: number
+  skipped_count: number
+  error_count: number
+  details: Array<{
+    employee_id: number
+    employee_name: string
+    assignment_id?: number
+    status: 'assigned' | 'skipped' | 'error'
+    reason?: string
+  }>
+  errors: string[]
+}
+
+// ============ KPI Dashboard Types ============
+
+export interface KPIDashboardData {
+  overview: {
+    total_kpis: number
+    avg_kpi_percentage: number
+    total_bonuses: number
+    unique_employees: number
+    total_goals: number
+    active_goals: number
+  }
+  status_distribution: Array<{
+    status: string
+    count: number
+    percentage: number
+  }>
+  monthly_trends: Array<{
+    month: number
+    month_name: string
+    avg_kpi: number
+    employee_count: number
+    total_bonus: number
+  }>
+  top_employees: Array<{
+    employee_id: number
+    employee_name: string
+    avg_kpi: number
+    total_bonus: number
+    kpi_count: number
+  }>
+  filters: {
+    year: number
+    department_id: number | null
+  }
 }
 
 export const kpiApi = {
@@ -279,6 +410,69 @@ export const kpiApi = {
     }
   }> => {
     const { data } = await apiClient.post('kpi/recalculate-department', null, { params })
+    return data
+  },
+
+  // ============ KPI Goal Templates ============
+
+  listTemplates: async (params?: {
+    department_id?: number
+    is_active?: boolean
+  }): Promise<KPIGoalTemplate[]> => {
+    const { data } = await apiClient.get<KPIGoalTemplate[]>('kpi/templates', { params })
+    return data
+  },
+
+  getTemplate: async (templateId: number): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.get<KPIGoalTemplate>(`kpi/templates/${templateId}`)
+    return data
+  },
+
+  createTemplate: async (templateData: KPIGoalTemplateCreate): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.post<KPIGoalTemplate>('kpi/templates', templateData)
+    return data
+  },
+
+  updateTemplate: async (
+    templateId: number,
+    templateData: KPIGoalTemplateUpdate
+  ): Promise<KPIGoalTemplate> => {
+    const { data } = await apiClient.put<KPIGoalTemplate>(`kpi/templates/${templateId}`, templateData)
+    return data
+  },
+
+  deleteTemplate: async (templateId: number): Promise<void> => {
+    await apiClient.delete(`kpi/templates/${templateId}`)
+  },
+
+  applyTemplate: async (
+    templateId: number,
+    request: ApplyTemplateRequest
+  ): Promise<ApplyTemplateResponse> => {
+    const { data } = await apiClient.post<ApplyTemplateResponse>(
+      `kpi/templates/${templateId}/apply`,
+      request
+    )
+    return data
+  },
+
+  // ============ Bulk Operations ============
+
+  bulkAssignGoals: async (request: BulkAssignGoalsRequest): Promise<BulkAssignGoalsResponse> => {
+    const { data } = await apiClient.post<BulkAssignGoalsResponse>(
+      'kpi/employee-kpi-goals/bulk-assign',
+      request
+    )
+    return data
+  },
+
+  // ============ KPI Dashboard ============
+
+  getDashboardData: async (params: {
+    year: number
+    department_id?: number
+  }): Promise<KPIDashboardData> => {
+    const { data } = await apiClient.get<KPIDashboardData>('kpi/analytics/dashboard', { params })
     return data
   },
 }

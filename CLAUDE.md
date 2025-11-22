@@ -43,7 +43,9 @@ Frontend UI Hiding   ────┘
 | `CREDIT_PORTFOLIO` | Кредитный портфель | Финансовый портфель + FTP import |
 | `REVENUE_BUDGET` | Бюджет доходов | Планирование доходов + LTV метрики |
 | `PAYROLL_KPI` | KPI и бонусы | Система KPI для сотрудников |
+| `HR_DEPARTMENT` | Табель рабочего времени | Учет рабочих часов сотрудников |
 | `INTEGRATIONS_1C` | Интеграция с 1С | OData синхронизация |
+| `INVOICE_PROCESSING` | AI обработка счетов | OCR + GPT-4o для счетов |
 | `FOUNDER_DASHBOARD` | Дашборд учредителя | Executive dashboard |
 | `ADVANCED_ANALYTICS` | Расширенная аналитика | Продвинутые отчеты |
 | `MULTI_DEPARTMENT` | Мультиотдельность | Управление отделами |
@@ -113,13 +115,28 @@ GET /api/v1/modules/enabled/my
 cd backend
 python scripts/seed_modules.py
 
-# 2. Включить модуль для организации (через SQL)
+# 2. Включить модули через Web UI (рекомендуется)
+# Войдите как ADMIN → Перейдите в меню "Модули" (/module-settings)
+# Выберите организацию и включите нужные модули через UI
+
+# ИЛИ через SQL напрямую:
 INSERT INTO organization_modules (organization_id, module_id, is_active)
 SELECT 1, id, true FROM modules WHERE code = 'AI_FORECAST';
 
 # 3. Frontend автоматически скроет/покажет элементы
 # 4. Backend автоматически защитит API endpoints
 ```
+
+**⚠️ ВАЖНО**: Система модулей сейчас временно отключена для обратной совместимости. Все модули доступны всем пользователям. Настройки модулей будут применены после активации системы (раскомментировать код в `module_service.py` и `ModulesContext.tsx`).
+
+**Web UI для управления модулями**:
+- **Путь**: `/module-settings` (только ADMIN)
+- **Меню**: Администрирование → Модули
+- **Функции**:
+  - Просмотр всех доступных модулей
+  - Включение/выключение модулей для организаций
+  - Просмотр зависимостей и описаний
+  - По умолчанию включены: BUDGET_CORE (обязательный) и PAYROLL_KPI
 
 **Полная документация**: [docs/MODULES.md](docs/MODULES.md)
 
@@ -2789,6 +2806,559 @@ GET /api/v1/founder/dashboard/budget-execution
 
 ---
 
+## ⏱️ Timesheet Module - Табель учета рабочего времени
+
+### Обзор функционала
+
+**Timesheet Module** (HR_DEPARTMENT) - модуль для учета рабочего времени сотрудников с автоматическим расчетом и Excel экспортом.
+
+**Ключевые возможности:**
+- ✅ Табель учета времени по дням месяца
+- ✅ Автоматическая подсветка выходных и праздников РФ
+- ✅ Поддержка темной темы
+- ✅ Статусы: DRAFT, APPROVED, PAID
+- ✅ Excel экспорт/импорт табелей
+- ✅ Шаблоны для ручного заполнения
+- ✅ Аналитика по отделам
+- ✅ Учет сверхурочных и перерывов
+
+### Модели данных (2 основные)
+
+```python
+# 1. WorkTimesheet - Табель сотрудника за месяц
+class WorkTimesheet(Base):
+    __tablename__ = "work_timesheets"
+
+    id = Column(UUID, primary_key=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)  # 1-12
+    status = Column(Enum(TimesheetStatusEnum), default=TimesheetStatusEnum.DRAFT)
+
+    # Итоги
+    total_days_worked = Column(Integer, default=0)
+    total_hours_worked = Column(Numeric(10, 2), default=0)
+
+    # Утверждение
+    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    approved_at = Column(DateTime)
+
+    # Оплата
+    is_paid = Column(Boolean, default=False)
+    paid_at = Column(DateTime)
+
+# 2. DailyWorkRecord - Ежедневная запись
+class DailyWorkRecord(Base):
+    __tablename__ = "daily_work_records"
+
+    id = Column(UUID, primary_key=True)
+    timesheet_id = Column(UUID, ForeignKey("work_timesheets.id"), nullable=False)
+    work_date = Column(Date, nullable=False)
+    is_working_day = Column(Boolean, default=True)
+
+    # Часы
+    hours_worked = Column(Numeric(5, 2), nullable=False)
+    break_hours = Column(Numeric(5, 2), default=0)
+    overtime_hours = Column(Numeric(5, 2), default=0)
+
+    # Вычисляемое поле
+    @property
+    def net_hours_worked(self):
+        return self.hours_worked - (self.break_hours or Decimal("0")) + (self.overtime_hours or Decimal("0"))
+
+    notes = Column(Text)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+```
+
+### Статусы табеля (TimesheetStatusEnum)
+
+```python
+DRAFT = "DRAFT"          # 📝 Черновик - можно редактировать
+APPROVED = "APPROVED"    # ✅ Утвержден - только чтение
+PAID = "PAID"           # 💰 Оплачен - архив
+```
+
+### API Endpoints
+
+**Base path**: `/api/v1/timesheets`
+
+```bash
+# ============ WorkTimesheet CRUD ============
+
+# Получить список табелей (с фильтрами)
+GET    /api/v1/timesheets
+  ?year=2025
+  &month=11
+  &department_id=1
+  &employee_id=5
+  &status=DRAFT
+
+# Получить табель по ID
+GET    /api/v1/timesheets/{timesheet_id}
+
+# Создать табель
+POST   /api/v1/timesheets
+{
+  "employee_id": 5,
+  "year": 2025,
+  "month": 11
+}
+
+# Обновить табель
+PUT    /api/v1/timesheets/{timesheet_id}
+{
+  "status": "APPROVED"
+}
+
+# Утвердить табель (HR/MANAGER)
+POST   /api/v1/timesheets/{timesheet_id}/approve
+{
+  "notes": "Утверждено"
+}
+
+# Удалить табель
+DELETE /api/v1/timesheets/{timesheet_id}
+
+# ============ DailyWorkRecord CRUD ============
+
+# Получить записи табеля
+GET    /api/v1/timesheets/{timesheet_id}/records
+
+# Создать запись
+POST   /api/v1/timesheets/{timesheet_id}/records
+{
+  "work_date": "2025-11-15",
+  "hours_worked": 8,
+  "break_hours": 1,
+  "is_working_day": true
+}
+
+# Обновить запись
+PUT    /api/v1/timesheets/records/{record_id}
+{
+  "hours_worked": 7.5
+}
+
+# Удалить запись
+DELETE /api/v1/timesheets/records/{record_id}
+
+# Массовое создание/обновление
+POST   /api/v1/timesheets/records/bulk
+{
+  "timesheet_id": "uuid",
+  "records": [
+    {"work_date": "2025-11-01", "hours_worked": 8},
+    {"work_date": "2025-11-02", "hours_worked": 8}
+  ]
+}
+
+# ============ Grid View (Главная функция) ============
+
+# Получить табель в виде сетки (все сотрудники + все дни месяца)
+GET    /api/v1/timesheets/grid/{year}/{month}?department_id=1
+
+Response:
+{
+  "year": 2025,
+  "month": 11,
+  "department_id": 1,
+  "department_name": "IT Department",
+  "working_days_in_month": 20,
+  "calendar_days_in_month": 30,
+  "employees": [
+    {
+      "employee_id": 5,
+      "employee_full_name": "Иванов Иван Иванович",
+      "employee_position": "Разработчик",
+      "employee_number": "EMP-001",
+      "timesheet_id": "uuid",
+      "timesheet_status": "DRAFT",
+      "total_days_worked": 18,
+      "total_hours_worked": 144.0,
+      "can_edit": true,
+      "days": [
+        {
+          "date": "2025-11-01",
+          "day_of_week": 6,  // 6=Saturday
+          "is_working_day": false,
+          "hours_worked": 0,
+          "break_hours": null,
+          "overtime_hours": null,
+          "net_hours_worked": 0,
+          "notes": null,
+          "record_id": null
+        },
+        {
+          "date": "2025-11-04",
+          "day_of_week": 2,  // 2=Tuesday
+          "is_working_day": true,
+          "hours_worked": 8.0,
+          "break_hours": 1.0,
+          "overtime_hours": 0,
+          "net_hours_worked": 7.0,
+          "notes": null,
+          "record_id": "uuid"
+        }
+        // ... all 30 days
+      ]
+    }
+    // ... all employees
+  ]
+}
+
+# ============ Analytics ============
+
+# Сводная статистика
+GET    /api/v1/timesheets/analytics/summary
+  ?year=2025
+  &month=11
+  &department_id=1
+
+Response:
+{
+  "year": 2025,
+  "month": 11,
+  "department_id": 1,
+  "total_employees": 8,
+  "employees_with_timesheets": 8,
+  "total_days_worked": 160,
+  "total_hours_worked": 1280.0,
+  "average_hours_per_employee": 160.0,
+  "draft_count": 5,
+  "approved_count": 2,
+  "paid_count": 1
+}
+
+# ============ Excel Export/Import ============
+
+# Экспорт табеля в Excel
+GET    /api/v1/timesheets/export/excel
+  ?year=2025
+  &month=11
+  &department_id=1
+
+Returns: Excel file (timesheet_2025_11_Department.xlsx)
+
+# Скачать шаблон для заполнения
+GET    /api/v1/timesheets/export/template
+  ?year=2025
+  &month=11
+  &department_id=1
+  &language=ru  # ru или en
+
+Returns: Excel template with employee list
+```
+
+### Роли и доступ
+
+**HR Role** (NEW):
+- Полный доступ ко всем табелям всех отделов
+- Может утверждать табели
+- Может редактировать любые черновики
+
+**MANAGER Role**:
+- Доступ к табелям своего отдела
+- Может утверждать табели своего отдела
+
+**USER Role**:
+- Видит только свой отдел
+- Может редактировать только свои черновики
+
+**ADMIN/FOUNDER**:
+- Полный доступ ко всем табелям (read-only для FOUNDER)
+
+### Frontend компоненты
+
+**Страницы:**
+1. `TimesheetsGridPage.tsx` - Главная страница с календарной сеткой
+
+**Компоненты:**
+1. `TimesheetGrid.tsx` - Календарная сетка с:
+   - Все сотрудники по строкам
+   - Все дни месяца по колонкам
+   - Автоматическая подсветка выходных (красный)
+   - Подсветка отработанных дней (зеленый)
+   - Tooltips с названиями праздников
+   - Предупреждения о перенесенных рабочих днях
+   - Итоговая строка с суммами
+   - Sticky header и controls
+   - Поддержка темной темы
+
+**Утилиты:**
+- `frontend/src/utils/holidays.ts` - Российский календарь праздников
+  - Фиксированные праздники (Новый год, 23 февраля, 8 марта, и т.д.)
+  - Переносы выходных по годам (2024, 2025)
+  - Проверка выходных и праздников
+  - Определение перенесенных рабочих дней
+
+**Роут**: `/timesheets` (доступен для ролей: ADMIN, MANAGER, USER, HR)
+
+**Меню**: Раздел "Справочники" → "Табель"
+
+### Excel сервис
+
+**Файл**: `backend/app/services/timesheet_excel_service.py`
+
+**Функции:**
+
+1. **export_timesheet_grid()** - Экспорт заполненного табеля
+   - Все сотрудники с табельными номерами
+   - Дни месяца в колонках
+   - Подсветка выходных (красный фон)
+   - Подсветка отработанных дней (зеленый фон)
+   - Итоговые строки с суммами
+   - Freeze panes для удобной прокрутки
+
+2. **generate_timesheet_template()** - Генерация шаблона
+   - Список сотрудников
+   - Пустые ячейки для заполнения
+   - Подсветка выходных
+   - Инструкции по заполнению
+   - Многоязычность (RU/EN)
+
+### Workflow использования
+
+```
+1. СОЗДАНИЕ ТАБЕЛЯ
+   ↓
+   POST /api/v1/timesheets (employee_id, year, month)
+   Status = DRAFT
+
+2. ЗАПОЛНЕНИЕ ДАННЫХ
+   ↓
+   Option A: Через UI (TimesheetGrid)
+   - Inline editing (будущая функция)
+
+   Option B: Массовая загрузка
+   - POST /timesheets/records/bulk
+
+   Option C: Excel импорт (будущая функция)
+   - Скачать template
+   - Заполнить в Excel
+   - Загрузить обратно
+
+3. АВТОМАТИЧЕСКИЙ РАСЧЕТ
+   ↓
+   После каждого изменения:
+   - Пересчет total_days_worked
+   - Пересчет total_hours_worked
+   - Обновление timesheet
+
+4. УТВЕРЖДЕНИЕ (HR/MANAGER)
+   ↓
+   POST /timesheets/{id}/approve
+   Status = APPROVED
+   Can no longer edit
+
+5. ОПЛАТА (HR)
+   ↓
+   Update: is_paid = true
+   Status = PAID
+   Архив
+
+6. ЭКСПОРТ
+   ↓
+   GET /timesheets/export/excel
+   - Для отчетности
+   - Для передачи в бухгалтерию
+```
+
+### База данных
+
+**Таблицы:**
+- `work_timesheets` - Табели сотрудников
+- `daily_work_records` - Ежедневные записи
+
+**Индексы:**
+```sql
+CREATE INDEX idx_work_timesheets_employee_year_month
+ON work_timesheets(employee_id, year, month);
+
+CREATE INDEX idx_work_timesheets_department
+ON work_timesheets(department_id);
+
+CREATE INDEX idx_work_timesheets_status
+ON work_timesheets(status);
+
+CREATE INDEX idx_daily_work_records_timesheet
+ON daily_work_records(timesheet_id);
+
+CREATE INDEX idx_daily_work_records_date
+ON daily_work_records(work_date);
+
+-- Unique constraint: один табель на сотрудника/месяц
+CREATE UNIQUE INDEX idx_work_timesheets_unique
+ON work_timesheets(employee_id, year, month)
+WHERE is_active = true;
+```
+
+### Seed данные
+
+**Скрипт**: `backend/scripts/seed_timesheets.py`
+
+```bash
+# Создать тестовые табели
+cd backend
+python scripts/seed_timesheets.py 2025 11
+
+# Параметры:
+# - year: год (default: 2025)
+# - month: месяц (default: 11)
+
+# Создаст:
+# - Табели для всех активных сотрудников
+# - Записи только для рабочих дней (Пн-Пт)
+# - Случайные часы (7-9 часов/день)
+# - Случайные сверхурочные (10% вероятность)
+# - Смешанные статусы (больше DRAFT, меньше APPROVED)
+```
+
+### Типичные сценарии
+
+#### 1. Просмотр табеля отдела за месяц
+```bash
+# Frontend: Выбрать месяц и год в UI
+# API вызов:
+GET /api/v1/timesheets/grid/2025/11?department_id=1
+
+# Результат: Календарная сетка со всеми сотрудниками и днями
+```
+
+#### 2. Создание табеля для сотрудника
+```bash
+curl -X POST "http://localhost:8000/api/v1/timesheets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_id": 5,
+    "year": 2025,
+    "month": 11
+  }'
+```
+
+#### 3. Массовое заполнение табеля
+```bash
+curl -X POST "http://localhost:8000/api/v1/timesheets/records/bulk" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "timesheet_id": "uuid",
+    "records": [
+      {"work_date": "2025-11-01", "hours_worked": 8, "break_hours": 1},
+      {"work_date": "2025-11-02", "hours_worked": 8, "break_hours": 1},
+      ...
+    ]
+  }'
+```
+
+#### 4. Утверждение табеля
+```bash
+curl -X POST "http://localhost:8000/api/v1/timesheets/{id}/approve" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notes": "Табель проверен и утвержден"
+  }'
+```
+
+#### 5. Экспорт в Excel
+```bash
+# Через UI: кнопка "Экспорт в Excel"
+# API:
+curl -X GET "http://localhost:8000/api/v1/timesheets/export/excel?year=2025&month=11&department_id=1" \
+  -H "Authorization: Bearer $TOKEN" \
+  -o timesheet_2025_11.xlsx
+```
+
+### Интеграция с другими модулями
+
+**Payroll (Зарплата)**:
+```python
+# Табель используется для расчета зарплаты
+timesheet = db.query(WorkTimesheet).filter_by(
+    employee_id=employee_id,
+    year=year,
+    month=month,
+    status=TimesheetStatusEnum.APPROVED
+).first()
+
+# Расчет оплаты
+base_salary = employee.base_salary
+hourly_rate = base_salary / 160  # Среднее: 160 часов/месяц
+actual_pay = hourly_rate * float(timesheet.total_hours_worked)
+```
+
+**Employees (Сотрудники)**:
+- Табель создается для каждого активного сотрудника
+- При увольнении сотрудника его табели остаются в архиве
+
+**Departments (Отделы)**:
+- Табели группируются по отделам
+- Multi-tenancy через department_id
+
+### Российский календарь праздников
+
+**Утилита**: `frontend/src/utils/holidays.ts`
+
+**Функции:**
+```typescript
+// Проверка выходного/праздника
+isWeekendOrHoliday(year: number, month: number, day: number): boolean
+
+// Получить название праздника
+getHolidayName(year: number, month: number, day: number): string | null
+
+// Проверить перенесенный рабочий день
+isTransferredWorkday(year: number, month: number, day: number): boolean
+```
+
+**Фиксированные праздники:**
+- 1-8 января: Новогодние каникулы
+- 7 января: Рождество Христово
+- 23 февраля: День защитника Отечества
+- 8 марта: Международный женский день
+- 1 мая: Праздник Весны и Труда
+- 9 мая: День Победы
+- 12 июня: День России
+- 4 ноября: День народного единства
+
+**Переносы выходных:**
+- 2024: рабочие дни 27.04, 02.11, 28.12
+- 2025: рабочие дни 03.01, 02.05
+- Обновляются ежегодно по постановлению правительства
+
+### Performance
+
+**Оптимизации:**
+- Joinedload для связей (employee, department)
+- Index на (employee_id, year, month)
+- Lazy loading для daily_records (только при необходимости)
+- Batch operations для массового создания записей
+- Мемоизация в React компонентах (useMemo, useCallback)
+
+### Ключевые файлы
+
+**Backend:**
+- `backend/app/db/models.py` - WorkTimesheet, DailyWorkRecord models
+- `backend/app/api/v1/timesheets.py` - API endpoints (943 lines)
+- `backend/app/schemas/timesheet.py` - Pydantic schemas
+- `backend/app/services/timesheet_excel_service.py` - Excel export/import
+- `backend/scripts/seed_timesheets.py` - Test data seeder
+
+**Frontend:**
+- `frontend/src/pages/TimesheetsGridPage.tsx` - Main page
+- `frontend/src/components/timesheet/TimesheetGrid.tsx` - Grid component
+- `frontend/src/types/timesheet.ts` - TypeScript types
+- `frontend/src/api/timesheets.ts` - API client
+- `frontend/src/utils/holidays.ts` - Russian holiday calendar
+
+**Миграции:**
+- `backend/alembic/versions/2025_11_20_0734-*.py` - Add HR role
+- `backend/alembic/versions/2025_11_20_0838-*.py` - Add timesheet tables
+
+---
+
 ## 📝 Правила создания документации
 
 ### ⚠️ ВАЖНО: Документация только для новой функциональности
@@ -3013,10 +3583,15 @@ const scrollToColumn = useCallback((columnIndex: number) => {
 - **Achievement Tracking**: Track actual vs. target performance
 - **Performance Bonuses**: Calculate bonuses based on KPI achievement
 - **Monthly/Quarterly Tracking**: Support for different bonus periods
+- **Goal Templates** (NEW v0.9.0): Reusable templates with predefined goals and weights, bulk apply to employees
+- **Auto-create EmployeeKPI** (NEW v0.9.0): Automated monthly KPI creation via scheduler (1st of month, 00:01 MSK)
+- **Auto-sync with Payroll** (NEW v0.9.0): Automatic PayrollPlan sync on EmployeeKPI approval
+- **Bulk Operations** (NEW v0.9.0): Mass assign goals to multiple employees with single API call, validation & error handling
 
 ### Payroll Enhancements
 - **Bonus Types**: FIXED, PERFORMANCE_BASED, MIXED bonus types
 - **KPI Integration**: Link bonuses to KPI achievements
+- **Auto-sync from KPI** (NEW v0.9.0): Calculated bonuses automatically update PayrollPlan when KPI approved
 - **Analytics**: Breakdown of salary components (base, bonuses, etc.)
 
 ### Bank Transactions (v0.6.0) 🏦

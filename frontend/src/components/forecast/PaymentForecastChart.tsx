@@ -10,7 +10,6 @@ import {
   Typography,
   Spin,
   Alert,
-  Table,
   Tag,
 } from 'antd'
 import {
@@ -28,6 +27,7 @@ import dayjs, { Dayjs } from 'dayjs'
 import { analyticsApi, categoriesApi } from '@/api'
 import type { ForecastMethod } from '@/types'
 import { formatCurrency } from '@/utils/formatters'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 
 const { RangePicker } = DatePicker
 const { Title, Text } = Typography
@@ -332,7 +332,7 @@ const PaymentForecastChart: React.FC<PaymentForecastChartProps> = ({
       >
         {showComparison && (
           <Spin spinning={comparisonLoading}>
-            <Table
+            <ResponsiveTable
               dataSource={comparisonTableData}
               columns={comparisonColumns}
               pagination={false}
@@ -344,7 +344,7 @@ const PaymentForecastChart: React.FC<PaymentForecastChartProps> = ({
 
       {/* Detailed Forecast Table */}
       <Card title="Детальный прогноз" style={{ marginTop: 24 }}>
-        <Table
+        <ResponsiveTable
           dataSource={forecastData?.forecast || []}
           columns={[
             {

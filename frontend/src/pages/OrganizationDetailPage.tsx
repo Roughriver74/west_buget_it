@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Card, Descriptions, Table, Tag, Spin, Statistic, Row, Col, Button, Space, Typography, Divider } from 'antd'
+import { Card, Descriptions, Tag, Spin, Statistic, Row, Col, Button, Space, Typography, Divider } from 'antd'
 import { ArrowLeftOutlined, DollarOutlined, FileTextOutlined, EditOutlined, BankOutlined, IdcardOutlined } from '@ant-design/icons'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { organizationsApi, expensesApi } from '@/api'
 import { ExpenseStatus } from '@/types'
 import type { Expense } from '@/types'
@@ -20,15 +21,13 @@ const OrganizationDetailPage = () => {
   const { data: organization, isLoading: organizationLoading } = useQuery({
     queryKey: ['organization', organizationId],
     queryFn: () => organizationsApi.getOne(organizationId),
-    enabled: !!organizationId,
-  })
+    enabled: !!organizationId})
 
   // Fetch expenses for this organization
   const { data: expenses, isLoading: expensesLoading } = useQuery({
     queryKey: ['expenses', 'organization', organizationId],
     queryFn: () => expensesApi.getAll({ organization_id: organizationId, limit: 100 }),
-    enabled: !!organizationId,
-  })
+    enabled: !!organizationId})
 
   if (organizationLoading || expensesLoading) {
     return (
@@ -60,21 +59,18 @@ const OrganizationDetailPage = () => {
         <Link to={`/expenses`} style={{ color: '#1890ff' }}>
           {number}
         </Link>
-      ),
-    },
+      )},
     {
       title: 'Дата',
       dataIndex: 'request_date',
       key: 'request_date',
       width: 120,
-      render: (date: string) => dayjs(date).format('DD.MM.YYYY'),
-    },
+      render: (date: string) => dayjs(date).format('DD.MM.YYYY')},
     {
       title: 'Категория',
       dataIndex: ['category', 'name'],
       key: 'category',
-      width: 200,
-    },
+      width: 200},
     {
       title: 'Сумма',
       dataIndex: 'amount',
@@ -85,9 +81,7 @@ const OrganizationDetailPage = () => {
         new Intl.NumberFormat('ru-RU', {
           style: 'currency',
           currency: 'RUB',
-          minimumFractionDigits: 0,
-        }).format(amount),
-    },
+          minimumFractionDigits: 0}).format(amount)},
     {
       title: 'Статус',
       dataIndex: 'status',
@@ -97,8 +91,7 @@ const OrganizationDetailPage = () => {
         <Tag color={getExpenseStatusColor(status)}>
           {getExpenseStatusLabel(status)}
         </Tag>
-      ),
-    },
+      )},
     {
       title: 'Контрагент',
       dataIndex: ['contractor', 'name'],
@@ -112,14 +105,12 @@ const OrganizationDetailPage = () => {
           </Link>
         ) : (
           '-'
-        ),
-    },
+        )},
     {
       title: 'Комментарий',
       dataIndex: 'comment',
       key: 'comment',
-      ellipsis: true,
-    },
+      ellipsis: true},
     {
       title: 'Действия',
       key: 'actions',
@@ -136,8 +127,7 @@ const OrganizationDetailPage = () => {
         >
           Изменить
         </Button>
-      ),
-    },
+      )},
   ]
 
   const handleModalClose = () => {
@@ -219,8 +209,7 @@ const OrganizationDetailPage = () => {
                 new Intl.NumberFormat('ru-RU', {
                   style: 'currency',
                   currency: 'RUB',
-                  minimumFractionDigits: 0,
-                }).format(value as number)
+                  minimumFractionDigits: 0}).format(value as number)
               }
             />
           </Card>
@@ -246,8 +235,7 @@ const OrganizationDetailPage = () => {
                 new Intl.NumberFormat('ru-RU', {
                   style: 'currency',
                   currency: 'RUB',
-                  minimumFractionDigits: 0,
-                }).format(value as number)
+                  minimumFractionDigits: 0}).format(value as number)
               }
             />
           </Card>
@@ -255,12 +243,13 @@ const OrganizationDetailPage = () => {
       </Row>
 
       <Card title="Заявки">
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={expenses?.items}
           rowKey="id"
           pagination={{ pageSize: 20, showSizeChanger: true }}
           scroll={{ x: 1000 }}
+          mobileLayout="card"
         />
       </Card>
 

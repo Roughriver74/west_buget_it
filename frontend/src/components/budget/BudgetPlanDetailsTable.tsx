@@ -3,7 +3,8 @@
  * Editable table for monthly budget planning by category
  */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Table, InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag, theme } from 'antd'
+import { InputNumber, Button, Space, message, Typography, Segmented, Checkbox, Tag, theme, Table } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { SaveOutlined, UndoOutlined, DownOutlined, RightOutlined, LeftOutlined, CalendarOutlined, DownloadOutlined, AppstoreAddOutlined, PlusOutlined } from '@ant-design/icons'
 import { LoadBaselineModal } from './LoadBaselineModal'
 import { ManageCategoriesModal } from './ManageCategoriesModal'
@@ -25,12 +26,10 @@ const CONTROL_PANEL_HEIGHT = 100
 const currencyFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
-  maximumFractionDigits: 0,
-})
+  maximumFractionDigits: 0})
 
 const numberFormatter = new Intl.NumberFormat('ru-RU', {
-  maximumFractionDigits: 0,
-})
+  maximumFractionDigits: 0})
 
 const formatCurrency = (value: number) => currencyFormatter.format(Number.isFinite(value) ? value : 0)
 const formatNumber = (value: number) => numberFormatter.format(Number.isFinite(value) ? value : 0)
@@ -105,8 +104,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   isEditable,
   onAfterSave,
   onRiskPremiumChange,
-  payrollSummary,
-}, ref) => {
+  payrollSummary}, ref) => {
   const { data: planDetails = [], isLoading } = usePlanDetails(versionId)
   const createMutation = useCreatePlanDetail()
   const updateMutation = useUpdatePlanDetail()
@@ -150,8 +148,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
     if (!categories.length) {
       return {
         orderedCategories: [] as Array<Category & { level: number; hasChildren: boolean }>,
-        descendantsMap: new Map<number, number[]>(),
-      }
+        descendantsMap: new Map<number, number[]>()}
     }
 
     const byParent = new Map<number | null, Category[]>()
@@ -216,8 +213,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         categoryLevel: category.level,
         hasChildren: category.hasChildren,
         descendantIds: descendantsMap.get(category.id) ?? [],
-        parentId: category.parentId ?? null,
-      }
+        parentId: category.parentId ?? null}
 
       // Initialize all months with 0
       MONTHS.forEach((month) => {
@@ -284,8 +280,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       categoryLevel: 0,
       hasChildren: false,
       descendantIds: [],
-      parentId: null,
-    }
+      parentId: null}
 
     // Initialize all months to 0
     MONTHS.forEach((month) => {
@@ -335,8 +330,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
           }
           return {
             ...row,
-            [`month_${month}`]: Number(value ?? 0),
-          }
+            [`month_${month}`]: Number(value ?? 0)}
         }
         return row
       })
@@ -363,8 +357,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         category_id: categoryId,
         month,
         planned_amount: plannedAmount,
-        type: row.categoryType,
-      }
+        type: row.categoryType}
 
       if (detailId) {
         if (row.hasChildren) {
@@ -375,9 +368,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
           id: detailId,
           data: {
             planned_amount: plannedAmount,
-            type: row.categoryType,
-          },
-        })
+            type: row.categoryType}})
       } else {
         if (row.hasChildren && plannedAmount === 0) {
           return
@@ -400,16 +391,14 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         updateMutation.mutateAsync({ id: update.id, data: update.data }).catch((err) => ({
           error: err,
           type: 'update' as const,
-          id: update.id,
-        }))
+          id: update.id}))
       )
 
       const createPromises = creations.map((payload) =>
         createMutation.mutateAsync(payload).catch((err) => ({
           error: err,
           type: 'create' as const,
-          payload,
-        }))
+          payload}))
       )
 
       const results = await Promise.all([...updatePromises, ...createPromises])
@@ -569,8 +558,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
   React.useImperativeHandle(
     ref,
     () => ({
-      scrollBy,
-    }),
+      scrollBy}),
     [scrollBy]
   )
 
@@ -612,8 +600,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       {
         threshold: [0, 1],
         // Check when sentinel crosses the sticky threshold (64px from top)
-        rootMargin: '0px 0px 0px 0px',
-      }
+        rootMargin: '0px 0px 0px 0px'}
     )
 
     observer.observe(sentinel)
@@ -639,8 +626,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
               alignItems: 'center',
               paddingLeft: record.categoryLevel * 16,
               fontWeight: record.hasChildren ? 600 : undefined,
-              gap: 8,
-            }}
+              gap: 8}}
           >
             {record.hasChildren && (
               <span
@@ -664,8 +650,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
             </div>
           </div>
         )
-      },
-    },
+      }},
     ...MONTHS.map((month) => ({
       title: month.label,
       dataIndex: `month_${month.key}`,
@@ -674,11 +659,9 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       align: 'right' as const,
       className: activeMonth === month.key ? 'active-month-header' : undefined,
       onHeaderCell: () => ({
-        className: activeMonth === month.key ? 'active-month-header' : undefined,
-      }),
+        className: activeMonth === month.key ? 'active-month-header' : undefined}),
       onCell: () => ({
-        className: activeMonth === month.key ? 'active-month-cell' : undefined,
-      }),
+        className: activeMonth === month.key ? 'active-month-cell' : undefined}),
       render: (_value: number, record: CategoryRow) => {
         const displayValue = getMonthValue(record, month.key)
         const formatted = formatNumber(Number(displayValue ?? 0))
@@ -705,15 +688,13 @@ export const BudgetPlanDetailsTable = React.forwardRef<
             onChange={(val) => handleCellChange(record.categoryId, month.key, val)}
             style={{
               width: '100%',
-              backgroundColor: isChanged ? (mode === 'dark' ? 'rgba(250, 173, 20, 0.15)' : '#fff7e6') : undefined,
-            }}
+              backgroundColor: isChanged ? (mode === 'dark' ? 'rgba(250, 173, 20, 0.15)' : '#fff7e6') : undefined}}
             formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
             parser={(value) => Number((value || '').replace(/\s/g, ''))}
             min={0}
           />
         )
-      },
-    })),
+      }})),
     {
       title: 'Итого',
       key: 'total',
@@ -722,8 +703,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
       align: 'right' as const,
       render: (_, record) => (
         <Text strong>{formatCurrency(getRowTotal(record))}</Text>
-      ),
-    },
+      )},
   ]
 
   const summaryRow = (
@@ -755,8 +735,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         style={{
           height: 0,
           overflow: 'hidden',
-          pointerEvents: 'none',
-        }}
+          pointerEvents: 'none'}}
       />
 
       {/* Sticky Control Panel */}
@@ -771,8 +750,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
           marginTop: isSticky ? 0 : 60,
           marginBottom: isSticky ? 16 : 0,
           borderBottom: `2px solid ${token.colorBorderSecondary}`,
-          boxShadow: isSticky ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
-        }}
+          boxShadow: isSticky ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none'}}
       >
         <div
           style={{
@@ -781,8 +759,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
             alignItems: 'center',
             gap: 16,
             flexWrap: 'wrap',
-            marginBottom: 12,
-          }}
+            marginBottom: 12}}
         >
           <Space size="middle" align="center" wrap>
             <span style={{ fontWeight: 500 }}>Месяц:</span>
@@ -876,7 +853,7 @@ export const BudgetPlanDetailsTable = React.forwardRef<
         ref={scrollContainerRef}
         style={{ width: '100%', maxWidth: '100%', position: 'relative' }}
       >
-        <Table
+        <ResponsiveTable
           sticky={{ offsetHeader: STICKY_HEADER_OFFSET + CONTROL_PANEL_HEIGHT }}
           columns={columns}
           dataSource={visibleData}

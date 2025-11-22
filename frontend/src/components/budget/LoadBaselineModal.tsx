@@ -3,7 +3,8 @@
  * Allows loading previous year data into budget plan
  */
 import React, { useState, useMemo, useCallback } from 'react'
-import { Modal, Checkbox, Table, message, Button, Space, Typography, Alert, Spin } from 'antd'
+import { Modal, Checkbox, message, Button, Space, Typography, Alert, Spin } from 'antd'
+import { ResponsiveTable } from '@/components/common/ResponsiveTable'
 import { DownloadOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { calculatorApi, planDetailsApi } from '@/api/budgetPlanning'
@@ -37,8 +38,7 @@ interface CategoryWithBaseline extends Category {
 const currencyFormatter = new Intl.NumberFormat('ru-RU', {
   style: 'currency',
   currency: 'RUB',
-  maximumFractionDigits: 0,
-})
+  maximumFractionDigits: 0})
 
 export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
   open,
@@ -46,8 +46,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
   year,
   categories,
   onClose,
-  onSuccess,
-}) => {
+  onSuccess}) => {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<number>>(new Set())
   const [categoriesData, setCategoriesData] = useState<Map<number, CategoryWithBaseline>>(new Map())
   const [loadingBaseline, setLoadingBaseline] = useState(false)
@@ -100,8 +99,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
         try {
           updates.set(categoryId, {
             ...leafCategories.find(c => c.id === categoryId)!,
-            loading: true,
-          })
+            loading: true})
           setCategoriesData(new Map(updates))
 
           const baseline = await calculatorApi.getBaseline(categoryId, previousYear)
@@ -109,16 +107,14 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
           updates.set(categoryId, {
             ...leafCategories.find(c => c.id === categoryId)!,
             baseline,
-            loading: false,
-          })
+            loading: false})
           setCategoriesData(new Map(updates))
         } catch (error: any) {
           console.error(`Failed to load baseline for category ${categoryId}:`, error)
           updates.set(categoryId, {
             ...leafCategories.find(c => c.id === categoryId)!,
             loading: false,
-            error: error.response?.data?.detail || 'Ошибка загрузки',
-          })
+            error: error.response?.data?.detail || 'Ошибка загрузки'})
           setCategoriesData(new Map(updates))
         }
       })
@@ -163,8 +159,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
             planned_amount: Number(monthData.amount || 0),
             type: categoryData.type,
             calculation_method: CalculationMethod.MANUAL,
-            based_on_year: previousYear,
-          })
+            based_on_year: previousYear})
         })
       }
 
@@ -219,8 +214,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
             {categoryData?.baseline && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
           </Space>
         )
-      },
-    },
+      }},
     {
       title: `Сумма ${previousYear} г.`,
       key: 'total',
@@ -234,8 +228,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
           return <Text type="danger">Ошибка</Text>
         }
         return <Text strong>{currencyFormatter.format(Number(categoryData.baseline.total_amount || 0))}</Text>
-      },
-    },
+      }},
     {
       title: 'Средняя в месяц',
       key: 'avg',
@@ -246,8 +239,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
           return <Text type="secondary">—</Text>
         }
         return <Text>{currencyFormatter.format(Number(categoryData.baseline.monthly_avg || 0))}</Text>
-      },
-    },
+      }},
   ]
 
   const totalSelected = useMemo(() => {
@@ -305,7 +297,7 @@ export const LoadBaselineModal: React.FC<LoadBaselineModalProps> = ({
           showIcon
         />
 
-        <Table
+        <ResponsiveTable
           columns={columns}
           dataSource={leafCategories}
           rowKey="id"
