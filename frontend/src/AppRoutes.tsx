@@ -20,6 +20,7 @@ const FounderDashboardPage = lazy(() => import('./pages/FounderDashboardPage'))
 // Account
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const ModuleSettingsPage = lazy(() => import('./pages/ModuleSettingsPage'))
 
 // Lazy-loaded pages (code splitting by module)
 
@@ -118,6 +119,14 @@ const AppRoutes = () => {
                       <Route path="/dashboard/custom" element={<CustomDashboardPage />} />
                       <Route path="/profile" element={<ProfilePage />} />
                       <Route path="/settings" element={<SettingsPage />} />
+                      <Route
+                        path="/module-settings"
+                        element={
+                          <ProtectedRoute requiredRoles={['ADMIN']}>
+                            <ModuleSettingsPage />
+                          </ProtectedRoute>
+                        }
+                      />
 
                       {/* Founder dashboard - FOUNDER and ADMIN only */}
                       <Route

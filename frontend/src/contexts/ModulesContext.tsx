@@ -55,13 +55,9 @@ export const ModulesProvider: React.FC<ModulesProviderProps> = ({ children }) =>
   })
 
   // Helper: Check if module is enabled
-  // TEMPORARILY DISABLED: Module system is disabled - all modules return True
-  const hasModule = (_moduleCode: ModuleCode | string): boolean => {
-    // TEMPORARILY DISABLED: Always return true
-    return true
-    // Original code:
-    // if (!data?.modules) return false
-    // return data.modules.some((m) => m.code === moduleCode && !m.is_expired)
+  const hasModule = (moduleCode: ModuleCode | string): boolean => {
+    if (!data?.modules) return false
+    return data.modules.some((m) => m.code === moduleCode && !m.is_expired)
   }
 
   // Helper: Get module info

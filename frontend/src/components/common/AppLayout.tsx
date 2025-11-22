@@ -42,6 +42,7 @@ import {
 	ClockCircleOutlined,
 	MenuFoldOutlined,
 	MenuUnfoldOutlined,
+	AppstoreAddOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -520,6 +521,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 		user?.role === 'ADMIN'
 			? [
 					...baseMenuItems,
+					{
+						key: '/module-settings',
+						icon: <AppstoreAddOutlined />,
+						label: <Link to='/module-settings'>Модули</Link>,
+					},
 					{
 						key: '/departments',
 						icon: <BankOutlined />,
